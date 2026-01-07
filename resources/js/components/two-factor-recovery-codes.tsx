@@ -6,8 +6,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { regenerateRecoveryCodes } from '@/routes/two-factor';
-import { Form } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
 import { Eye, EyeOff, LockKeyhole, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AlertError from './alert-error';
@@ -18,6 +17,9 @@ interface TwoFactorRecoveryCodesProps {
     errors: string[];
 }
 
+// Hardcoded URL for regenerating recovery codes
+const REGENERATE_RECOVERY_CODES_URL = '/two-factor-recovery-codes';
+
 export default function TwoFactorRecoveryCodes({
     recoveryCodesList,
     fetchRecoveryCodes,
@@ -26,6 +28,9 @@ export default function TwoFactorRecoveryCodes({
     const [codesAreVisible, setCodesAreVisible] = useState<boolean>(false);
     const codesSectionRef = useRef<HTMLDivElement | null>(null);
     const canRegenerateCodes = recoveryCodesList.length > 0 && codesAreVisible;
+    
+    // Form for regenerating codes
+    const regenerateForm = useForm({});
 
     const toggleCodesVisibility = useCallback(async () => {
         if (!codesAreVisible && !recoveryCodesList.length) {
@@ -49,6 +54,16 @@ export default function TwoFactorRecoveryCodes({
             fetchRecoveryCodes();
         }
     }, [recoveryCodesList.length, fetchRecoveryCodes]);
+
+    const handleRegenerateCodes = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (confirm('Are you sure you want to generate new recovery codes? Your old codes will no longer work.')) {
+            regenerateForm.post(REGENERATE_RECOVERY_CODES_URL, {
+                preserveScroll: true,
+                onSuccess: fetchRecoveryCodes,
+            });
+        }
+    };
 
     const RecoveryCodeIconComponent = codesAreVisible ? EyeOff : Eye;
 
@@ -80,22 +95,16 @@ export default function TwoFactorRecoveryCodes({
                     </Button>
 
                     {canRegenerateCodes && (
-                        <Form
-                            {...regenerateRecoveryCodes.form()}
-                            options={{ preserveScroll: true }}
-                            onSuccess={fetchRecoveryCodes}
-                        >
-                            {({ processing }) => (
-                                <Button
-                                    variant="secondary"
-                                    type="submit"
-                                    disabled={processing}
-                                    aria-describedby="regenerate-warning"
-                                >
-                                    <RefreshCw /> Regenerate Codes
-                                </Button>
-                            )}
-                        </Form>
+                        <form onSubmit={handleRegenerateCodes}>
+                            <Button
+                                variant="secondary"
+                                type="submit"
+                                disabled={regenerateForm.processing}
+                                aria-describedby="regenerate-warning"
+                            >
+                                <RefreshCw className="mr-2 h-4 w-4" /> Regenerate Codes
+                            </Button>
+                        </form>
                     )}
                 </div>
                 <div

@@ -1,34 +1,36 @@
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { cn, isSameUrl, resolveUrl } from '@/lib/utils';
-import { edit as editAppearance } from '@/routes/appearance';
-import { edit } from '@/routes/profile';
-import { show } from '@/routes/two-factor';
-import { edit as editPassword } from '@/routes/user-password';
+import { cn, isSameUrl } from '@/lib/utils';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 
+// Hardcoded URLs - update these to match your actual routes
+const PROFILE_EDIT_URL = '/adminsettings/profile';
+const PASSWORD_EDIT_URL = '/adminsettings/password';
+const TWO_FACTOR_SHOW_URL = '/adminsettings/two-factor-authentication';
+const APPEARANCE_EDIT_URL = '/adminsettings/appearance';
+
 const sidebarNavItems: NavItem[] = [
     {
         title: 'Profile',
-        href: edit(),
+        href: PROFILE_EDIT_URL,
         icon: null,
     },
     {
         title: 'Password',
-        href: editPassword(),
+        href: PASSWORD_EDIT_URL,
         icon: null,
     },
     {
         title: 'Two-Factor Auth',
-        href: show(),
+        href: TWO_FACTOR_SHOW_URL,
         icon: null,
     },
     {
         title: 'Appearance',
-        href: editAppearance(),
+        href: APPEARANCE_EDIT_URL,
         icon: null,
     },
 ];
@@ -53,7 +55,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     <nav className="flex flex-col space-y-1 space-x-0">
                         {sidebarNavItems.map((item, index) => (
                             <Button
-                                key={`${resolveUrl(item.href)}-${index}`}
+                                key={`${item.href}-${index}`}
                                 size="sm"
                                 variant="ghost"
                                 asChild

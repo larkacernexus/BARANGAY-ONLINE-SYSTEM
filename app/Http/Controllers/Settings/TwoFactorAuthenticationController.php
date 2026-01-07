@@ -34,4 +34,5 @@ class TwoFactorAuthenticationController extends Controller implements HasMiddlew
             'requiresConfirmation' => Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm'),
         ]);
     }
+    
 }

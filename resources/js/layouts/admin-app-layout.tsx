@@ -5,10 +5,12 @@ import MobileStickyFooter from '@/layouts/mobile-sticky-footer';
 
 interface AppLayoutProps {
     children: ReactNode;
+    title?: string;
     breadcrumbs?: BreadcrumbItem[];
+    className?: string;
 }
 
-export default ({ children, breadcrumbs, ...props }: AppLayoutProps) => {
+export default ({ children, breadcrumbs, className = '', ...props }: AppLayoutProps) => {
     // Update mobile footer items to use only icon names that exist in iconMap
     const mobileFooterItems = [
         { 
@@ -18,19 +20,19 @@ export default ({ children, breadcrumbs, ...props }: AppLayoutProps) => {
             activePaths: ['/dashboard', '/']
         },
         { 
-            icon: 'search', // Use 'search' instead of 'users'
+            icon: 'search',
             label: 'Residents', 
             href: '/residents',
             activePaths: ['/residents', '/residents/create', '/residents/edit']
         },
         { 
-            icon: 'user', // Use 'user' instead of 'home' for households
+            icon: 'user',
             label: 'Households', 
             href: '/households',
             activePaths: ['/households', '/households/create', '/households/edit']
         },
         { 
-            icon: 'bell', // Use 'bell' instead of 'credit-card'
+            icon: 'bell',
             label: 'Payments', 
             href: '/payments',
             activePaths: ['/payments', '/payments/create']
@@ -48,9 +50,22 @@ export default ({ children, breadcrumbs, ...props }: AppLayoutProps) => {
             {/* Use a flex container for sidebar + main content */}
             <div className="flex flex-1 overflow-hidden">
                 <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
-                    {/* Ensure children don't cause overflow */}
-                    <div className="h-full overflow-y-auto">
-                        {children}
+                    {/* Main content container with consistent spacing */}
+                    <div className={`h-full overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 ${className}`}>
+                        {/* Breadcrumb spacing */}
+                        {breadcrumbs && breadcrumbs.length > 0 && (
+                            <div className="mb-6">
+                                {/* Breadcrumbs will be rendered by AppLayoutTemplate */}
+                            </div>
+                        )}
+                        
+                        {/* Main content with proper margins */}
+                        <main className="max-w-full mx-auto">
+                            {/* Add spacing wrapper around children */}
+                            <div className="space-y-6">
+                                {children}
+                            </div>
+                        </main>
                     </div>
                 </AppLayoutTemplate>
             </div>

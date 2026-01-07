@@ -4,47 +4,64 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
-import { store } from '@/routes/password/confirm';
-import { Form, Head } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
+
+// Hardcoded URL for RESIDENT password confirmation
+const RESIDENT_CONFIRM_PASSWORD_URL = '/resident/confirm-password';
 
 export default function ConfirmPassword() {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        password: '',
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        post(RESIDENT_CONFIRM_PASSWORD_URL, {
+            preserveScroll: true,
+            onSuccess: () => {
+                reset('password');
+            },
+        });
+    };
+
     return (
         <AuthLayout
             title="Confirm your password"
-            description="This is a secure area of the application. Please confirm your password before continuing."
+            description="This is a secure area of the resident portal. Please confirm your password before continuing."
         >
-            <Head title="Confirm password" />
+            <Head title="Confirm password - Resident" />
 
-            <Form {...store.form()} resetOnSuccess={['password']}>
-                {({ processing, errors }) => (
-                    <div className="space-y-6">
-                        <div className="grid gap-2">
-                            <Label htmlFor="password">Password</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                name="password"
-                                placeholder="Password"
-                                autoComplete="current-password"
-                                autoFocus
-                            />
+            <form onSubmit={handleSubmit}>
+                <div className="space-y-6">
+                    <div className="grid gap-2">
+                        <Label htmlFor="password">Password</Label>
+                        <Input
+                            id="password"
+                            type="password"
+                            name="password"
+                            value={data.password}
+                            onChange={(e) => setData('password', e.target.value)}
+                            placeholder="Enter your resident password"
+                            autoComplete="current-password"
+                            autoFocus
+                        />
 
-                            <InputError message={errors.password} />
-                        </div>
-
-                        <div className="flex items-center">
-                            <Button
-                                className="w-full"
-                                disabled={processing}
-                                data-test="confirm-password-button"
-                            >
-                                {processing && <Spinner />}
-                                Confirm password
-                            </Button>
-                        </div>
+                        <InputError message={errors.password} />
                     </div>
-                )}
-            </Form>
+
+                    <div className="flex items-center">
+                        <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={processing}
+                            data-test="confirm-password-button"
+                        >
+                            {processing && <Spinner />}
+                            Confirm password
+                        </Button>
+                    </div>
+                </div>
+            </form>
         </AuthLayout>
     );
 }

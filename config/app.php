@@ -67,6 +67,9 @@ return [
 
     'timezone' => 'UTC',
 
+    'max_file_size' => 10, // MB
+    'allowed_file_types' => ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'],
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

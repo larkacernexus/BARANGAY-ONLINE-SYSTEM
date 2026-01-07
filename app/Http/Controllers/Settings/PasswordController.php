@@ -35,4 +35,10 @@ class PasswordController extends Controller
 
         return back();
     }
+
+     public function editresident(): Response
+    {
+        return Inertia::render('residentsettings/password');
+    }
+
 }

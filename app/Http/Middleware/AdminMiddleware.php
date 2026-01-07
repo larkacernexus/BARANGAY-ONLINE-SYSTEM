@@ -15,7 +15,7 @@ class AdminMiddleware
         }
 
         // STRING ROLE
-      if (auth()->user()->role_as !== 'admin') {
+      if (auth()->user()->role_id !== 1) {
                 abort(403, 'Admins only.');
             }
         // NUMERIC ROLE (example)

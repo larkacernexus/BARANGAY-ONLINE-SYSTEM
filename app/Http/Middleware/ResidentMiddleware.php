@@ -15,7 +15,7 @@ class ResidentMiddleware
         }
 
         // STRING ROLE
-        if (auth()->user()->role !== 'resident') {
+      if (auth()->user()->role_id !== 8) {
             abort(403, 'Unauthorized');
         }
 

@@ -6,12 +6,15 @@ import { type BreadcrumbItem } from '@/types';
 
 import AppLayout from '@/layouts/admin-app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { edit as editAppearance } from '@/routes/appearance';
+
+// Hardcoded URL for appearance settings
+const APPEARANCE_EDIT_URL = '/settings/appearance'; // For admin
+// OR for resident: const RESIDENT_APPEARANCE_EDIT_URL = '/residentsettings/appearance';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Appearance settings',
-        href: editAppearance().url,
+        href: APPEARANCE_EDIT_URL,
     },
 ];
 

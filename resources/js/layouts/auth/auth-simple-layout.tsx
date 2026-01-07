@@ -1,26 +1,28 @@
 import AppLogoIcon from '@/components/app-logo-icon';
-import { home } from '@/routes';
 import { Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 
-interface AuthLayoutProps {
+interface ResidentAuthLayoutProps {
     name?: string;
     title?: string;
     description?: string;
 }
 
-export default function AuthSimpleLayout({
+// Hardcoded URL for resident home page
+const RESIDENT_HOME_URL = '/resident/dashboard';
+
+export default function ResidentAuthSimpleLayout({
     children,
     title,
     description,
-}: PropsWithChildren<AuthLayoutProps>) {
+}: PropsWithChildren<ResidentAuthLayoutProps>) {
     return (
         <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
             <div className="w-full max-w-sm">
                 <div className="flex flex-col gap-8">
                     <div className="flex flex-col items-center gap-4">
                         <Link
-                            href={home()}
+                            href={RESIDENT_HOME_URL}
                             className="flex flex-col items-center gap-2 font-medium"
                         >
                             <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-md">

@@ -5,29 +5,31 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useTwoFactorAuth } from '@/hooks/use-two-factor-auth';
 import AppLayout from '@/layouts/admin-app-layout';
-import SettingsLayout from '@/layouts/settings/layout';
-import { disable, enable, show } from '@/routes/two-factor';
+import ResidentSettingsLayout from '@/layouts/settings/layout'; // Use resident layout
 import { type BreadcrumbItem } from '@/types';
-import { Form, Head } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import { ShieldBan, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
-interface TwoFactorProps {
+interface ResidentTwoFactorProps {
     requiresConfirmation?: boolean;
     twoFactorEnabled?: boolean;
 }
 
+// Hardcoded URLs for RESIDENT two-factor authentication
+const RESIDENT_TWO_FACTOR_URL = '/resident/settings/security';
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Two-Factor Authentication',
-        href: show.url(),
+        href: RESIDENT_TWO_FACTOR_URL,
     },
 ];
 
-export default function TwoFactor({
+export default function ResidentTwoFactor({
     requiresConfirmation = false,
     twoFactorEnabled = false,
-}: TwoFactorProps) {
+}: ResidentTwoFactorProps) {
     const {
         qrCodeSvg,
         hasSetupData,
@@ -38,25 +40,46 @@ export default function TwoFactor({
         fetchRecoveryCodes,
         errors,
     } = useTwoFactorAuth();
+    
     const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
+    
+    const enableForm = useForm({});
+    const disableForm = useForm({});
+
+    const handleEnableSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        enableForm.post(RESIDENT_TWO_FACTOR_URL, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowSetupModal(true);
+            },
+        });
+    };
+
+    const handleDisableSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (confirm('Are you sure you want to disable two-factor authentication?')) {
+            disableForm.delete(RESIDENT_TWO_FACTOR_URL, {
+                preserveScroll: true,
+            });
+        }
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Two-Factor Authentication" />
-            <SettingsLayout>
+            <Head title="Resident Two-Factor Authentication" />
+            {/* Use ResidentSettingsLayout for resident pages */}
+            <ResidentSettingsLayout>
                 <div className="space-y-6">
                     <HeadingSmall
                         title="Two-Factor Authentication"
-                        description="Manage your two-factor authentication settings"
+                        description="Secure your resident account with two-factor authentication"
                     />
                     {twoFactorEnabled ? (
                         <div className="flex flex-col items-start justify-start space-y-4">
                             <Badge variant="default">Enabled</Badge>
                             <p className="text-muted-foreground">
-                                With two-factor authentication enabled, you will
-                                be prompted for a secure, random pin during
-                                login, which you can retrieve from the
-                                TOTP-supported application on your phone.
+                                Your resident account is protected with two-factor authentication.
                             </p>
 
                             <TwoFactorRecoveryCodes
@@ -66,27 +89,22 @@ export default function TwoFactor({
                             />
 
                             <div className="relative inline">
-                                <Form {...disable.form()}>
-                                    {({ processing }) => (
-                                        <Button
-                                            variant="destructive"
-                                            type="submit"
-                                            disabled={processing}
-                                        >
-                                            <ShieldBan /> Disable 2FA
-                                        </Button>
-                                    )}
-                                </Form>
+                                <form onSubmit={handleDisableSubmit}>
+                                    <Button
+                                        variant="destructive"
+                                        type="submit"
+                                        disabled={disableForm.processing}
+                                    >
+                                        <ShieldBan className="mr-2 h-4 w-4" /> Disable 2FA
+                                    </Button>
+                                </form>
                             </div>
                         </div>
                     ) : (
                         <div className="flex flex-col items-start justify-start space-y-4">
                             <Badge variant="destructive">Disabled</Badge>
                             <p className="text-muted-foreground">
-                                When you enable two-factor authentication, you
-                                will be prompted for a secure pin during login.
-                                This pin can be retrieved from a TOTP-supported
-                                application on your phone.
+                                Add an extra layer of security to your resident account.
                             </p>
 
                             <div>
@@ -94,26 +112,19 @@ export default function TwoFactor({
                                     <Button
                                         onClick={() => setShowSetupModal(true)}
                                     >
-                                        <ShieldCheck />
+                                        <ShieldCheck className="mr-2 h-4 w-4" />
                                         Continue Setup
                                     </Button>
                                 ) : (
-                                    <Form
-                                        {...enable.form()}
-                                        onSuccess={() =>
-                                            setShowSetupModal(true)
-                                        }
-                                    >
-                                        {({ processing }) => (
-                                            <Button
-                                                type="submit"
-                                                disabled={processing}
-                                            >
-                                                <ShieldCheck />
-                                                Enable 2FA
-                                            </Button>
-                                        )}
-                                    </Form>
+                                    <form onSubmit={handleEnableSubmit}>
+                                        <Button
+                                            type="submit"
+                                            disabled={enableForm.processing}
+                                        >
+                                            <ShieldCheck className="mr-2 h-4 w-4" />
+                                            Enable 2FA
+                                        </Button>
+                                    </form>
                                 )}
                             </div>
                         </div>
@@ -131,7 +142,7 @@ export default function TwoFactor({
                         errors={errors}
                     />
                 </div>
-            </SettingsLayout>
+            </ResidentSettingsLayout>
         </AppLayout>
     );
 }

@@ -6,22 +6,58 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
-import { logout } from '@/routes';
-import { edit } from '@/routes/profile';
 import { type User } from '@/types';
-import { Link, router } from '@inertiajs/react';
 import { LogOut, Settings } from 'lucide-react';
+import React from 'react';
+import { router } from '@inertiajs/react';
 
-interface UserMenuContentProps {
-    user: User;
+// Declare type for Inertia Link component
+interface InertiaLinkProps {
+    href: string;
+    children: React.ReactNode;
+    prefetch?: boolean;
+    onClick?: () => void;
+    className?: string;
 }
 
-export function UserMenuContent({ user }: UserMenuContentProps) {
-    const cleanup = useMobileNavigation();
+// Define the props interface
+interface UserMenuContentProps {
+    user: User;
+    Link?: React.ComponentType<InertiaLinkProps>;
+}
 
-    const handleLogout = () => {
+export function UserMenuContent({ user, Link }: UserMenuContentProps) {
+    const cleanup = useMobileNavigation();
+    
+    // Hardcoded URLs - replace with your actual URLs
+    const LOGOUT_URL = '/logout';
+    const PROFILE_EDIT_URL = '/adminsettings/profile'; // Change this to your actual profile edit URL
+    
+    console.log('Logout URL:', LOGOUT_URL);
+    console.log('Profile edit URL:', PROFILE_EDIT_URL);
+    
+    // Default fallback components
+    const DefaultLink = ({ href, children, ...props }: InertiaLinkProps) => (
+        <a href={href} {...props}>{children}</a>
+    );
+    
+    const LinkComponent = Link || DefaultLink;
+
+    const handleLogout = (e: React.MouseEvent) => {
+        e.preventDefault();
         cleanup();
-        router.flushAll();
+        
+        // Use Inertia's router.post() method
+        // This automatically includes CSRF token and handles SPA navigation
+        router.post(LOGOUT_URL);
+    };
+
+    const handleSettingsClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        cleanup();
+        
+        // Navigate to profile edit page
+        router.get(PROFILE_EDIT_URL);
     };
 
     return (
@@ -34,30 +70,28 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
                 <DropdownMenuItem asChild>
-                    <Link
-                        className="block w-full"
-                        href={edit()}
-                        as="button"
-                        prefetch
-                        onClick={cleanup}
+                    <LinkComponent
+                        className="block w-full cursor-pointer"
+                        href={PROFILE_EDIT_URL}
+                        prefetch={true}
+                        onClick={handleSettingsClick}
                     >
-                        <Settings className="mr-2" />
+                        <Settings className="mr-2 h-4 w-4" />
                         Settings
-                    </Link>
+                    </LinkComponent>
                 </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-                <Link
-                    className="block w-full"
-                    href={logout()}
-                    as="button"
+                <button
                     onClick={handleLogout}
+                    className="flex w-full items-center cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
                     data-test="logout-button"
+                    type="button"
                 >
-                    <LogOut className="mr-2" />
+                    <LogOut className="mr-2 h-4 w-4" />
                     Log out
-                </Link>
+                </button>
             </DropdownMenuItem>
         </>
     );
