@@ -11,6 +11,7 @@ class PaymentItem extends Model
 
     protected $fillable = [
         'payment_id',
+        'clearance_request_id', 
         'fee_id',
         'fee_name',
         'fee_code',
@@ -32,9 +33,13 @@ class PaymentItem extends Model
         'total_amount' => 'decimal:2',
         'months_late' => 'integer',
         'fee_metadata' => 'array',
+        'clearance_request_id' => 'integer',
     ];
 
-    // Relationships
+    /* =====================
+     |  Relationships
+     ===================== */
+
     public function payment()
     {
         return $this->belongsTo(Payment::class);
@@ -45,7 +50,15 @@ class PaymentItem extends Model
         return $this->belongsTo(Fee::class);
     }
 
-    // Helper methods
+    public function clearanceRequest()
+    {
+        return $this->belongsTo(ClearanceRequest::class);
+    }
+
+    /* =====================
+     |  Accessors
+     ===================== */
+
     public function getFormattedBaseAmountAttribute()
     {
         return '₱' . number_format($this->base_amount, 2);
@@ -66,6 +79,10 @@ class PaymentItem extends Model
         return '₱' . number_format($this->total_amount, 2);
     }
 
+    /* =====================
+     |  Helpers
+     ===================== */
+
     public function hasLatePayment()
     {
         return $this->surcharge > 0 || $this->penalty > 0;
@@ -73,12 +90,12 @@ class PaymentItem extends Model
 
     public function getLatePaymentDetails()
     {
-        if (!$this->hasLatePayment()) {
+        if (! $this->hasLatePayment()) {
             return null;
         }
 
         $details = [];
-        
+
         if ($this->surcharge > 0) {
             $details['surcharge'] = [
                 'amount' => $this->surcharge,

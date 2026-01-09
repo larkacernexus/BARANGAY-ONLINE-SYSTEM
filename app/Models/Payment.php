@@ -32,7 +32,7 @@ class Payment extends Model
         'purpose',
         'remarks',
         'is_cleared',
-        'certificate_type',
+        'clearance_type', // Changed from certificate_type
         'validity_date',
         'collection_type',
         'status',
@@ -62,12 +62,13 @@ class Payment extends Model
         'payment_method_display',
         'status_display',
         'collection_type_display',
-        'certificate_type_display',
+        'clearance_type_display', // Changed from certificate_type_display
         'is_cleared_display',
         'has_surcharge',
         'has_penalty',
         'has_discount',
         'payer_details',
+        'is_clearance_payment', // New attribute
     ];
 
     protected $attributes = [
@@ -94,6 +95,11 @@ class Payment extends Model
     public function recorder()
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function clearanceRequest()
+    {
+        return $this->belongsTo(ClearanceRequest::class, 'clearance_request_id');
     }
 
     // Accessors
@@ -157,22 +163,92 @@ class Payment extends Model
         return $types[$this->collection_type] ?? ucfirst($this->collection_type);
     }
 
-    public function getCertificateTypeDisplayAttribute()
+    public function getClearanceTypeDisplayAttribute() // Changed from getCertificateTypeDisplayAttribute
     {
-        if (!$this->certificate_type) {
+        if (!$this->clearance_type) {
             return null;
         }
 
+        // Common clearance types with display names
         $types = [
-            'residency' => 'Certificate of Residency',
-            'indigency' => 'Certificate of Indigency',
+            // Barangay Clearances
+            'BRGY_CLEARANCE' => 'Barangay Clearance',
+            'BARANGAY_CLEARANCE' => 'Barangay Clearance',
             'clearance' => 'Barangay Clearance',
-            'cedula' => 'Cedula',
-            'business' => 'Business Permit',
+            
+            // Business Clearances
+            'BUSINESS_CLEARANCE' => 'Business Clearance',
+            'BUSINESS_PERMIT' => 'Business Permit',
+            
+            // Police/NBI Clearances
+            'POLICE_CLEARANCE' => 'Police Clearance Endorsement',
+            'NBI_CLEARANCE' => 'NBI Clearance Endorsement',
+            'NBI_CLEARANCE_ENDORSEMENT' => 'NBI Clearance Endorsement',
+            
+            // Certificates
+            'INDIGENCY_CERT' => 'Certificate of Indigency',
+            'INDIGENCY_CERTIFICATE' => 'Certificate of Indigency',
+            'RESIDENCY_CERT' => 'Certificate of Residency',
+            'RESIDENCY_CERTIFICATE' => 'Certificate of Residency',
+            'GOOD_MORAL_CERT' => 'Good Moral Character Certificate',
+            
+            // Travel
+            'TRAVEL_CLEARANCE' => 'Travel Clearance',
+            
+            // Employment
+            'EMPLOYMENT_CLEARANCE' => 'Employment Clearance',
+            'SCHOLARSHIP_CLEARANCE' => 'Scholarship Clearance',
+            
+            // Other
+            'CEDULA' => 'Cedula',
+            'OTHER' => 'Other Certificate',
             'other' => 'Other Certificate',
         ];
 
-        return $types[$this->certificate_type] ?? ucfirst($this->certificate_type);
+        // First check for exact match
+        if (isset($types[$this->clearance_type])) {
+            return $types[$this->clearance_type];
+        }
+        
+        // Check for case-insensitive match
+        $lowercaseType = strtolower($this->clearance_type);
+        foreach ($types as $key => $value) {
+            if (strtolower($key) === $lowercaseType) {
+                return $value;
+            }
+        }
+        
+        // If no match, try to find partial matches
+        if (str_contains(strtolower($this->clearance_type), 'indigen')) {
+            return 'Certificate of Indigency';
+        }
+        if (str_contains(strtolower($this->clearance_type), 'residen')) {
+            return 'Certificate of Residency';
+        }
+        if (str_contains(strtolower($this->clearance_type), 'business')) {
+            return 'Business Clearance';
+        }
+        if (str_contains(strtolower($this->clearance_type), 'nbi')) {
+            return 'NBI Clearance Endorsement';
+        }
+        if (str_contains(strtolower($this->clearance_type), 'police')) {
+            return 'Police Clearance Endorsement';
+        }
+        if (str_contains(strtolower($this->clearance_type), 'travel')) {
+            return 'Travel Clearance';
+        }
+        if (str_contains(strtolower($this->clearance_type), 'employ')) {
+            return 'Employment Clearance';
+        }
+        if (str_contains(strtolower($this->clearance_type), 'scholarship')) {
+            return 'Scholarship Clearance';
+        }
+        if (str_contains(strtolower($this->clearance_type), 'good moral')) {
+            return 'Good Moral Character Certificate';
+        }
+        
+        // Default: return the original value with proper casing
+        return ucwords(str_replace('_', ' ', $this->clearance_type));
     }
 
     public function getIsClearedDisplayAttribute()
@@ -246,6 +322,11 @@ class Payment extends Model
         return null;
     }
 
+    public function getIsClearancePaymentAttribute()
+    {
+        return !empty($this->clearance_type) || !empty($this->clearance_request_id);
+    }
+
     // Scopes
     public function scopeCompleted($query)
     {
@@ -284,6 +365,22 @@ class Payment extends Model
         return $query->with(['resident.household', 'household.members']);
     }
 
+    public function scopeClearancePayments($query)
+    {
+        return $query->whereNotNull('clearance_type')
+                    ->orWhereNotNull('clearance_request_id');
+    }
+
+    public function scopeByClearanceType($query, $clearanceType)
+    {
+        return $query->where('clearance_type', $clearanceType);
+    }
+
+    public function scopeWithClearanceRequest($query)
+    {
+        return $query->with('clearanceRequest.clearanceType');
+    }
+
     // Static methods
     public static function generateOrNumber()
     {
@@ -301,8 +398,31 @@ class Payment extends Model
 
         return "BAR-{$date}-{$newNumber}";
     }
-    public function clearanceRequest()
+
+    // Helper methods
+    public function isClearancePayment()
+    {
+        return $this->is_clearance_payment;
+    }
+
+    public function getClearanceTypeName()
+    {
+        return $this->clearance_type_display;
+    }
+
+    public function linkToClearanceRequest(ClearanceRequest $clearanceRequest)
+    {
+        $this->clearance_request_id = $clearanceRequest->id;
+        $this->clearance_type = $clearanceRequest->clearanceType->code ?? $clearanceRequest->clearance_type;
+        $this->save();
+        
+        return $this;
+    }
+
+
+public function clearanceType()
 {
-    return $this->belongsTo(ClearanceRequest::class);
+    return $this->belongsTo(ClearanceType::class, 'clearance_type_id');
 }
+    
 }

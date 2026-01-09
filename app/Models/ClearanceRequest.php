@@ -110,6 +110,10 @@ class ClearanceRequest extends Model
         return $this->hasOne(Payment::class);
     }
 
+    public function payments(): HasMany
+{
+    return $this->hasMany(Payment::class, 'clearance_request_id');
+}
     public function requestedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by_user_id');

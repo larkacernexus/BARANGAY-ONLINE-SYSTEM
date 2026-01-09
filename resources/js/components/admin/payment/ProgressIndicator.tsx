@@ -1,3 +1,5 @@
+// resources/js/components/admin/payment/ProgressIndicator.tsx
+import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -22,13 +24,9 @@ export function ProgressIndicator({ step, onStepClick }: ProgressIndicatorProps)
     ];
 
     const isStepClickable = (stepNumber: number) => {
-        // Steps are clickable only when:
-        // 1. In step 3, all steps are clickable
-        // 2. In step 2, only steps 1 and 2 are clickable
-        // 3. In step 1, only step 1 is clickable
-        if (step >= 3) return true; // In step 3, all steps are clickable
-        if (step === 2) return stepNumber <= 2; // In step 2, only steps 1 and 2
-        return stepNumber === 1; // In step 1, only step 1
+        if (step >= 3) return true;
+        if (step === 2) return stepNumber <= 2;
+        return stepNumber === 1;
     };
 
     const handleStepClick = (stepNumber: number) => {
@@ -65,14 +63,14 @@ export function ProgressIndicator({ step, onStepClick }: ProgressIndicatorProps)
                                     key={stepDesc.number}
                                     type="button"
                                     variant="ghost"
-                                    className={`text-center p-3 rounded-lg border h-auto flex flex-col items-center justify-center transition-all ${
+                                    className={`text-center p-3 rounded-lg border h-auto flex flex-col items-center justify-center ${
                                         isCurrent
-                                            ? 'border-primary bg-primary/5 text-primary cursor-default'
+                                            ? 'border-primary bg-primary/5 text-primary'
                                             : isCompleted
                                             ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
                                             : clickable
-                                            ? 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 cursor-pointer'
-                                            : 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                            ? 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                            : 'border-gray-200 bg-gray-50 text-gray-400'
                                     }`}
                                     onClick={() => handleStepClick(stepDesc.number)}
                                     disabled={!clickable || isCurrent}
@@ -88,11 +86,6 @@ export function ProgressIndicator({ step, onStepClick }: ProgressIndicatorProps)
                                         <div className="font-medium">Step {stepDesc.number}</div>
                                     </div>
                                     <div className="text-sm">{stepDesc.title}</div>
-                                    {!clickable && stepDesc.number > step && (
-                                        <div className="text-xs text-gray-400 mt-1">
-                                            Complete current step first
-                                        </div>
-                                    )}
                                 </Button>
                             );
                         })}

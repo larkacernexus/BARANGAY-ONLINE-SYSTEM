@@ -1,3 +1,5 @@
+// resources/js/components/admin/payment/PaymentDetailsStep.tsx
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,39 +22,43 @@ import {
     Smartphone,
     Landmark,
     CheckCircle,
-    ExternalLink,
-    QrCode,
-    ShieldCheck,
-    Wallet,
     Banknote,
     FileCheck,
     Shield,
     AlertTriangle,
     Home,
     Package,
-    Hash,
     User,
     Users,
     Phone,
     MapPin,
     Calendar,
     FileDigit,
-    ClipboardList,
-    BadgeCheck,
-    Info,
     Lock,
     Check,
     CalendarDays,
-    Download,
-    Printer,
-    Copy,
-    Eye,
-    EyeOff,
-    FileType,
-    FileKey,
-    FileBadge
+    FileBadge,
+    CircleAlert,
+    RefreshCw,
+    UserCircle,
+    Mail,
+    MapPinHouse,
+    Hash
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+
+interface ClearanceType {
+    id: string | number;
+    code: string;
+    name: string;
+    description?: string;
+    fee: number | string;
+    formatted_fee?: string;
+    processing_days?: number;
+    validity_days: number;
+    requires_payment: boolean;
+    requires_approval: boolean;
+    is_online_only: boolean;
+}
 
 interface PaymentItem {
     id: number;
@@ -63,6 +69,7 @@ interface PaymentItem {
     base_amount: number;
     surcharge: number;
     penalty: number;
+    discount: number;
     total_amount: number;
     category: string;
     period_covered: string;
@@ -70,6 +77,7 @@ interface PaymentItem {
     metadata?: {
         is_clearance_fee?: boolean;
         clearance_request_id?: string | number;
+        clearance_type_id?: string | number;
     };
 }
 
@@ -96,7 +104,7 @@ interface PaymentFormData {
     purpose: string;
     remarks: string;
     is_cleared: boolean;
-    certificate_type: string;
+    clearance_type_id: string | number;
     validity_date: string;
     collection_type: 'manual' | 'system';
     clearance_request_id?: string | number;
@@ -113,153 +121,19 @@ interface PaymentDetailsStepProps {
     processing: boolean;
     handlePurposeChange: (value: string) => void;
     handlePeriodCoveredChange: (value: string) => void;
-    handleCertificateTypeChange?: (value: string) => void;
+    handleClearanceTypeChange?: (id: string | number) => void;
     userModifiedPurpose: boolean;
     setUserModifiedPurpose: (value: boolean) => void;
     generatePurpose: () => string;
-    clearanceTypes?: Record<string, string>;
+    clearanceTypes?: ClearanceType[];
     isClearancePayment?: boolean;
     clearanceRequest?: any;
+    selectedClearanceType?: ClearanceType | null;
+    getClearanceTypeNameById?: (id: string | number) => string;
+    selectedResident?: any;
+    selectedHousehold?: any;
 }
 
-// Enhanced payment method configurations
-const paymentMethods = [
-    {
-        id: 'cash',
-        name: 'Cash',
-        icon: Banknote,
-        description: 'Pay with physical cash',
-        color: 'bg-green-50 border-green-200',
-        textColor: 'text-green-700',
-        iconColor: 'text-green-600',
-        badge: 'Instant',
-        popular: true,
-        fields: []
-    },
-    {
-        id: 'gcash',
-        name: 'GCash',
-        icon: Smartphone,
-        description: 'Mobile payment via GCash',
-        color: 'bg-blue-50 border-blue-200',
-        textColor: 'text-blue-700',
-        iconColor: 'text-blue-600',
-        badge: 'Popular',
-        popular: true,
-        fields: [
-            {
-                label: 'GCash Transaction ID',
-                placeholder: 'e.g., GX1234567890',
-                required: true,
-                pattern: '^[A-Z0-9]{10,}$'
-            },
-            {
-                label: 'GCash Account Name',
-                placeholder: 'Sender\'s name on GCash',
-                required: true
-            },
-            {
-                label: 'GCash Account Number',
-                placeholder: '09XX XXX XXXX',
-                required: true,
-                pattern: '^09[0-9]{9}$'
-            }
-        ]
-    },
-    {
-        id: 'maya',
-        name: 'Maya',
-        icon: CreditCard,
-        description: 'Mobile payment via Maya',
-        color: 'bg-purple-50 border-purple-200',
-        textColor: 'text-purple-700',
-        iconColor: 'text-purple-600',
-        badge: null,
-        popular: false,
-        fields: [
-            {
-                label: 'Maya Reference Number',
-                placeholder: 'Maya transaction reference',
-                required: true
-            },
-            {
-                label: 'Maya Account Name',
-                placeholder: 'Sender\'s name on Maya',
-                required: true
-            }
-        ]
-    },
-    {
-        id: 'bank',
-        name: 'Bank Transfer',
-        icon: Landmark,
-        description: 'Online bank transfer',
-        color: 'bg-indigo-50 border-indigo-200',
-        textColor: 'text-indigo-700',
-        iconColor: 'text-indigo-600',
-        badge: null,
-        popular: false,
-        fields: [
-            {
-                label: 'Bank Name',
-                placeholder: 'e.g., BDO, BPI, Metrobank',
-                required: true
-            },
-            {
-                label: 'Account Number',
-                placeholder: 'Bank account number',
-                required: true
-            },
-            {
-                label: 'Transaction Reference',
-                placeholder: 'Bank transfer reference',
-                required: true
-            }
-        ]
-    },
-    {
-        id: 'check',
-        name: 'Check',
-        icon: FileText,
-        description: 'Post-dated check payment',
-        color: 'bg-amber-50 border-amber-200',
-        textColor: 'text-amber-700',
-        iconColor: 'text-amber-600',
-        badge: null,
-        popular: false,
-        fields: [
-            {
-                label: 'Check Number',
-                placeholder: 'Check number',
-                required: true
-            },
-            {
-                label: 'Bank Name',
-                placeholder: 'Issuing bank',
-                required: true
-            },
-            {
-                label: 'Check Date',
-                type: 'date',
-                required: true
-            }
-        ]
-    },
-    {
-        id: 'online',
-        name: 'Online Payment',
-        icon: ShieldCheck,
-        description: 'Pay via online portal',
-        color: 'bg-cyan-50 border-cyan-200',
-        textColor: 'text-cyan-700',
-        iconColor: 'text-cyan-600',
-        badge: 'Secure',
-        popular: false,
-        fields: []
-    }
-];
-
-// Helper functions
 function formatCurrency(amount: number): string {
     if (!amount && amount !== 0) return '₱0.00';
     const numAmount = typeof amount === 'number' ? amount : parseFloat(String(amount));
@@ -267,29 +141,15 @@ function formatCurrency(amount: number): string {
     return `₱${numAmount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
 }
 
-// Function to get category icon
-const getCategoryIcon = (category: string) => {
-    const icons: Record<string, React.ElementType> = {
-        'tax': DollarSign,
-        'clearance': FileCheck,
-        'certificate': Shield,
-        'service': Package,
-        'rental': Home,
-        'fine': AlertTriangle,
-    };
-    const IconComponent = icons[category] || FileText;
-    return <IconComponent className="h-3 w-3" />;
-};
-
-// Function to generate OR number
-const generateORNumber = (): string => {
+function generateORNumber(): string {
     const date = new Date();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const timestamp = Date.now();
+    const random = String(timestamp % 1000).padStart(3, '0');
     return `BAR-${year}${month}${day}-${random}`;
-};
+}
 
 export function PaymentDetailsStep({
     data,
@@ -302,162 +162,397 @@ export function PaymentDetailsStep({
     processing,
     handlePurposeChange,
     handlePeriodCoveredChange,
-    handleCertificateTypeChange,
+    handleClearanceTypeChange,
     userModifiedPurpose,
     setUserModifiedPurpose,
     generatePurpose,
-    clearanceTypes = {},
+    clearanceTypes = [],
     isClearancePayment = false,
-    clearanceRequest = null
+    clearanceRequest = null,
+    selectedClearanceType = null,
+    getClearanceTypeNameById = (id: string | number) => 'Clearance',
+    selectedResident = null,
+    selectedHousehold = null
 }: PaymentDetailsStepProps) {
-    const [selectedMethodFields, setSelectedMethodFields] = useState<Record<string, string>>({});
     const [purposeError, setPurposeError] = useState<string>('');
     const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-    const [isCleared, setIsCleared] = useState(data.is_cleared);
+    const [isCleared, setIsCleared] = useState(data.is_cleared || false);
     const [validityDate, setValidityDate] = useState(data.validity_date || '');
-
-    // Get current payment method configuration
-    const currentMethod = paymentMethods.find(method => method.id === data.payment_method);
-
-    // Check if this is a clearance payment
+    const [clearanceError, setClearanceError] = useState<string>('');
+    const [autoGeneratedOR, setAutoGeneratedOR] = useState<boolean>(false);
+    
     const isClearanceFeePayment = isClearancePayment || paymentItems.some(item => 
         item.metadata?.is_clearance_fee || item.category === 'clearance'
     );
 
-    // Initialize data with default values to prevent uncontrolled inputs
-    const safeData = {
-        or_number: data.or_number || generateORNumber(),
-        payment_date: data.payment_date || new Date().toISOString().split('T')[0],
-        payment_method: data.payment_method || 'cash',
-        reference_number: data.reference_number || '',
-        period_covered: data.period_covered || '',
-        purpose: data.purpose || '',
-        remarks: data.remarks || '',
-        subtotal: data.subtotal || 0,
-        surcharge: data.surcharge || 0,
-        penalty: data.penalty || 0,
-        discount: data.discount || 0,
-        total_amount: data.total_amount || 0,
-        certificate_type: data.certificate_type || '',
-        is_cleared: data.is_cleared || false,
-        validity_date: data.validity_date || '',
+    // Get clearance item
+    const clearanceItem = paymentItems.find(item => 
+        item.metadata?.is_clearance_fee || item.category === 'clearance'
+    );
+
+    // Calculate totals based on payment items
+    const calculateTotals = (items: PaymentItem[]) => {
+        let subtotal = 0;
+        let surcharge = 0;
+        let penalty = 0;
+        let total = 0;
+
+        items.forEach(item => {
+            subtotal += item.base_amount || 0;
+            surcharge += item.surcharge || 0;
+            penalty += item.penalty || 0;
+            total += item.total_amount || 0;
+        });
+
+        return { subtotal, surcharge, penalty, total };
     };
 
-    // Generate purpose with ALL item names if not already set
+    // Auto-update totals when payment items change
     useEffect(() => {
-        if (!data.purpose && paymentItems.length > 0) {
-            const purpose = generatePurpose();
-            handlePurposeChange(purpose);
-        }
+        const { subtotal, surcharge, penalty, total } = calculateTotals(paymentItems);
         
-        // Set certificate type for clearance payments
-        if (isClearanceFeePayment && !data.certificate_type && clearanceRequest?.clearance_type?.code) {
-            setData('certificate_type', clearanceRequest.clearance_type.code);
-        }
-    }, [paymentItems, data.purpose, isClearanceFeePayment]);
+        setData(prev => ({
+            ...prev,
+            subtotal: subtotal,
+            surcharge: surcharge,
+            penalty: penalty,
+            total_amount: total,
+        }));
+    }, [paymentItems]);
 
-    // Auto-set validity date for clearance certificates
+    // Auto-generate OR number
     useEffect(() => {
-        if (isClearanceFeePayment && data.certificate_type && !data.validity_date) {
+        if (!data.or_number || data.or_number.trim() === '') {
+            const newOR = generateORNumber();
+            setData('or_number', newOR);
+            setAutoGeneratedOR(true);
+        }
+    }, []);
+
+    // Set default payment date
+    useEffect(() => {
+        if (!data.payment_date) {
+            const today = new Date().toISOString().split('T')[0];
+            setData('payment_date', today);
+        }
+    }, []);
+
+    // Auto-set validity date
+    useEffect(() => {
+        if (selectedClearanceType && selectedClearanceType.validity_days && !data.validity_date) {
             const today = new Date();
-            const validityDays = 30; // Default validity days
             const validUntil = new Date(today);
-            validUntil.setDate(today.getDate() + validityDays);
+            validUntil.setDate(today.getDate() + selectedClearanceType.validity_days);
             
             const formattedDate = validUntil.toISOString().split('T')[0];
             setValidityDate(formattedDate);
             setData('validity_date', formattedDate);
         }
-    }, [data.certificate_type, isClearanceFeePayment]);
+    }, [selectedClearanceType, data.validity_date]);
 
     const handlePaymentMethodChange = (methodId: string) => {
         setData('payment_method', methodId);
-        // Clear reference number when switching methods
         setData('reference_number', '');
-        // Clear method-specific fields
-        setSelectedMethodFields({});
     };
 
-    const handleMethodFieldChange = (fieldName: string, value: string) => {
-        setSelectedMethodFields(prev => ({
-            ...prev,
-            [fieldName]: value
-        }));
-    };
-
-    // Generate QR code text for GCash/Maya
-    const generateQRText = () => {
-        if (safeData.payment_method === 'gcash' || safeData.payment_method === 'maya') {
-            const total = safeData.total_amount.toFixed(2);
-            const message = `Payment for ${safeData.purpose || 'Barangay Fees'}`;
-            const reference = safeData.or_number;
-            return `Amount: ${total}\nReference: ${reference}\n${message}`;
+    const handleClearanceTypeSelect = (value: string) => {
+        const id = value;
+        if (handleClearanceTypeChange) {
+            handleClearanceTypeChange(id);
         }
-        return '';
+        setClearanceError('');
     };
 
-    // Validate form before submission
-    const validateForm = () => {
-        if (!safeData.purpose || safeData.purpose.trim() === '') {
-            setPurposeError('Purpose of payment is required');
-            return false;
-        }
-        
-        // Validate certificate type for clearance payments
-        if (isClearanceFeePayment && !safeData.certificate_type) {
-            alert('Please select a certificate type for clearance payment');
-            return false;
-        }
-        
-        setPurposeError('');
-        return true;
-    };
-
-    // Handle OR number regeneration
-    const handleRegenerateOR = () => {
-        const newOR = generateORNumber();
-        setData('or_number', newOR);
-    };
-
-    // Handle reference number generation
-    const handleGenerateReference = () => {
-        if (currentMethod) {
-            const random = Math.random().toString(36).substring(2, 10).toUpperCase();
-            const newReference = `${currentMethod.name.substring(0, 2)}-${random}`;
-            setData('reference_number', newReference);
-        }
-    };
-
-    // Handle certificate type change
-    const handleCertTypeChange = (value: string) => {
-        setData('certificate_type', value);
-        if (handleCertificateTypeChange) {
-            handleCertificateTypeChange(value);
-        }
-        
-        // Set default purpose based on certificate type
-        if (!userModifiedPurpose && value) {
-            const purpose = clearanceTypes[value] ? `Payment for ${clearanceTypes[value]}` : 'Certificate Payment';
-            handlePurposeChange(purpose);
-        }
-    };
-
-    // Handle cleared status change
     const handleClearedChange = (checked: boolean) => {
         setIsCleared(checked);
         setData('is_cleared', checked);
     };
 
-    // Handle validity date change
     const handleValidityDateChange = (value: string) => {
         setValidityDate(value);
         setData('validity_date', value);
     };
 
+    const handleRegenerateOR = () => {
+        const newOR = generateORNumber();
+        setData('or_number', newOR);
+        setAutoGeneratedOR(true);
+    };
+
+    const validateForm = () => {
+        let isValid = true;
+        
+        setPurposeError('');
+        setClearanceError('');
+        
+        if (!data.purpose || data.purpose.trim() === '') {
+            setPurposeError('Purpose of payment is required');
+            isValid = false;
+        }
+        
+        if (!data.or_number || data.or_number.trim() === '') {
+            const newOR = generateORNumber();
+            setData('or_number', newOR);
+            setAutoGeneratedOR(true);
+        }
+        
+        if (!data.payment_date) {
+            setData('payment_date', new Date().toISOString().split('T')[0]);
+        }
+        
+        if (isClearanceFeePayment && clearanceTypes.length > 0) {
+            if (!data.clearance_type_id || String(data.clearance_type_id).trim() === '') {
+                setClearanceError('Please select a clearance type for clearance payment');
+                isValid = false;
+            }
+        }
+        
+        // Validate that total amount is greater than 0
+        if (data.total_amount <= 0) {
+            setPurposeError('Total amount must be greater than 0. Please check your payment items.');
+            isValid = false;
+        }
+        
+        return isValid;
+    };
+
+    const formatDateDisplay = (dateString: string) => {
+        if (!dateString) return '';
+        try {
+            const [year, month, day] = dateString.split('-');
+            return `${day}/${month}/${year}`;
+        } catch {
+            return dateString;
+        }
+    };
+
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!data.or_number || data.or_number.trim() === '') {
+            const newOR = generateORNumber();
+            setData('or_number', newOR);
+            setAutoGeneratedOR(true);
+        }
+        
+        if (!data.payment_date) {
+            setData('payment_date', new Date().toISOString().split('T')[0]);
+        }
+        
+        if (validateForm()) {
+            const form = document.getElementById('paymentForm') as HTMLFormElement;
+            if (form) {
+                form.requestSubmit();
+            }
+        }
+    };
+
+    // Calculate totals for display
+    const displayTotals = calculateTotals(paymentItems);
+    const discountAmount = data.discount || 0;
+    const finalTotal = Math.max(0, displayTotals.total - discountAmount);
+
+    // Get payer details based on selected resident or household
+    const getPayerTypeDisplay = () => {
+        switch (data.payer_type) {
+            case 'resident':
+                return { label: 'Individual Resident', icon: User, color: 'bg-blue-100 text-blue-700' };
+            case 'household':
+                return { label: 'Household/Family', icon: Users, color: 'bg-green-100 text-green-700' };
+            case 'business':
+                return { label: 'Business/Company', icon: Building, color: 'bg-purple-100 text-purple-700' };
+            default:
+                return { label: 'Other Payer', icon: UserCircle, color: 'bg-gray-100 text-gray-700' };
+        }
+    };
+
+    const payerTypeInfo = getPayerTypeDisplay();
+
     return (
         <div className="grid gap-6 lg:grid-cols-3">
-            {/* Left Column - Payment Information */}
+            {/* Left Column - Payer & Payment Information */}
             <div className="lg:col-span-2 space-y-6">
+                {/* Payer Information Card */}
+                <Card className="border border-gray-200 shadow-sm">
+                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 border-b">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-100 rounded-lg">
+                                    <UserCircle className="h-5 w-5 text-blue-700" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-xl font-semibold text-gray-900">
+                                        Payer Information
+                                    </CardTitle>
+                                    <CardDescription className="text-gray-600">
+                                        Details of the person or entity making the payment
+                                    </CardDescription>
+                                </div>
+                            </div>
+                            <Badge className={`${payerTypeInfo.color} border-0`}>
+                                {payerTypeInfo.label}
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-6">
+                        {/* Payer Name and Contact */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="payerName" className="flex items-center gap-1 text-sm font-medium">
+                                    <User className="h-3.5 w-3.5 text-gray-500" />
+                                    Payer Name *
+                                </Label>
+                                <Input
+                                    id="payerName"
+                                    value={data.payer_name || ''}
+                                    onChange={(e) => setData('payer_name', e.target.value)}
+                                    required
+                                    className="bg-gray-50"
+                                    placeholder="Enter payer's full name"
+                                />
+                                {data.payer_type === 'resident' && selectedResident && (
+                                    <p className="text-xs text-green-600 flex items-center gap-1">
+                                        <CheckCircle className="h-3 w-3" />
+                                        Selected from resident records
+                                    </p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="contactNumber" className="flex items-center gap-1 text-sm font-medium">
+                                    <Phone className="h-3.5 w-3.5 text-gray-500" />
+                                    Contact Number
+                                </Label>
+                                <Input
+                                    id="contactNumber"
+                                    value={data.contact_number || ''}
+                                    onChange={(e) => setData('contact_number', e.target.value)}
+                                    className="bg-gray-50"
+                                    placeholder="e.g., 09123456789"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Address Information */}
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="address" className="flex items-center gap-1 text-sm font-medium">
+                                    <MapPin className="h-3.5 w-3.5 text-gray-500" />
+                                    Complete Address
+                                </Label>
+                                <Textarea
+                                    id="address"
+                                    value={data.address || ''}
+                                    onChange={(e) => setData('address', e.target.value)}
+                                    className="min-h-[60px] bg-gray-50"
+                                    placeholder="Enter complete address including street, barangay, city/municipality"
+                                    rows={2}
+                                />
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="purok" className="flex items-center gap-1 text-sm font-medium">
+                                        <MapPinHouse className="h-3.5 w-3.5 text-gray-500" />
+                                        Purok/Zone
+                                    </Label>
+                                    <Input
+                                        id="purok"
+                                        value={data.purok || ''}
+                                        onChange={(e) => setData('purok', e.target.value)}
+                                        className="bg-gray-50"
+                                        placeholder="Purok number or name"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="householdNumber" className="flex items-center gap-1 text-sm font-medium">
+                                        <Hash className="h-3.5 w-3.5 text-gray-500" />
+                                        Household Number
+                                    </Label>
+                                    <Input
+                                        id="householdNumber"
+                                        value={data.household_number || ''}
+                                        onChange={(e) => setData('household_number', e.target.value)}
+                                        className="bg-gray-50"
+                                        placeholder="HH-0001"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Payer Summary */}
+                        {(selectedResident || selectedHousehold) && (
+                            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-medium text-sm text-gray-900">
+                                        {data.payer_type === 'resident' ? 'Resident Details' : 'Household Details'}
+                                    </h4>
+                                    <Badge variant="outline" className="text-xs">
+                                        From Records
+                                    </Badge>
+                                </div>
+                                
+                                {data.payer_type === 'resident' && selectedResident && (
+                                    <div className="space-y-1 text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <User className="h-3 w-3 text-gray-500" />
+                                            <span className="font-medium text-gray-900">{selectedResident.name}</span>
+                                        </div>
+                                        {selectedResident.contact_number && (
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <Phone className="h-3 w-3" />
+                                                <span>{selectedResident.contact_number}</span>
+                                            </div>
+                                        )}
+                                        {selectedResident.address && (
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <MapPin className="h-3 w-3" />
+                                                <span className="truncate">{selectedResident.address}</span>
+                                            </div>
+                                        )}
+                                        {selectedResident.household_number && (
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <Home className="h-3 w-3" />
+                                                <span>HH#: {selectedResident.household_number}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                
+                                {data.payer_type === 'household' && selectedHousehold && (
+                                    <div className="space-y-1 text-sm">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="h-3 w-3 text-gray-500" />
+                                            <span className="font-medium text-gray-900">{selectedHousehold.head_name}</span>
+                                            <Badge variant="outline" className="text-xs">
+                                                Head of Family
+                                            </Badge>
+                                        </div>
+                                        {selectedHousehold.contact_number && (
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <Phone className="h-3 w-3" />
+                                                <span>{selectedHousehold.contact_number}</span>
+                                            </div>
+                                        )}
+                                        {selectedHousehold.address && (
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <MapPin className="h-3 w-3" />
+                                                <span className="truncate">{selectedHousehold.address}</span>
+                                            </div>
+                                        )}
+                                        {selectedHousehold.family_members > 0 && (
+                                            <div className="flex items-center gap-2 text-gray-600">
+                                                <User className="h-3 w-3" />
+                                                <span>{selectedHousehold.family_members} family members</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Payment Information Card */}
                 <Card className="border border-gray-200 shadow-sm">
                     <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 border-b">
                         <div className="flex items-center justify-between">
@@ -481,7 +576,7 @@ export function PaymentDetailsStep({
                     </CardHeader>
                     <CardContent className="space-y-6 pt-6">
                         {/* Clearance Payment Info */}
-                        {isClearanceFeePayment && (
+                        {isClearanceFeePayment && clearanceTypes.length > 0 && (
                             <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
                                 <div className="flex items-center gap-3 mb-3">
                                     <div className="p-2 bg-purple-100 rounded-lg">
@@ -495,86 +590,151 @@ export function PaymentDetailsStep({
                                     </div>
                                 </div>
                                 
-                                {/* Certificate Type Selection */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="certificateType" className="flex items-center gap-1 text-sm font-medium text-purple-800">
-                                            <FileType className="h-3.5 w-3.5" />
-                                            Certificate Type *
-                                        </Label>
-                                        <Select
-                                            value={safeData.certificate_type || ''}
-                                            onValueChange={handleCertTypeChange}
-                                        >
-                                            <SelectTrigger className={`h-9 text-sm ${!safeData.certificate_type ? 'border-purple-300 bg-purple-50' : 'bg-white'}`}>
-                                                <SelectValue placeholder="Select certificate type..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Object.entries(clearanceTypes).map(([code, name]) => (
-                                                    <SelectItem key={code} value={code} className="text-sm">
+                                {/* Clearance Type Selection */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="clearanceType" className="flex items-center gap-1 text-sm font-medium text-purple-800">
+                                        <FileBadge className="h-3.5 w-3.5" />
+                                        Clearance Type
+                                    </Label>
+                                    
+                                    <Select
+                                        value={String(data.clearance_type_id || "")}
+                                        onValueChange={handleClearanceTypeSelect}
+                                    >
+                                        <SelectTrigger className={`h-9 text-sm bg-white ${clearanceError ? 'border-red-300' : 'border-purple-300'}`}>
+                                            {selectedClearanceType ? (
+                                                <div className="flex items-center gap-2 text-left">
+                                                    <FileBadge className="h-3.5 w-3.5 text-purple-600" />
+                                                    <span>{selectedClearanceType.name}</span>
+                                                    <Badge variant="outline" className="ml-2 text-xs bg-purple-100 text-purple-700 border-purple-200">
+                                                        {selectedClearanceType.code}
+                                                    </Badge>
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-500">Select clearance type...</span>
+                                            )}
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {clearanceTypes.length > 0 ? (
+                                                clearanceTypes.map((type) => (
+                                                    <SelectItem key={type.id} value={String(type.id)} className="text-sm">
                                                         <div className="flex items-center gap-2">
-                                                            <FileBadge className="h-3.5 w-3.5 text-purple-600" />
-                                                            <span>{name}</span>
+                                                            <FileBadge className="h-3.5 w-3.5 text-purple-600 flex-shrink-0" />
+                                                            <div className="flex flex-col">
+                                                                <span>{type.name}</span>
+                                                                <span className="text-xs text-gray-500">
+                                                                    Code: {type.code} • Fee: {type.formatted_fee}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="py-6 text-center">
+                                                    <CircleAlert className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                                    <p className="text-sm text-gray-500">No clearance types available</p>
+                                                </div>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
                                     
-                                    <div className="space-y-2">
+                                    {clearanceError && (
+                                        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+                                            <AlertCircle className="h-3.5 w-3.5" />
+                                            {clearanceError}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Display selected clearance type details */}
+                                    {selectedClearanceType && (
+                                        <div className="mt-2 p-3 bg-white border border-purple-100 rounded-md">
+                                            <div className="flex items-start gap-2">
+                                                <FileText className="h-4 w-4 text-purple-600 mt-0.5" />
+                                                <div className="text-sm">
+                                                    <div className="font-medium text-purple-800">
+                                                        {selectedClearanceType.name}
+                                                    </div>
+                                                    <div className="text-xs text-gray-600 mt-1">
+                                                        Code: <span className="font-mono">{selectedClearanceType.code}</span>
+                                                        {selectedClearanceType.validity_days > 0 && (
+                                                            <span> • Valid for {selectedClearanceType.validity_days} days</span>
+                                                        )}
+                                                    </div>
+                                                    {clearanceRequest?.reference_number && (
+                                                        <div className="text-xs text-gray-600 mt-1">
+                                                            Request ID: <span className="font-mono">{clearanceRequest.reference_number}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                    
+                                {/* Validity Date */}
+                                {selectedClearanceType && (
+                                    <div className="space-y-2 mt-4">
                                         <Label htmlFor="validityDate" className="flex items-center gap-1 text-sm font-medium text-purple-800">
                                             <CalendarDays className="h-3.5 w-3.5" />
                                             Valid Until
                                         </Label>
-                                        <Input
-                                            id="validityDate"
-                                            type="date"
-                                            value={validityDate}
-                                            onChange={(e) => handleValidityDateChange(e.target.value)}
-                                            className="bg-white"
-                                        />
-                                    </div>
-                                </div>
-                                
-                                {/* Certificate Issuance Status */}
-                                <div className="mt-4 flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
-                                    <Switch
-                                        checked={isCleared}
-                                        onCheckedChange={handleClearedChange}
-                                        className="data-[state=checked]:bg-green-600"
-                                    />
-                                    <div className="flex-1">
-                                        <Label htmlFor="certificate-status" className="text-sm font-medium text-gray-900">
-                                            Mark as cleared for issuance
-                                        </Label>
-                                        <p className="text-xs text-gray-600">
-                                            When checked, the certificate will be marked as ready for issuance after payment.
+                                        <div className="relative">
+                                            <Input
+                                                id="validityDate"
+                                                type="date"
+                                                value={validityDate}
+                                                onChange={(e) => handleValidityDateChange(e.target.value)}
+                                                className="bg-white border-purple-300"
+                                                min={new Date().toISOString().split('T')[0]}
+                                            />
+                                        </div>
+                                        <p className="text-xs text-gray-500">
+                                            Clearance validity date.
                                         </p>
                                     </div>
-                                    {isCleared && (
-                                        <Badge className="bg-green-100 text-green-800 border-green-200">
-                                            <Check className="h-3 w-3 mr-1" />
-                                            Ready to Issue
-                                        </Badge>
-                                    )}
-                                </div>
+                                )}
                                 
-                                {/* Clearance Request Info */}
-                                {clearanceRequest && (
-                                    <div className="mt-3 p-3 bg-white border border-gray-200 rounded-lg">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <FileKey className="h-4 w-4 text-gray-600" />
-                                            <span className="font-medium text-sm">Clearance Request:</span>
-                                            <Badge variant="outline" className="text-xs font-mono bg-gray-100">
-                                                {clearanceRequest.reference_number}
+                                {/* Clearance Issuance Status */}
+                                {selectedClearanceType && (
+                                    <div className="mt-4 flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+                                        <Switch
+                                            checked={isCleared}
+                                            onCheckedChange={handleClearedChange}
+                                            className="data-[state=checked]:bg-green-600"
+                                        />
+                                        <div className="flex-1">
+                                            <Label htmlFor="clearance-status" className="text-sm font-medium text-gray-900">
+                                                Mark as ready for issuance
+                                            </Label>
+                                            <p className="text-xs text-gray-600">
+                                                When checked, the clearance will be marked as ready for issuance after payment.
+                                            </p>
+                                        </div>
+                                        {isCleared && (
+                                            <Badge className="bg-green-100 text-green-800 border-green-200">
+                                                <Check className="h-3 w-3 mr-1" />
+                                                Ready to Issue
                                             </Badge>
-                                        </div>
-                                        <div className="text-sm text-gray-600">
-                                            Purpose: {clearanceRequest.purpose}
-                                        </div>
+                                        )}
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* Show info if no clearance types */}
+                        {isClearanceFeePayment && clearanceTypes.length === 0 && (
+                            <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-amber-100 rounded-lg">
+                                        <CircleAlert className="h-5 w-5 text-amber-700" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-amber-900">Clearance Payment</h3>
+                                        <p className="text-sm text-amber-700">
+                                            This payment includes a clearance fee, but no clearance types are configured.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -591,47 +751,57 @@ export function PaymentDetailsStep({
                                     <Label htmlFor="orNumber" className="flex items-center gap-1 text-sm font-medium">
                                         OR Number *
                                         <Badge variant="outline" className="text-xs bg-gray-50">
-                                            Auto-generated
+                                            {autoGeneratedOR ? 'Auto-generated' : 'Enter manually'}
                                         </Badge>
                                     </Label>
                                     <div className="relative">
                                         <Input
                                             id="orNumber"
-                                            value={safeData.or_number}
-                                            onChange={(e) => setData('or_number', e.target.value)}
+                                            value={data.or_number || ''}
+                                            onChange={(e) => {
+                                                setData('or_number', e.target.value);
+                                                setAutoGeneratedOR(false);
+                                            }}
                                             required
-                                            className="font-mono bg-gray-50"
+                                            className="font-mono bg-gray-50 pr-24"
+                                            placeholder="BAR-YYYYMMDD-XXX"
                                         />
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="absolute right-1 top-1 h-7 px-2 hover:bg-gray-100"
-                                            onClick={handleRegenerateOR}
-                                        >
-                                            Refresh
-                                        </Button>
+                                        <div className="absolute right-1 top-1 flex gap-1">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 px-2 hover:bg-gray-100 text-xs"
+                                                onClick={handleRegenerateOR}
+                                                title="Generate new OR number"
+                                            >
+                                                <RefreshCw className="h-3 w-3 mr-1" />
+                                                Refresh
+                                            </Button>
+                                        </div>
                                     </div>
+                                    {autoGeneratedOR && (
+                                        <p className="text-xs text-green-600 flex items-center gap-1">
+                                            <CheckCircle className="h-3 w-3" />
+                                            OR number auto-generated
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="paymentDate" className="text-sm font-medium">
                                         Payment Date *
                                     </Label>
-                                    <div className="relative">
-                                        <Input
-                                            id="paymentDate"
-                                            type="date"
-                                            value={safeData.payment_date}
-                                            onChange={(e) => setData('payment_date', e.target.value)}
-                                            required
-                                            className="bg-gray-50"
-                                        />
-                                        {safeData.payment_date === new Date().toISOString().split('T')[0] && (
-                                            <Badge className="absolute -top-2 -right-2 text-xs" variant="secondary">
-                                                Today
-                                            </Badge>
-                                        )}
-                                    </div>
+                                    <Input
+                                        id="paymentDate"
+                                        type="date"
+                                        value={data.payment_date || new Date().toISOString().split('T')[0]}
+                                        onChange={(e) => setData('payment_date', e.target.value)}
+                                        required
+                                        className="bg-gray-50"
+                                    />
+                                    <p className="text-xs text-gray-500">
+                                        {formatDateDisplay(data.payment_date)}
+                                    </p>
                                 </div>
                             </div>
                             <div className="space-y-2">
@@ -641,7 +811,7 @@ export function PaymentDetailsStep({
                                 <Input
                                     id="periodCovered"
                                     placeholder="e.g., January 2024, Q1 2024, Annual 2024"
-                                    value={safeData.period_covered}
+                                    value={data.period_covered || ''}
                                     onChange={(e) => handlePeriodCoveredChange(e.target.value)}
                                     className="bg-gray-50"
                                 />
@@ -650,7 +820,7 @@ export function PaymentDetailsStep({
 
                         <Separator />
 
-                        {/* Purpose of Payment - REQUIRED */}
+                        {/* Purpose of Payment */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -670,8 +840,8 @@ export function PaymentDetailsStep({
                                 </Label>
                                 <Textarea
                                     id="purpose"
-                                    placeholder="Enter the purpose of payment (e.g., Business Permit, Health Certificate, Real Property Tax)..."
-                                    value={safeData.purpose}
+                                    placeholder="Enter the purpose of payment..."
+                                    value={data.purpose || ''}
                                     onChange={(e) => handlePurposeChange(e.target.value)}
                                     required
                                     className={`min-h-[80px] bg-gray-50 ${purposeError ? 'border-red-300 focus-visible:ring-red-300' : ''}`}
@@ -684,12 +854,11 @@ export function PaymentDetailsStep({
                                     </div>
                                 ) : (
                                     <div className="text-xs text-gray-500">
-                                        This description will appear on the official receipt. Be clear and specific.
+                                        This description will appear on the official receipt.
                                     </div>
                                 )}
                             </div>
 
-                            {/* Auto-fill suggestion */}
                             {paymentItems.length > 0 && (
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
@@ -727,11 +896,15 @@ export function PaymentDetailsStep({
                                 <h3 className="font-medium text-base text-gray-900">Payment Method</h3>
                             </div>
                             
-                            {/* Recommended Methods */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {paymentMethods.filter(m => m.popular).map((method) => {
+                                {[
+                                    { id: 'cash', icon: Banknote, name: 'Cash', description: 'Pay with physical cash', badge: 'Instant', iconColor: 'text-green-600' },
+                                    { id: 'gcash', icon: Smartphone, name: 'GCash', description: 'Mobile payment via GCash', badge: 'Popular', iconColor: 'text-blue-600' },
+                                    { id: 'maya', icon: CreditCard, name: 'Maya', description: 'Mobile payment via Maya', badge: null, iconColor: 'text-purple-600' },
+                                    { id: 'bank', icon: Landmark, name: 'Bank Transfer', description: 'Online bank transfer', badge: null, iconColor: 'text-indigo-600' },
+                                ].filter(m => ['cash', 'gcash'].includes(m.id)).map((method) => {
                                     const Icon = method.icon;
-                                    const isSelected = safeData.payment_method === method.id;
+                                    const isSelected = data.payment_method === method.id;
                                     return (
                                         <div
                                             key={method.id}
@@ -740,7 +913,7 @@ export function PaymentDetailsStep({
                                                 isSelected
                                                     ? 'ring-2 ring-primary border-primary bg-primary/5'
                                                     : 'border-gray-200 hover:border-gray-300'
-                                            } ${method.color}`}
+                                            } ${isSelected ? 'bg-primary/5' : 'bg-white'}`}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
@@ -768,103 +941,10 @@ export function PaymentDetailsStep({
                                     );
                                 })}
                             </div>
-
-                            {/* All Methods */}
-                            <div className="pt-2">
-                                <div className="text-xs text-gray-500 mb-2 font-medium">OTHER PAYMENT OPTIONS</div>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    {paymentMethods.filter(m => !m.popular).map((method) => {
-                                        const Icon = method.icon;
-                                        const isSelected = safeData.payment_method === method.id;
-                                        return (
-                                            <div
-                                                key={method.id}
-                                                onClick={() => handlePaymentMethodChange(method.id)}
-                                                className={`border rounded-lg p-3 cursor-pointer transition-all ${
-                                                    isSelected
-                                                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                                                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Icon className={`h-4 w-4 ${method.iconColor}`} />
-                                                    <span className="text-sm font-medium text-gray-900">{method.name}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
                         </div>
 
-                        {/* Payment Method Specific Fields */}
-                        {currentMethod && currentMethod.fields.length > 0 && (
-                            <div className="space-y-4 p-4 border rounded-lg bg-gray-50/50">
-                                <div className="flex items-center gap-2">
-                                    <currentMethod.icon className="h-4 w-4" />
-                                    <h4 className="font-medium text-gray-900">{currentMethod.name} Details</h4>
-                                </div>
-                                <div className="space-y-3">
-                                    {currentMethod.fields.map((field, index) => (
-                                        <div key={index} className="space-y-2">
-                                            <Label htmlFor={`field-${field.label}`} className="text-sm">
-                                                {field.label} {field.required && '*'}
-                                            </Label>
-                                            <Input
-                                                id={`field-${field.label}`}
-                                                type={field.type || 'text'}
-                                                placeholder={field.placeholder}
-                                                value={selectedMethodFields[field.label] || ''}
-                                                onChange={(e) => handleMethodFieldChange(field.label, e.target.value)}
-                                                required={field.required}
-                                                pattern={field.pattern}
-                                                className="bg-white"
-                                            />
-                                            {field.label.includes('Transaction') && (
-                                                <div className="flex items-center gap-2 text-xs text-gray-500">
-                                                    <Info className="h-3 w-3" />
-                                                    Keep this reference for verification purposes
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                                
-                                {/* QR Code Section for Mobile Payments */}
-                                {(safeData.payment_method === 'gcash' || safeData.payment_method === 'maya') && (
-                                    <div className="mt-4 p-4 border rounded-lg bg-white">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <QrCode className="h-4 w-4" />
-                                                <span className="font-medium text-gray-900">Quick Pay with QR</span>
-                                            </div>
-                                            <Button variant="outline" size="sm" type="button" className="text-xs">
-                                                <ExternalLink className="h-3 w-3 mr-1" />
-                                                Open App
-                                            </Button>
-                                        </div>
-                                        <div className="text-center">
-                                            <div className="inline-block p-4 border-2 border-dashed border-gray-300 rounded-lg bg-white">
-                                                <div className="w-32 h-32 bg-gray-100 rounded flex items-center justify-center">
-                                                    <QrCode className="h-16 w-16 text-gray-400" />
-                                                </div>
-                                            </div>
-                                            <p className="text-xs text-gray-500 mt-2">
-                                                Scan this QR code with your {currentMethod.name} app
-                                            </p>
-                                            <div className="mt-3 text-left text-sm bg-gray-50 p-3 rounded border">
-                                                <div className="font-mono text-xs break-all text-gray-700">
-                                                    {generateQRText()}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Reference Number for all non-cash methods */}
-                        {safeData.payment_method !== 'cash' && currentMethod && currentMethod.fields.length === 0 && (
+                        {/* Reference Number for non-cash methods */}
+                        {data.payment_method !== 'cash' && (
                             <div className="space-y-2">
                                 <Label htmlFor="referenceNumber" className="flex items-center gap-1 text-sm font-medium">
                                     Reference Number *
@@ -872,29 +952,14 @@ export function PaymentDetailsStep({
                                         Required
                                     </Badge>
                                 </Label>
-                                <div className="relative">
-                                    <Input
-                                        id="referenceNumber"
-                                        placeholder={`${currentMethod.name} transaction reference`}
-                                        value={safeData.reference_number}
-                                        onChange={(e) => setData('reference_number', e.target.value)}
-                                        required
-                                        className="bg-gray-50"
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="absolute right-1 top-1 h-7 px-2 hover:bg-gray-100"
-                                        onClick={handleGenerateReference}
-                                    >
-                                        Generate
-                                    </Button>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-gray-500">
-                                    <Info className="h-3 w-3" />
-                                    Keep this reference number for payment tracking and verification
-                                </div>
+                                <Input
+                                    id="referenceNumber"
+                                    placeholder={`Transaction reference`}
+                                    value={data.reference_number || ''}
+                                    onChange={(e) => setData('reference_number', e.target.value)}
+                                    required
+                                    className="bg-gray-50"
+                                />
                             </div>
                         )}
 
@@ -907,7 +972,6 @@ export function PaymentDetailsStep({
                                 className="text-xs text-gray-600 hover:text-gray-900"
                                 onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
                             >
-                                {showAdvancedOptions ? <EyeOff className="h-3 w-3 mr-1" /> : <Eye className="h-3 w-3 mr-1" />}
                                 {showAdvancedOptions ? 'Hide' : 'Show'} Advanced Options
                             </Button>
                             
@@ -931,7 +995,6 @@ export function PaymentDetailsStep({
                                         </Select>
                                     </div>
                                     
-                                    {/* Additional Information - Remarks */}
                                     <div className="space-y-2">
                                         <Label htmlFor="remarks" className="text-sm font-medium">
                                             Remarks / Notes <span className="text-gray-500 font-normal">(optional)</span>
@@ -940,13 +1003,10 @@ export function PaymentDetailsStep({
                                             id="remarks"
                                             placeholder="Any additional notes or special instructions..."
                                             rows={2}
-                                            value={safeData.remarks}
+                                            value={data.remarks || ''}
                                             onChange={(e) => setData('remarks', e.target.value)}
                                             className="bg-white"
                                         />
-                                        <div className="text-xs text-gray-500">
-                                            For internal use only. This will not appear on the official receipt.
-                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -956,14 +1016,10 @@ export function PaymentDetailsStep({
                         <div className="flex gap-3 pt-6 border-t border-gray-200">
                             <Button 
                                 type="submit" 
-                                disabled={processing || !safeData.purpose} 
+                                disabled={processing} 
                                 className="flex-1 bg-gradient-to-r from-primary to-primary/90 hover:from-primary hover:to-primary shadow-sm" 
                                 size="lg"
-                                onClick={() => {
-                                    if (!validateForm()) {
-                                        return;
-                                    }
-                                }}
+                                onClick={handleFormSubmit}
                             >
                                 {processing ? (
                                     <>
@@ -993,7 +1049,100 @@ export function PaymentDetailsStep({
 
             {/* Right Column - Summary & Receipt */}
             <div className="space-y-6">
-                {/* Payment Summary */}
+                {/* Payer Summary Card */}
+                <Card className="border border-gray-200 shadow-sm">
+                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 border-b">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-green-100 rounded-lg">
+                                <UserCircle className="h-5 w-5 text-green-700" />
+                            </div>
+                            <CardTitle className="text-lg font-semibold text-gray-900">
+                                Payer Summary
+                            </CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-4">
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    {payerTypeInfo.icon && (
+                                        <div className={`p-1.5 rounded ${payerTypeInfo.color}`}>
+                                            {React.createElement(payerTypeInfo.icon, { className: "h-3.5 w-3.5" })}
+                                        </div>
+                                    )}
+                                    <span className="font-medium text-gray-900">Payer Type</span>
+                                </div>
+                                <Badge className={`${payerTypeInfo.color} border-0`}>
+                                    {payerTypeInfo.label}
+                                </Badge>
+                            </div>
+                            
+                            <Separator />
+                            
+                            <div className="space-y-2">
+                                <div className="flex items-start gap-2">
+                                    <User className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
+                                    <div className="flex-1">
+                                        <div className="text-xs text-gray-500 mb-0.5">Payer Name</div>
+                                        <div className="font-medium text-gray-900 text-sm">
+                                            {data.payer_name || 'Not specified'}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {data.contact_number && (
+                                    <div className="flex items-start gap-2">
+                                        <Phone className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
+                                        <div className="flex-1">
+                                            <div className="text-xs text-gray-500 mb-0.5">Contact Number</div>
+                                            <div className="font-medium text-gray-900 text-sm">
+                                                {data.contact_number}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {data.address && (
+                                    <div className="flex items-start gap-2">
+                                        <MapPin className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
+                                        <div className="flex-1">
+                                            <div className="text-xs text-gray-500 mb-0.5">Address</div>
+                                            <div className="font-medium text-gray-900 text-sm line-clamp-2">
+                                                {data.address}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {data.purok && (
+                                    <div className="flex items-start gap-2">
+                                        <MapPinHouse className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
+                                        <div className="flex-1">
+                                            <div className="text-xs text-gray-500 mb-0.5">Purok/Zone</div>
+                                            <div className="font-medium text-gray-900 text-sm">
+                                                {data.purok}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {data.household_number && (
+                                    <div className="flex items-start gap-2">
+                                        <Hash className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
+                                        <div className="flex-1">
+                                            <div className="text-xs text-gray-500 mb-0.5">Household Number</div>
+                                            <div className="font-medium text-gray-900 text-sm">
+                                                {data.household_number}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Payment Summary Card */}
                 <Card className="border border-gray-200 shadow-sm">
                     <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 border-b">
                         <div className="flex items-center justify-between">
@@ -1005,23 +1154,63 @@ export function PaymentDetailsStep({
                                     Payment Summary
                                 </CardTitle>
                             </div>
-                            <Badge variant="outline" className="bg-white">
-                                {currentMethod?.name || 'Cash'}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-white">
+                                    {data.payment_method === 'cash' ? 'Cash' : data.payment_method === 'gcash' ? 'GCash' : data.payment_method}
+                                </Badge>
+                                {isClearanceFeePayment && (
+                                    <Badge className="bg-gradient-to-r from-purple-600 to-purple-700 text-white border-0">
+                                        <FileBadge className="h-3 w-3 mr-1" />
+                                        Clearance
+                                    </Badge>
+                                )}
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-4 pt-4">
-                        {/* Clearance Payment Badge */}
                         {isClearanceFeePayment && (
-                            <div className="mb-3">
-                                <Badge className="w-full justify-center bg-gradient-to-r from-purple-600 to-purple-700 text-white border-0">
-                                    <FileBadge className="h-3.5 w-3.5 mr-1.5" />
-                                    Clearance/Certificate Payment
-                                </Badge>
+                            <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-lg">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <FileBadge className="h-4 w-4 text-purple-600" />
+                                    <span className="font-medium text-purple-800">Clearance Details</span>
+                                </div>
+                                <div className="text-sm">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-gray-600">Type:</span>
+                                        <span className="font-medium text-purple-700">
+                                            {selectedClearanceType?.name || getClearanceTypeNameById(data.clearance_type_id) || 'Clearance Fee'}
+                                        </span>
+                                    </div>
+                                    {selectedClearanceType && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-gray-600">Code:</span>
+                                            <span className="font-mono text-xs text-gray-700">{selectedClearanceType.code}</span>
+                                        </div>
+                                    )}
+                                    {clearanceItem && (
+                                        <div className="mt-2 pt-2 border-t border-purple-200">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-600">Fee:</span>
+                                                <span className="font-medium text-purple-700">
+                                                    {formatCurrency(clearanceItem.total_amount || 0)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {clearanceRequest?.reference_number && (
+                                        <div className="mt-2 pt-2 border-t border-purple-200">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-gray-600">Request ID:</span>
+                                                <span className="font-medium text-purple-700 font-mono text-xs">
+                                                    {clearanceRequest.reference_number}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 
-                        {/* ALL Items Display in Compact List */}
                         {paymentItems.length > 0 && (
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
@@ -1033,6 +1222,7 @@ export function PaymentDetailsStep({
                                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                                     {paymentItems.map((item, index) => {
                                         const isClearanceItem = item.metadata?.is_clearance_fee || item.category === 'clearance';
+                                        const itemTotal = item.total_amount || 0;
                                         return (
                                             <div 
                                                 key={item.id} 
@@ -1051,7 +1241,6 @@ export function PaymentDetailsStep({
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        {getCategoryIcon(item.category)}
                                                         <span className={`font-medium truncate ${
                                                             isClearanceItem ? 'text-purple-800' : 'text-gray-900'
                                                         }`}>
@@ -1066,23 +1255,9 @@ export function PaymentDetailsStep({
                                                     <div className="flex items-center justify-between text-xs text-gray-500">
                                                         <span className="font-mono">Code: {item.fee_code}</span>
                                                         <span className="font-medium text-gray-900">
-                                                            {formatCurrency(item.total_amount)}
+                                                            {formatCurrency(itemTotal)}
                                                         </span>
                                                     </div>
-                                                    {(item.surcharge > 0 || item.penalty > 0) && (
-                                                        <div className="flex items-center gap-2 text-xs mt-1">
-                                                            {item.surcharge > 0 && (
-                                                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 px-1.5">
-                                                                    +{formatCurrency(item.surcharge)} surcharge
-                                                                </Badge>
-                                                            )}
-                                                            {item.penalty > 0 && (
-                                                                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 px-1.5">
-                                                                    +{formatCurrency(item.penalty)} penalty
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -1096,46 +1271,39 @@ export function PaymentDetailsStep({
                             <div className="space-y-1.5">
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-600">Subtotal</span>
-                                    <span className="font-medium text-gray-900">{formatCurrency(safeData.subtotal)}</span>
+                                    <span className="font-medium text-gray-900">{formatCurrency(displayTotals.subtotal)}</span>
                                 </div>
-                                {safeData.surcharge > 0 && (
+                                {displayTotals.surcharge > 0 && (
                                     <div className="flex justify-between items-center text-sm">
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-amber-700">Surcharge</span>
-                                        </div>
-                                        <span className="font-medium text-amber-700">+{formatCurrency(safeData.surcharge)}</span>
+                                        <span className="text-amber-700">Surcharge</span>
+                                        <span className="font-medium text-amber-700">+{formatCurrency(displayTotals.surcharge)}</span>
                                     </div>
                                 )}
-                                {safeData.penalty > 0 && (
+                                {displayTotals.penalty > 0 && (
                                     <div className="flex justify-between items-center text-sm">
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-red-700">Penalty</span>
-                                        </div>
-                                        <span className="font-medium text-red-700">+{formatCurrency(safeData.penalty)}</span>
-                                    </div>
+                                        <span className="text-red-700">Penalty</span>
+                                        <span className="font-medium text-red-700">+{formatCurrency(displayTotals.penalty)}</span>
+                                </div>
                                 )}
-                                {selectedDiscountType && safeData.discount > 0 && (
+                                {selectedDiscountType && selectedDiscountType !== 'no_discount' && discountAmount > 0 && (
                                     <div className="flex justify-between items-center text-sm">
                                         <div className="flex items-center gap-1">
                                             <span className="text-green-700">Discount</span>
                                             <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 px-1.5 py-0">
-                                                {selectedDiscountType}
+                                                {discountTypes[selectedDiscountType] || selectedDiscountType}
                                             </Badge>
                                         </div>
-                                        <span className="font-medium text-green-700">-{formatCurrency(safeData.discount)}</span>
+                                        <span className="font-medium text-green-700">-{formatCurrency(discountAmount)}</span>
                                     </div>
                                 )}
                             </div>
                             <Separator />
                             <div className="flex justify-between items-center pt-1">
                                 <span className="font-bold text-gray-900">Total Amount</span>
-                                <span className="text-primary font-bold text-lg">{formatCurrency(safeData.total_amount)}</span>
+                                <span className="text-primary font-bold text-lg">
+                                    {formatCurrency(finalTotal)}
+                                </span>
                             </div>
-                            {safeData.payment_method === 'cash' && (
-                                <div className="text-xs text-gray-500 text-center pt-1 italic">
-                                    Please prepare exact amount for faster processing
-                                </div>
-                            )}
                         </div>
 
                         {/* Discount Selection */}
@@ -1162,316 +1330,15 @@ export function PaymentDetailsStep({
                                             <div className="flex items-center gap-2">
                                                 <div className="h-2 w-2 rounded-full bg-green-500" />
                                                 <span>{label}</span>
-                                                <Badge variant="outline" className="ml-auto text-xs bg-green-50 text-green-700">
-                                                    -10%
-                                                </Badge>
                                             </div>
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {selectedDiscountType && selectedDiscountType !== 'no_discount' && (
-                                <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded flex items-center gap-1.5">
-                                    <CheckCircle className="h-3.5 w-3.5" />
-                                    10% discount has been applied to eligible items
-                                </div>
-                            )}
                         </div>
                     </CardContent>
                 </Card>
-
-                {/* Professional Receipt Preview */}
-                <ReceiptPreview
-                    orNumber={safeData.or_number}
-                    paymentDate={safeData.payment_date}
-                    payerName={data.payer_name}
-                    totalAmount={safeData.total_amount}
-                    paymentMethod={safeData.payment_method}
-                    referenceNumber={safeData.reference_number}
-                    purpose={safeData.purpose}
-                    paymentItems={paymentItems}
-                    isClearancePayment={isClearanceFeePayment}
-                    certificateType={safeData.certificate_type}
-                    clearanceTypes={clearanceTypes}
-                />
             </div>
         </div>
-    );
-}
-
-// Professional Receipt Preview Component
-function ReceiptPreview({ 
-    orNumber, 
-    paymentDate, 
-    payerName, 
-    totalAmount,
-    paymentMethod,
-    referenceNumber,
-    purpose,
-    paymentItems = [],
-    isClearancePayment = false,
-    certificateType = '',
-    clearanceTypes = {}
-}: { 
-    orNumber: string; 
-    paymentDate: string; 
-    payerName: string; 
-    totalAmount: number;
-    paymentMethod: string;
-    referenceNumber: string;
-    purpose: string;
-    paymentItems?: PaymentItem[];
-    isClearancePayment?: boolean;
-    certificateType?: string;
-    clearanceTypes?: Record<string, string>;
-}) {
-    const formatMethodName = (method: string) => {
-        const methods: Record<string, string> = {
-            'cash': 'Cash',
-            'gcash': 'GCash',
-            'maya': 'Maya',
-            'bank': 'Bank Transfer',
-            'check': 'Check',
-            'online': 'Online Payment'
-        };
-        return methods[method] || method;
-    };
-
-    // Format date
-    const formatDate = () => {
-        if (!paymentDate) return '';
-        try {
-            return new Date(paymentDate).toLocaleDateString('en-PH', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                weekday: 'short'
-            });
-        } catch (error) {
-            return '';
-        }
-    };
-
-    // Calculate totals from items
-    const calculateTotals = () => {
-        const subtotal = paymentItems.reduce((sum, item) => sum + item.base_amount, 0);
-        const surcharge = paymentItems.reduce((sum, item) => sum + item.surcharge, 0);
-        const penalty = paymentItems.reduce((sum, item) => sum + item.penalty, 0);
-        return { subtotal, surcharge, penalty };
-    };
-
-    const totals = calculateTotals();
-    const certificateName = certificateType && clearanceTypes[certificateType] 
-        ? clearanceTypes[certificateType] 
-        : certificateType;
-
-    return (
-        <Card className="border border-gray-200 shadow-sm">
-            <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 border-b">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-green-100 rounded-lg">
-                            <Receipt className="h-5 w-5 text-green-700" />
-                        </div>
-                        <CardTitle className="text-lg font-semibold text-gray-900">
-                            Receipt Preview
-                        </CardTitle>
-                    </div>
-                    <Badge variant="outline" className="bg-white text-xs">
-                        Live Preview
-                    </Badge>
-                </div>
-            </CardHeader>
-            <CardContent className="p-4">
-                {/* Receipt Container */}
-                <div className="bg-white border border-gray-300 rounded-lg overflow-hidden shadow-sm">
-                    {/* Receipt Header */}
-                    <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-4 text-center">
-                        <h2 className="text-lg font-bold tracking-tight">BARANGAY GOVERNMENT</h2>
-                        <p className="text-xs opacity-90 mt-1">Official Receipt</p>
-                        {isClearancePayment && (
-                            <div className="mt-2">
-                                <Badge className="bg-gradient-to-r from-purple-600 to-purple-700 text-white border-0">
-                                    <FileBadge className="h-3 w-3 mr-1" />
-                                    CERTIFICATE PAYMENT
-                                </Badge>
-                            </div>
-                        )}
-                    </div>
-                    
-                    {/* Receipt Body */}
-                    <div className="p-4">
-                        {/* Receipt Info */}
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            <div>
-                                <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">OR Number</div>
-                                <div className="font-mono font-bold text-sm text-gray-900">{orNumber || 'BAR-20240101-001'}</div>
-                            </div>
-                            <div>
-                                <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Date</div>
-                                <div className="font-medium text-sm text-gray-900">{formatDate()}</div>
-                            </div>
-                        </div>
-
-                        {/* Certificate Type */}
-                        {isClearancePayment && certificateName && (
-                            <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <FileBadge className="h-4 w-4 text-purple-600" />
-                                    <span className="font-medium text-purple-900">Certificate Type:</span>
-                                </div>
-                                <div className="font-bold text-purple-800">{certificateName}</div>
-                            </div>
-                        )}
-
-                        {/* Payer Info */}
-                        <div className="mb-4">
-                            <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Paid By</div>
-                            <div className="font-medium text-gray-900 border-b border-gray-200 pb-2">
-                                {payerName || 'Juan Dela Cruz'}
-                            </div>
-                        </div>
-
-                        {/* Purpose */}
-                        {purpose && (
-                            <div className="mb-4">
-                                <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Purpose</div>
-                                <div className="text-sm text-gray-700 bg-gray-50 p-2 rounded border border-gray-200">
-                                    {purpose}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Items Summary */}
-                        {paymentItems.length > 0 && (
-                            <div className="mb-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide font-medium">Items</div>
-                                    <Badge variant="outline" className="text-xs bg-gray-100">
-                                        {paymentItems.length} items
-                                    </Badge>
-                                </div>
-                                <div className="space-y-1">
-                                    {paymentItems.slice(0, 3).map((item) => (
-                                        <div key={item.id} className="flex justify-between items-center text-sm">
-                                            <span className={`text-gray-700 truncate ${item.metadata?.is_clearance_fee ? 'font-medium' : ''}`}>
-                                                {item.metadata?.is_clearance_fee && '✓ '}{item.fee_name}
-                                            </span>
-                                            <span className="font-medium text-gray-900">{formatCurrency(item.total_amount)}</span>
-                                        </div>
-                                    ))}
-                                    {paymentItems.length > 3 && (
-                                        <div className="text-xs text-gray-500 text-center">
-                                            + {paymentItems.length - 3} more items
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Totals */}
-                        <div className="border-t border-gray-300 pt-3">
-                            <div className="space-y-1">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-600">Subtotal</span>
-                                    <span className="font-medium">{formatCurrency(totals.subtotal)}</span>
-                                </div>
-                                {totals.surcharge > 0 && (
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-amber-700">Surcharge</span>
-                                        <span className="font-medium text-amber-700">+{formatCurrency(totals.surcharge)}</span>
-                                    </div>
-                                )}
-                                {totals.penalty > 0 && (
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-red-700">Penalty</span>
-                                        <span className="font-medium text-red-700">+{formatCurrency(totals.penalty)}</span>
-                                    </div>
-                                )}
-                            </div>
-                            
-                            {/* Total */}
-                            <div className="mt-3 pt-3 border-t border-gray-400">
-                                <div className="flex justify-between items-center">
-                                    <span className="font-bold text-gray-900">TOTAL AMOUNT PAID</span>
-                                    <span className="text-lg font-bold text-primary">{formatCurrency(totalAmount)}</span>
-                                </div>
-                            </div>
-
-                            {/* Payment Method */}
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                                <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Payment Method</div>
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-gray-100">
-                                        {formatMethodName(paymentMethod)}
-                                    </Badge>
-                                    {referenceNumber && (
-                                        <span className="text-xs text-gray-600">Ref: {referenceNumber}</span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Certificate Notice */}
-                        {isClearancePayment && (
-                            <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <FileBadge className="h-4 w-4 text-purple-600" />
-                                    <span className="font-medium text-purple-800">Certificate Issuance</span>
-                                </div>
-                                <p className="text-sm text-purple-700">
-                                    This payment confirms eligibility for {certificateName}. Certificate will be issued upon validation.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Signatures */}
-                        <div className="mt-4 pt-4 border-t border-gray-300 grid grid-cols-2 gap-4 text-center">
-                            <div>
-                                <div className="border-b border-gray-400 h-12 mb-1"></div>
-                                <div className="text-xs text-gray-600">Treasurer</div>
-                            </div>
-                            <div>
-                                <div className="border-b border-gray-400 h-12 mb-1"></div>
-                                <div className="text-xs text-gray-600">Barangay Captain</div>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="mt-4 pt-3 border-t border-gray-300 text-center">
-                            <div className="text-xs text-gray-500">
-                                <div>Transaction ID: {orNumber}</div>
-                                <div className="mt-1">Issued: {new Date().toLocaleDateString('en-PH')}</div>
-                                <div className="mt-2 text-[10px] text-gray-400">
-                                    This is an official receipt. Keep for your records.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Preview Note */}
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-start gap-2">
-                        <Info className="h-4 w-4 text-blue-600 mt-0.5" />
-                        <div className="text-xs text-blue-700">
-                            This is a preview of how the official receipt will appear. All details shown here will be printed on the final document.
-                        </div>
-                    </div>
-                    {isClearancePayment && (
-                        <div className="mt-2 flex gap-2">
-                            <Button variant="outline" size="sm" className="text-xs">
-                                <Download className="h-3 w-3 mr-1" />
-                                Download Receipt
-                            </Button>
-                            <Button variant="outline" size="sm" className="text-xs">
-                                <Printer className="h-3 w-3 mr-1" />
-                                Print Receipt
-                            </Button>
-                        </div>
-                    )}
-                </div>
-            </CardContent>
-        </Card>
     );
 }

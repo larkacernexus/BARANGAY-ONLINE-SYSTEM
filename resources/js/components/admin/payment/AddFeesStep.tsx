@@ -1,3 +1,4 @@
+// resources/js/components/admin/payment/AddFeesStep.tsx
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,21 +25,18 @@ import {
     Search,
     Calendar,
     CheckCircle,
-    Plus,
     AlertCircle,
     Phone,
     MapPin,
     Hash,
-    Clock,
     FileSearch,
     CreditCard,
-    Info
+    Info,
+    FileBadge
 } from 'lucide-react';
 
-// Import the LatePaymentSettings component
 import { LatePaymentSettings } from './LatePaymentSettings';
 
-// Updated Interfaces
 interface FeeType {
     id: string | number;
     name: string;
@@ -60,12 +58,10 @@ interface OutstandingFee {
     fee_code: string;
     payer_name: string;
     due_date: string;
-    issue_date?: string;
     base_amount: string;
     surcharge_amount?: string;
     penalty_amount: string;
     discount_amount?: string;
-    total_amount: string;
     amount_paid: string;
     balance: string;
     status: string;
@@ -88,16 +84,9 @@ interface PaymentItem {
     period_covered?: string;
     months_late?: number;
     metadata?: {
-        original_surcharge: number;
-        original_penalty: number;
-        additional_surcharge: number;
-        additional_penalty: number;
-        is_late_payment: boolean;
-        original_total: number;
-        is_future_fee: boolean;
-        data_warning: boolean;
         is_clearance_fee?: boolean;
         clearance_request_id?: string | number;
+        is_prefilled_clearance?: boolean;
     };
 }
 
@@ -110,28 +99,9 @@ interface PaymentFormData {
     household_number?: string;
     payer_id?: string | number;
     clearance_request_id?: string | number;
-}
-
-interface PrefilledFee {
-    id?: string | number;
-    fee_id?: string | number;
-    fee_name?: string;
-    fee_code?: string;
-    fee_type?: FeeType;
-    payer_type?: string;
-    payer_id?: string | number;
-    payer_name?: string;
-    contact_number?: string;
-    address?: string;
-    house_number?: string;
-    purok?: string;
-    total_amount?: number;
-    amount_paid?: number;
-    balance?: number;
-    status?: string;
-    description?: string;
-    is_clearance_fee?: boolean;
-    clearance_request_id?: string | number;
+    clearance_type?: string;
+    clearance_type_id?: string | number;
+    clearance_code?: string;
 }
 
 interface ClearanceRequest {
@@ -149,13 +119,11 @@ interface ClearanceRequest {
     };
 }
 
-// Props interface - UPDATED
 interface AddFeesStepProps {
     data: PaymentFormData;
     setStep: (step: number) => void;
     paymentItems: PaymentItem[];
     removePaymentItem: (id: number) => void;
-    prefilledFee?: PrefilledFee;
     payerOutstandingFees: OutstandingFee[];
     
     // Late payment modal props
@@ -172,15 +140,19 @@ interface AddFeesStepProps {
     onCancelLateSettings: () => void;
     onDirectAddFee?: (fee: OutstandingFee) => void;
     
-    // Other props - UPDATED
+    // Other props
     feeTypes?: FeeType[];
-    dataWarnings?: string[];
     isClearancePayment?: boolean;
     clearanceRequest?: ClearanceRequest | null;
-    clearanceFeeType?: any;
+    pre_filled_data?: {
+        fee_type_id?: string | number | null;
+        clearance_type_id?: string | number | null;
+        clearance_code?: string | null;
+    } | null;
+    // Add source parameter to track where payer was selected from
+    payerSource?: 'clearance' | 'residents' | 'business' | 'other';
 }
 
-// Helper functions
 function formatCurrency(amount: number): string {
     return `₱${amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
 }
@@ -191,15 +163,7 @@ function parseCurrencyString(amountString: string): number {
     return isNaN(parsed) ? 0 : parsed;
 }
 
-// Check if date is valid
-function isValidDate(dateString: string): boolean {
-    const date = new Date(dateString);
-    return !isNaN(date.getTime());
-}
-
-// Check if fee is a future fee
 function isFutureFee(fee: OutstandingFee): boolean {
-    if (!isValidDate(fee.due_date)) return false;
     const dueDate = new Date(fee.due_date);
     const today = new Date();
     return dueDate > today;
@@ -208,7 +172,7 @@ function isFutureFee(fee: OutstandingFee): boolean {
 const getCategoryIcon = (category: string) => {
     const icons: Record<string, React.ElementType> = {
         'tax': DollarSign,
-        'clearance': FileCheck,
+        'clearance': FileBadge,
         'certificate': Shield,
         'service': Package,
         'rental': Home,
@@ -237,8 +201,7 @@ const getStatusBadge = (status: string) => {
         'issued': { label: 'Issued', color: 'bg-blue-100 text-blue-800 border-blue-200' },
         'overdue': { label: 'Overdue', color: 'bg-red-100 text-red-800 border-red-200' },
         'partially_paid': { label: 'Partial', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-        'paid': { label: 'Paid', color: 'bg-green-100 text-green-800 border-green-200' },
-        'pending': { label: 'Pending', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' }
+        'paid': { label: 'Paid', color: 'bg-green-100 text-green-800 border-green-200' }
     };
     
     const configItem = config[status] || { label: status, color: 'bg-gray-100 text-gray-800 border-gray-200' };
@@ -254,124 +217,113 @@ export function AddFeesStep({
     setStep,
     paymentItems,
     removePaymentItem,
-    prefilledFee,
     payerOutstandingFees,
-    
-    // Late payment modal props
     selectedFee,
     showLateSettings,
     isLatePayment,
     setIsLatePayment,
     monthsLate,
     setMonthsLate,
-    
-    // Event handlers
     onFeeClick,
     onAddWithLateSettings,
     onCancelLateSettings,
     onDirectAddFee,
-    
-    // Other props - UPDATED
     feeTypes = [],
-    dataWarnings = [],
     isClearancePayment = false,
     clearanceRequest = null,
-    clearanceFeeType = null
+    pre_filled_data = null,
+    payerSource = 'residents' // Default to residents
 }: AddFeesStepProps) {
     
-    // State for filtering
     const [searchQuery, setSearchQuery] = useState<string>('');
-    const [showClearanceInfo, setShowClearanceInfo] = useState<boolean>(isClearancePayment);
+    const [internalIsClearancePayment, setInternalIsClearancePayment] = useState<boolean>(false);
+    const [showClearanceInfo, setShowClearanceInfo] = useState<boolean>(false);
     
-    // Check if fee is already added
+    // Determine if this is a clearance payment based on multiple factors
+    useEffect(() => {
+        const determineClearanceMode = () => {
+            console.log('🔍 AddFeesStep Clearance Check - START:', {
+                payerSource,
+                isClearancePayment,
+                hasClearanceRequest: !!clearanceRequest,
+                hasPreFilledClearance: !!(pre_filled_data && (
+                    pre_filled_data.clearance_type_id != null || 
+                    pre_filled_data.clearance_code != null ||
+                    pre_filled_data.fee_type_id != null
+                )),
+                hasFormClearance: !!(data && (
+                    data.clearance_type_id != null || 
+                    data.clearance_code != null ||
+                    data.clearance_type != null ||
+                    data.clearance_request_id != null
+                )),
+                hasClearancePaymentItems: paymentItems.some(item => item.metadata?.is_clearance_fee),
+                paymentItemsCount: paymentItems.length
+            });
+            
+            // Check multiple conditions for clearance payment
+            const hasClearanceRequest = !!clearanceRequest;
+            const hasPreFilledClearance = pre_filled_data && (
+                pre_filled_data.clearance_type_id != null || 
+                pre_filled_data.clearance_code != null ||
+                pre_filled_data.fee_type_id != null
+            );
+            
+            const hasFormClearance = data && (
+                data.clearance_type_id != null || 
+                data.clearance_code != null ||
+                data.clearance_type != null ||
+                data.clearance_request_id != null
+            );
+            
+            // Check if any payment item is a clearance fee
+            const hasClearancePaymentItems = paymentItems.some(
+                item => item.metadata?.is_clearance_fee
+            );
+            
+            const result = isClearancePayment || 
+                          hasClearanceRequest || 
+                          hasPreFilledClearance || 
+                          hasFormClearance ||
+                          hasClearancePaymentItems ||
+                          payerSource === 'clearance'; // Add this line - if coming from clearance tab
+            
+            console.log('🔍 AddFeesStep Clearance Check - RESULT:', {
+                result,
+                payerSource,
+                isClearancePayment,
+                hasClearanceRequest,
+                hasPreFilledClearance,
+                hasFormClearance,
+                hasClearancePaymentItems
+            });
+            
+            setInternalIsClearancePayment(result);
+            setShowClearanceInfo(result || payerSource === 'clearance');
+        };
+        
+        determineClearanceMode();
+    }, [isClearancePayment, clearanceRequest, pre_filled_data, data, paymentItems, payerSource]);
+    
     const isFeeAlreadyAdded = (feeId: string | number) => {
         return paymentItems.some(item => item.fee_id === feeId);
     };
     
-    // Auto-add prefilled fee on component mount
-    useEffect(() => {
-        if (prefilledFee && !prefilledFee.is_clearance_fee && paymentItems.length === 0) {
-            // Create a payment item from prefilled fee data
-            const feeItem: PaymentItem = {
-                id: Date.now(),
-                fee_id: prefilledFee.id || prefilledFee.fee_id || Date.now(),
-                fee_name: prefilledFee.fee_name || 'Fee',
-                fee_code: prefilledFee.fee_code || 'FEE',
-                base_amount: prefilledFee.balance || prefilledFee.total_amount || 0,
-                penalty: 0,
-                total_amount: prefilledFee.balance || prefilledFee.total_amount || 0,
-                category: prefilledFee.fee_type?.category || 'other',
-                surcharge: 0,
-                discount: 0,
-                metadata: {
-                    original_surcharge: 0,
-                    original_penalty: 0,
-                    additional_surcharge: 0,
-                    additional_penalty: 0,
-                    is_late_payment: false,
-                    original_total: prefilledFee.balance || prefilledFee.total_amount || 0,
-                    is_future_fee: false,
-                    data_warning: false
-                }
-            };
-            
-            if (onDirectAddFee) {
-                // Create a temporary OutstandingFee object for compatibility
-                const tempFee: OutstandingFee = {
-                    id: prefilledFee.id || prefilledFee.fee_id || Date.now(),
-                    fee_type_id: prefilledFee.fee_type?.id || 0,
-                    fee_code: prefilledFee.fee_code || 'FEE',
-                    payer_name: prefilledFee.payer_name || data.payer_name,
-                    due_date: new Date().toISOString().split('T')[0],
-                    base_amount: (prefilledFee.balance || prefilledFee.total_amount || 0).toString(),
-                    penalty_amount: '0',
-                    discount_amount: '0',
-                    surcharge_amount: '0',
-                    total_amount: (prefilledFee.balance || prefilledFee.total_amount || 0).toString(),
-                    amount_paid: '0',
-                    balance: (prefilledFee.balance || prefilledFee.total_amount || 0).toString(),
-                    status: 'issued',
-                    purpose: prefilledFee.description || prefilledFee.fee_name || 'Fee Payment',
-                    fee_type: prefilledFee.fee_type,
-                    fee_type_name: prefilledFee.fee_type?.name,
-                    fee_type_category: prefilledFee.fee_type?.category
-                };
-                
-                onDirectAddFee(tempFee);
-            }
-        }
-    }, [prefilledFee]);
-    
-    // Calculate total outstanding balance (with correct penalty logic)
-    const totalOutstandingBalance = payerOutstandingFees.reduce((total, fee) => {
-        const base = parseCurrencyString(fee.base_amount);
-        const surcharge = parseCurrencyString(fee.surcharge_amount || '0');
-        const penalty = isFutureFee(fee) ? 0 : parseCurrencyString(fee.penalty_amount);
-        const discount = parseCurrencyString(fee.discount_amount || '0');
-        
-        const correctedBalance = base + surcharge + penalty - discount;
-        return total + correctedBalance;
-    }, 0);
-    
-    // Calculate total selected amount
     const totalSelectedAmount = paymentItems.reduce((total, item) => {
         return total + item.total_amount;
     }, 0);
     
-    // Filter outstanding fees
     const filteredFees = payerOutstandingFees.filter(fee => {
         if (!searchQuery) return true;
         
         const query = searchQuery.toLowerCase();
         return (
             fee.fee_code.toLowerCase().includes(query) ||
-            (fee.fee_type?.name && fee.fee_type.name.toLowerCase().includes(query)) ||
             (fee.fee_type_name && fee.fee_type_name.toLowerCase().includes(query)) ||
             (fee.purpose && fee.purpose.toLowerCase().includes(query))
         );
     });
     
-    // Calculate corrected balance for a fee (removes penalty if future fee)
     const getCorrectedBalance = (fee: OutstandingFee): number => {
         const isFuture = isFutureFee(fee);
         const base = parseCurrencyString(fee.base_amount);
@@ -382,24 +334,16 @@ export function AddFeesStep({
         return base + surcharge + penalty - discount;
     };
     
-    // Check if fee has data integrity issues
-    const hasDataIssue = (fee: OutstandingFee): boolean => {
-        return isFutureFee(fee) && parseCurrencyString(fee.penalty_amount) > 0;
-    };
-    
-    // Handle fee selection
     const handleSelectFee = (fee: OutstandingFee) => {
         if (isFeeAlreadyAdded(fee.id)) {
             return;
         }
         
-        // Use parent's onDirectAddFee function
         if (onDirectAddFee) {
             onDirectAddFee(fee);
         }
     };
     
-    // Handle continue to payment
     const handleContinue = () => {
         if (paymentItems.length === 0) {
             alert('Please add at least one fee to pay.');
@@ -408,10 +352,36 @@ export function AddFeesStep({
         setStep(3);
     };
     
-    // Handle back to payer selection
     const handleBack = () => {
         setStep(1);
     };
+    
+    // Get clearance type name from various sources
+    const getClearanceTypeName = () => {
+        if (clearanceRequest?.clearance_type?.name) {
+            return clearanceRequest.clearance_type.name;
+        }
+        
+        // Check form data
+        if (data.clearance_type) {
+            return data.clearance_type;
+        }
+        
+        // If coming from clearance tab but no specific type, show generic
+        if (payerSource === 'clearance') {
+            return 'Clearance Payment';
+        }
+        
+        return 'Clearance Payment';
+    };
+    
+    // Check if this is specifically a clearance-only payment (no other fees)
+    const isClearanceOnlyPayment = internalIsClearancePayment && 
+        paymentItems.length > 0 && 
+        paymentItems.every(item => item.metadata?.is_clearance_fee);
+
+    // Check if we should show clearance mode message
+    const shouldShowClearanceMode = internalIsClearancePayment || payerSource === 'clearance';
 
     return (
         <div className="grid gap-6 lg:grid-cols-3">
@@ -422,22 +392,20 @@ export function AddFeesStep({
                         <CardTitle className="flex items-center gap-2">
                             {getPayerTypeIcon(data.payer_type)}
                             Payer Information
-                            {isClearancePayment && (
+                            {showClearanceInfo && (
                                 <Badge className="ml-2 bg-purple-100 text-purple-800 border-purple-200">
-                                    <FileCheck className="h-3 w-3 mr-1" />
-                                    Clearance
+                                    <FileBadge className="h-3 w-3 mr-1" />
+                                    {payerSource === 'clearance' ? 'From Clearance Tab' : 'Clearance'}
                                 </Badge>
                             )}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {/* Payer Information */}
                         <div>
                             <Label className="text-sm text-gray-500">Payer Name</Label>
                             <div className="font-medium">{data.payer_name}</div>
                         </div>
                         
-                        {/* Contact and Household Number */}
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <Label className="text-sm text-gray-500">Contact</Label>
@@ -455,7 +423,6 @@ export function AddFeesStep({
                             </div>
                         </div>
                         
-                        {/* Address */}
                         <div>
                             <Label className="text-sm text-gray-500">Address</Label>
                             <div className="font-medium flex items-center gap-1">
@@ -464,7 +431,6 @@ export function AddFeesStep({
                             </div>
                         </div>
                         
-                        {/* Purok (if available) */}
                         {data.purok && (
                             <div>
                                 <Label className="text-sm text-gray-500">Purok</Label>
@@ -472,46 +438,54 @@ export function AddFeesStep({
                             </div>
                         )}
                         
-                        {/* Clearance Request Info (if applicable) */}
-                        {isClearancePayment && clearanceRequest && (
+                        {showClearanceInfo && (
                             <>
                                 <Separator />
                                 <div className="p-3 bg-purple-50 border border-purple-200 rounded-md">
                                     <div className="flex items-center gap-2 mb-2">
                                         <FileSearch className="h-4 w-4 text-purple-600" />
-                                        <span className="font-medium text-purple-800">Clearance Request</span>
+                                        <span className="font-medium text-purple-800">
+                                            {getClearanceTypeName()}
+                                        </span>
+                                        {payerSource === 'clearance' && (
+                                            <Badge className="ml-2 bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                                                From Clearance Tab
+                                            </Badge>
+                                        )}
                                     </div>
                                     <div className="space-y-2 text-sm">
-                                        <div>
-                                            <span className="text-purple-700">Reference:</span>
-                                            <div className="font-mono font-medium">{clearanceRequest.reference_number}</div>
-                                        </div>
-                                        <div>
-                                            <span className="text-purple-700">Type:</span>
-                                            <div>{clearanceRequest.clearance_type?.name || 'Clearance'}</div>
-                                        </div>
-                                        <div>
-                                            <span className="text-purple-700">Purpose:</span>
-                                            <div className="text-purple-900">{clearanceRequest.specific_purpose || clearanceRequest.purpose}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                        
-                        {/* Outstanding Balance Summary */}
-                        {payerOutstandingFees.length > 0 && (
-                            <>
-                                <Separator />
-                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-sm font-medium text-amber-800">Total Outstanding</span>
-                                        <Badge variant="outline" className="bg-amber-100 text-amber-800">
-                                            {payerOutstandingFees.length} fees
-                                        </Badge>
-                                    </div>
-                                    <div className="text-lg font-bold text-amber-900">
-                                        {formatCurrency(totalOutstandingBalance)}
+                                        {clearanceRequest?.reference_number && (
+                                            <div>
+                                                <span className="text-purple-700">Reference:</span>
+                                                <div className="font-mono font-medium">{clearanceRequest.reference_number}</div>
+                                            </div>
+                                        )}
+                                        {data.clearance_code && (
+                                            <div>
+                                                <span className="text-purple-700">Code:</span>
+                                                <div className="font-mono font-medium">{data.clearance_code}</div>
+                                            </div>
+                                        )}
+                                        {data.clearance_type_id && !clearanceRequest?.reference_number && !data.clearance_code && (
+                                            <div>
+                                                <span className="text-purple-700">Type ID:</span>
+                                                <div className="font-medium">{data.clearance_type_id}</div>
+                                            </div>
+                                        )}
+                                        {isClearanceOnlyPayment && (
+                                            <div className="mt-2 p-2 bg-purple-100 rounded">
+                                                <p className="text-xs text-purple-800 font-medium">
+                                                    This is a clearance-only payment
+                                                </p>
+                                            </div>
+                                        )}
+                                        {payerSource === 'clearance' && !internalIsClearancePayment && (
+                                            <div className="mt-2 p-2 bg-blue-100 rounded">
+                                                <p className="text-xs text-blue-800 font-medium">
+                                                    Selected from Clearance tab
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </>
@@ -540,26 +514,35 @@ export function AddFeesStep({
                             Outstanding Fees
                         </CardTitle>
                         <CardDescription>
-                            Select fees to pay {isClearancePayment && "(additional fees for clearance)"}
+                            {shouldShowClearanceMode 
+                                ? "Select additional fees to pay (optional)" 
+                                : "Select fees to pay"
+                            }
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {/* Info Banner for Clearance Payments */}
-                        {isClearancePayment && (
+                        {shouldShowClearanceMode && (
                             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                                 <div className="flex items-center gap-2 text-blue-800">
                                     <Info className="h-4 w-4 flex-shrink-0" />
                                     <div className="text-sm">
-                                        <p className="font-medium">Clearance Payment Mode</p>
+                                        <p className="font-medium">
+                                            {payerSource === 'clearance' ? 'Clearance Tab Selection' : 'Clearance Payment Mode'}
+                                        </p>
                                         <p className="text-blue-700">
-                                            You're paying for a clearance request. You can add additional outstanding fees if needed.
+                                            {payerSource === 'clearance' 
+                                                ? "You selected this payer from the Clearance tab. You can add clearance fees or other outstanding fees below."
+                                                : "You're paying for a clearance request. " + 
+                                                  (isClearanceOnlyPayment 
+                                                    ? "You can add other outstanding fees if needed." 
+                                                    : "You can add additional outstanding fees below.")
+                                            }
                                         </p>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Late Payment Settings Modal (if shown) */}
                         {showLateSettings && selectedFee && (
                             <div className="mb-6">
                                 <LatePaymentSettings
@@ -574,7 +557,6 @@ export function AddFeesStep({
                             </div>
                         )}
 
-                        {/* Search Bar */}
                         <div className="mb-4">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -587,16 +569,13 @@ export function AddFeesStep({
                             </div>
                         </div>
                         
-                        {/* Fees List */}
                         <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
                             {filteredFees.length > 0 ? (
                                 filteredFees.map((fee) => {
                                     const isAdded = isFeeAlreadyAdded(fee.id);
-                                    const category = fee.fee_type?.category || fee.fee_type_category || 'other';
+                                    const category = fee.fee_type_category || 'other';
                                     const isFuture = isFutureFee(fee);
-                                    const dataIssue = hasDataIssue(fee);
                                     const correctedBalance = getCorrectedBalance(fee);
-                                    const originalBalance = parseCurrencyString(fee.balance);
                                     const penaltyAmount = parseCurrencyString(fee.penalty_amount);
                                     
                                     return (
@@ -606,7 +585,7 @@ export function AddFeesStep({
                                                 isAdded 
                                                     ? 'bg-green-50 border-green-200 cursor-default' 
                                                     : 'bg-white hover:border-primary hover:shadow-sm cursor-pointer'
-                                            } ${dataIssue ? 'border-red-200 bg-red-50/50' : ''}`}
+                                            }`}
                                             onClick={() => !isAdded && onDirectAddFee && handleSelectFee(fee)}
                                         >
                                             <div className="flex items-start justify-between">
@@ -614,7 +593,7 @@ export function AddFeesStep({
                                                     <div className="flex items-center gap-2 mb-2">
                                                         {getCategoryIcon(category)}
                                                         <span className="font-medium">
-                                                            {fee.fee_type?.name || fee.fee_type_name || 'Fee'}
+                                                            {fee.fee_type_name || 'Fee'}
                                                         </span>
                                                         {getStatusBadge(fee.status)}
                                                         {isFuture && (
@@ -635,7 +614,6 @@ export function AddFeesStep({
                                                         {fee.purpose && ` • ${fee.purpose}`}
                                                     </div>
                                                     
-                                                    {/* Amount Breakdown - CLEANED UP */}
                                                     <div className="space-y-1 text-xs mb-2">
                                                         <div className="flex justify-between">
                                                             <span>Base:</span>
@@ -649,15 +627,12 @@ export function AddFeesStep({
                                                             </div>
                                                         )}
                                                         
-                                                        {/* Show penalty ONLY if fee is NOT future AND has penalty */}
                                                         {!isFuture && penaltyAmount > 0 && (
                                                             <div className="flex justify-between text-red-600">
                                                                 <span>Penalty:</span>
                                                                 <span>+{formatCurrency(penaltyAmount)}</span>
                                                             </div>
                                                         )}
-                                                        
-                                                        {/* DON'T show penalty line for future fees at all */}
                                                         
                                                         {parseCurrencyString(fee.discount_amount || '0') > 0 && (
                                                             <div className="flex justify-between text-green-600">
@@ -666,11 +641,10 @@ export function AddFeesStep({
                                                             </div>
                                                         )}
                                                         
-                                                        {/* Always show the CORRECT total amount */}
                                                         <div className="flex justify-between font-bold pt-1 border-t mt-1">
                                                             <span>Total Amount:</span>
                                                             <span>
-                                                                {formatCurrency(dataIssue ? correctedBalance : originalBalance)}
+                                                                {formatCurrency(correctedBalance)}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -682,7 +656,7 @@ export function AddFeesStep({
                                                         </div>
                                                         <div className="text-right">
                                                             <div className="text-lg font-bold text-primary">
-                                                                {formatCurrency(dataIssue ? correctedBalance : originalBalance)}
+                                                                {formatCurrency(correctedBalance)}
                                                             </div>
                                                             <div className="text-xs text-gray-500">
                                                                 Balance
@@ -716,13 +690,11 @@ export function AddFeesStep({
                                     <p className="text-sm text-gray-500 mt-1">
                                         {searchQuery 
                                             ? 'No fees match your search'
-                                            : 'No outstanding fees available'}
+                                            : shouldShowClearanceMode 
+                                                ? 'No additional outstanding fees'
+                                                : 'No outstanding fees available'
+                                        }
                                     </p>
-                                    {isClearancePayment && (
-                                        <p className="text-sm text-blue-600 mt-2">
-                                            You can proceed with the clearance payment only.
-                                        </p>
-                                    )}
                                 </div>
                             )}
                         </div>
@@ -752,44 +724,50 @@ export function AddFeesStep({
                                     <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                                     <h4 className="font-medium text-gray-700">No items selected</h4>
                                     <p className="text-sm text-gray-500 mt-1">
-                                        Select fees from the list to add them here
+                                        {shouldShowClearanceMode 
+                                            ? "Add clearance fee or select other fees to pay"
+                                            : "Select fees from the list to add them here"
+                                        }
+                                        {payerSource === 'clearance' && (
+                                            <span className="block text-purple-600 font-medium mt-1">
+                                                (Selected from Clearance tab)
+                                            </span>
+                                        )}
                                     </p>
-                                    {isClearancePayment && (
-                                        <p className="text-sm text-blue-600 mt-2">
-                                            The clearance fee will be automatically added.
-                                        </p>
-                                    )}
                                 </div>
                             ) : (
                                 <>
-                                    {/* Clearance Payment Note */}
-                                    {isClearancePayment && (
+                                    {showClearanceInfo && (
                                         <div className="p-3 bg-purple-50 border border-purple-200 rounded-md mb-4">
                                             <div className="flex items-center gap-2 text-purple-800">
-                                                <FileCheck className="h-4 w-4" />
-                                                <span className="font-medium">Clearance Payment</span>
+                                                <FileBadge className="h-4 w-4" />
+                                                <span className="font-medium">{getClearanceTypeName()}</span>
+                                                {payerSource === 'clearance' && (
+                                                    <Badge className="ml-2 bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                                                        From Clearance Tab
+                                                    </Badge>
+                                                )}
                                             </div>
-                                            {clearanceRequest && (
+                                            {(clearanceRequest?.reference_number || data.clearance_code) && (
                                                 <div className="mt-2 text-sm text-purple-700">
-                                                    <div>Reference: {clearanceRequest.reference_number}</div>
-                                                    <div>Fee: {formatCurrency(typeof clearanceRequest.fee_amount === 'string' 
-                                                        ? parseCurrencyString(clearanceRequest.fee_amount)
-                                                        : Number(clearanceRequest.fee_amount || 0)
-                                                    )}</div>
+                                                    {clearanceRequest?.reference_number && (
+                                                        <div>Reference: {clearanceRequest.reference_number}</div>
+                                                    )}
+                                                    {data.clearance_code && (
+                                                        <div>Code: {data.clearance_code}</div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
                                     )}
 
-                                    {/* Selected Items List */}
                                     <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                                         {paymentItems.map((item) => {
-                                            // Check if this is a clearance fee
                                             const isClearanceFee = item.metadata?.is_clearance_fee;
                                             
                                             return (
                                                 <div key={item.id} className={`p-3 border rounded-lg ${
-                                                    isClearanceFee ? 'bg-purple-50 border-purple-200' : ''
+                                                    isClearanceFee ? 'bg-purple-50 border-purple-200' : 'bg-white'
                                                 }`}>
                                                     <div className="flex items-start justify-between mb-2">
                                                         <div className="flex-1">
@@ -798,21 +776,16 @@ export function AddFeesStep({
                                                                 <span className="font-medium">{item.fee_name}</span>
                                                                 {isClearanceFee && (
                                                                     <Badge className="bg-purple-100 text-purple-800 border-purple-200">
-                                                                        <FileCheck className="h-3 w-3 mr-1" />
+                                                                        <FileBadge className="h-3 w-3 mr-1" />
                                                                         Clearance
                                                                     </Badge>
                                                                 )}
                                                             </div>
                                                             <div className="text-xs text-gray-500">
                                                                 {item.fee_code}
-                                                                {item.metadata?.clearance_request_id && (
-                                                                    <span className="ml-2 text-purple-600">
-                                                                        (Request #{item.metadata.clearance_request_id})
-                                                                    </span>
-                                                                )}
+                                                                {item.metadata?.is_prefilled_clearance && " (Prefilled)"}
                                                             </div>
                                                         </div>
-                                                        {/* Don't allow removal of clearance fee if it's a clearance payment */}
                                                         {!isClearanceFee && (
                                                             <Button
                                                                 type="button"
@@ -853,13 +826,6 @@ export function AddFeesStep({
                                                             </div>
                                                         )}
                                                         
-                                                        {isClearanceFee && (
-                                                            <div className="flex justify-between text-purple-600 text-xs italic">
-                                                                <span>Clearance fee</span>
-                                                                <FileCheck className="h-3 w-3" />
-                                                            </div>
-                                                        )}
-                                                        
                                                         <div className="flex justify-between font-bold pt-1">
                                                             <span>Total:</span>
                                                             <span>{formatCurrency(item.total_amount)}</span>
@@ -870,7 +836,6 @@ export function AddFeesStep({
                                         })}
                                     </div>
                                     
-                                    {/* Total Summary */}
                                     <div className="pt-4 border-t">
                                         <div className="space-y-3">
                                             <div className="flex justify-between items-center text-lg font-bold">
@@ -879,17 +844,6 @@ export function AddFeesStep({
                                                     {formatCurrency(totalSelectedAmount)}
                                                 </span>
                                             </div>
-                                            
-                                            {isClearancePayment && (
-                                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                                    <div className="flex items-center gap-2 text-sm text-blue-800">
-                                                        <CreditCard className="h-4 w-4" />
-                                                        <span>
-                                                            This payment includes a clearance request. Proceed to complete the payment.
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            )}
                                             
                                             <Button
                                                 type="button"
@@ -900,10 +854,20 @@ export function AddFeesStep({
                                                 <ChevronRight className="h-4 w-4 ml-2" />
                                             </Button>
                                             
-                                            <div className="text-xs text-gray-500 text-center">
-                                                {paymentItems.length} item{paymentItems.length !== 1 ? 's' : ''} selected
-                                                {isClearancePayment && " (includes clearance)"}
-                                            </div>
+                                            {internalIsClearancePayment && isClearanceOnlyPayment && (
+                                                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                                                    <p className="text-xs text-blue-700 text-center">
+                                                        Proceeding with clearance-only payment
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {payerSource === 'clearance' && !internalIsClearancePayment && (
+                                                <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded-md">
+                                                    <p className="text-xs text-purple-700 text-center">
+                                                        Payer selected from Clearance tab
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </>
