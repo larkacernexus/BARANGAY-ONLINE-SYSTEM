@@ -139,6 +139,8 @@ class ResidentClearanceController extends Controller
         ]);
     }
     
+// app/Http/Controllers/Resident/ResidentClearanceController.php
+
 public function show(ClearanceRequest $clearance)
 {
     // Manual authorization - resident can only view their own clearances
@@ -159,16 +161,23 @@ public function show(ClearanceRequest $clearance)
         abort(403, 'You are not authorized to view this clearance.');
     }
     
-    // Load relationships - use camelCase for the relationship name
+    // Load relationships - REMOVED invalid 'payment' relationship
     $clearance->load([
         'clearance_type',
         'documents.documentType',
-        'payment',
-        'statusHistory.causer', // Changed from 'status_history' to 'statusHistory'
+        'statusHistory.causer',
     ]);
+    
+    // Load payment items if the relationship exists
+    $paymentItems = collect();
+    if (method_exists($clearance, 'paymentItems')) {
+        $clearance->load('paymentItems.payment');
+        $paymentItems = $clearance->paymentItems;
+    }
     
     return Inertia::render('resident/Clearances/Show', [
         'clearance' => $clearance,
+        'payment_items' => $paymentItems,
     ]);
 }
     
@@ -344,129 +353,255 @@ public function show(ClearanceRequest $clearance)
     /**
      * Store a newly created clearance request in storage.
      */
-    public function store(Request $request)
-    {
-        try {
-            // Simple validation
-            $validated = $request->validate([
-                'clearance_type_id' => 'required|exists:clearance_types,id',
-                'purpose' => 'required|string|max:255',
-                'specific_purpose' => 'required|string',
-                'needed_date' => 'required|date|after:today',
-                'resident_id' => 'required|exists:residents,id',
+ public function store(Request $request)
+{
+    try {
+        // Enhanced validation
+        $validated = $request->validate([
+            'clearance_type_id' => 'required|exists:clearance_types,id',
+            'purpose' => 'required|string|max:255',
+            'specific_purpose' => 'nullable|string|max:500',
+            'needed_date' => 'required|date|after_or_equal:today',
+            'resident_id' => 'required|exists:residents,id',
+            'additional_notes' => 'nullable|string|max:1000',
+            'documents' => 'nullable|array|max:20', // Limit number of files
+            'documents.*' => 'file|max:5120|mimes:pdf,jpg,jpeg,png,doc,docx', // 5MB max
+            'document_type_ids' => 'nullable|array', // Document type IDs
+            'document_type_ids.*' => 'nullable|integer|exists:document_types,id',
+            'descriptions' => 'nullable|array',
+            'descriptions.*' => 'nullable|string|max:255',
+        ]);
+
+        // Get the logged-in user
+        $user = Auth::user();
+        
+        if (!$user) {
+            Log::warning('Unauthenticated clearance request attempt', [
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent()
             ]);
-    
-            // Get the logged-in user
-            $user = Auth::user();
             
-            if (!$user) {
-                return response()->json([
-                    'message' => 'User not authenticated'
-                ], 401);
-            }
-    
-            // Get the user's household
-            $userHousehold = Household::where('user_id', $user->id)->first();
+            return back()->withErrors([
+                'message' => 'User not authenticated'
+            ]);
+        }
+
+        // Log the request start
+        Log::info('Clearance request submission started', [
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'resident_id' => $validated['resident_id'],
+            'clearance_type_id' => $validated['clearance_type_id'],
+            'request_data' => $request->except(['documents', 'descriptions'])
+        ]);
+
+        // Get the user's household
+        $userHousehold = Household::where('user_id', $user->id)->first();
+        
+        if (!$userHousehold) {
+            Log::error('Household not found for user', [
+                'user_id' => $user->id,
+                'email' => $user->email
+            ]);
             
-            if (!$userHousehold) {
-                return response()->json([
-                    'message' => 'Household not found. Please contact support.'
-                ], 422);
-            }
-    
-            // Get the resident being requested
-            $requestedResident = Resident::find($validated['resident_id']);
-            
-            if (!$requestedResident) {
-                return response()->json([
-                    'message' => 'Resident not found'
-                ], 422);
-            }
-    
-            // Check if requested resident belongs to user's household
-            if ($requestedResident->household_id !== $userHousehold->id) {
-                return response()->json([
-                    'message' => 'You can only request clearance for residents in your household'
-                ], 403);
-            }
-    
-            // Get clearance type
-            $clearanceType = ClearanceType::findOrFail($validated['clearance_type_id']);
-            
-            // Generate reference number
-            $referenceNumber = 'CLEAR-' . date('Ymd') . '-' . strtoupper(Str::random(6));
-    
-            // Create clearance request
-            $clearanceRequest = ClearanceRequest::create([
+            return back()->withErrors([
+                'message' => 'Household not found. Please contact support.'
+            ]);
+        }
+
+        // Get the resident being requested
+        $requestedResident = Resident::find($validated['resident_id']);
+        
+        if (!$requestedResident) {
+            Log::warning('Resident not found', [
                 'resident_id' => $validated['resident_id'],
-                'clearance_type_id' => $validated['clearance_type_id'],
-                'reference_number' => $referenceNumber,
-                'purpose' => $validated['purpose'],
-                'specific_purpose' => $validated['specific_purpose'],
-                'needed_date' => $validated['needed_date'],
-                'fee_amount' => $clearanceType->fee,
-                'status' => 'pending',
-                'requested_by_user_id' => $user->id, // Store user who made the request
-                'household_id' => $userHousehold->id, // Store household for reference
+                'user_id' => $user->id
             ]);
-    
-            // Handle file uploads
-            if ($request->hasFile('documents')) {
-                foreach ($request->file('documents') as $index => $file) {
+            
+            return back()->withErrors([
+                'message' => 'Resident not found'
+            ]);
+        }
+
+        // Check if requested resident belongs to user's household
+        if ($requestedResident->household_id !== $userHousehold->id) {
+            Log::warning('Attempt to request clearance for non-household resident', [
+                'user_id' => $user->id,
+                'user_household_id' => $userHousehold->id,
+                'resident_household_id' => $requestedResident->household_id,
+                'resident_id' => $requestedResident->id
+            ]);
+            
+            return back()->withErrors([
+                'message' => 'You can only request clearance for residents in your household'
+            ]);
+        }
+
+        // Get clearance type with logging
+        $clearanceType = ClearanceType::findOrFail($validated['clearance_type_id']);
+        
+        Log::info('Clearance type details', [
+            'clearance_type_id' => $clearanceType->id,
+            'name' => $clearanceType->name,
+            'fee' => $clearanceType->fee,
+            'processing_days' => $clearanceType->processing_days
+        ]);
+
+        // Generate reference number
+        $referenceNumber = 'CLEAR-' . date('Ymd') . '-' . strtoupper(Str::random(6));
+        
+        Log::info('Generated reference number', [
+            'reference_number' => $referenceNumber
+        ]);
+
+        // Create clearance request
+        $clearanceRequest = ClearanceRequest::create([
+            'resident_id' => $validated['resident_id'],
+            'clearance_type_id' => $validated['clearance_type_id'],
+            'reference_number' => $referenceNumber,
+            'purpose' => $validated['purpose'],
+            'specific_purpose' => $validated['specific_purpose'] ?? null,
+            'needed_date' => $validated['needed_date'],
+            'additional_notes' => $validated['additional_notes'] ?? null,
+            'fee_amount' => $clearanceType->fee,
+            'status' => 'pending',
+            'requested_by_user_id' => $user->id,
+            'household_id' => $userHousehold->id,
+        ]);
+
+        Log::info('Clearance request created', [
+            'request_id' => $clearanceRequest->id,
+            'reference_number' => $clearanceRequest->reference_number,
+            'status' => $clearanceRequest->status
+        ]);
+
+        // Handle file uploads with document_type_ids
+        $uploadedDocuments = [];
+        if ($request->hasFile('documents')) {
+            $documents = $request->file('documents');
+            
+            Log::info('Processing document uploads', [
+                'total_files' => count($documents),
+                'request_id' => $clearanceRequest->id
+            ]);
+            
+            foreach ($documents as $index => $file) {
+                try {
                     if ($file->isValid()) {
+                        // Get document type ID from request
+                        $documentTypeId = $request->input("document_type_ids.{$index}");
+                        
+                        // Validate document type exists if provided
+                        if ($documentTypeId && !DocumentType::where('id', $documentTypeId)->exists()) {
+                            Log::warning('Invalid document type ID provided', [
+                                'document_type_id' => $documentTypeId,
+                                'index' => $index
+                            ]);
+                            $documentTypeId = null;
+                        }
+                        
                         // Generate filename
-                        $filename = 'clearance_' . $clearanceRequest->id . '_' . time() . '_' . $index . '.' . $file->getClientOriginalExtension();
+                        $originalName = $file->getClientOriginalName();
+                        $extension = $file->getClientOriginalExtension();
+                        $filename = 'clearance_' . $clearanceRequest->id . '_' . time() . '_' . $index . '.' . $extension;
                         $path = $file->storeAs('clearance_docs', $filename, 'public');
                         
                         // Get description if provided
                         $description = $request->input("descriptions.{$index}", '');
                         
-                        // Save document record
-                        ClearanceRequestDocument::create([
+                        // Save document record with document_type_id
+                        $document = ClearanceRequestDocument::create([
                             'clearance_request_id' => $clearanceRequest->id,
+                            'document_type_id' => $documentTypeId,
                             'file_path' => $path,
                             'file_name' => $filename,
-                            'original_name' => $file->getClientOriginalName(),
+                            'original_name' => $originalName,
                             'description' => $description,
                             'file_size' => $file->getSize(),
-                            'file_type' => $file->getClientOriginalExtension(),
+                            'file_type' => $extension,
+                        ]);
+                        
+                        $uploadedDocuments[] = [
+                            'original_name' => $originalName,
+                            'file_name' => $filename,
+                            'document_type_id' => $documentTypeId,
+                            'size' => $file->getSize()
+                        ];
+                        
+                        Log::info('Document uploaded successfully', [
+                            'document_id' => $document->id,
+                            'original_name' => $originalName,
+                            'document_type_id' => $documentTypeId
+                        ]);
+                    } else {
+                        Log::warning('Invalid file uploaded', [
+                            'index' => $index,
+                            'file_name' => $file->getClientOriginalName(),
+                            'error' => $file->getError()
                         ]);
                     }
+                } catch (\Exception $e) {
+                    Log::error('Document upload failed for index ' . $index, [
+                        'error' => $e->getMessage(),
+                        'file_name' => $file->getClientOriginalName(),
+                        'request_id' => $clearanceRequest->id
+                    ]);
                 }
             }
-    
-            // Calculate estimated completion
-            $estimatedCompletion = now()->addDays($clearanceType->processing_days)->format('F j, Y');
-    
-            return response()->json([
-                'success' => true,
-                'message' => 'Clearance request submitted successfully!',
-                'reference_number' => $referenceNumber,
-                'estimated_completion' => $estimatedCompletion,
-                'total_fee' => $clearanceType->fee,
-                'redirect_url' => '/my-clearances'
+        } else {
+            Log::info('No documents uploaded with request', [
+                'request_id' => $clearanceRequest->id
             ]);
-    
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'errors' => $e->errors(),
-                'message' => 'Validation failed. Please check your input.'
-            ], 422);
-            
-        } catch (\Exception $e) {
-            \Log::error('Clearance request error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => Auth::id(),
-                'request' => $request->except(['documents'])
-            ]);
-            
-            return response()->json([
-                'message' => 'Failed to submit request. Please try again later.'
-            ], 500);
         }
+
+        // Calculate estimated completion
+        $estimatedCompletion = now()->addDays($clearanceType->processing_days);
+        $formattedDate = $estimatedCompletion->format('F j, Y');
+
+        // Log successful submission
+        Log::info('Clearance request submitted successfully', [
+            'request_id' => $clearanceRequest->id,
+            'reference_number' => $clearanceRequest->reference_number,
+            'resident_id' => $clearanceRequest->resident_id,
+            'clearance_type' => $clearanceType->name,
+            'documents_uploaded' => count($uploadedDocuments),
+            'total_fee' => $clearanceType->fee,
+            'estimated_completion' => $formattedDate,
+            'user_id' => $user->id,
+            'timestamp' => now()->toDateTimeString()
+        ]);
+
+        return redirect()->route('my.clearances.index')
+            ->with('success', 'Clearance request submitted successfully!')
+            ->with('reference_number', $referenceNumber)
+            ->with('estimated_completion', $formattedDate);
+
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        Log::warning('Validation failed for clearance request', [
+            'errors' => $e->errors(),
+            'user_id' => Auth::id() ?? 'guest',
+            'request_data' => $request->except(['documents', 'descriptions'])
+        ]);
+        
+        throw $e; // Let Inertia handle the validation exception
+        
+    } catch (\Exception $e) {
+        // Comprehensive error logging
+        Log::error('Clearance request submission failed', [
+            'error_message' => $e->getMessage(),
+            'error_trace' => $e->getTraceAsString(),
+            'user_id' => Auth::id() ?? 'unknown',
+            'request_data' => $request->except(['documents', 'descriptions']),
+            'timestamp' => now()->toDateTimeString(),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent()
+        ]);
+        
+        return back()->withErrors([
+            'message' => 'Failed to submit request. Please try again later.'
+        ]);
     }
-    
+}
     /**
      * Cancel a clearance request.
      */

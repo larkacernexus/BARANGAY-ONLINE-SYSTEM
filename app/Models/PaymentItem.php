@@ -11,6 +11,7 @@ class PaymentItem extends Model
 
     protected $fillable = [
         'payment_id',
+        'original_fee_id',
         'clearance_request_id', 
         'fee_id',
         'fee_name',

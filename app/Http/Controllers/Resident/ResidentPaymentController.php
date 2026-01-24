@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Resident;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\PaymentType;
+use App\Models\Household;
+use App\Models\Resident;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -14,35 +16,51 @@ class ResidentPaymentController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $resident = $user->resident;
         
-        // Check if user has a resident profile
-        if (!$resident) {
+        // Get the household associated with the authenticated user (head of household)
+        $household = Household::where('user_id', $user->id)->first();
+        
+        if (!$household) {
             return Inertia::render('resident/Payments/Index', [
                 'payments' => $this->emptyPagination(),
                 'stats' => $this->emptyStats(),
                 'paymentMethods' => [],
                 'hasProfile' => false,
                 'filters' => $request->only(['search', 'status', 'start_date', 'end_date', 'payment_method']),
+                'error' => 'Your account is not associated with any household. Please contact the barangay administrator.'
             ]);
         }
         
-        // Get the household head's household
-        $household = $resident->household;
+        // Get all residents belonging to this household
+        $residents = Resident::where('household_id', $household->id)->get();
         
-        // Start building query
-        $query = Payment::where(function($query) use ($resident, $household) {
-                // Payments for the resident
-                $query->where('payer_type', 'resident')
-                      ->where('payer_id', $resident->id);
+        if ($residents->isEmpty()) {
+            return Inertia::render('resident/Payments/Index', [
+                'payments' => $this->emptyPagination(),
+                'stats' => $this->emptyStats(),
+                'paymentMethods' => [],
+                'hasProfile' => false,
+                'filters' => $request->only(['search', 'status', 'start_date', 'end_date', 'payment_method']),
+                'error' => 'No residents found in your household. Please contact the barangay administrator.'
+            ]);
+        }
+        
+        // Get resident IDs for querying payments
+        $residentIds = $residents->pluck('id');
+        
+        // Start building query - include payments for ALL residents in the household AND the household itself
+        $query = Payment::where(function($query) use ($residentIds, $household) {
+                // Payments for individual residents in the household
+                $query->where(function($q) use ($residentIds) {
+                    $q->where('payer_type', 'resident')
+                      ->whereIn('payer_id', $residentIds);
+                });
                 
-                // Payments for the household (if household exists)
-                if ($household) {
-                    $query->orWhere(function($q) use ($household) {
-                        $q->where('payer_type', 'household')
-                          ->where('payer_id', $household->id);
-                    });
-                }
+                // Payments for the household itself
+                $query->orWhere(function($q) use ($household) {
+                    $q->where('payer_type', 'household')
+                      ->where('payer_id', $household->id);
+                });
             })
             ->with(['resident', 'household', 'items']);
         
@@ -52,7 +70,8 @@ class ResidentPaymentController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('or_number', 'like', "%{$search}%")
                   ->orWhere('reference_number', 'like', "%{$search}%")
-                  ->orWhere('purpose', 'like', "%{$search}%");
+                  ->orWhere('purpose', 'like', "%{$search}%")
+                  ->orWhere('payer_name', 'like', "%{$search}%");
             });
         }
         
@@ -77,28 +96,49 @@ class ResidentPaymentController extends Controller
         
         // Apply export logic
         if ($request->has('export')) {
-            // Handle export logic here
             return $this->exportPayments($query->get());
         }
         
         // Get paginated results with formatted data
         $payments = $query->latest('payment_date')
             ->paginate(10)
-            ->through(function ($payment) {
-                return $this->formatPaymentForFrontend($payment);
+            ->through(function ($payment) use ($residents, $household) {
+                $formatted = $this->formatPaymentForFrontend($payment);
+                
+                // Add context about who paid
+                if ($payment->payer_type === 'resident') {
+                    $resident = $residents->firstWhere('id', $payment->payer_id);
+                    $formatted['paid_by'] = 'resident';
+                    $formatted['resident_name'] = $resident ? $resident->full_name : 'Unknown Resident';
+                    $formatted['relationship'] = 'Personal Payment';
+                    $formatted['is_self'] = $resident && $resident->is_head_of_household ?? false;
+                } else {
+                    // Household payment
+                    $formatted['paid_by'] = 'household';
+                    $formatted['relationship'] = 'Household Payment';
+                    $formatted['is_self'] = true; // Head manages household payments
+                }
+                
+                return $formatted;
             });
         
         // Calculate statistics
-        $stats = $this->calculateStats($resident, $household);
+        $stats = $this->calculateStats($residentIds, $household);
         
         // Get payment methods used
-        $paymentMethods = $this->getPaymentMethods($resident, $household);
+        $paymentMethods = $this->getPaymentMethods($residentIds, $household);
+        
+        // Get the head resident (for display)
+        $headResident = $residents->firstWhere('id', $household->head_resident_id);
         
         return Inertia::render('resident/Payments/Index', [
             'payments' => $payments,
             'stats' => $stats,
             'paymentMethods' => $paymentMethods,
             'hasProfile' => true,
+            'householdResidents' => $residents,
+            'currentResident' => $headResident ?? $residents->first(),
+            'household' => $household,
             'filters' => $request->only(['search', 'status', 'start_date', 'end_date', 'payment_method']),
         ]);
     }
@@ -176,6 +216,8 @@ class ResidentPaymentController extends Controller
             'collection_type' => $payment->collection_type,
             'collection_type_display' => $collectionTypeDisplay,
             'remarks' => $payment->remarks,
+            'payer_type' => $payment->payer_type,
+            'payer_id' => $payment->payer_id,
             'formatted_total' => '₱' . $formatAmount($payment->total_amount),
             'formatted_date' => $payment->payment_date ? $payment->payment_date->format('M d, Y') : 'N/A',
             'formatted_subtotal' => '₱' . $formatAmount($payment->subtotal),
@@ -186,11 +228,11 @@ class ResidentPaymentController extends Controller
             'items' => $payment->items->map(function ($item) {
                 return [
                     'id' => $item->id,
-                    'item_name' => $item->item_name,
-                    'description' => $item->description,
-                    'quantity' => (int) $item->quantity,
-                    'unit_price' => (float) $item->unit_price,
-                    'total' => (float) $item->total,
+                    'item_name' => $item->item_name ?? $item->fee_name ?? 'N/A',
+                    'description' => $item->description ?? 'N/A',
+                    'quantity' => (int) ($item->quantity ?? 1),
+                    'unit_price' => (float) ($item->unit_price ?? $item->base_amount ?? 0),
+                    'total' => (float) ($item->total ?? $item->total_amount ?? 0),
                 ];
             })->toArray(),
         ];
@@ -219,91 +261,63 @@ class ResidentPaymentController extends Controller
         ];
     }
     
-    private function calculateStats($resident, $household)
+    private function calculateStats($residentIds, $household)
     {
-        // Get payments for resident
-        $residentPayments = Payment::where('payer_type', 'resident')
-            ->where('payer_id', $resident->id);
-        
-        // Get payments for household (if exists)
-        $householdPayments = $household ? 
-            Payment::where('payer_type', 'household')
-                ->where('payer_id', $household->id) : null;
-        
-        $totalPayments = $residentPayments->count();
-        $pendingPayments = $residentPayments->whereIn('status', ['pending', 'overdue'])->count();
-        $totalPaid = $residentPayments->where('status', 'completed')->sum('total_amount');
-        $balanceDue = $residentPayments->whereIn('status', ['pending', 'overdue'])->sum('total_amount');
-        
-        // Add household payments if they exist
-        if ($householdPayments) {
-            $totalPayments += $householdPayments->count();
-            $pendingPayments += $householdPayments->whereIn('status', ['pending', 'overdue'])->count();
-            $totalPaid += $householdPayments->where('status', 'completed')->sum('total_amount');
-            $balanceDue += $householdPayments->whereIn('status', ['pending', 'overdue'])->sum('total_amount');
-        }
+        // Combined query for all payments
+        $allPayments = Payment::where(function($q) use ($residentIds, $household) {
+            $q->where('payer_type', 'resident')
+              ->whereIn('payer_id', $residentIds);
+            
+            $q->orWhere('payer_type', 'household')
+              ->where('payer_id', $household->id);
+        });
         
         return [
-            'total_payments' => $totalPayments,
-            'pending_payments' => $pendingPayments,
-            'total_paid' => (float) $totalPaid,
-            'balance_due' => (float) $balanceDue,
+            'total_payments' => $allPayments->count(),
+            'total_amount' => $allPayments->sum('total_amount'),
+            'resident_payments' => Payment::where('payer_type', 'resident')
+                ->whereIn('payer_id', $residentIds)->count(),
+            'household_payments' => Payment::where('payer_type', 'household')
+                ->where('payer_id', $household->id)->count(),
+            'resident_amount' => Payment::where('payer_type', 'resident')
+                ->whereIn('payer_id', $residentIds)->sum('total_amount'),
+            'household_amount' => Payment::where('payer_type', 'household')
+                ->where('payer_id', $household->id)->sum('total_amount'),
+            'completed_payments' => $allPayments->where('status', 'completed')->count(),
+            'pending_payments' => $allPayments->where('status', 'pending')->count(),
+            'cancelled_payments' => $allPayments->where('status', 'cancelled')->count(),
         ];
     }
     
-    private function getPaymentMethods($resident, $household)
+    private function getPaymentMethods($residentIds, $household)
     {
-        // Get payment methods from resident payments
-        $residentMethods = Payment::where('payer_type', 'resident')
-            ->where('payer_id', $resident->id)
-            ->whereNotNull('payment_method')
-            ->select('payment_method')
-            ->distinct()
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'type' => $item->payment_method,
-                    'display_name' => ucfirst($item->payment_method),
-                ];
-            });
-        
-        // Get payment methods from household payments (if household exists)
-        $householdMethods = $household ?
-            Payment::where('payer_type', 'household')
-                ->where('payer_id', $household->id)
-                ->whereNotNull('payment_method')
-                ->select('payment_method')
-                ->distinct()
-                ->get()
-                ->map(function ($item) {
-                    return [
-                        'type' => $item->payment_method,
-                        'display_name' => ucfirst($item->payment_method),
-                    ];
-                }) : collect([]);
-        
-        // Combine and deduplicate
-        $allMethods = $residentMethods->concat($householdMethods)
-            ->unique('type')
-            ->values()
-            ->all();
-        
-        // Format display names properly
-        return array_map(function($method) {
-            $displayName = $method['display_name'];
-            if ($method['type'] === 'gcash') {
-                $displayName = 'GCash';
-            } elseif ($method['type'] === 'maya') {
-                $displayName = 'Maya';
-            } elseif ($method['type'] === 'online') {
-                $displayName = 'Online Payment';
-            }
+        $query = Payment::where(function($q) use ($residentIds, $household) {
+            $q->where('payer_type', 'resident')
+              ->whereIn('payer_id', $residentIds);
             
-            return [
-                'type' => $method['type'],
-                'display_name' => $displayName,
-            ];
-        }, $allMethods);
+            $q->orWhere('payer_type', 'household')
+              ->where('payer_id', $household->id);
+        });
+        
+        return $query->select('payment_method')
+            ->distinct()
+            ->pluck('payment_method')
+            ->filter()
+            ->map(function($method) {
+                $displayNames = [
+                    'cash' => 'Cash',
+                    'gcash' => 'GCash',
+                    'maya' => 'Maya',
+                    'bank' => 'Bank Transfer',
+                    'check' => 'Check',
+                    'online' => 'Online Payment',
+                ];
+                return [
+                    'value' => $method,
+                    'label' => $displayNames[$method] ?? ucfirst($method)
+                ];
+            })
+            ->values();
     }
     
     private function exportPayments($payments)
@@ -316,11 +330,20 @@ class ResidentPaymentController extends Controller
     
     public function create()
     {
-        $resident = auth()->user()->resident;
+        $user = auth()->user();
+        $household = Household::where('user_id', $user->id)->first();
         
-        if (!$resident) {
-            return redirect()->route('resident.profile.create')
-                ->with('error', 'Please complete your resident profile before making payments.');
+        if (!$household) {
+            return redirect()->route('dashboard')
+                ->with('error', 'Your account is not associated with any household.');
+        }
+        
+        // Get all residents in the household
+        $residents = Resident::where('household_id', $household->id)->get();
+        
+        if ($residents->isEmpty()) {
+            return redirect()->route('dashboard')
+                ->with('error', 'No residents found in your household.');
         }
         
         // Get available payment types
@@ -334,24 +357,34 @@ class ResidentPaymentController extends Controller
             'business' => 'Business Permit',
         ];
         
+        // Get head resident
+        $headResident = $residents->firstWhere('id', $household->head_resident_id);
+        
         return Inertia::render('Resident/Payments/Pay', [
             'paymentTypes' => $paymentTypes,
             'certificateTypes' => $certificateTypes,
-            'resident' => $resident,
-            'residentDetails' => [
-                'id' => $resident->id,
-                'name' => $resident->full_name ?? $resident->name,
-                'address' => $resident->address,
-                'contact_number' => $resident->contact_number,
-                'household_number' => $resident->household_number,
-                'purok' => $resident->purok,
+            'household' => $household,
+            'householdResidents' => $residents,
+            'currentResident' => $headResident ?? $residents->first(),
+            'payerTypes' => [
+                ['value' => 'resident', 'label' => 'Individual Resident'],
+                ['value' => 'household', 'label' => 'Entire Household'],
             ],
         ]);
     }
     
     public function store(Request $request)
     {
+        $user = auth()->user();
+        $household = Household::where('user_id', $user->id)->first();
+        
+        if (!$household) {
+            return back()->with('error', 'Your account is not associated with any household.');
+        }
+        
         $validated = $request->validate([
+            'payer_type' => 'required|in:resident,household',
+            'payer_id' => 'required',
             'payment_type_id' => 'nullable|exists:payment_types,id',
             'certificate_type' => 'nullable|string|in:residency,indigency,clearance,cedula,business,other',
             'purpose' => 'required|string|max:500',
@@ -362,10 +395,33 @@ class ResidentPaymentController extends Controller
             'period_covered' => 'nullable|string|max:255',
         ]);
         
-        $resident = auth()->user()->residentProfile;
-        
-        if (!$resident) {
-            return back()->with('error', 'Please complete your resident profile first.');
+        // Validate payer_id based on payer_type
+        if ($validated['payer_type'] === 'resident') {
+            $resident = Resident::where('id', $validated['payer_id'])
+                ->where('household_id', $household->id)
+                ->first();
+            
+            if (!$resident) {
+                return back()->with('error', 'Selected resident is not in your household.');
+            }
+            
+            $payerName = $resident->full_name;
+            $contactNumber = $resident->contact_number;
+            $address = $resident->address;
+            $householdNumber = $resident->household_number;
+            $purok = $resident->purok;
+            
+        } else {
+            // Payer is household
+            if ($validated['payer_id'] != $household->id) {
+                return back()->with('error', 'Invalid household selected.');
+            }
+            
+            $payerName = $household->head_of_family ?? $household->name ?? 'Household #' . $household->household_number;
+            $contactNumber = $household->contact_number;
+            $address = $household->address;
+            $householdNumber = $household->household_number;
+            $purok = $household->purok->name ?? 'N/A';
         }
         
         // Calculate subtotal (base amount)
@@ -381,13 +437,13 @@ class ResidentPaymentController extends Controller
         // Create payment record
         $payment = Payment::create([
             'or_number' => $orNumber,
-            'payer_type' => 'resident',
-            'payer_id' => $resident->id,
-            'payer_name' => $resident->full_name ?? $resident->name,
-            'contact_number' => $resident->contact_number,
-            'address' => $resident->address,
-            'household_number' => $resident->household_number,
-            'purok' => $resident->purok,
+            'payer_type' => $validated['payer_type'],
+            'payer_id' => $validated['payer_id'],
+            'payer_name' => $payerName,
+            'contact_number' => $contactNumber,
+            'address' => $address,
+            'household_number' => $householdNumber,
+            'purok' => $purok,
             'payment_date' => now(),
             'period_covered' => $validated['period_covered'] ?? null,
             'payment_method' => $validated['payment_method'],
@@ -431,14 +487,30 @@ class ResidentPaymentController extends Controller
     
     public function show(Payment $payment)
     {
-        $resident = auth()->user()->residentProfile;
+        $user = auth()->user();
+        $household = Household::where('user_id', $user->id)->first();
         
-        // Check if payment belongs to authenticated resident
-        if ($payment->payer_type !== 'resident' || $payment->payer_id !== $resident->id) {
+        if (!$household) {
             abort(403, 'You are not authorized to view this payment.');
         }
         
-        $payment->load(['items', 'resident']);
+        // Check if payment belongs to this household or its residents
+        $authorized = false;
+        
+        if ($payment->payer_type === 'household' && $payment->payer_id === $household->id) {
+            $authorized = true;
+        } elseif ($payment->payer_type === 'resident') {
+            $resident = Resident::where('id', $payment->payer_id)
+                ->where('household_id', $household->id)
+                ->exists();
+            $authorized = $resident;
+        }
+        
+        if (!$authorized) {
+            abort(403, 'You are not authorized to view this payment.');
+        }
+        
+        $payment->load(['items', 'resident', 'household']);
         
         // Format payment for frontend
         $formattedPayment = $this->formatPaymentForFrontend($payment);
@@ -463,10 +535,13 @@ class ResidentPaymentController extends Controller
     
     public function updatePaymentMethod(Request $request, Payment $payment)
     {
-        $resident = auth()->user()->residentProfile;
+        $user = auth()->user();
+        $household = Household::where('user_id', $user->id)->first();
         
-        // Check if payment belongs to authenticated resident
-        if ($payment->payer_type !== 'resident' || $payment->payer_id !== $resident->id) {
+        // Check authorization
+        $authorized = $this->checkPaymentAuthorization($payment, $household);
+        
+        if (!$authorized) {
             abort(403, 'You are not authorized to update this payment.');
         }
         
@@ -494,10 +569,13 @@ class ResidentPaymentController extends Controller
     
     public function cancel(Request $request, Payment $payment)
     {
-        $resident = auth()->user()->residentProfile;
+        $user = auth()->user();
+        $household = Household::where('user_id', $user->id)->first();
         
-        // Check if payment belongs to authenticated resident
-        if ($payment->payer_type !== 'resident' || $payment->payer_id !== $resident->id) {
+        // Check authorization
+        $authorized = $this->checkPaymentAuthorization($payment, $household);
+        
+        if (!$authorized) {
             abort(403, 'You are not authorized to cancel this payment.');
         }
         
@@ -508,7 +586,7 @@ class ResidentPaymentController extends Controller
         
         $payment->update([
             'status' => 'cancelled',
-            'remarks' => $request->input('reason', 'Cancelled by resident') . '. ' . ($payment->remarks ?? ''),
+            'remarks' => $request->input('reason', 'Cancelled by household head') . '. ' . ($payment->remarks ?? ''),
         ]);
         
         return redirect()->route('resident.payments.index')
@@ -517,10 +595,13 @@ class ResidentPaymentController extends Controller
     
     public function receipt(Payment $payment)
     {
-        $resident = auth()->user()->residentProfile;
+        $user = auth()->user();
+        $household = Household::where('user_id', $user->id)->first();
         
-        // Check if payment belongs to authenticated resident
-        if ($payment->payer_type !== 'resident' || $payment->payer_id !== $resident->id) {
+        // Check authorization
+        $authorized = $this->checkPaymentAuthorization($payment, $household);
+        
+        if (!$authorized) {
             abort(403, 'You are not authorized to view this receipt.');
         }
         
@@ -537,10 +618,13 @@ class ResidentPaymentController extends Controller
     
     public function verify(Request $request, Payment $payment)
     {
-        $resident = auth()->user()->residentProfile;
+        $user = auth()->user();
+        $household = Household::where('user_id', $user->id)->first();
         
-        // Check if payment belongs to authenticated resident
-        if ($payment->payer_type !== 'resident' || $payment->payer_id !== $resident->id) {
+        // Check authorization
+        $authorized = $this->checkPaymentAuthorization($payment, $household);
+        
+        if (!$authorized) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access.',
@@ -582,11 +666,17 @@ class ResidentPaymentController extends Controller
     
     public function getPaymentLink(Payment $payment)
     {
-        $resident = auth()->user()->residentProfile;
+        $user = auth()->user();
+        $household = Household::where('user_id', $user->id)->first();
         
-        // Check if payment belongs to authenticated resident
-        if ($payment->payer_type !== 'resident' || $payment->payer_id !== $resident->id) {
-            abort(403, 'You are not authorized to access this payment.');
+        // Check authorization
+        $authorized = $this->checkPaymentAuthorization($payment, $household);
+        
+        if (!$authorized) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access.',
+            ], 403);
         }
         
         if ($payment->status !== 'pending') {
@@ -615,5 +705,27 @@ class ResidentPaymentController extends Controller
                 'bank' => 'Bank: BPI, Account: 1234-5678-90',
             ][$payment->payment_method] ?? 'Please proceed with your selected payment method.',
         ]);
+    }
+    
+    /**
+     * Check if the authenticated user is authorized to access this payment
+     */
+    private function checkPaymentAuthorization(Payment $payment, $household)
+    {
+        if (!$household) {
+            return false;
+        }
+        
+        if ($payment->payer_type === 'household' && $payment->payer_id === $household->id) {
+            return true;
+        }
+        
+        if ($payment->payer_type === 'resident') {
+            return Resident::where('id', $payment->payer_id)
+                ->where('household_id', $household->id)
+                ->exists();
+        }
+        
+        return false;
     }
 }

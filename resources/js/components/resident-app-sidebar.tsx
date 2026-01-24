@@ -10,7 +10,7 @@ import {
   SidebarGroupLabel,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { cn } from '@/lib/utils';
 import { NavUser } from '@/components/nav-user';
 import { 
@@ -30,10 +30,12 @@ import {
   MapPin,
   Building2,
   FileCheck,
-  Receipt // ADDED for Fees
+  Receipt, // ADDED for Fees
+  AlertCircle // ADDED for Announcements indicator
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { NavResident } from './nav-resident';
+import { Badge } from '@/components/ui/badge';
 
 // Resident-specific navigation - UPDATED to match actual routes
 const residentNav = [
@@ -55,7 +57,6 @@ const residentQuickActions = [
 // UPDATED to match actual route prefixes
 const residentResources = [
   { title: 'Announcements', href: '/resident-announcements', icon: Bell },
-  { title: 'Events', href: '/resident-events', icon: Calendar },
   { title: 'Forms', href: '/resident-forms', icon: Download },
   { title: 'Settings', href: '/resident/settings', icon: Settings },
 ];
@@ -63,6 +64,16 @@ const residentResources = [
 export function ResidentSidebar({ className }: { className?: string }) {
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const { url } = usePage();
+  
+  // Check if current URL matches navigation item
+  const isActive = (href: string) => {
+    // Check for exact match or starts with for nested routes
+    return url === href || url.startsWith(href + '/');
+  };
+  
+  // Check for announcements route specifically
+  const isAnnouncementsActive = url === '/resident-announcements' || url.startsWith('/resident-announcements/');
   
   return (
     <TooltipProvider>
@@ -203,6 +214,7 @@ export function ResidentSidebar({ className }: { className?: string }) {
                           href={item.href} 
                           className={cn(
                             "flex items-center gap-2",
+                            isActive(item.href) && "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
                             isCollapsed ? "justify-center" : ""
                           )}
                         >
@@ -210,9 +222,19 @@ export function ResidentSidebar({ className }: { className?: string }) {
                             "flex items-center justify-center",
                             isCollapsed ? "h-8 w-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" : ""
                           )}>
-                            <item.icon className="h-4 w-4" />
+                            <item.icon className={cn(
+                              "h-4 w-4",
+                              isActive(item.href) && "text-blue-600 dark:text-blue-400"
+                            )} />
                           </div>
-                          {!isCollapsed && <span className="truncate">{item.title}</span>}
+                          {!isCollapsed && (
+                            <>
+                              <span className="truncate">{item.title}</span>
+                              {isActive(item.href) && (
+                                <div className="h-1.5 w-1.5 rounded-full bg-blue-600 ml-auto" />
+                              )}
+                            </>
+                          )}
                         </Link>
                       </SidebarMenuButton>
                     </TooltipTrigger>
@@ -225,7 +247,7 @@ export function ResidentSidebar({ className }: { className?: string }) {
             </SidebarMenu>
           </SidebarGroup>
 
-          {/* Resources */}
+          {/* Resources - With Announcements highlighted */}
           <SidebarGroup>
             {!isCollapsed && (
               <SidebarGroupLabel className="text-xs font-medium text-gray-500 uppercase px-1 mb-2 truncate">
@@ -233,34 +255,67 @@ export function ResidentSidebar({ className }: { className?: string }) {
               </SidebarGroupLabel>
             )}
             <SidebarMenu>
-              {residentResources.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <SidebarMenuButton asChild>
-                        <Link 
-                          href={item.href} 
-                          className={cn(
-                            "flex items-center gap-2",
-                            isCollapsed ? "justify-center" : ""
-                          )}
-                        >
-                          <div className={cn(
-                            "flex items-center justify-center",
-                            isCollapsed ? "h-8 w-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" : ""
-                          )}>
-                            <item.icon className="h-4 w-4" />
-                          </div>
-                          {!isCollapsed && <span className="truncate">{item.title}</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{item.title}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </SidebarMenuItem>
-              ))}
+              {residentResources.map((item) => {
+                const active = isActive(item.href);
+                const isAnnouncement = item.title === 'Announcements';
+                
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuButton asChild>
+                          <Link 
+                            href={item.href} 
+                            className={cn(
+                              "flex items-center gap-2 relative",
+                              active && "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
+                              isCollapsed ? "justify-center" : ""
+                            )}
+                          >
+                            <div className={cn(
+                              "flex items-center justify-center relative",
+                              isCollapsed ? "h-8 w-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" : ""
+                            )}>
+                              <item.icon className={cn(
+                                "h-4 w-4",
+                                active && "text-blue-600 dark:text-blue-400"
+                              )} />
+                              
+                              {/* New announcements badge */}
+                              {isAnnouncement && !active && (
+                                <div className="absolute -top-1 -right-1">
+                                  <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            {!isCollapsed && (
+                              <div className="flex items-center justify-between flex-1">
+                                <span className="truncate">{item.title}</span>
+                                
+                                {/* Active indicator or new badge */}
+                                {active ? (
+                                  <div className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+                                ) : isAnnouncement ? (
+                                  <Badge variant="outline" className="h-4 px-1 text-[10px] bg-red-50 text-red-600 border-red-200">
+                                    <AlertCircle className="h-2.5 w-2.5" />
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p>{item.title}</p>
+                        {isAnnouncement && !active && (
+                          <p className="text-xs text-red-500 mt-1">New updates available!</p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroup>
 

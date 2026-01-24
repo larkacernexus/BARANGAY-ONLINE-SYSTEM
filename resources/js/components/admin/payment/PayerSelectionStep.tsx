@@ -27,7 +27,10 @@ import {
     DollarSign,
     Calendar,
     CheckCircle,
-    XCircle
+    XCircle,
+    Phone,
+    MapPin,
+    Tag
 } from 'lucide-react';
 
 interface Resident {
@@ -90,43 +93,72 @@ interface ClearanceRequest {
 
 interface Fee {
     id: string | number;
-    fee_code: string;
     fee_type_id: string | number;
-    fee_type_name: string;
-    fee_type_category: string;
-    payer_type: 'resident' | 'household';
-    payer_id: string | number;
+    fee_code: string;
+    payer_type: 'resident' | 'household' | 'business';
+    resident_id: string | number | null;
+    household_id: string | number | null;
+    business_name: string | null;
     payer_name: string;
-    contact_number?: string;
-    address?: string;
-    purok?: string;
-    base_amount: number;
-    surcharge_amount: number;
-    penalty_amount: number;
-    discount_amount: number;
-    total_amount: number;
-    amount_paid: number;
-    balance: number;
-    status: 'pending' | 'issued' | 'partially_paid' | 'overdue' | 'paid' | 'cancelled';
+    contact_number: string | null;
+    address: string | null;
+    purok: string | null;
+    zone: string | null;
+    billing_period: string | null;
+    period_start: string | null;
+    period_end: string | null;
     issue_date: string;
     due_date: string;
-    purpose?: string;
-    remarks?: string;
-    billing_period?: string;
-    period_start?: string;
-    period_end?: string;
+    base_amount: number | string;
+    surcharge_amount: number | string;
+    penalty_amount: number | string;
+    discount_amount: number | string;
+    discount_type: string | null;
+    total_amount: number | string;
+    status: 'pending' | 'issued' | 'partially_paid' | 'overdue' | 'paid' | 'cancelled' | 'waived';
+    amount_paid: number | string | null;
+    balance: number | string;
+    payment_id: string | number | null;
+    or_number: string | null;
+    payment_date: string | null;
+    payment_method: string | null;
+    transaction_reference: string | null;
+    certificate_number: string | null;
+    valid_from: string | null;
+    valid_until: string | null;
+    purpose: string | null;
+    property_description: string | null;
+    business_type: string | null;
+    area: number | string | null;
+    issued_by: string | number | null;
+    collected_by: string | number | null;
+    approved_by: string | number | null;
+    computation_details: string | null;
+    requirements_submitted: string | null;
+    remarks: string | null;
+    waiver_reason: string | null;
+    created_by: string | number | null;
+    updated_by: string | number | null;
+    cancelled_by: string | number | null;
+    cancelled_at: string | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
+    
+    fee_type_name?: string;
+    fee_type_category?: string;
 }
 
 interface PayerSelectionStepProps {
     residents: Resident[];
     households: Household[];
     clearanceRequests?: ClearanceRequest[];
-    fees?: Fee[]; // CHANGED: from feeTypes to fees
+    fees?: Fee[];
     payerSource: 'residents' | 'households' | 'clearance' | 'fees';
     setPayerSource: (source: 'residents' | 'households' | 'clearance' | 'fees') => void;
     searchQuery: string;
     setSearchQuery: (query: string) => void;
-    handleSelectPayer: (payer: Resident | Household | ClearanceRequest | Fee) => void; // CHANGED: Fee instead of FeeType
+    handleSelectPayer: (payer: Resident | Household | ClearanceRequest | Fee) => void;
     handleManualPayer: () => void;
     preSelectedPayerId?: string | number;
     preSelectedPayerType?: string;
@@ -139,7 +171,7 @@ export function PayerSelectionStep({
     residents,
     households,
     clearanceRequests = [],
-    fees = [], // CHANGED: from feeTypes to fees
+    fees = [],
     payerSource,
     setPayerSource,
     searchQuery,
@@ -168,10 +200,29 @@ export function PayerSelectionStep({
             'residents': User,
             'households': Home,
             'clearance': FileText,
-            'fees': Receipt, // CHANGED: from FileCheck to Receipt
+            'fees': Receipt,
         };
         const IconComponent = icons[source as keyof typeof icons] || UserCircle;
         return <IconComponent className="h-5 w-5" />;
+    };
+
+    const parseAmount = (amount: number | string | null): number => {
+        if (amount === null || amount === undefined) return 0;
+        if (typeof amount === 'number') return amount;
+        if (typeof amount === 'string') {
+            const cleaned = amount.replace(/[₱,]/g, '').trim();
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+        return 0;
+    };
+
+    const getFeeTypeName = (fee: Fee): string => {
+        return fee.fee_type_name || 'Fee';
+    };
+
+    const getFeeCategory = (fee: Fee): string => {
+        return fee.fee_type_category || 'other';
     };
 
     const filteredPayers = () => {
@@ -193,10 +244,11 @@ export function PayerSelectionStep({
                 break;
             
             case 'fees':
-                // Filter only fees with balance > 0 and status = 'pending'
-                baseList = fees.filter(fee => 
-                    fee.balance > 0 && fee.status === 'pending' // CHANGED: Filter for pending fees with balance
-                );
+                baseList = fees.filter(fee => {
+                    const balance = parseAmount(fee.balance);
+                    const isPayableStatus = ['pending', 'issued', 'partially_paid', 'overdue'].includes(fee.status);
+                    return balance > 0 && isPayableStatus;
+                });
                 break;
             
             default:
@@ -231,12 +283,15 @@ export function PayerSelectionStep({
                            (payer.clearance_type?.code?.toLowerCase().includes(query));
                 
                 case 'fees':
-                    // Search in fee properties
                     return payer.payer_name.toLowerCase().includes(query) ||
                            payer.fee_code.toLowerCase().includes(query) ||
-                           payer.fee_type_name.toLowerCase().includes(query) ||
+                           (payer.fee_type_name?.toLowerCase() || '').includes(query) ||
                            (payer.purpose?.toLowerCase() || '').includes(query) ||
-                           (payer.contact_number?.toLowerCase() || '').includes(query);
+                           (payer.contact_number?.toLowerCase() || '').includes(query) ||
+                           (payer.address?.toLowerCase() || '').includes(query) ||
+                           (payer.purok?.toLowerCase() || '').includes(query) ||
+                           (payer.business_name?.toLowerCase() || '').includes(query) ||
+                           (payer.property_description?.toLowerCase() || '').includes(query);
                 
                 default:
                     return false;
@@ -258,8 +313,11 @@ export function PayerSelectionStep({
                 ).length;
             
             case 'fees':
-                // Count only pending fees with balance
-                return fees.filter(fee => fee.balance > 0 && fee.status === 'pending').length;
+                return fees.filter(fee => {
+                    const balance = parseAmount(fee.balance);
+                    const isPayableStatus = ['pending', 'issued', 'partially_paid', 'overdue'].includes(fee.status);
+                    return balance > 0 && isPayableStatus;
+                }).length;
             
             default:
                 return 0;
@@ -277,7 +335,8 @@ export function PayerSelectionStep({
                 payer.clearance_type?.name || 'Clearance';
             return `${payer.resident?.name || 'Unknown'} - ${clearanceTypeName}`;
         } else if (payerSource === 'fees') {
-            return `${payer.payer_name} - ${payer.fee_type_name}`;
+            const feeTypeName = getFeeTypeName(payer);
+            return `${payer.payer_name} - ${feeTypeName}`;
         }
         return payer.name || payer.head_name || payer.payer_name || 'Unknown';
     };
@@ -301,7 +360,7 @@ export function PayerSelectionStep({
                                 <CreditCard className="h-3 w-3 text-amber-600" />
                                 <span className="text-amber-600">
                                     {payer.outstanding_fee_count || 0} outstanding fee{payer.outstanding_fee_count !== 1 ? 's' : ''}
-                                    {payer.total_outstanding_balance && ` • ₱${payer.total_outstanding_balance}`}
+                                    {payer.total_outstanding_balance && ` • ${payer.total_outstanding_balance}`}
                                 </span>
                             </>
                         )}
@@ -333,7 +392,7 @@ export function PayerSelectionStep({
                             <CreditCard className="h-3 w-3" />
                             <span>
                                 {payer.outstanding_fee_count || 0} outstanding fee{payer.outstanding_fee_count !== 1 ? 's' : ''}
-                                {payer.total_outstanding_balance && ` • ₱${payer.total_outstanding_balance}`}
+                                {payer.total_outstanding_balance && ` • ${payer.total_outstanding_balance}`}
                             </span>
                         </div>
                     )}
@@ -379,61 +438,158 @@ export function PayerSelectionStep({
                 </>
             );
         } else if (payerSource === 'fees') {
-            // Display fee details
-            const isOverdue = new Date(payer.due_date) < new Date() && payer.status !== 'paid';
-            const balance = payer.balance || 0;
-            const amountPaid = payer.amount_paid || 0;
-            const totalAmount = payer.total_amount || 0;
+            const baseAmount = parseAmount(payer.base_amount);
+            const surchargeAmount = parseAmount(payer.surcharge_amount);
+            const penaltyAmount = parseAmount(payer.penalty_amount);
+            const discountAmount = parseAmount(payer.discount_amount);
+            const totalAmount = parseAmount(payer.total_amount);
+            const amountPaid = parseAmount(payer.amount_paid);
+            const balance = parseAmount(payer.balance);
+            
+            const feeTypeName = getFeeTypeName(payer);
+            const feeCategory = getFeeCategory(payer);
+            
+            const isOverdue = new Date(payer.due_date) < new Date() && 
+                              !['paid', 'cancelled', 'waived'].includes(payer.status);
+            
+            const isBusinessFee = payer.payer_type === 'business' || payer.business_name;
+            const isHouseholdFee = payer.payer_type === 'household' || payer.household_id;
             
             return (
                 <>
                     <div className="text-xs mb-1">
-                        <div className="flex items-center gap-1">
-                            <Hash className="h-3 w-3" />
-                            <span className="font-mono">{payer.fee_code}</span>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1">
+                                <Hash className="h-3 w-3" />
+                                <span className="font-mono">{payer.fee_code}</span>
+                            </div>
+                            <Badge variant="outline" className="text-xs px-2 py-0">
+                                {payer.payer_type === 'resident' ? 'Resident' : 
+                                 payer.payer_type === 'household' ? 'Household' : 
+                                 payer.payer_type === 'business' ? 'Business' : 'Other'}
+                            </Badge>
                         </div>
-                        <div className="mt-1">
-                            {payer.payer_type === 'resident' ? 'Resident' : 'Household'} • 
-                            {payer.purpose && ` • ${payer.purpose}`}
-                            {payer.billing_period && ` • ${payer.billing_period}`}
+                        
+                        <div className="mt-1 space-y-0.5">
+                            {payer.billing_period && (
+                                <div className="flex items-center gap-1">
+                                    <Calendar className="h-3 w-3 text-gray-400" />
+                                    <span>{payer.billing_period}</span>
+                                </div>
+                            )}
+                            
+                            {payer.purok && (
+                                <div className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3 text-gray-400" />
+                                    <span>Purok {payer.purok}</span>
+                                </div>
+                            )}
+                            
+                            {payer.purpose && (
+                                <div className="flex items-center gap-1">
+                                    <Tag className="h-3 w-3 text-gray-400" />
+                                    <span>{payer.purpose}</span>
+                                </div>
+                            )}
+                            
+                            {isBusinessFee && payer.business_name && (
+                                <div className="flex items-center gap-1">
+                                    <Building className="h-3 w-3 text-gray-400" />
+                                    <span>{payer.business_name}</span>
+                                    {payer.business_type && ` • ${payer.business_type}`}
+                                </div>
+                            )}
+                            
+                            {payer.contact_number && (
+                                <div className="flex items-center gap-1">
+                                    <Phone className="h-3 w-3 text-gray-400" />
+                                    <span>{payer.contact_number}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <div className="text-xs font-medium space-y-1">
+                    
+                    <div className="text-xs font-medium space-y-1 mt-2">
                         <div className="flex items-center justify-between">
                             <span className="text-gray-600">Balance:</span>
                             <span className={`font-bold ${balance > 0 ? 'text-amber-600' : 'text-green-600'}`}>
                                 ₱{balance.toFixed(2)}
                             </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-gray-600">Total:</span>
-                            <span className="text-gray-900">₱{totalAmount.toFixed(2)}</span>
-                        </div>
-                        {amountPaid > 0 && (
+                        
+                        <div className="grid grid-cols-2 gap-1 text-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-gray-600">Paid:</span>
-                                <span className="text-green-600">₱{amountPaid.toFixed(2)}</span>
+                                <span className="text-gray-500">Base:</span>
+                                <span>₱{baseAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-500">Surcharge:</span>
+                                <span className={surchargeAmount > 0 ? 'text-amber-600' : ''}>
+                                    ₱{surchargeAmount.toFixed(2)}
+                                </span>
+                            </div>
+                            {penaltyAmount > 0 && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-500">Penalty:</span>
+                                    <span className="text-red-600">₱{penaltyAmount.toFixed(2)}</span>
+                                </div>
+                            )}
+                            {discountAmount > 0 && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-500">Discount:</span>
+                                    <span className="text-green-600">₱{discountAmount.toFixed(2)}</span>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                            <span className="text-gray-600">Total:</span>
+                            <span className="text-gray-900 font-bold">₱{totalAmount.toFixed(2)}</span>
+                        </div>
+                        
+                        {amountPaid > 0 && (
+                            <div className="flex items-center justify-between text-green-600">
+                                <span>Paid:</span>
+                                <span className="font-bold">₱{amountPaid.toFixed(2)}</span>
                             </div>
                         )}
                     </div>
+                    
                     <div className="mt-2 flex items-center justify-between">
                         <Badge variant="outline" className={`text-xs ${
                             payer.status === 'pending' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                             payer.status === 'overdue' ? 'bg-red-100 text-red-700 border-red-200' :
                             payer.status === 'partially_paid' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                            payer.status === 'issued' ? 'bg-green-100 text-green-700 border-green-200' :
                             'bg-gray-100 text-gray-700 border-gray-200'
                         }`}>
                             {payer.status.replace('_', ' ')}
                         </Badge>
+                        
                         <div className="text-xs text-gray-500 flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            Due: {new Date(payer.due_date).toLocaleDateString()}
+                            <span>
+                                Due: {new Date(payer.due_date).toLocaleDateString()}
+                                {payer.issue_date && (
+                                    <span className="ml-1">
+                                        (Issued: {new Date(payer.issue_date).toLocaleDateString()})
+                                    </span>
+                                )}
+                            </span>
                         </div>
                     </div>
+                    
                     {isOverdue && (
                         <div className="mt-1 text-xs text-red-600 flex items-center gap-1">
                             <AlertTriangle className="h-3 w-3" />
                             <span>OVERDUE</span>
+                        </div>
+                    )}
+                    
+                    {payer.amount_paid && parseAmount(payer.amount_paid) > 0 && (
+                        <div className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" />
+                            <span>Partial payment: ₱{parseAmount(payer.amount_paid).toFixed(2)}</span>
                         </div>
                     )}
                 </>
@@ -468,6 +624,14 @@ export function PayerSelectionStep({
     const payers = filteredPayers();
     const hasPayers = payers.length > 0;
 
+    const totalOutstandingBalance = fees
+        .filter(fee => {
+            const balance = parseAmount(fee.balance);
+            const isPayableStatus = ['pending', 'issued', 'partially_paid', 'overdue'].includes(fee.status);
+            return balance > 0 && isPayableStatus;
+        })
+        .reduce((sum, fee) => sum + parseAmount(fee.balance), 0);
+
     return (
         <div className="grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
@@ -489,7 +653,7 @@ export function PayerSelectionStep({
                                     { value: 'residents', icon: User, label: 'Residents', count: getPayerCount('residents'), color: 'text-blue-600 border-blue-200' },
                                     { value: 'households', icon: Home, label: 'Households', count: getPayerCount('households'), color: 'text-green-600 border-green-200' },
                                     { value: 'clearance', icon: FileText, label: 'Clearance', count: getPayerCount('clearance'), color: 'text-purple-600 border-purple-200' },
-                                    { value: 'fees', icon: Receipt, label: 'Fees Due', count: getPayerCount('fees'), color: 'text-amber-600 border-amber-200' }, // CHANGED: label and icon
+                                    { value: 'fees', icon: Receipt, label: 'Outstanding Fees', count: getPayerCount('fees'), color: 'text-amber-600 border-amber-200' },
                                 ].map((source) => (
                                     <button
                                         key={source.value}
@@ -518,7 +682,7 @@ export function PayerSelectionStep({
                                 {payerSource === 'residents' ? 'Search residents...' :
                                  payerSource === 'households' ? 'Search households...' :
                                  payerSource === 'clearance' ? 'Search clearance requests...' :
-                                 'Search outstanding fees...'} {/* CHANGED */}
+                                 'Search outstanding fees...'}
                             </Label>
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -527,7 +691,7 @@ export function PayerSelectionStep({
                                         payerSource === 'residents' ? 'Search residents by name, household, or purok...' :
                                         payerSource === 'households' ? 'Search households by head name, household number, or address...' :
                                         payerSource === 'clearance' ? 'Search clearance requests by reference number, resident name, or purpose...' :
-                                        'Search fees by payer name, fee code, or purpose...' // CHANGED
+                                        'Search fees by payer name, fee code, purpose, or address...'
                                     }
                                     className="pl-10"
                                     value={searchQuery}
@@ -550,7 +714,7 @@ export function PayerSelectionStep({
                                             ? 'No households found matching your search'
                                             : payerSource === 'clearance'
                                             ? 'No payable clearance requests found'
-                                            : 'No outstanding fees found matching your search'} {/* CHANGED */}
+                                            : 'No outstanding fees found matching your search'}
                                     </p>
                                 </div>
                             ) : (
@@ -567,7 +731,7 @@ export function PayerSelectionStep({
                                             <div className="flex items-center gap-4">
                                                 <div className={`p-3 rounded-full ${
                                                     payerSource === 'clearance' ? 'bg-purple-100 text-purple-600' :
-                                                    payerSource === 'fees' ? 'bg-amber-100 text-amber-600' : // CHANGED: color for fees
+                                                    payerSource === 'fees' ? 'bg-amber-100 text-amber-600' :
                                                     payerSource === 'residents' && payer.has_outstanding_fees ? 'bg-blue-100 text-blue-600' :
                                                     'bg-primary/10 text-primary'
                                                 }`}>
@@ -581,14 +745,19 @@ export function PayerSelectionStep({
                                                                 Payment Due
                                                             </Badge>
                                                         )}
-                                                        {payerSource === 'fees' && payer.status === 'overdue' && ( // ADDED: overdue badge for fees
+                                                        {payerSource === 'fees' && payer.status === 'overdue' && (
                                                             <Badge className="ml-2 px-2 py-0.5 text-xs bg-red-100 text-red-600 rounded-full">
                                                                 Overdue
                                                             </Badge>
                                                         )}
-                                                        {payerSource === 'fees' && payer.status === 'pending' && ( // ADDED: pending badge for fees
+                                                        {payerSource === 'fees' && payer.status === 'pending' && (
                                                             <Badge className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">
                                                                 Pending
+                                                            </Badge>
+                                                        )}
+                                                        {payerSource === 'fees' && payer.status === 'partially_paid' && (
+                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-amber-100 text-amber-600 rounded-full">
+                                                                Partial Payment
                                                             </Badge>
                                                         )}
                                                     </div>
@@ -668,13 +837,13 @@ export function PayerSelectionStep({
                                 </div>
                             </div>
                             <div className="flex items-start gap-2">
-                                <Receipt className="h-4 w-4 text-amber-600 mt-0.5" /> {/* CHANGED icon */}
+                                <Receipt className="h-4 w-4 text-amber-600 mt-0.5" />
                                 <div>
-                                    <div className="font-medium text-amber-700">Fees Due</div> {/* CHANGED label */}
-                                    <p className="text-gray-500">Pay outstanding fees and bills</p> {/* CHANGED description */}
+                                    <div className="font-medium text-amber-700">Outstanding Fees</div>
+                                    <p className="text-gray-500">Pay outstanding fees and bills</p>
                                     <div className="text-xs text-amber-600 mt-1 flex items-center gap-1">
                                         <DollarSign className="h-3 w-3" />
-                                        <span>Pending fees with remaining balance</span> {/* CHANGED */}
+                                        <span>Includes all pending and overdue fees</span>
                                     </div>
                                 </div>
                             </div>
@@ -739,19 +908,16 @@ export function PayerSelectionStep({
                                 <div className="font-semibold text-purple-600">{getPayerCount('clearance')}</div>
                             </div>
                             <div className="space-y-1">
-                                <div className="text-gray-500">Fees Due</div> {/* CHANGED label */}
+                                <div className="text-gray-500">Outstanding Fees</div>
                                 <div className="font-semibold text-amber-600">{getPayerCount('fees')}</div>
                             </div>
                         </div>
                         <div className="mt-4 pt-4 border-t border-gray-200">
                             <div className="text-xs text-gray-500">
                                 <DollarSign className="h-3 w-3 inline mr-1" />
-                                Total Outstanding Balance: 
+                                Total Outstanding Balance (Fees): 
                                 <span className="font-semibold text-amber-600 ml-1">
-                                    ₱{fees
-                                        .filter(fee => fee.balance > 0 && fee.status === 'pending')
-                                        .reduce((sum, fee) => sum + (fee.balance || 0), 0)
-                                        .toFixed(2)}
+                                    ₱{totalOutstandingBalance.toFixed(2)}
                                 </span>
                             </div>
                         </div>

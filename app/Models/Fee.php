@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+use Illuminate\Notifications\Notifiable;
+
 class Fee extends Model
 {
-    use HasFactory;
-
+ use HasFactory, Notifiable;
     protected $fillable = [
         'fee_type_id',
         'payer_type',
@@ -249,4 +250,6 @@ class Fee extends Model
     {
         return $this->paymentItems()->exists();
     }
+
+    
 }

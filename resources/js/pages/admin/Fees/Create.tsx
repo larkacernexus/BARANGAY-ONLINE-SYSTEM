@@ -16,7 +16,8 @@ import {
     Copy,
     Check,
     X,
-    Info
+    Info,
+    Filter
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import AppLayout from '@/layouts/admin-app-layout';
@@ -28,6 +29,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+
+interface DocumentCategory {
+    id: number | string;
+    name: string;
+    slug: string;
+    description?: string;
+    order?: number;
+}
 
 interface DiscountType {
     id: number | string;
@@ -56,7 +72,8 @@ interface FeeType {
     id: number | string;
     code: string;
     name: string;
-    category: string;
+    document_category_id: number | string | null;
+    document_category?: DocumentCategory;
     base_amount: number;
     has_surcharge: boolean;
     surcharge_percentage?: number;
@@ -104,6 +121,7 @@ interface FeesCreateProps {
     preselectedHousehold?: Household;
     puroks: string[];
     discountTypes: DiscountType[];
+    documentCategories: DocumentCategory[];
     errors?: Record<string, string>;
     initialData?: Partial<FeeFormData>;
     duplicateFrom?: {
@@ -299,6 +317,15 @@ const calculateDiscountedAmount = (
     return discountAmount;
 };
 
+// Payer types with icons
+const payerTypes = [
+    { value: 'resident', icon: User, label: 'Resident' },
+    { value: 'business', icon: Building, label: 'Business' },
+    { value: 'household', icon: Home, label: 'Household' },
+    { value: 'visitor', icon: User, label: 'Visitor' },
+    { value: 'other', icon: User, label: 'Other' },
+];
+
 export default function FeesCreate({ 
     feeTypes, 
     residents, 
@@ -307,6 +334,7 @@ export default function FeesCreate({
     preselectedHousehold, 
     puroks,
     discountTypes,
+    documentCategories,
     errors,
     initialData,
     duplicateFrom
@@ -392,6 +420,7 @@ export default function FeesCreate({
     const [showPenalty, setShowPenalty] = useState(false);
     const [availableDiscounts, setAvailableDiscounts] = useState<DiscountType[]>([]);
     const [autoCalculateDiscount, setAutoCalculateDiscount] = useState(true);
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
     // Initialize form when component mounts
     useEffect(() => {
@@ -662,13 +691,20 @@ export default function FeesCreate({
         }
     };
 
-    const payerTypes = [
-        { value: 'resident', icon: User, label: 'Resident' },
-        { value: 'business', icon: Building, label: 'Business' },
-        { value: 'household', icon: Home, label: 'Household' },
-        { value: 'visitor', icon: User, label: 'Visitor' },
-        { value: 'other', icon: User, label: 'Other' },
-    ];
+    // Filter fee types by selected category
+    const filteredFeeTypes = useMemo(() => {
+        if (selectedCategory === 'all') return feeTypes;
+        return feeTypes.filter(feeType => 
+            feeType.document_category_id && feeType.document_category_id.toString() === selectedCategory
+        );
+    }, [selectedCategory, feeTypes]);
+
+    // Compact category display for selected category badge
+    const getSelectedCategoryName = () => {
+        if (selectedCategory === 'all') return 'All Categories';
+        const category = documentCategories.find(cat => cat.id.toString() === selectedCategory);
+        return category ? category.name : 'Select Category';
+    };
 
     return (
         <AppLayout
@@ -753,6 +789,59 @@ export default function FeesCreate({
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
+                                    {/* Document Category Filter - COMPACT VERSION */}
+                                    {documentCategories.length > 0 && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="flex items-center gap-2">
+                                                    <Filter className="h-4 w-4" />
+                                                    Filter by Category
+                                                </Label>
+                                                {selectedCategory !== 'all' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedCategory('all')}
+                                                        className="text-sm text-primary hover:underline"
+                                                    >
+                                                        Clear filter
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1">
+                                                    <Select
+                                                        value={selectedCategory}
+                                                        onValueChange={setSelectedCategory}
+                                                    >
+                                                        <SelectTrigger className="w-full">
+                                                            <SelectValue>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span>{getSelectedCategoryName()}</span>
+                                                                    {selectedCategory !== 'all' && (
+                                                                        <Badge variant="secondary" className="ml-2">
+                                                                            {filteredFeeTypes.length} fee type(s)
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                            </SelectValue>
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="all">All Categories</SelectItem>
+                                                            {documentCategories.map(category => (
+                                                                <SelectItem 
+                                                                    key={category.id} 
+                                                                    value={category.id.toString()}
+                                                                >
+                                                                    {category.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
                                     <div className="space-y-2">
                                         <Label htmlFor="fee_type_id">Fee Type *</Label>
                                         <select
@@ -763,23 +852,39 @@ export default function FeesCreate({
                                             onChange={handleFeeTypeChange}
                                         >
                                             <option value="">Select Fee Type</option>
-                                            {feeTypes.map((feeType) => (
+                                            {filteredFeeTypes.map((feeType) => (
                                                 <option key={feeType.id} value={feeType.id}>
                                                     {feeType.code} - {feeType.name}
+                                                    {feeType.document_category && ` (${feeType.document_category.name})`}
                                                 </option>
                                             ))}
                                         </select>
                                         {errors?.fee_type_id && (
                                             <p className="text-sm text-red-500">{errors.fee_type_id}</p>
                                         )}
+                                        
+                                        {/* Show filtered count */}
+                                        {selectedCategory !== 'all' && filteredFeeTypes.length === 0 && (
+                                            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800">
+                                                <p>No fee types found for this category. <button 
+                                                    type="button"
+                                                    onClick={() => setSelectedCategory('all')}
+                                                    className="text-yellow-700 hover:text-yellow-900 underline font-medium"
+                                                >
+                                                    Show all fee types
+                                                </button></p>
+                                            </div>
+                                        )}
                                     </div>
                                     
                                     {selectedFeeType && (
                                         <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
                                             <div className="grid grid-cols-2 gap-3 text-sm">
-                                                <div>
-                                                    <span className="font-medium">Category:</span> {selectedFeeType.category}
-                                                </div>
+                                                {selectedFeeType.document_category && (
+                                                    <div>
+                                                        <span className="font-medium">Category:</span> {selectedFeeType.document_category.name}
+                                                    </div>
+                                                )}
                                                 <div>
                                                     <span className="font-medium">Base Amount:</span> 
                                                     <span className="ml-2 font-semibold">₱{selectedFeeType.base_amount.toFixed(2)}</span>
@@ -1088,21 +1193,24 @@ export default function FeesCreate({
                                         <div>
                                             <Label>Payer Type *</Label>
                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                                                {payerTypes.map((type) => (
-                                                    <button
-                                                        key={type.value}
-                                                        type="button"
-                                                        onClick={() => handlePayerTypeChange(type.value)}
-                                                        className={`flex flex-col items-center justify-center p-3 rounded-md border transition-colors ${
-                                                            data.payer_type === type.value
-                                                                ? 'border-primary bg-primary/10 text-primary'
-                                                                : 'border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                                                        }`}
-                                                    >
-                                                        <type.icon className="h-5 w-5 mb-1" />
-                                                        <span className="text-xs font-medium">{type.label}</span>
-                                                    </button>
-                                                ))}
+                                                {payerTypes.map((type) => {
+                                                    const IconComponent = type.icon;
+                                                    return (
+                                                        <button
+                                                            key={type.value}
+                                                            type="button"
+                                                            onClick={() => handlePayerTypeChange(type.value)}
+                                                            className={`flex flex-col items-center justify-center p-3 rounded-md border transition-colors ${
+                                                                data.payer_type === type.value
+                                                                    ? 'border-primary bg-primary/10 text-primary'
+                                                                    : 'border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                                            }`}
+                                                        >
+                                                            <IconComponent className="h-5 w-5 mb-1" />
+                                                            <span className="text-xs font-medium">{type.label}</span>
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
                                             {errors?.payer_type && (
                                                 <p className="text-sm text-red-500">{errors.payer_type}</p>

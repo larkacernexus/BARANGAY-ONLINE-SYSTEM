@@ -1,7 +1,8 @@
 import AppLayoutTemplate from '@/layouts/app/resident-app-sidebar-layout';
 import { type BreadcrumbItem } from '@/types';
 import { type ReactNode } from 'react';
-import ResidentMobileFooter from '@/layouts/resident-mobile-sticky-footer'; // Updated import
+import ResidentMobileFooter from '@/layouts/resident-mobile-sticky-footer';
+import { Breadcrumbs } from '@/components/breadcrumbs'; // Import Breadcrumbs component
 
 interface AppLayoutProps {
     children: ReactNode;
@@ -9,7 +10,7 @@ interface AppLayoutProps {
     className?: string;
 }
 
-export default ({ children, breadcrumbs, className = '', ...props }: AppLayoutProps) => {
+export default ({ children, breadcrumbs = [], className = '', ...props }: AppLayoutProps) => {
     // Update mobile footer items to use only icon names that exist in iconMap
     const mobileFooterItems = [
         { 
@@ -51,10 +52,17 @@ export default ({ children, breadcrumbs, className = '', ...props }: AppLayoutPr
                 <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
                     {/* Main content container with consistent spacing */}
                     <div className={`h-full overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 ${className}`}>
-                        {/* Breadcrumb spacing */}
+                        {/* Mobile breadcrumbs - only visible on small screens */}
                         {breadcrumbs && breadcrumbs.length > 0 && (
-                            <div className="mb-6">
-                                {/* Breadcrumbs will be rendered by AppLayoutTemplate */}
+                            <div className="md:hidden mb-4">
+                                <Breadcrumbs breadcrumbs={breadcrumbs} />
+                            </div>
+                        )}
+                        
+                        {/* Desktop breadcrumbs spacing - managed by AppLayoutTemplate */}
+                        {breadcrumbs && breadcrumbs.length > 0 && (
+                            <div className="hidden md:block mb-6">
+                                {/* Breadcrumbs will be rendered by AppLayoutTemplate in header */}
                             </div>
                         )}
                         

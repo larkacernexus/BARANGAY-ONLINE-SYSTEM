@@ -5,9 +5,10 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
 import { Head, useForm } from '@inertiajs/react';
+import { route } from 'ziggy-js';
 
 // Hardcoded URL for RESIDENT password confirmation
-const RESIDENT_CONFIRM_PASSWORD_URL = '/resident/confirm-password';
+const RESIDENT_CONFIRM_PASSWORD_URL = route('resident.password.confirm.store');
 
 export default function ConfirmPassword() {
     const { data, setData, post, processing, errors, reset } = useForm({

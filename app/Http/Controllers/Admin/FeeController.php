@@ -12,6 +12,7 @@ use App\Models\PaymentItem;
 use App\Models\DiscountType;
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\Models\DocumentCategory;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -25,7 +26,7 @@ class FeeController extends Controller
     {
         $query = Fee::query()
             ->with([
-                'feeType:id,name,code,category',
+                'feeType:id,name,code,document_category_id',
                 'resident:id,first_name,last_name,middle_name',
                 'household:id,head_of_family',
                 'paymentItems.payment:id,payment_date,total_amount,or_number,status'  
@@ -53,7 +54,7 @@ class FeeController extends Controller
         // Filter by category
         if ($request->has('category') && $request->category) {
             $query->whereHas('feeType', function($q) use ($request) {
-                $q->where('category', $request->category);
+                $q->where('document_category_id', $request->category);
             });
         }
         
@@ -142,11 +143,11 @@ class FeeController extends Controller
             ],
             
             // Category breakdown
-            'category_totals' => Fee::selectRaw('fee_types.category, COUNT(fees.id) as count, SUM(fees.total_amount) as total_amount')
+            'category_totals' => Fee::selectRaw('fee_types.document_category_id, COUNT(fees.id) as count, SUM(fees.total_amount) as total_amount')
                 ->join('fee_types', 'fees.fee_type_id', '=', 'fee_types.id')
-                ->groupBy('fee_types.category')
+                ->groupBy('fee_types.document_category_id')
                 ->get()
-                ->keyBy('category')
+                ->keyBy('document_category_id')
                 ->toArray(),
         ];
     
@@ -171,16 +172,11 @@ class FeeController extends Controller
         ];
     
         // Category options
-        $categories = [
-            'tax' => 'Taxes',
-            'clearance' => 'Clearances',
-            'certificate' => 'Certificates',
-            'service' => 'Services',
-            'rental' => 'Rentals',
-            'fine' => 'Fines',
-            'contribution' => 'Contributions',
-            'other' => 'Other',
-        ];
+        $categories = DocumentCategory::active()
+            ->ordered()
+            ->get(['id', 'name'])
+            ->pluck('name', 'id')
+            ->toArray();
     
         // Payer type options
         $payerTypes = [
@@ -349,7 +345,7 @@ class FeeController extends Controller
     }
 
     // Show create form
-  public function create(Request $request)
+public function create(Request $request)
 {
     $resident = null;
     $household = null;
@@ -383,11 +379,14 @@ class FeeController extends Controller
         $initialData = $this->prepareDuplicateData($feeToDuplicate);
     }
     
-    // Get fee types with discount relationships
-    $feeTypes = FeeType::with(['discountFeeTypes' => function($query) {
-            $query->where('is_active', true)
-                  ->with('discountType');
-        }])
+    // Get fee types with discount relationships and document category
+    $feeTypes = FeeType::with([
+            'documentCategory', // Load document category
+            'discountFeeTypes' => function($query) {
+                $query->where('is_active', true)
+                      ->with('discountType');
+            }
+        ])
         ->active()
         ->get()
         ->map(function($type) {
@@ -397,7 +396,16 @@ class FeeController extends Controller
                 'id' => $type->id,
                 'code' => $type->code,
                 'name' => $type->name,
-                'category' => $type->category,
+                'document_category_id' => $type->document_category_id,
+                'document_category' => $type->documentCategory ? [
+                    'id' => $type->documentCategory->id,
+                    'name' => $type->documentCategory->name,
+                    'slug' => $type->documentCategory->slug,
+                    'icon' => $type->documentCategory->icon,
+                    'color' => $type->documentCategory->color,
+                    'description' => $type->documentCategory->description,
+                    'order' => $type->documentCategory->order,
+                ] : null,
                 'base_amount' => (float) $type->base_amount,
                 'amount_type' => $type->amount_type,
                 'has_surcharge' => $type->has_surcharge,
@@ -512,6 +520,11 @@ class FeeController extends Controller
             ];
         });
     
+    // Get document categories for filtering
+    $documentCategories = DocumentCategory::active()
+        ->ordered()
+        ->get(['id', 'name', 'slug', 'icon', 'color', 'description', 'order']);
+    
     // Prepare preselected household data
     $preselectedHouseholdData = null;
     if ($household) {
@@ -551,6 +564,7 @@ class FeeController extends Controller
         'preselectedHousehold' => $preselectedHouseholdData,
         'puroks' => \App\Models\Purok::pluck('name')->filter()->values(),
         'discountTypes' => $discountTypes,
+        'documentCategories' => $documentCategories,
         // Add initial data for form
         'initialData' => $initialData,
         // Pass the fee being duplicated for reference
@@ -715,7 +729,7 @@ private function prepareDuplicateData($fee)
     {
         // Load all necessary relationships - UPDATED to match your Payment model
         $fee->load([
-            'feeType:id,code,name,category,description,base_amount,validity_days',
+            'feeType:id,code,name,document_category_id,description,base_amount,validity_days',
             'resident:id,first_name,last_name,middle_name,birth_date,gender,occupation,contact_number',
             'household:id,head_of_family,address,contact_number',
             'issuedBy:id,first_name,last_name,email',
@@ -775,7 +789,7 @@ private function prepareDuplicateData($fee)
                 'id' => $fee->feeType->id,
                 'name' => $fee->feeType->name,
                 'code' => $fee->feeType->code,
-                'category' => $fee->feeType->category,
+                'document_category_id' => $fee->feeType->document_category_id,
                 'description' => $fee->feeType->description,
                 'base_amount' => (float) $fee->feeType->base_amount,
                 'validity_days' => $fee->feeType->validity_days,
@@ -1306,7 +1320,11 @@ private function prepareDuplicateData($fee)
         'type' => $type,
     ];
     
-    if ($type === 'certificate' && $fee->certificate_number) {
+    $isCertificate = $fee->feeType && $fee->feeType->document_category_id 
+    && in_array($fee->feeType->documentCategory->slug ?? '', ['certificate', 'clearance']);
+
+   if ($type === 'certificate' && ($fee->certificate_number || $isCertificate)) {
+
         $view = 'pdf.fee-certificate';
         $filename = "certificate-{$fee->certificate_number}.pdf";
     } else {
@@ -1431,14 +1449,14 @@ private function prepareDuplicateData($fee)
             ->get();
         
         // Fees by category
-        $feesByCategory = Fee::select(
-                'fee_types.category',
-                DB::raw('COUNT(fees.id) as count'),
-                DB::raw('SUM(fees.total_amount) as total')
-            )
-            ->join('fee_types', 'fees.fee_type_id', '=', 'fee_types.id')
-            ->groupBy('fee_types.category')
-            ->get();
+            $feesByCategory = Fee::select(
+                    'fee_types.document_category_id',
+                    DB::raw('COUNT(fees.id) as count'),
+                    DB::raw('SUM(fees.total_amount) as total')
+                )
+                ->join('fee_types', 'fees.fee_type_id', '=', 'fee_types.id')
+                ->groupBy('fee_types.document_category_id')
+                ->get();
         
         return Inertia::render('admin/Fees/Dashboard', [
             'stats' => $stats,
@@ -1500,11 +1518,11 @@ private function prepareDuplicateData($fee)
             fwrite($file, "\xEF\xBB\xBF");
             
             // Headers
-            fputcsv($file, [
+           fputcsv($file, [
                 'ID',
                 'Fee Code',
                 'Fee Type',
-                'Category',
+                'Document Category ID',
                 'Payer Name',
                 'Payer Type',
                 'Contact Number',
@@ -1526,7 +1544,7 @@ private function prepareDuplicateData($fee)
                     $fee->id,
                     $fee->fee_code,
                     $fee->feeType->name ?? 'N/A',
-                    $fee->feeType->category ?? 'N/A',
+                    $fee->feeType->document_category_id ?? 'N/A',
                     $fee->payer_name,
                     $fee->payer_type,
                     $fee->contact_number,

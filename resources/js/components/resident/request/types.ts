@@ -7,6 +7,7 @@ export interface DocumentType {
 }
 
 export interface ClearanceType {
+    is_popular: boolean;
     id: number;
     name: string;
     fee: number;
@@ -24,6 +25,10 @@ export interface ClearanceType {
 }
 
 export interface Resident {
+    first_name: string;
+    last_name: string;
+    middle_name: string;
+    suffix: string;
     id: number;
     full_name: string;
     address: string;

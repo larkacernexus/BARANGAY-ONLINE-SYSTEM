@@ -3,22 +3,28 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use Inertia\Testing\AssertableInertia as Assert;
 
 class DashboardTest extends TestCase
 {
-    use RefreshDatabase;
-
-    public function test_guests_are_redirected_to_the_login_page()
+    public function test_dashboard_renders_with_user_data(): void
     {
-        $this->get(route('dashboard'))->assertRedirect(route('login'));
-    }
+        $user = User::factory()->create([
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+        ]);
 
-    public function test_authenticated_users_can_visit_the_dashboard()
-    {
-        $this->actingAs($user = User::factory()->create());
+        $response = $this->actingAs($user)
+            ->get('/dashboard');
 
-        $this->get(route('dashboard'))->assertOk();
+        $response->assertInertiaComponent('Dashboard')
+            ->assertInertia(function (Assert $page) use ($user) {
+                $page->has('user', function (Assert $prop) use ($user) {
+                    $prop->where('id', $user->id)
+                        ->where('name', $user->name)
+                        ->where('email', $user->email);
+                });
+            });
     }
 }

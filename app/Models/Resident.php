@@ -60,10 +60,28 @@ class Resident extends Model
     return $value ? \Carbon\Carbon::parse($value) : null;
 }
     // Add accessor for full name
-    public function getFullNameAttribute()
-    {
-        return trim("{$this->first_name} {$this->middle_name} {$this->last_name}");
+public function getFullNameAttribute()
+{
+    $parts = [];
+    
+    if ($this->first_name) {
+        $parts[] = $this->first_name;
     }
+    
+    if ($this->middle_name) {
+        $parts[] = $this->middle_name;
+    }
+    
+    if ($this->last_name) {
+        $parts[] = $this->last_name;
+    }
+    
+    if ($this->suffix) {
+        $parts[] = $this->suffix;
+    }
+    
+    return implode(' ', $parts);
+}
 
 
      public function fees()

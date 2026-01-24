@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, FileText } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, CheckCircle, FileText, FileWarning } from 'lucide-react';
 
 interface DocumentType {
     id: number;
@@ -27,70 +28,101 @@ export function DocumentRequirementsCard({
     selectedDocumentTypes,
     documentRequirements,
 }: DocumentRequirementsCardProps) {
+    const requiredDocuments = documentTypes.filter(doc => doc.is_required);
+    const completedCount = requiredDocuments.filter(doc => 
+        selectedDocumentTypes.has(doc.id)
+    ).length;
+
     return (
-        <Card className="lg:rounded-xl">
+        <Card className="lg:rounded-xl shadow-sm">
             <CardHeader className="p-4 lg:p-6">
-                <CardTitle className="flex items-center gap-2 text-xs lg:text-sm">
-                    <FileText className="h-3 w-3 lg:h-4 lg:w-4" />
-                    Required Documents
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 lg:p-6 pt-0 lg:pt-0">
-                <div className="space-y-2 lg:space-y-3">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs lg:text-sm font-medium">Status:</span>
-                        <div className={`flex items-center gap-1 ${documentRequirements.met ? 'text-green-600' : 'text-amber-600'}`}>
-                            {documentRequirements.met ? (
-                                <>
-                                    <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4" />
-                                    <span className="text-xs font-medium">Complete</span>
-                                </>
-                            ) : (
-                                <>
-                                    <AlertCircle className="h-3 w-3 lg:h-4 lg:w-4" />
-                                    <span className="text-xs font-medium">Incomplete</span>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                    
-                    <div className="space-y-1.5 lg:space-y-2">
-                        <p className="text-xs text-gray-600">Required for {clearanceName}:</p>
-                        <div className="space-y-1">
-                            {documentTypes
-                                .filter(doc => doc.is_required)
-                                .map((doc, index) => {
-                                    const isUploaded = selectedDocumentTypes.has(doc.id);
-                                    return (
-                                        <div key={index} className="flex items-center gap-1.5 lg:gap-2 text-xs">
-                                            {isUploaded ? (
-                                                <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
-                                            ) : (
-                                                <div className="h-3 w-3 rounded-full border-2 border-gray-300 flex-shrink-0"></div>
-                                            )}
-                                            <span className="flex-1 truncate">
-                                                {doc.name}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                        </div>
-                    </div>
-                    
-                    {documentRequirements.missing.length > 0 && (
-                        <Alert variant="destructive" className="mt-2 lg:mt-3 p-2 lg:p-3">
-                            <AlertCircle className="h-3 w-3 lg:h-4 lg:w-4" />
-                            <AlertTitle className="text-xs lg:text-sm">Missing Documents</AlertTitle>
-                            <AlertDescription>
-                                <ul className="list-disc list-inside space-y-1">
-                                    {documentRequirements.missing.map((doc, index) => (
-                                        <li key={index} className="text-xs">{doc}</li>
-                                    ))}
-                                </ul>
-                            </AlertDescription>
-                        </Alert>
-                    )}
+                <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-sm lg:text-base font-semibold">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        Document Requirements
+                    </CardTitle>
+                    <Badge 
+                        variant={documentRequirements.met ? "default" : "destructive"}
+                        className="gap-1"
+                    >
+                        {completedCount}/{requiredDocuments.length}
+                    </Badge>
                 </div>
+            </CardHeader>
+            <CardContent className="p-4 lg:p-6 pt-0 space-y-4">
+                {/* Progress Indicator */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-600">Progress</span>
+                        <span className="text-xs font-medium">{completedCount}/{requiredDocuments.length}</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                            className="h-full bg-green-500 transition-all duration-300"
+                            style={{ width: `${(completedCount / requiredDocuments.length) * 100}%` }}
+                        />
+                    </div>
+                </div>
+
+                {/* Requirements List */}
+                <div className="space-y-2">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                        For {clearanceName}:
+                    </p>
+                    <div className="space-y-1">
+                        {requiredDocuments.map((doc, index) => {
+                            const isUploaded = selectedDocumentTypes.has(doc.id);
+                            return (
+                                <div 
+                                    key={index} 
+                                    className={`flex items-center justify-between p-2 rounded-lg ${isUploaded ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-800/50'}`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {isUploaded ? (
+                                            <CheckCircle className="h-4 w-4 text-green-500" />
+                                        ) : (
+                                            <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
+                                        )}
+                                        <span className="text-sm">{doc.name}</span>
+                                    </div>
+                                    <Badge 
+                                        variant={isUploaded ? "outline" : "secondary"}
+                                        className="text-xs h-5"
+                                    >
+                                        {isUploaded ? "Uploaded" : "Pending"}
+                                    </Badge>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Missing Documents Alert */}
+                {documentRequirements.missing.length > 0 && (
+                    <Alert variant="destructive" className="p-3">
+                        <FileWarning className="h-4 w-4" />
+                        <AlertTitle className="text-sm">Missing Required Documents</AlertTitle>
+                        <AlertDescription className="text-xs mt-1">
+                            <ul className="space-y-1">
+                                {documentRequirements.missing.map((doc, index) => (
+                                    <li key={index} className="flex items-center gap-2">
+                                        <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                                        {doc}
+                                    </li>
+                                ))}
+                            </ul>
+                        </AlertDescription>
+                    </Alert>
+                )}
+                
+                {documentRequirements.met && (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <p className="text-sm text-green-800 dark:text-green-300">
+                            All required documents are uploaded
+                        </p>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

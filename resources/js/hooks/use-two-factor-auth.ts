@@ -1,108 +1,180 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
+import { route } from 'ziggy-js';
 
-interface TwoFactorSetupData {
-    svg: string;
-    url: string;
+interface TwoFactorAuthHook {
+    qrCodeSvg: string;
+    manualSetupKey: string;
+    hasSetupData: boolean;
+    recoveryCodesList: string[];
+    errors: Record<string, string>;
+    clearSetupData: () => void;
+    fetchSetupData: () => Promise<void>;
+    fetchRecoveryCodes: () => Promise<void>;
+    regenerateRecoveryCodes: () => Promise<void>;
+    confirmSetup: (code: string) => Promise<{ success: boolean; recoveryCodes?: string[] }>;
 }
 
-interface TwoFactorSecretKey {
-    secretKey: string;
-}
-
-export const OTP_MAX_LENGTH = 6;
-
-// Hardcoded URLs for two-factor authentication
-const TWO_FACTOR_QR_CODE_URL = '/two-factor-qr-code';
-const TWO_FACTOR_SECRET_KEY_URL = '/two-factor-secret-key';
-const TWO_FACTOR_RECOVERY_CODES_URL = '/two-factor-recovery-codes';
-
-const fetchJson = async <T>(url: string): Promise<T> => {
-    const response = await fetch(url, {
-        headers: { Accept: 'application/json' },
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to fetch: ${response.status}`);
-    }
-
-    return response.json();
-};
-
-export const useTwoFactorAuth = () => {
-    const [qrCodeSvg, setQrCodeSvg] = useState<string | null>(null);
-    const [manualSetupKey, setManualSetupKey] = useState<string | null>(null);
+export function useTwoFactorAuth(): TwoFactorAuthHook {
+    const [qrCodeSvg, setQrCodeSvg] = useState<string>('');
+    const [manualSetupKey, setManualSetupKey] = useState<string>('');
     const [recoveryCodesList, setRecoveryCodesList] = useState<string[]>([]);
-    const [errors, setErrors] = useState<string[]>([]);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const hasSetupData = useMemo<boolean>(
-        () => qrCodeSvg !== null && manualSetupKey !== null,
-        [qrCodeSvg, manualSetupKey],
-    );
-
-    const fetchQrCode = useCallback(async (): Promise<void> => {
+    const fetchSetupData = async () => {
         try {
-            const { svg } = await fetchJson<TwoFactorSetupData>(TWO_FACTOR_QR_CODE_URL);
-            setQrCodeSvg(svg);
-        } catch {
-            setErrors((prev) => [...prev, 'Failed to fetch QR code']);
-            setQrCodeSvg(null);
+            setErrors({});
+            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            
+            const response = await fetch(route('resident.two-factor.enable'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                setQrCodeSvg(result.data.qrCodeSvg || '');
+                setManualSetupKey(result.data.manualSetupKey || '');
+                setErrors({});
+            } else {
+                const errorMessage = result.message || 'Failed to enable 2FA';
+                setErrors({ general: errorMessage });
+                if (result.errors) {
+                    setErrors(result.errors);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching 2FA setup data:', error);
+            setErrors({ general: 'Network error occurred' });
         }
-    }, []);
+    };
 
-    const fetchSetupKey = useCallback(async (): Promise<void> => {
+    const confirmSetup = async (code: string) => {
         try {
-            const { secretKey: key } = await fetchJson<TwoFactorSecretKey>(
-                TWO_FACTOR_SECRET_KEY_URL,
-            );
-            setManualSetupKey(key);
-        } catch {
-            setErrors((prev) => [...prev, 'Failed to fetch a setup key']);
-            setManualSetupKey(null);
+            setErrors({});
+            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            
+            const response = await fetch(route('resident.two-factor.confirm'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ code }),
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                setErrors({});
+                if (result.data?.recoveryCodes) {
+                    setRecoveryCodesList(result.data.recoveryCodes);
+                }
+                return { 
+                    success: true, 
+                    recoveryCodes: result.data?.recoveryCodes 
+                };
+            } else {
+                const errorMessage = result.message || 'Invalid code';
+                setErrors({ code: errorMessage });
+                if (result.errors) {
+                    setErrors(result.errors);
+                }
+                return { success: false };
+            }
+        } catch (error) {
+            console.error('Error confirming 2FA:', error);
+            setErrors({ general: 'Network error occurred' });
+            return { success: false };
         }
-    }, []);
+    };
 
-    const clearErrors = useCallback((): void => {
-        setErrors([]);
-    }, []);
-
-    const clearSetupData = useCallback((): void => {
-        setManualSetupKey(null);
-        setQrCodeSvg(null);
-        clearErrors();
-    }, [clearErrors]);
-
-    const fetchRecoveryCodes = useCallback(async (): Promise<void> => {
+    const fetchRecoveryCodes = async () => {
         try {
-            clearErrors();
-            const codes = await fetchJson<string[]>(TWO_FACTOR_RECOVERY_CODES_URL);
-            setRecoveryCodesList(codes);
-        } catch {
-            setErrors((prev) => [...prev, 'Failed to fetch recovery codes']);
-            setRecoveryCodesList([]);
+            setErrors({});
+            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            
+            const response = await fetch(route('resident.two-factor.recovery-codes'), {
+                method: 'GET',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                setRecoveryCodesList(result.data?.recoveryCodes || []);
+                setErrors({});
+            } else {
+                const errorMessage = result.message || 'Failed to fetch recovery codes';
+                setErrors({ general: errorMessage });
+            }
+        } catch (error) {
+            console.error('Error fetching recovery codes:', error);
+            setErrors({ general: 'Network error occurred' });
         }
-    }, [clearErrors]);
+    };
 
-    const fetchSetupData = useCallback(async (): Promise<void> => {
+    const regenerateRecoveryCodes = async () => {
         try {
-            clearErrors();
-            await Promise.all([fetchQrCode(), fetchSetupKey()]);
-        } catch {
-            setQrCodeSvg(null);
-            setManualSetupKey(null);
+            setErrors({});
+            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            
+            const response = await fetch(route('resident.two-factor.regenerate-recovery-codes'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                setRecoveryCodesList(result.data?.recoveryCodes || []);
+                setErrors({});
+            } else {
+                const errorMessage = result.message || 'Failed to regenerate recovery codes';
+                setErrors({ general: errorMessage });
+            }
+        } catch (error) {
+            console.error('Error regenerating recovery codes:', error);
+            setErrors({ general: 'Network error occurred' });
         }
-    }, [clearErrors, fetchQrCode, fetchSetupKey]);
+    };
+
+    const clearSetupData = () => {
+        setQrCodeSvg('');
+        setManualSetupKey('');
+        setErrors({});
+    };
 
     return {
         qrCodeSvg,
         manualSetupKey,
+        hasSetupData: !!qrCodeSvg,
         recoveryCodesList,
-        hasSetupData,
         errors,
-        clearErrors,
         clearSetupData,
-        fetchQrCode,
-        fetchSetupKey,
         fetchSetupData,
         fetchRecoveryCodes,
+        regenerateRecoveryCodes,
+        confirmSetup,
     };
-};
+}

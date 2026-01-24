@@ -14,6 +14,7 @@ class ResidentDocument extends Model
     protected $fillable = [
         'resident_id',
         'document_category_id',
+        'document_type_id',
         'name',
         'file_name',
         'file_path',
@@ -26,23 +27,35 @@ class ResidentDocument extends Model
         'issue_date',
         'expiry_date',
         'metadata',
+        'tags',
         'is_public',
         'requires_password',
         'password',
         'view_count',
         'download_count',
         'status',
+        'uploaded_by',
+        'uploaded_at',
+
     ];
 
     protected $casts = [
         'metadata' => 'array',
+        'tags' => 'array',
+        // REMOVED:
+        // 'security_options' => 'array',
         'is_public' => 'boolean',
         'requires_password' => 'boolean',
+        // REMOVED:
+        // 'add_watermark' => 'boolean',
+        // 'enable_encryption' => 'boolean',
+        // 'audit_log_access' => 'boolean',
         'issue_date' => 'date',
         'expiry_date' => 'date',
         'file_size' => 'integer',
         'view_count' => 'integer',
         'download_count' => 'integer',
+        'uploaded_at' => 'datetime',
     ];
 
     /**
@@ -59,6 +72,22 @@ class ResidentDocument extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(DocumentCategory::class, 'document_category_id');
+    }
+
+    /**
+     * Get the document type.
+     */
+    public function documentType(): BelongsTo
+    {
+        return $this->belongsTo(DocumentType::class, 'document_type_id');
+    }
+
+    /**
+     * Get the user who uploaded the document.
+     */
+    public function uploadedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'uploaded_by');
     }
 
     /**
@@ -140,5 +169,37 @@ class ResidentDocument extends Model
         ];
 
         return $icons[strtolower($this->file_extension)] ?? 'File';
+    }
+
+    /**
+     * Get tags as array.
+     */
+    public function getTagsAttribute($value)
+    {
+        return $value ? json_decode($value, true) : [];
+    }
+
+    /**
+     * Set tags attribute.
+     */
+    public function setTagsAttribute($value)
+    {
+        $this->attributes['tags'] = $value ? json_encode($value) : null;
+    }
+
+    /**
+     * Get metadata as array.
+     */
+    public function getMetadataAttribute($value)
+    {
+        return $value ? json_decode($value, true) : [];
+    }
+
+    /**
+     * Set metadata attribute.
+     */
+    public function setMetadataAttribute($value)
+    {
+        $this->attributes['metadata'] = $value ? json_encode($value) : null;
     }
 }

@@ -36,10 +36,12 @@ export function AppSidebarHeader({
             <div className="flex items-center gap-4 flex-1 min-w-0">
                 <SidebarTrigger className="-ml-1" />
                 <div className="flex flex-col min-w-0">
-                    {/* Breadcrumbs row */}
-                    <div className="flex items-center gap-2">
-                        <Breadcrumbs breadcrumbs={breadcrumbs} />
-                    </div>
+                    {/* Breadcrumbs row - hidden on phone, visible on tablet and above */}
+                    {breadcrumbs.length > 0 && (
+                        <div className="hidden md:flex items-center gap-2">
+                            <Breadcrumbs breadcrumbs={breadcrumbs} />
+                        </div>
+                    )}
                     
                     {/* Title and description */}
                     {(title || description) && (

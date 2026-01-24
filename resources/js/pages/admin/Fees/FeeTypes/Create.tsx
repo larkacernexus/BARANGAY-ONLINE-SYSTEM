@@ -29,7 +29,7 @@ import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface FeeTypesCreateProps {
-    categories?: Record<string, string>;
+    categories?: Record<string, string>; // Now uses document_category_id (number) as key
     amountTypes?: Record<string, string>;
     frequencies?: Record<string, string>;
     applicableTo?: Record<string, string>;
@@ -41,7 +41,7 @@ interface FeeFormData {
     code: string;
     name: string;
     short_name: string;
-    category: string;
+    document_category_id: string; // Changed from category to document_category_id
     base_amount: number;
     amount_type: string;
     unit: string;
@@ -89,18 +89,17 @@ const PHILIPPINE_STANDARD_DISCOUNTS = {
     indigent: 50
 };
 
-// Generate a fee code based on category and name
-function generateFeeCode(name: string, category: string): string {
-    const categoryPrefixes: Record<string, string> = {
-        'tax': 'TAX',
-        'clearance': 'CLR',
-        'certificate': 'CERT',
-        'service': 'SVC',
-        'rental': 'RNT',
-        'fine': 'FINE'
-    };
+// Generate a fee code based on category name and fee name
+function generateFeeCode(name: string, categoryId: string, categories: Record<string, string>): string {
+    // Get category name from ID
+    const categoryName = categories[categoryId] || 'FEE';
     
-    const prefix = categoryPrefixes[category] || 'FEE';
+    // Use first 3 letters of category name as prefix
+    const prefix = categoryName
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase())
+        .join('')
+        .substring(0, 3);
     
     // Get initials from name
     const nameInitials = name
@@ -130,11 +129,14 @@ export default function FeeTypesCreate({
     const [isGenerating, setIsGenerating] = useState<boolean>(false);
     const [showDiscountInfo, setShowDiscountInfo] = useState<boolean>(false);
     
+    // Get first category ID for default value
+    const firstCategoryId = Object.keys(categories)[0] || '';
+    
     const { data, setData, post, processing } = useForm<FeeFormData>({
         code: '',
         name: '',
         short_name: '',
-        category: 'tax',
+        document_category_id: firstCategoryId, // Changed from category to document_category_id
         base_amount: 0,
         amount_type: 'fixed',
         unit: '',
@@ -177,18 +179,18 @@ export default function FeeTypesCreate({
 
     // Auto-generate code when name or category changes
     useEffect(() => {
-        if (autoGenerateCode && data.name.trim() && data.category) {
-            const generatedCode = generateFeeCode(data.name, data.category);
+        if (autoGenerateCode && data.name.trim() && data.document_category_id) {
+            const generatedCode = generateFeeCode(data.name, data.document_category_id, categories);
             setData('code', generatedCode);
         }
-    }, [data.name, data.category, autoGenerateCode]);
+    }, [data.name, data.document_category_id, autoGenerateCode, categories]);
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         
         // If code is empty but auto-generation is on, generate one
         if (!data.code.trim() && autoGenerateCode) {
-            const generatedCode = generateFeeCode(data.name || 'New Fee', data.category);
+            const generatedCode = generateFeeCode(data.name || 'New Fee', data.document_category_id, categories);
             setData('code', generatedCode);
         }
         
@@ -197,7 +199,7 @@ export default function FeeTypesCreate({
 
     const handleGenerateCode = () => {
         setIsGenerating(true);
-        const generatedCode = generateFeeCode(data.name || 'New Fee', data.category);
+        const generatedCode = generateFeeCode(data.name || 'New Fee', data.document_category_id, categories);
         setData('code', generatedCode);
         
         setTimeout(() => setIsGenerating(false), 500);
@@ -414,20 +416,24 @@ export default function FeeTypesCreate({
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="category">Category *</Label>
+                                            <Label htmlFor="document_category_id">Category *</Label>
                                             <select
-                                                id="category"
+                                                id="document_category_id"
                                                 required
                                                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                                value={data.category}
-                                                onChange={(e) => setData('category', e.target.value)}
+                                                value={data.document_category_id}
+                                                onChange={(e) => setData('document_category_id', e.target.value)}
                                             >
-                                                {Object.entries(safeCategories).map(([value, label]) => (
-                                                    <option key={value} value={value}>
+                                                <option value="">Select a category</option>
+                                                {Object.entries(safeCategories).map(([id, label]) => (
+                                                    <option key={id} value={id}>
                                                         {label}
                                                     </option>
                                                 ))}
                                             </select>
+                                            {errors?.document_category_id && (
+                                                <p className="text-sm text-red-500">{errors.document_category_id}</p>
+                                            )}
                                         </div>
                                         <div className="md:col-span-2 space-y-2">
                                             <Label htmlFor="description">Description</Label>

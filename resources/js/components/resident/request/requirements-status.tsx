@@ -1,13 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { 
     CheckCircle, 
     FileWarning, 
-    Check,
     Clock,
     Calendar,
     AlertCircle,
-    FileText
+    FileText,
+    DollarSign,
+    Shield
 } from 'lucide-react';
 
 interface DocumentRequirements {
@@ -45,120 +47,220 @@ export function RequirementsStatus({
     detailsProvided,
     dateSpecified,
 }: RequirementsStatusProps) {
+    const getCompletionStatus = () => {
+        const checks = [
+            clearanceTypeSelected,
+            purposeSelected,
+            documentRequirements?.met || documentRequirements?.requiredCount === 0,
+            detailsProvided,
+            dateSpecified
+        ];
+        const completed = checks.filter(Boolean).length;
+        const total = checks.length;
+        const percentage = Math.round((completed / total) * 100);
+        
+        return {
+            completed,
+            total,
+            percentage,
+            isComplete: completed === total
+        };
+    };
+
+    const completion = getCompletionStatus();
+
     return (
-        <div className="space-y-6">
-            {/* Order Summary */}
+        <div className="space-y-4">
+            {/* Order Summary - Compact */}
             <Card className="lg:rounded-xl">
-                <CardHeader className="p-4 lg:p-6">
-                    <CardTitle className="text-base lg:text-lg">Order Summary</CardTitle>
+                <CardHeader className="p-3 border-b">
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-semibold">Order Summary</CardTitle>
+                        {completion.isComplete ? (
+                            <Badge className="h-5 gap-1 text-xs">
+                                <CheckCircle className="h-3 w-3" />
+                                Ready
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline" className="h-5 text-xs">
+                                {completion.percentage}%
+                            </Badge>
+                        )}
+                    </div>
                 </CardHeader>
-                <CardContent className="p-4 lg:p-6 pt-0 lg:pt-0">
-                    <div className="space-y-3 lg:space-y-4">
-                        <div className="space-y-2 lg:space-y-3">
-                            <div className="flex justify-between text-xs lg:text-sm">
-                                <span className="text-gray-600">Clearance Type:</span>
-                                <span className="font-medium text-right max-w-[60%] truncate">
-                                    {clearanceName || 'None'}
-                                </span>
+                <CardContent className="p-3">
+                    {/* Progress Bar */}
+                    <div className="mb-3">
+                        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                                className={`h-full transition-all duration-300 ${
+                                    completion.isComplete ? 'bg-green-500' : 'bg-blue-500'
+                                }`}
+                                style={{ width: `${completion.percentage}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid gap-2 text-sm">
+                        <div className="flex items-center justify-between py-1">
+                            <div className="flex items-center gap-2 text-gray-600">
+                                <FileText className="h-3.5 w-3.5" />
+                                <span>Clearance</span>
                             </div>
-                            <div className="flex justify-between text-xs lg:text-sm">
-                                <span className="text-gray-600">Fee:</span>
-                                <span className="font-medium">{fee}</span>
-                            </div>
-                            <div className="flex justify-between text-xs lg:text-sm">
-                                <span className="text-gray-600">Processing:</span>
-                                <span className="font-medium flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {processingDays} days
-                                </span>
-                            </div>
-                            <div className="flex justify-between text-xs lg:text-sm">
-                                <span className="text-gray-600">Validity:</span>
-                                <span className="font-medium flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    {validityDays} days
-                                </span>
-                            </div>
-                            
-                            {documentRequirements && (
-                                <div className="flex justify-between items-center text-xs lg:text-sm pt-2 border-t">
-                                    <span className="text-gray-600">Requirements:</span>
-                                    <div className={`flex items-center gap-1 ${documentRequirements.met ? 'text-green-600' : 'text-amber-600'}`}>
-                                        {documentRequirements.met ? (
-                                            <>
-                                                <CheckCircle className="h-3 w-3 lg:h-3.5 lg:w-3.5" />
-                                                <span className="text-xs font-medium">
-                                                    {documentRequirements.fulfilledCount}/{documentRequirements.requiredCount}
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FileWarning className="h-3 w-3 lg:h-3.5 lg:w-3.5" />
-                                                <span className="text-xs font-medium">
-                                                    {documentRequirements.fulfilledCount}/{documentRequirements.requiredCount}
-                                                </span>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                            <span className="font-medium truncate max-w-[150px]">{clearanceName || 'Not selected'}</span>
                         </div>
                         
-                        <Separator />
-                        
-                        <div className="space-y-1 lg:space-y-2">
-                            <div className="flex justify-between font-bold text-base lg:text-lg">
-                                <span>Total:</span>
-                                <span>{fee}</span>
+                        <div className="flex items-center justify-between py-1">
+                            <div className="flex items-center gap-2 text-gray-600">
+                                <Clock className="h-3.5 w-3.5" />
+                                <span>Processing</span>
                             </div>
-                            <p className="text-xs text-gray-500">
-                                {requiresPayment ? 'Payment upon claim' : 'No payment required'}
-                            </p>
+                            <span className="font-medium">{processingDays} days</span>
+                        </div>
+                        
+                        <div className="flex items-center justify-between py-1">
+                            <div className="flex items-center gap-2 text-gray-600">
+                                <Calendar className="h-3.5 w-3.5" />
+                                <span>Validity</span>
+                            </div>
+                            <span className="font-medium">{validityDays} days</span>
+                        </div>
+                        
+                        {requiresApproval && (
+                            <div className="flex items-center justify-between py-1">
+                                <div className="flex items-center gap-2 text-gray-600">
+                                    <Shield className="h-3.5 w-3.5" />
+                                    <span>Approval</span>
+                                </div>
+                                <Badge variant="outline" className="h-5 text-xs">Required</Badge>
+                            </div>
+                        )}
+                        
+                        {documentRequirements && documentRequirements.requiredCount > 0 && (
+                            <div className="flex items-center justify-between py-1">
+                                <div className="flex items-center gap-2 text-gray-600">
+                                    <FileText className="h-3.5 w-3.5" />
+                                    <span>Documents</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <Badge 
+                                        variant={documentRequirements.met ? "default" : "destructive"} 
+                                        className="h-5 text-xs px-1.5"
+                                    >
+                                        {documentRequirements.fulfilledCount}/{documentRequirements.requiredCount}
+                                    </Badge>
+                                    {documentRequirements.met ? (
+                                        <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                                    ) : (
+                                        <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <Separator className="my-2" />
+                        
+                        {/* Total Fee */}
+                        <div className="flex items-center justify-between pt-2">
+                            <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-blue-600" />
+                                <span className="font-semibold">Total Fee</span>
+                            </div>
+                            <div className="text-right">
+                                <p className="font-bold text-lg text-blue-600">{fee}</p>
+                                <p className="text-xs text-gray-500">
+                                    {requiresPayment ? 'Pay on claim' : 'No payment'}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Requirements Checklist */}
+            {/* Requirements Checklist - Compact */}
             <Card className="lg:rounded-xl">
-                <CardHeader className="p-4 lg:p-6">
-                    <CardTitle className="text-base lg:text-lg">Requirements Status</CardTitle>
+                <CardHeader className="p-3 border-b">
+                    <CardTitle className="text-sm font-semibold">Requirements</CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 lg:p-6 pt-0 lg:pt-0">
-                    <div className="space-y-2 lg:space-y-3">
-                        <div className={`flex items-center gap-2 lg:gap-3 ${clearanceTypeSelected ? 'text-green-600' : 'text-gray-400'}`}>
-                            <div className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${clearanceTypeSelected ? 'bg-green-100' : 'bg-gray-100'}`}>
-                                {clearanceTypeSelected ? <Check className="h-2.5 w-2.5 lg:h-3 lg:w-3" /> : <span className="text-xs">1</span>}
-                            </div>
-                            <span className="text-xs lg:text-sm">Clearance type selected</span>
-                        </div>
-                        <div className={`flex items-center gap-2 lg:gap-3 ${purposeSelected ? 'text-green-600' : 'text-gray-400'}`}>
-                            <div className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${purposeSelected ? 'bg-green-100' : 'bg-gray-100'}`}>
-                                {purposeSelected ? <Check className="h-2.5 w-2.5 lg:h-3 lg:w-3" /> : <span className="text-xs">2</span>}
-                            </div>
-                            <span className="text-xs lg:text-sm">Purpose selected</span>
-                        </div>
-                        <div className={`flex items-center gap-2 lg:gap-3 ${documentRequirements?.met ? 'text-green-600' : 'text-amber-600'}`}>
-                            <div className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${documentRequirements?.met ? 'bg-green-100' : 'bg-amber-100'}`}>
-                                {documentRequirements?.met ? <Check className="h-2.5 w-2.5 lg:h-3 lg:w-3" /> : <span className="text-xs">3</span>}
-                            </div>
-                            <span className="text-xs lg:text-sm">
-                                Documents {documentRequirements?.met ? 'uploaded' : 'required'} 
-                                {documentRequirements && ` (${documentRequirements.fulfilledCount}/${documentRequirements.requiredCount})`}
-                            </span>
-                        </div>
-                        <div className={`flex items-center gap-2 lg:gap-3 ${detailsProvided ? 'text-green-600' : 'text-gray-400'}`}>
-                            <div className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${detailsProvided ? 'bg-green-100' : 'bg-gray-100'}`}>
-                                {detailsProvided ? <Check className="h-2.5 w-2.5 lg:h-3 lg:w-3" /> : <span className="text-xs">4</span>}
-                            </div>
-                            <span className="text-xs lg:text-sm">Details provided</span>
-                        </div>
-                        <div className={`flex items-center gap-2 lg:gap-3 ${dateSpecified ? 'text-green-600' : 'text-gray-400'}`}>
-                            <div className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${dateSpecified ? 'bg-green-100' : 'bg-gray-100'}`}>
-                                {dateSpecified ? <Check className="h-2.5 w-2.5 lg:h-3 lg:w-3" /> : <span className="text-xs">5</span>}
-                            </div>
-                            <span className="text-xs lg:text-sm">Date specified</span>
-                        </div>
+                <CardContent className="p-3">
+                    <div className="space-y-2">
+                        {[
+                            {
+                                id: 1,
+                                label: 'Clearance type',
+                                completed: clearanceTypeSelected,
+                                icon: FileText
+                            },
+                            {
+                                id: 2,
+                                label: 'Purpose',
+                                completed: purposeSelected,
+                                icon: CheckCircle
+                            },
+                            {
+                                id: 3,
+                                label: 'Documents',
+                                completed: documentRequirements?.met || documentRequirements?.requiredCount === 0,
+                                icon: FileText,
+                                status: documentRequirements ? 
+                                    `${documentRequirements.fulfilledCount}/${documentRequirements.requiredCount}` : 
+                                    '0/0'
+                            },
+                            {
+                                id: 4,
+                                label: 'Details',
+                                completed: detailsProvided,
+                                icon: CheckCircle
+                            },
+                            {
+                                id: 5,
+                                label: 'Date',
+                                completed: dateSpecified,
+                                icon: Calendar
+                            }
+                        ].map((item) => {
+                            const Icon = item.icon;
+                            return (
+                                <div 
+                                    key={item.id}
+                                    className={`flex items-center justify-between py-2 px-2 rounded transition-colors ${
+                                        item.completed 
+                                            ? 'bg-green-50 dark:bg-green-900/10' 
+                                            : 'bg-gray-50 dark:bg-gray-800/30'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2.5 flex-1">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                            item.completed 
+                                                ? 'bg-green-100 dark:bg-green-800' 
+                                                : 'bg-gray-100 dark:bg-gray-700'
+                                        }`}>
+                                            {item.completed ? (
+                                                <CheckCircle className="h-3 w-3 text-green-600" />
+                                            ) : (
+                                                <span className="text-xs font-medium text-gray-500">{item.id}</span>
+                                            )}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className={`text-sm truncate ${item.completed ? 'text-green-800 font-medium' : 'text-gray-700'}`}>
+                                                {item.label}
+                                            </p>
+                                            {item.status && (
+                                                <p className="text-xs text-gray-500">{item.status}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex-shrink-0">
+                                        {item.completed ? (
+                                            <CheckCircle className="h-4 w-4 text-green-500" />
+                                        ) : (
+                                            <div className="h-2 w-2 rounded-full bg-gray-300" />
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </CardContent>
             </Card>

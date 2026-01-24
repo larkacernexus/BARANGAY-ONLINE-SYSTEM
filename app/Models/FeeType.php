@@ -15,7 +15,7 @@ class FeeType extends Model
         'code',
         'name',
         'short_name',
-        'category',
+        'document_category_id', // Changed from 'category'
         'base_amount',
         'amount_type',
         'computation_formula',
@@ -85,15 +85,20 @@ class FeeType extends Model
         return $this->hasManyThrough(PaymentItem::class, Fee::class);
     }
 
+    public function documentCategory()
+    {
+        return $this->belongsTo(DocumentCategory::class);
+    }
+
     // Scopes
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
-    public function scopeByCategory($query, $category)
+    public function scopeByDocumentCategory($query, $documentCategoryId)
     {
-        return $query->where('category', $category);
+        return $query->where('document_category_id', $documentCategoryId);
     }
 
     public function scopeApplicableTo($query, $type)
@@ -134,18 +139,8 @@ class FeeType extends Model
 
     public function getCategoryDisplayAttribute()
     {
-        $categories = [
-            'tax' => 'Taxes',
-            'clearance' => 'Clearances',
-            'certificate' => 'Certificates',
-            'service' => 'Services',
-            'rental' => 'Rentals',
-            'fine' => 'Fines',
-            'contribution' => 'Contributions',
-            'other' => 'Other Fees',
-        ];
-        
-        return $categories[$this->category] ?? $this->category;
+        // Now get category from document_category relationship
+        return $this->documentCategory ? $this->documentCategory->name : 'Uncategorized';
     }
 
     public function getApplicableToDisplayAttribute()

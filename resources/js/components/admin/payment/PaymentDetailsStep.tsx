@@ -190,34 +190,64 @@ export function PaymentDetailsStep({
         item.metadata?.is_clearance_fee || item.category === 'clearance'
     );
 
-    // Calculate totals based on payment items
+    // Calculate totals based on payment items - FIXED VERSION
     const calculateTotals = (items: PaymentItem[]) => {
+        console.log('🧮 PaymentDetailsStep - Calculating totals from items:', items);
+        
         let subtotal = 0;
         let surcharge = 0;
         let penalty = 0;
         let total = 0;
 
         items.forEach(item => {
+            console.log('📦 Processing item:', {
+                name: item.fee_name,
+                base_amount: item.base_amount,
+                surcharge: item.surcharge,
+                penalty: item.penalty,
+                discount: item.discount,
+                total_amount: item.total_amount
+            });
+            
             subtotal += item.base_amount || 0;
             surcharge += item.surcharge || 0;
             penalty += item.penalty || 0;
+            // The total_amount field should already be set correctly (balance to pay)
             total += item.total_amount || 0;
         });
 
+        console.log('🧮 Calculated totals:', { subtotal, surcharge, penalty, total });
         return { subtotal, surcharge, penalty, total };
     };
 
     // Auto-update totals when payment items change
     useEffect(() => {
+        console.log('🔄 PaymentDetailsStep - Payment items changed:', {
+            itemsCount: paymentItems.length,
+            items: paymentItems
+        });
+        
         const { subtotal, surcharge, penalty, total } = calculateTotals(paymentItems);
         
-        setData(prev => ({
-            ...prev,
-            subtotal: subtotal,
-            surcharge: surcharge,
-            penalty: penalty,
-            total_amount: total,
-        }));
+        console.log('📊 Setting form data with totals:', { 
+            subtotal, 
+            surcharge, 
+            penalty, 
+            total,
+            currentData: data
+        });
+        
+        // Only update if values are different to avoid infinite loops
+        if (data.subtotal !== subtotal || data.surcharge !== surcharge || 
+            data.penalty !== penalty || data.total_amount !== total) {
+            setData(prev => ({
+                ...prev,
+                subtotal: subtotal,
+                surcharge: surcharge,
+                penalty: penalty,
+                total_amount: total,
+            }));
+        }
     }, [paymentItems]);
 
     // Auto-generate OR number
@@ -350,7 +380,20 @@ export function PaymentDetailsStep({
     // Calculate totals for display
     const displayTotals = calculateTotals(paymentItems);
     const discountAmount = data.discount || 0;
-    const finalTotal = Math.max(0, displayTotals.total - discountAmount);
+    // Use data.total_amount directly (already calculated correctly)
+    const finalTotal = data.total_amount || 0;
+
+    console.log('📋 PaymentDetailsStep - Final display:', {
+        displayTotals,
+        dataTotals: {
+            subtotal: data.subtotal,
+            surcharge: data.surcharge,
+            penalty: data.penalty,
+            total_amount: data.total_amount
+        },
+        discountAmount,
+        finalTotal
+    });
 
     // Get payer details based on selected resident or household
     const getPayerTypeDisplay = () => {
@@ -1258,6 +1301,13 @@ export function PaymentDetailsStep({
                                                             {formatCurrency(itemTotal)}
                                                         </span>
                                                     </div>
+                                                    {/* Show item breakdown */}
+                                                    <div className="text-xs text-gray-500 mt-1">
+                                                        {item.base_amount > 0 && `Base: ${formatCurrency(item.base_amount)}`}
+                                                        {item.surcharge > 0 && ` | Surcharge: ${formatCurrency(item.surcharge)}`}
+                                                        {item.penalty > 0 && ` | Penalty: ${formatCurrency(item.penalty)}`}
+                                                        {item.discount > 0 && ` | Discount: ${formatCurrency(item.discount)}`}
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -1266,26 +1316,26 @@ export function PaymentDetailsStep({
                             </div>
                         )}
 
-                        {/* Totals Section */}
+                        {/* Totals Section - FIXED VERSION */}
                         <div className="space-y-2 pt-2 border-t border-gray-200">
                             <div className="space-y-1.5">
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-600">Subtotal</span>
-                                    <span className="font-medium text-gray-900">{formatCurrency(displayTotals.subtotal)}</span>
+                                    <span className="font-medium text-gray-900">{formatCurrency(data.subtotal || displayTotals.subtotal)}</span>
                                 </div>
-                                {displayTotals.surcharge > 0 && (
+                                {data.surcharge > 0 && (
                                     <div className="flex justify-between items-center text-sm">
                                         <span className="text-amber-700">Surcharge</span>
-                                        <span className="font-medium text-amber-700">+{formatCurrency(displayTotals.surcharge)}</span>
+                                        <span className="font-medium text-amber-700">+{formatCurrency(data.surcharge)}</span>
                                     </div>
                                 )}
-                                {displayTotals.penalty > 0 && (
+                                {data.penalty > 0 && (
                                     <div className="flex justify-between items-center text-sm">
                                         <span className="text-red-700">Penalty</span>
-                                        <span className="font-medium text-red-700">+{formatCurrency(displayTotals.penalty)}</span>
-                                </div>
+                                        <span className="font-medium text-red-700">+{formatCurrency(data.penalty)}</span>
+                                    </div>
                                 )}
-                                {selectedDiscountType && selectedDiscountType !== 'no_discount' && discountAmount > 0 && (
+                                {data.discount > 0 && (
                                     <div className="flex justify-between items-center text-sm">
                                         <div className="flex items-center gap-1">
                                             <span className="text-green-700">Discount</span>
@@ -1293,7 +1343,7 @@ export function PaymentDetailsStep({
                                                 {discountTypes[selectedDiscountType] || selectedDiscountType}
                                             </Badge>
                                         </div>
-                                        <span className="font-medium text-green-700">-{formatCurrency(discountAmount)}</span>
+                                        <span className="font-medium text-green-700">-{formatCurrency(data.discount)}</span>
                                     </div>
                                 )}
                             </div>
@@ -1301,7 +1351,7 @@ export function PaymentDetailsStep({
                             <div className="flex justify-between items-center pt-1">
                                 <span className="font-bold text-gray-900">Total Amount</span>
                                 <span className="text-primary font-bold text-lg">
-                                    {formatCurrency(finalTotal)}
+                                    {formatCurrency(data.total_amount)}
                                 </span>
                             </div>
                         </div>

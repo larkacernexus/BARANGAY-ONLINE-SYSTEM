@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, Clock, Calendar, Shield, FileText, DollarSign } from 'lucide-react';
 
 interface ImportantNotesProps {
     processingDays?: number;
@@ -17,40 +18,80 @@ export function ImportantNotes({
     requiredCount = 0,
 }: ImportantNotesProps) {
     return (
-        <Card className="lg:rounded-xl">
-            <CardHeader className="p-4 lg:p-6">
-                <CardTitle className="flex items-center gap-2 text-xs lg:text-sm">
-                    <AlertCircle className="h-3 w-3 lg:h-4 lg:w-4" />
-                    Important Notes
+        <Card className="lg:rounded-xl shadow-sm border-amber-200 dark:border-amber-800">
+            <CardHeader className="p-4 lg:p-6 bg-amber-50 dark:bg-amber-900/10 rounded-t-lg">
+                <CardTitle className="flex items-center gap-2 text-sm lg:text-base font-semibold">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    Important Notes & Reminders
                 </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 lg:p-6 pt-0 lg:pt-0">
-                <ul className="space-y-1.5 lg:space-y-2 text-xs lg:text-sm">
-                    <li className="flex items-start gap-1.5 lg:gap-2">
-                        <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-blue-500 mt-1 flex-shrink-0"></div>
-                        <span>Ready in {processingDays} working days</span>
-                    </li>
-                    <li className="flex items-start gap-1.5 lg:gap-2">
-                        <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-blue-500 mt-1 flex-shrink-0"></div>
-                        <span>Bring valid ID when claiming</span>
-                    </li>
-                    <li className="flex items-start gap-1.5 lg:gap-2">
-                        <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-blue-500 mt-1 flex-shrink-0"></div>
-                        <span>Valid for {validityDays} days</span>
-                    </li>
-                    {requiresApproval && (
-                        <li className="flex items-start gap-1.5 lg:gap-2">
-                            <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-amber-500 mt-1 flex-shrink-0"></div>
-                            <span>Requires barangay approval</span>
-                        </li>
-                    )}
+            <CardContent className="p-4 lg:p-6 space-y-3">
+                <div className="space-y-2">
+                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/10">
+                        <Clock className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium">Processing Time</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-300">
+                                Ready in <span className="font-semibold">{processingDays} working days</span>. You'll be notified when ready for pickup.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/10">
+                        <Calendar className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium">Validity Period</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-300">
+                                Valid for <span className="font-semibold">{validityDays} days</span> from date of issuance.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/10">
+                        <Shield className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium">Claiming Requirements</p>
+                            <p className="text-xs text-gray-600 dark:text-gray-300">
+                                Bring a <span className="font-semibold">valid government-issued ID</span> when claiming.
+                            </p>
+                        </div>
+                    </div>
+                    
                     {requiresDocuments && requiredCount > 0 && (
-                        <li className="flex items-start gap-1.5 lg:gap-2">
-                            <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-purple-500 mt-1 flex-shrink-0"></div>
-                            <span>{requiredCount} required document{requiredCount !== 1 ? 's' : ''}</span>
-                        </li>
+                        <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/10">
+                            <FileText className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <p className="text-sm font-medium">Document Requirements</p>
+                                    <Badge variant="secondary" className="h-4 px-1 text-xs">
+                                        {requiredCount} required
+                                    </Badge>
+                                </div>
+                                <p className="text-xs text-gray-600 dark:text-gray-300">
+                                    All required documents must be uploaded before submission.
+                                </p>
+                            </div>
+                        </div>
                     )}
-                </ul>
+                    
+                    {requiresApproval && (
+                        <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/10">
+                            <Shield className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                                <p className="text-sm font-medium">Barangay Approval</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-300">
+                                    Requires barangay official approval. Processing may take additional time.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+                
+                <div className="pt-2 border-t">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                        Note: Submission times may vary during peak hours and holidays.
+                    </p>
+                </div>
             </CardContent>
         </Card>
     );

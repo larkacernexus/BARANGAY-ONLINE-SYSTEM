@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\LoginLogController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ReportsController;
+use App\Http\Controllers\Admin\FormController;
 use App\Http\Controllers\Admin\ReceiptsController;  
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -18,6 +20,8 @@ use App\Http\Controllers\Admin\ClearanceController;
 use App\Http\Controllers\Admin\ClearanceApprovalController;
 use App\Http\Controllers\Admin\ClearanceTypeController;
 use App\Http\Controllers\Admin\PurokController;
+use App\Http\Controllers\Admin\SecurityController;
+use App\Http\Controllers\Admin\AnnouncementController;
 use App\Http\Controllers\Admin\AdminComplaintController;
 use App\Http\Controllers\Resident\ResidentPortalController;
 use App\Http\Controllers\Resident\ResidentDashboardController;
@@ -26,9 +30,12 @@ use App\Http\Controllers\Resident\ResidentFeeController;
 use App\Http\Controllers\Resident\ResidentClearanceController;
 use App\Http\Controllers\Resident\ComplaintController;
 use App\Http\Controllers\Resident\RecordController;
-use App\Http\Controllers\Resident\AnnouncementController;
 use App\Http\Controllers\Resident\EventController;
-use App\Http\Controllers\Resident\FormController;
+use App\Http\Controllers\Resident\ResidentAnnouncementController;
+
+use App\Http\Controllers\Auth\LoginController;
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -41,6 +48,17 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
+
+
+Route::middleware('guest')->group(function () {
+    Route::get('login', [LoginController::class, 'create'])->name('login');
+    Route::post('login', [LoginController::class, 'store']);
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('logout', [LoginController::class, 'destroy'])->name('logout');
+
+});
 /*
 |--------------------------------------------------------------------------
 | Admin Routes (ALL PROTECTED)
@@ -189,8 +207,42 @@ Route::get('/payments/{payment}/receipt', [PaymentController::class, 'printRecei
     */
 Route::prefix('admincomplaints')->group(function () {
     Route::get('/', [AdminComplaintController::class, 'index'])->name('admin.complaints.index');
-});
+    Route::get('/complaintsshow', [AdminComplaintController::class, 'show'])->name('admin.complaints.show');
 
+    Route::get('/create', [AdminComplaintController::class, 'create'])->name('admin.complaints.create');
+
+    });
+
+
+     Route::prefix('forms')->name('forms.')->group(function () {
+     Route::get('forms/{form}/download', [FormController::class, 'download'])->name('forms.download');
+     Route::get('/', [FormController::class, 'index'])->name('index');
+         Route::get('forms/{form}/download', [FormController::class, 'download'])->name('forms.download');
+
+        Route::get('/create', [FormController::class, 'create'])->name('create');
+        Route::post('/', [FormController::class, 'store'])->name('store');
+        Route::get('/{form}', [FormController::class, 'show'])->name('show');
+        Route::get('/{form}/edit', [FormController::class, 'edit'])->name('edit');
+        Route::put('/{form}', [FormController::class, 'update'])->name('update');
+        Route::delete('/{form}', [FormController::class, 'destroy'])->name('destroy');
+    });
+
+    
+Route::prefix('announcements')->group(function () {
+    Route::get('/', [AnnouncementController::class, 'index'])->name('announcements.index');
+    Route::get('/show/{announcement}', [AnnouncementController::class, 'show'])->name('announcements.show');
+    Route::get('/create', [AnnouncementController::class, 'create'])->name('announcements.create');
+    Route::post('/store', [AnnouncementController::class, 'store'])->name('announcements.store');
+    Route::get('/edit/{announcement}', [AnnouncementController::class, 'edit'])->name('announcements.edit');
+    Route::put('/update/{announcement}', [AnnouncementController::class, 'update'])->name('announcements.update');
+    Route::delete('/delete/{announcement}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+    
+    // Bulk actions
+    Route::post('/bulk-action', [AnnouncementController::class, 'bulkAction'])->name('announcements.bulk-action');
+    
+    // Status toggle
+    Route::post('/toggle-status/{announcement}', [AnnouncementController::class, 'toggleStatus'])->name('announcements.toggle-status');
+});
 
    Route::prefix('fee-types')->group(function () {
     Route::get('/', [FeeTypeController::class, 'index'])->name('fee-types.index');
@@ -237,21 +289,30 @@ Route::prefix('admincomplaints')->group(function () {
 
 
 Route::prefix('clearance-types')->name('clearance-types.')->group(function () {
+    // List and create routes
     Route::get('/', [ClearanceTypeController::class, 'index'])->name('index');
     Route::get('/create', [ClearanceTypeController::class, 'create'])->name('create');
     Route::post('/', [ClearanceTypeController::class, 'store'])->name('store');
+    Route::get('/export', [ClearanceTypeController::class, 'export'])->name('export');
+    
+    // Bulk operations
+    Route::post('/bulk-action', [ClearanceTypeController::class, 'bulkAction'])->name('bulk-action');
+    Route::post('/bulk-activate', [ClearanceTypeController::class, 'bulkActivate'])->name('bulk-activate');
+    Route::post('/bulk-deactivate', [ClearanceTypeController::class, 'bulkDeactivate'])->name('bulk-deactivate');
+    Route::post('/bulk-delete', [ClearanceTypeController::class, 'bulkDelete'])->name('bulk-delete');
+    Route::post('/bulk-duplicate', [ClearanceTypeController::class, 'bulkDuplicate'])->name('bulk-duplicate');
+    Route::post('/bulk-update', [ClearanceTypeController::class, 'bulkUpdate'])->name('bulk-update');
     
     // Single clearance type routes
     Route::prefix('{clearanceType}')->group(function () {
         Route::get('/', [ClearanceTypeController::class, 'show'])->name('show');
         Route::get('/edit', [ClearanceTypeController::class, 'edit'])->name('edit');
+        Route::get('/print', [ClearanceTypeController::class, 'print'])->name('print'); // Add print route here
         Route::put('/', [ClearanceTypeController::class, 'update'])->name('update');
         Route::delete('/', [ClearanceTypeController::class, 'destroy'])->name('destroy');
         Route::post('/toggle-status', [ClearanceTypeController::class, 'toggleStatus'])->name('toggle-status');
         Route::post('/duplicate', [ClearanceTypeController::class, 'duplicate'])->name('duplicate');
     });
-    
-    Route::post('/bulk-action', [ClearanceTypeController::class, 'bulkAction'])->name('bulk-action');
 });
 
 
@@ -292,8 +353,27 @@ Route::get('/reports/collections', [ReportsController::class, 'collections'])->n
     
     // Revenue Analytics
     Route::get('/reports/revenue', [ReportsController::class, 'revenue'])->name('reports.revenue');
+        Route::get('/reports/audit-logs', [ReportsController::class, 'auditLogs'])->name('reports.auditLogs');
+
+    Route::get('/reports/activity-logs', [ReportsController::class, 'activityLogs'])->name('reports.activity-logs');
+Route::get('/reports/activity-logs/export', [ReportsController::class, 'activityLogsExport'])->name('reports.activity-logs.export');
+Route::get('/reports/activity-logs/{id}', [ReportsController::class, 'activityLogShow'])->name('reports.activity-logs.show');
+  
+    Route::get('/reports/login-logs', [LoginLogController::class, 'index'])->name('reports.login-logs');
+Route::get('/reports/login-logs/{id}', [LoginLogController::class, 'show'])->name('reports.login-logs.show');
+
+
+    Route::get('/security/access-logs', [SecurityController::class, 'accessLogs'])
+        ->name('reports.access-logs');
     
-    // Outstanding Fees Report
+    Route::get('/security/access-logs/export', [SecurityController::class, 'exportAccessLogs'])
+        ->name('reports.access-logs.export');
+    Route::get('/security/security-audit', [SecurityController::class, 'securityAudit'])
+        ->name('reports.security-audit');
+            Route::get('/security/sessions', [SecurityController::class, 'sessions'])
+        ->name('admin.security.sessions');
+
+// Outstanding Fees Report
     
     // Receipts Management
     Route::get('/receipts', [ReceiptsController::class, 'index'])->name('receipts.index');
@@ -346,7 +426,7 @@ Route::prefix('my-clearances')->name('my.clearances.')->group(function () {
         Route::get('/', [ComplaintController::class, 'index'])->name('index');
         Route::get('/create', [ComplaintController::class, 'create'])->name('create');
         Route::post('/', [ComplaintController::class, 'store'])->name('store');
-        Route::get('/show/{complaint}', [ComplaintController::class, 'show'])->name('show');
+        Route::get('/{complaint}', [ComplaintController::class, 'show'])->name('show');
         Route::post('/{complaint}/comments', [ComplaintController::class, 'addComment'])->name('comments.store');
         Route::post('/{complaint}/rate', [ComplaintController::class, 'rate'])->name('rate');
         Route::put('/{complaint}', [ComplaintController::class, 'update'])->name('update');
@@ -354,31 +434,30 @@ Route::prefix('my-clearances')->name('my.clearances.')->group(function () {
     });
     
     // Records - resident specific
-    Route::prefix('my-records')->name('my.records.')->group(function () {
-        Route::get('/', [RecordController::class, 'index'])->name('index');
-         Route::get('/create', [RecordController::class, 'create'])->name('create');
-        Route::get('/{record}/download', [RecordController::class, 'download'])->name('download');
-        Route::get('/{record}/view', [RecordController::class, 'view'])->name('view');
-        Route::delete('/{record}', [RecordController::class, 'destroy'])->name('destroy');
-        Route::post('/export', [RecordController::class, 'export'])->name('export');
-    });
+Route::prefix('my-records')->name('my.records.')->group(function () {
+    Route::get('/', [RecordController::class, 'index'])->name('index');
+    Route::post('/filter', [RecordController::class, 'filter'])->name('filter'); // ADD THIS LINE
+    Route::get('/create', [RecordController::class, 'create'])->name('create');
+    Route::post('/', [RecordController::class, 'store'])->name('store');
+    Route::get('/{record}', [RecordController::class, 'show'])->name('show');
+    Route::get('/{record}/download', [RecordController::class, 'download'])->name('download');
+    Route::post('/{record}/verify-password', [RecordController::class, 'verifyPassword'])->name('verify-password');
+    Route::delete('/{record}', [RecordController::class, 'destroy'])->name('destroy');
+    Route::post('/export', [RecordController::class, 'export'])->name('export');
+    Route::get('/{id}/preview', [RecordController::class, 'preview'])->name('preview'); // Add this line
+    Route::post('/my-records/{document}/extend-session', [RecordController::class, 'extendSession'])
+    ->name('documents.extend-session')
+    ->middleware('auth');
+});
     
     // Announcements - resident specific
     Route::prefix('resident-announcements')->name('resident.announcements.')->group(function () {
-        Route::get('/', [AnnouncementController::class, 'index'])->name('index');
-        Route::get('/{announcement}', [AnnouncementController::class, 'show'])->name('show');
-        Route::post('/{announcement}/bookmark', [AnnouncementController::class, 'bookmark'])->name('bookmark');
-        Route::post('/subscribe', [AnnouncementController::class, 'subscribe'])->name('subscribe');
+        Route::get('/', [ResidentAnnouncementController::class, 'index'])->name('index');
+        Route::get('/{announcement}', [ResidentAnnouncementController::class, 'show'])->name('show');
+        Route::post('/{announcement}/bookmark', [ResidentAnnouncementController::class, 'bookmark'])->name('bookmark');
+        Route::post('/subscribe', [ResidentAnnouncementController::class, 'subscribe'])->name('subscribe');
     });
-    
-    // Events - resident specific
-    Route::prefix('resident-events')->name('resident.events.')->group(function () {
-        Route::get('/', [EventController::class, 'index'])->name('index');
-        Route::get('/{event}', [EventController::class, 'show'])->name('show');
-        Route::post('/{event}/register', [EventController::class, 'register'])->name('register');
-        Route::post('/{event}/cancel', [EventController::class, 'cancel'])->name('cancel');
-        Route::post('/alerts', [EventController::class, 'toggleAlerts'])->name('alerts');
-    });
+ 
     
 
      Route::prefix('residentfees')->name('fees.')->group(function () {
@@ -433,6 +512,24 @@ Route::prefix('my-clearances')->name('my.clearances.')->group(function () {
 });
 
 
+// Notifications Routes
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+    Route::delete('/notifications/clear-all', [NotificationController::class, 'clearAll'])->name('notifications.clear-all');
+    Route::post('/notifications/{notification}/mark-read', [NotificationController::class, 'markAsRead'])->name('notifications.mark-read');
+    Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy'])->name('notifications.destroy');
+    
+    // API endpoints for AJAX calls
+    Route::prefix('api')->group(function () {
+        Route::get('/notifications/stats', [NotificationController::class, 'getStats']);
+        Route::get('/notifications/unread-count', [NotificationController::class, 'getUnreadCount']);
+        Route::post('/fees/{fee}/send-reminder', [NotificationController::class, 'sendFeeReminder']);
+        Route::post('/payments/{payment}/send-receipt', [NotificationController::class, 'sendPaymentReceipt']);
+        Route::post('/clearance-requests/{clearanceRequest}/send-status', [NotificationController::class, 'sendClearanceStatus']);
+        Route::post('/notifications/send-bulk-reminders', [NotificationController::class, 'sendBulkReminders']);
+    });
+});
 /*
 |--------------------------------------------------------------------------
 | Fallback
@@ -441,3 +538,4 @@ Route::prefix('my-clearances')->name('my.clearances.')->group(function () {
 Route::fallback(fn () => inertia('Error/404'));
 
 require __DIR__.'/settings.php';
+require __DIR__.'/residentsettings.php';

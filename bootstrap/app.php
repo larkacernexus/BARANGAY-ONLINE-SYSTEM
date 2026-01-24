@@ -1,9 +1,5 @@
 <?php
 
-use App\Http\Middleware\AdminMiddleware;
-use App\Http\Middleware\ResidentMiddleware;
-use App\Http\Middleware\HandleAppearance;
-use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,24 +12,25 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-
+        
         // Cookie encryption exceptions
         $middleware->encryptCookies(except: [
             'appearance',
             'sidebar_state',
         ]);
-
+        
         // Web middleware stack (GLOBAL)
         $middleware->web(append: [
-            HandleAppearance::class,
-            HandleInertiaRequests::class,
+            \App\Http\Middleware\HandleAppearance::class,
+            \App\Http\Middleware\HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+            // \App\Http\Middleware\LogUserAccess::class, // ← COMMENT THIS OUT FOR NOW
         ]);
-
-        // ✅ Route middleware aliases (CORRECT)
+        
+        // Route middleware aliases
         $middleware->alias([
-            'admin'    => AdminMiddleware::class,
-            'resident' => ResidentMiddleware::class,
+            'admin'    => \App\Http\Middleware\AdminMiddleware::class,
+            'resident' => \App\Http\Middleware\ResidentMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

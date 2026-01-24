@@ -5,106 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ClearanceType;
 use App\Models\DocumentType;
+use App\Models\DocumentRequirement;
+use App\Models\ClearanceRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ClearanceTypeController extends Controller
 {
-    // Define common types as a constant or method
-    private const COMMON_TYPES = [
-        'business_clearance' => [
-            'name' => 'Business Clearance',
-            'code' => 'BUSINESS_CLEARANCE',
-            'description' => 'For business permit applications',
-            'fee' => 500.00,
-            'processing_days' => 3,
-            'validity_days' => 365,
-            'requires_payment' => true,
-        ],
-        'residency_certificate' => [
-            'name' => 'Certificate of Residency',
-            'code' => 'RESIDENCY_CERTIFICATE',
-            'description' => 'Proof of barangay residency',
-            'fee' => 100.00,
-            'processing_days' => 1,
-            'validity_days' => 90,
-            'requires_payment' => true,
-        ],
-        'barangay_clearance' => [
-            'name' => 'Barangay Clearance',
-            'code' => 'BARANGAY_CLEARANCE',
-            'description' => 'General barangay clearance for various purposes',
-            'fee' => 50.00,
-            'processing_days' => 1,
-            'validity_days' => 60,
-            'requires_payment' => true,
-        ],
-        'indigency_certificate' => [
-            'name' => 'Certificate of Indigency',
-            'code' => 'INDIGENCY_CERTIFICATE',
-            'description' => 'For indigent residents applying for assistance',
-            'fee' => 0.00,
-            'processing_days' => 2,
-            'validity_days' => 90,
-            'requires_payment' => false,
-        ],
-        'good_moral_certificate' => [
-            'name' => 'Certificate of Good Moral Character',
-            'code' => 'GOOD_MORAL_CERTIFICATE',
-            'description' => 'For employment and educational purposes',
-            'fee' => 150.00,
-            'processing_days' => 3,
-            'validity_days' => 180,
-            'requires_payment' => true,
-        ],
-        'first_time_jobseeker' => [
-            'name' => 'First Time Jobseeker Certificate',
-            'code' => 'FIRST_TIME_JOBSEEKER',
-            'description' => 'For first time jobseekers applying for benefits',
-            'fee' => 0.00,
-            'processing_days' => 2,
-            'validity_days' => 365,
-            'requires_payment' => false,
-        ],
-        'solo_parent_certificate' => [
-            'name' => 'Solo Parent Certificate',
-            'code' => 'SOLO_PARENT_CERTIFICATE',
-            'description' => 'For solo parents applying for benefits',
-            'fee' => 0.00,
-            'processing_days' => 3,
-            'validity_days' => 365,
-            'requires_payment' => false,
-        ],
-        'pwd_certificate' => [
-            'name' => 'PWD Certificate',
-            'code' => 'PWD_CERTIFICATE',
-            'description' => 'For persons with disability applying for benefits',
-            'fee' => 0.00,
-            'processing_days' => 3,
-            'validity_days' => 365,
-            'requires_payment' => false,
-        ],
-        'senior_citizen_certificate' => [
-            'name' => 'Senior Citizen Certificate',
-            'code' => 'SENIOR_CITIZEN_CERTIFICATE',
-            'description' => 'For senior citizens applying for benefits',
-            'fee' => 0.00,
-            'processing_days' => 2,
-            'validity_days' => 365,
-            'requires_payment' => false,
-        ],
-        'business_permit_renewal' => [
-            'name' => 'Business Permit Renewal',
-            'code' => 'BUSINESS_PERMIT_RENEWAL',
-            'description' => 'For renewing business permits',
-            'fee' => 300.00,
-            'processing_days' => 2,
-            'validity_days' => 365,
-            'requires_payment' => true,
-        ],
-    ];
-
     /**
      * Display a listing of the resource.
      */
@@ -150,6 +58,29 @@ class ClearanceTypeController extends Controller
 
         $clearanceTypes = $query->paginate(10)->withQueryString();
 
+        // Transform data to include necessary attributes
+        $clearanceTypes->getCollection()->transform(function ($type) {
+            return [
+                'id' => $type->id,
+                'name' => $type->name,
+                'code' => $type->code,
+                'description' => $type->description,
+                'fee' => $type->fee,
+                'formatted_fee' => $type->formatted_fee,
+                'processing_days' => $type->processing_days,
+                'validity_days' => $type->validity_days,
+                'is_active' => $type->is_active,
+                'requires_payment' => $type->requires_payment,
+                'requires_approval' => $type->requires_approval,
+                'is_online_only' => $type->is_online_only,
+                'clearances_count' => $type->clearance_requests_count,
+                'document_types_count' => $type->documentRequirements()->count(),
+                'created_at' => $type->created_at ? $type->created_at->format('Y-m-d H:i:s') : null,
+                'updated_at' => $type->updated_at ? $type->updated_at->format('Y-m-d H:i:s') : null,
+                'purpose_options' => $type->purpose_options,
+            ];
+        });
+
         return Inertia::render('admin/Clearance-types/Index', [
             'clearanceTypes' => $clearanceTypes,
             'filters' => $request->only(['search', 'status', 'requires_payment', 'sort', 'direction']),
@@ -162,12 +93,14 @@ class ClearanceTypeController extends Controller
      */
     public function create()
     {
+        $documentTypes = DocumentType::where('is_active', true)
+            ->orderBy('category')
+            ->orderBy('sort_order')
+            ->get(['id', 'name', 'description', 'category', 'is_active']);
+
         return Inertia::render('admin/Clearance-types/Create', [
-            'commonTypes' => self::COMMON_TYPES,
-            'documentTypes' => DocumentType::where('is_active', true)
-                ->orderBy('category')
-                ->orderBy('sort_order')
-                ->get(),
+            'commonTypes' => ClearanceType::COMMON_TYPES,
+            'documentTypes' => $documentTypes,
             'defaultPurposeOptions' => [
                 'Employment',
                 'Business Registration',
@@ -207,26 +140,46 @@ class ClearanceTypeController extends Controller
             'requires_payment' => 'boolean',
             'requires_approval' => 'boolean',
             'is_online_only' => 'boolean',
-            'document_type_ids' => 'nullable|array',
-            'document_type_ids.*' => 'exists:document_types,id',
+            'document_requirements' => 'nullable|array',
+            'document_requirements.*.document_type_id' => 'required|exists:document_types,id',
+            'document_requirements.*.is_required' => 'boolean',
+            'document_requirements.*.sort_order' => 'integer|min:0',
             'eligibility_criteria' => 'nullable|array',
             'eligibility_criteria.*.field' => 'required|string',
             'eligibility_criteria.*.operator' => 'required|string',
             'eligibility_criteria.*.value' => 'required',
             'purpose_options' => 'nullable|string|max:1000',
+            'requirements' => 'nullable|array',
         ]);
 
         DB::transaction(function () use ($validated) {
-            // Convert eligibility criteria to JSON
-            if (isset($validated['eligibility_criteria'])) {
-                $validated['eligibility_criteria'] = json_encode($validated['eligibility_criteria']);
-            }
+            // Create the clearance type
+            $clearanceType = ClearanceType::create([
+                'name' => $validated['name'],
+                'code' => $validated['code'],
+                'description' => $validated['description'] ?? null,
+                'fee' => $validated['fee'],
+                'processing_days' => $validated['processing_days'],
+                'validity_days' => $validated['validity_days'],
+                'is_active' => $validated['is_active'] ?? true,
+                'requires_payment' => $validated['requires_payment'] ?? false,
+                'requires_approval' => $validated['requires_approval'] ?? false,
+                'is_online_only' => $validated['is_online_only'] ?? false,
+                'eligibility_criteria' => $validated['eligibility_criteria'] ?? null,
+                'purpose_options' => $validated['purpose_options'] ?? null,
+                'requirements' => $validated['requirements'] ?? null,
+            ]);
 
-            $clearanceType = ClearanceType::create($validated);
-            
-            // Attach document types if provided
-            if (isset($validated['document_type_ids'])) {
-                $clearanceType->documentTypes()->sync($validated['document_type_ids']);
+            // Create document requirements if provided
+            if (!empty($validated['document_requirements'])) {
+                foreach ($validated['document_requirements'] as $index => $req) {
+                    DocumentRequirement::create([
+                        'clearance_type_id' => $clearanceType->id,
+                        'document_type_id' => $req['document_type_id'],
+                        'is_required' => $req['is_required'] ?? true,
+                        'sort_order' => $req['sort_order'] ?? $index,
+                    ]);
+                }
             }
         });
 
@@ -239,27 +192,83 @@ class ClearanceTypeController extends Controller
      */
     public function show(ClearanceType $clearanceType)
     {
-        $clearanceType->load(['documentTypes', 'clearances' => function ($query) {
-            $query->latest()->limit(5)->with('resident:id,first_name,last_name');
-        }])->loadCount('clearances');
+        // Check if the clearance type exists
+        if (!$clearanceType->exists) {
+            abort(404, 'Clearance type not found');
+        }
 
-        // Ensure eligibility_criteria is properly cast to array
-        $clearanceTypeArray = $clearanceType->toArray();
-        $clearanceTypeArray['eligibility_criteria'] = $clearanceType->eligibility_criteria ?? [];
+        // Load relationships using query to get actual data
+        $clearanceType->load([
+            'documentRequirements' => function ($query) {
+                $query->with('documentType:id,name,description')
+                      ->orderBy('sort_order', 'asc');
+            },
+            'clearanceRequests' => function ($query) {
+                $query->with('resident:id,first_name,last_name')
+                      ->latest()
+                      ->limit(5);
+            }
+        ]);
 
-        $recentClearances = $clearanceType->clearances->map(function ($clearance) {
-            return [
-                'id' => $clearance->id,
-                'resident_name' => $clearance->resident ? 
-                    $clearance->resident->first_name . ' ' . $clearance->resident->last_name : 'Unknown',
-                'status' => $clearance->status,
-                'created_at' => $clearance->created_at,
-            ];
-        });
+        // Prepare recent clearances - use the loaded relationship
+        $recentClearances = collect();
+        if ($clearanceType->relationLoaded('clearanceRequests')) {
+            // Access the relationship as a method to get collection
+            $clearanceRequests = $clearanceType->clearanceRequests()->get();
+            $recentClearances = $clearanceRequests->map(function ($request) {
+                return [
+                    'id' => $request->id,
+                    'resident_name' => $request->resident ? 
+                        $request->resident->first_name . ' ' . $request->resident->last_name : 'Unknown',
+                    'status' => $request->status,
+                    'created_at' => $request->created_at ? $request->created_at->format('Y-m-d H:i:s') : null,
+                ];
+            });
+        }
+
+        // Prepare document types - get the relationship as a collection
+        $documentTypes = collect();
+        if ($clearanceType->relationLoaded('documentRequirements')) {
+            // Access the relationship as a method to get collection
+            $documentRequirements = $clearanceType->documentRequirements()->get();
+            $documentTypes = $documentRequirements->map(function ($requirement) {
+                return [
+                    'id' => $requirement->document_type_id,
+                    'name' => $requirement->documentType->name ?? 'Unknown',
+                    'description' => $requirement->documentType->description ?? '',
+                    'is_required' => $requirement->is_required,
+                    'sort_order' => $requirement->sort_order,
+                ];
+            });
+        }
+
+        // Prepare clearance type data
+        $clearanceTypeData = [
+            'id' => $clearanceType->id,
+            'name' => $clearanceType->name,
+            'code' => $clearanceType->code,
+            'description' => $clearanceType->description,
+            'fee' => $clearanceType->fee,
+            'formatted_fee' => $clearanceType->formatted_fee,
+            'processing_days' => $clearanceType->processing_days,
+            'validity_days' => $clearanceType->validity_days,
+            'is_active' => $clearanceType->is_active,
+            'requires_payment' => $clearanceType->requires_payment,
+            'requires_approval' => $clearanceType->requires_approval,
+            'is_online_only' => $clearanceType->is_online_only,
+            'eligibility_criteria' => $clearanceType->eligibility_criteria ?? [],
+            'purpose_options' => $clearanceType->purpose_options,
+            'requirements' => $clearanceType->requirements ?? [],
+            'document_types' => $documentTypes->values()->all(), // Convert to array
+            'clearances_count' => $clearanceType->clearanceRequests()->count(),
+            'document_types_count' => $clearanceType->documentRequirements()->count(),
+            'created_at' => $clearanceType->created_at ? $clearanceType->created_at->format('Y-m-d H:i:s') : null,
+            'updated_at' => $clearanceType->updated_at ? $clearanceType->updated_at->format('Y-m-d H:i:s') : null,
+        ];
 
         return Inertia::render('admin/Clearance-types/Show', [
-            'clearanceType' => $clearanceTypeArray,
-            'recentClearances' => $recentClearances,
+            'clearanceType' => $clearanceTypeData,
+            'recentClearances' => $recentClearances->values()->all(), // Convert to array
         ]);
     }
 
@@ -268,19 +277,62 @@ class ClearanceTypeController extends Controller
      */
     public function edit(ClearanceType $clearanceType)
     {
-        // Ensure eligibility_criteria is properly cast to array
-        $clearanceTypeArray = $clearanceType->toArray();
-        $clearanceTypeArray['eligibility_criteria'] = $clearanceType->eligibility_criteria ?? [];
+        // Check if the clearance type exists
+        if (!$clearanceType->exists) {
+            abort(404, 'Clearance type not found');
+        }
+
+        // Load relationships
+        $clearanceType->load([
+            'documentRequirements' => function ($query) {
+                $query->with('documentType:id,name')
+                      ->orderBy('sort_order', 'asc');
+            }
+        ]);
+
+        // Get available document types
+        $documentTypes = DocumentType::where('is_active', true)
+            ->orderBy('category')
+            ->orderBy('sort_order')
+            ->get(['id', 'name', 'description', 'category', 'is_active']);
+
+        // Prepare document requirements for the form
+        $documentRequirements = collect();
+        if ($clearanceType->relationLoaded('documentRequirements')) {
+            // Access the relationship as a method to get collection
+            $requirements = $clearanceType->documentRequirements()->get();
+            $documentRequirements = $requirements->map(function ($requirement) {
+                return [
+                    'document_type_id' => $requirement->document_type_id,
+                    'is_required' => $requirement->is_required,
+                    'sort_order' => $requirement->sort_order,
+                ];
+            });
+        }
+
+        // Prepare clearance type data
+        $clearanceTypeData = [
+            'id' => $clearanceType->id,
+            'name' => $clearanceType->name,
+            'code' => $clearanceType->code,
+            'description' => $clearanceType->description,
+            'fee' => $clearanceType->fee,
+            'processing_days' => $clearanceType->processing_days,
+            'validity_days' => $clearanceType->validity_days,
+            'is_active' => $clearanceType->is_active,
+            'requires_payment' => $clearanceType->requires_payment,
+            'requires_approval' => $clearanceType->requires_approval,
+            'is_online_only' => $clearanceType->is_online_only,
+            'eligibility_criteria' => $clearanceType->eligibility_criteria ?? [],
+            'purpose_options' => $clearanceType->purpose_options,
+            'requirements' => $clearanceType->requirements ?? [],
+            'document_requirements' => $documentRequirements->values()->all(), // Convert to array
+        ];
 
         return Inertia::render('admin/Clearance-types/Edit', [
-            'clearanceType' => array_merge($clearanceTypeArray, [
-                'document_types' => $clearanceType->documentTypes->toArray()
-            ]),
-            'commonTypes' => self::COMMON_TYPES,
-            'documentTypes' => DocumentType::where('is_active', true)
-                ->orderBy('category')
-                ->orderBy('sort_order')
-                ->get(),
+            'clearanceType' => $clearanceTypeData,
+            'commonTypes' => ClearanceType::COMMON_TYPES,
+            'documentTypes' => $documentTypes,
             'defaultPurposeOptions' => [
                 'Employment',
                 'Business Registration',
@@ -309,6 +361,11 @@ class ClearanceTypeController extends Controller
      */
     public function update(Request $request, ClearanceType $clearanceType)
     {
+        // Check if the clearance type exists
+        if (!$clearanceType->exists) {
+            abort(404, 'Clearance type not found');
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:clearance_types,name,' . $clearanceType->id,
             'code' => 'required|string|max:50|unique:clearance_types,code,' . $clearanceType->id . '|regex:/^[A-Z_]+$/',
@@ -320,27 +377,51 @@ class ClearanceTypeController extends Controller
             'requires_payment' => 'boolean',
             'requires_approval' => 'boolean',
             'is_online_only' => 'boolean',
-            'document_type_ids' => 'nullable|array',
-            'document_type_ids.*' => 'exists:document_types,id',
+            'document_requirements' => 'nullable|array',
+            'document_requirements.*.document_type_id' => 'required|exists:document_types,id',
+            'document_requirements.*.is_required' => 'boolean',
+            'document_requirements.*.sort_order' => 'integer|min:0',
             'eligibility_criteria' => 'nullable|array',
             'eligibility_criteria.*.field' => 'required|string',
             'eligibility_criteria.*.operator' => 'required|string',
             'eligibility_criteria.*.value' => 'required',
             'purpose_options' => 'nullable|string|max:1000',
+            'requirements' => 'nullable|array',
         ]);
 
         DB::transaction(function () use ($validated, $clearanceType) {
-            // Convert eligibility criteria to JSON
-            if (isset($validated['eligibility_criteria'])) {
-                $validated['eligibility_criteria'] = json_encode($validated['eligibility_criteria']);
-            } else {
-                $validated['eligibility_criteria'] = null;
-            }
+            // Update the clearance type
+            $clearanceType->update([
+                'name' => $validated['name'],
+                'code' => $validated['code'],
+                'description' => $validated['description'] ?? null,
+                'fee' => $validated['fee'],
+                'processing_days' => $validated['processing_days'],
+                'validity_days' => $validated['validity_days'],
+                'is_active' => $validated['is_active'] ?? $clearanceType->is_active,
+                'requires_payment' => $validated['requires_payment'] ?? $clearanceType->requires_payment,
+                'requires_approval' => $validated['requires_approval'] ?? $clearanceType->requires_approval,
+                'is_online_only' => $validated['is_online_only'] ?? $clearanceType->is_online_only,
+                'eligibility_criteria' => $validated['eligibility_criteria'] ?? null,
+                'purpose_options' => $validated['purpose_options'] ?? null,
+                'requirements' => $validated['requirements'] ?? null,
+            ]);
 
-            $clearanceType->update($validated);
-            
-            // Sync document types
-            $clearanceType->documentTypes()->sync($validated['document_type_ids'] ?? []);
+            // Sync document requirements
+            if (isset($validated['document_requirements'])) {
+                // Delete existing requirements
+                $clearanceType->documentRequirements()->delete();
+                
+                // Create new requirements
+                foreach ($validated['document_requirements'] as $index => $req) {
+                    DocumentRequirement::create([
+                        'clearance_type_id' => $clearanceType->id,
+                        'document_type_id' => $req['document_type_id'],
+                        'is_required' => $req['is_required'] ?? true,
+                        'sort_order' => $req['sort_order'] ?? $index,
+                    ]);
+                }
+            }
         });
 
         return redirect()->route('clearance-types.show', $clearanceType)
@@ -352,10 +433,15 @@ class ClearanceTypeController extends Controller
      */
     public function destroy(ClearanceType $clearanceType)
     {
-        // Check if there are any clearances using this type
-        if ($clearanceType->clearances()->count() > 0) {
+        // Check if the clearance type exists
+        if (!$clearanceType->exists) {
+            abort(404, 'Clearance type not found');
+        }
+
+        // Check if there are any clearance requests using this type
+        if ($clearanceType->clearanceRequests()->count() > 0) {
             return redirect()->back()
-                ->with('error', 'Cannot delete clearance type. There are existing clearances using this type.');
+                ->with('error', 'Cannot delete clearance type. There are existing clearance requests using this type.');
         }
 
         $clearanceType->delete();
@@ -369,6 +455,11 @@ class ClearanceTypeController extends Controller
      */
     public function toggleStatus(ClearanceType $clearanceType)
     {
+        // Check if the clearance type exists
+        if (!$clearanceType->exists) {
+            abort(404, 'Clearance type not found');
+        }
+
         $clearanceType->update([
             'is_active' => !$clearanceType->is_active
         ]);
@@ -382,15 +473,23 @@ class ClearanceTypeController extends Controller
      */
     public function duplicate(ClearanceType $clearanceType)
     {
+        // Check if the clearance type exists
+        if (!$clearanceType->exists) {
+            abort(404, 'Clearance type not found');
+        }
+
         DB::transaction(function () use ($clearanceType) {
+            // Duplicate the clearance type
             $newClearanceType = $clearanceType->replicate();
             $newClearanceType->name = $clearanceType->name . ' (Copy)';
             $newClearanceType->code = $clearanceType->code . '_COPY';
-            $newClearanceType->push();
+            $newClearanceType->save();
 
-            // Duplicate document type relationships
-            if ($clearanceType->documentTypes()->count() > 0) {
-                $newClearanceType->documentTypes()->sync($clearanceType->documentTypes->pluck('id'));
+            // Duplicate document requirements
+            foreach ($clearanceType->documentRequirements()->get() as $requirement) {
+                $newRequirement = $requirement->replicate();
+                $newRequirement->clearance_type_id = $newClearanceType->id;
+                $newRequirement->save();
             }
         });
 
@@ -421,14 +520,14 @@ class ClearanceTypeController extends Controller
                 break;
                 
             case 'delete':
-                // Check if any clearance type has associated clearances
-                $typesWithClearances = ClearanceType::whereIn('id', $request->ids)
-                    ->has('clearances')
+                // Check if any clearance type has associated clearance requests
+                $typesWithRequests = ClearanceType::whereIn('id', $request->ids)
+                    ->has('clearanceRequests')
                     ->count();
                     
-                if ($typesWithClearances > 0) {
+                if ($typesWithRequests > 0) {
                     return redirect()->back()
-                        ->with('error', 'Cannot delete clearance types that have associated clearances.');
+                        ->with('error', 'Cannot delete clearance types that have associated clearance requests.');
                 }
                 
                 ClearanceType::whereIn('id', $request->ids)->delete();
@@ -437,6 +536,188 @@ class ClearanceTypeController extends Controller
         }
 
         return redirect()->back()->with('success', $message);
+    }
+
+    /**
+     * Bulk activate (separate endpoint)
+     */
+    public function bulkActivate(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:clearance_types,id',
+        ]);
+
+        ClearanceType::whereIn('id', $request->ids)->update(['is_active' => true]);
+
+        return response()->json(['message' => 'Selected clearance types activated successfully.']);
+    }
+
+    /**
+     * Bulk deactivate (separate endpoint)
+     */
+    public function bulkDeactivate(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:clearance_types,id',
+        ]);
+
+        ClearanceType::whereIn('id', $request->ids)->update(['is_active' => false]);
+
+        return response()->json(['message' => 'Selected clearance types deactivated successfully.']);
+    }
+
+    /**
+     * Bulk delete (separate endpoint)
+     */
+    public function bulkDelete(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:clearance_types,id',
+        ]);
+
+        // Check if any have clearance requests
+        $typesWithRequests = ClearanceType::whereIn('id', $request->ids)
+            ->has('clearanceRequests')
+            ->count();
+
+        if ($typesWithRequests > 0) {
+            return response()->json([
+                'error' => 'Cannot delete clearance types that have associated clearance requests.'
+            ], 422);
+        }
+
+        ClearanceType::whereIn('id', $request->ids)->delete();
+
+        return response()->json(['message' => 'Selected clearance types deleted successfully.']);
+    }
+
+    /**
+     * Bulk duplicate (separate endpoint)
+     */
+    public function bulkDuplicate(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:clearance_types,id',
+        ]);
+
+        DB::transaction(function () use ($request) {
+            $clearanceTypes = ClearanceType::whereIn('id', $request->ids)->get();
+            
+            foreach ($clearanceTypes as $type) {
+                // Duplicate the clearance type
+                $newType = $type->replicate();
+                $newType->name = $type->name . ' (Copy)';
+                $newType->code = $type->code . '_COPY_' . time();
+                $newType->save();
+
+                // Duplicate document requirements
+                foreach ($type->documentRequirements()->get() as $requirement) {
+                    $newRequirement = $requirement->replicate();
+                    $newRequirement->clearance_type_id = $newType->id;
+                    $newRequirement->save();
+                }
+            }
+        });
+
+        return response()->json(['message' => 'Selected clearance types duplicated successfully.']);
+    }
+
+    /**
+     * Bulk update (separate endpoint)
+     */
+    public function bulkUpdate(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:clearance_types,id',
+            'field' => 'required|string|in:processing_days,validity_days,fee,requires_payment,requires_approval,is_online_only,is_active',
+            'value' => 'required',
+        ]);
+
+        $field = $request->field;
+        $value = $request->value;
+
+        // Convert value based on field type
+        if (in_array($field, ['processing_days', 'validity_days'])) {
+            $value = (int) $value;
+        } elseif ($field === 'fee') {
+            $value = (float) $value;
+        } elseif (in_array($field, ['requires_payment', 'requires_approval', 'is_online_only', 'is_active'])) {
+            $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        ClearanceType::whereIn('id', $request->ids)->update([$field => $value]);
+
+        return response()->json(['message' => 'Selected clearance types updated successfully.']);
+    }
+
+    /**
+     * Export clearance types
+     */
+    public function export(Request $request)
+    {
+        $query = ClearanceType::query();
+
+        // Apply filters if provided
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->has('status')) {
+            if ($request->status === 'active') {
+                $query->where('is_active', true);
+            } elseif ($request->status === 'inactive') {
+                $query->where('is_active', false);
+            }
+        }
+
+        if ($request->has('requires_payment')) {
+            $query->where('requires_payment', $request->requires_payment === 'yes');
+        }
+
+        if ($request->has('ids')) {
+            $query->whereIn('id', $request->ids);
+        }
+
+        $clearanceTypes = $query->get();
+
+        // Generate CSV content
+        $csv = "ID,Name,Code,Description,Fee,Processing Days,Validity Days,Active,Requires Payment,Requires Approval,Online Only,Document Count,Clearance Requests\n";
+        
+        foreach ($clearanceTypes as $type) {
+            $csv .= sprintf(
+                "%d,\"%s\",\"%s\",\"%s\",%.2f,%d,%d,%s,%s,%s,%s,%d,%d\n",
+                $type->id,
+                $type->name,
+                $type->code,
+                $type->description,
+                $type->fee,
+                $type->processing_days,
+                $type->validity_days,
+                $type->is_active ? 'Yes' : 'No',
+                $type->requires_payment ? 'Yes' : 'No',
+                $type->requires_approval ? 'Yes' : 'No',
+                $type->is_online_only ? 'Yes' : 'No',
+                $type->documentRequirements()->count(),
+                $type->clearanceRequests()->count()
+            );
+        }
+
+        $filename = 'clearance_types_export_' . date('Y-m-d_H-i-s') . '.csv';
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
     }
 
     /**

@@ -37,11 +37,15 @@ class ResidentFeeController extends Controller
             ];
         });
         
-        // Paginate results - remove the ->through() call for now
-        $fees = $query->paginate(15);
+        // Paginate results - use eager loading
+        $fees = $query->paginate(15)->withQueryString(); // Added withQueryString
         
-        // Format fees manually
+        // Format fees manually - EAGER LOAD documentCategory through feeType
         $formattedFees = $fees->getCollection()->map(function ($fee) {
+            // Make sure we load the feeType with its documentCategory
+            if ($fee->feeType && !$fee->feeType->relationLoaded('documentCategory')) {
+                $fee->feeType->load('documentCategory');
+            }
             return $this->formatFeeForFrontend($fee);
         });
         
@@ -62,6 +66,100 @@ class ResidentFeeController extends Controller
             'filters' => $this->getSanitizedFilters($request),
         ]);
     }
+
+    private function getAvailableFeeTypes($residentIds, $resident)
+    {
+        return FeeType::active()
+            ->with('documentCategory')
+            ->where(function($query) use ($resident) {
+                $query->where('applicable_to', 'all_residents')
+                    ->orWhere('applicable_to', 'property_owners')
+                    ->orWhere(function($q) use ($resident) {
+                        $q->where('applicable_to', 'specific_purok')
+                            ->where('applicable_puroks', 'like', "%{$resident->purok}%");
+                    });
+            })
+            ->orderBy('sort_order')
+            ->get()
+            ->map(function ($feeType) {
+                // Get category name from documentCategory - use slug as code
+                $categoryName = $feeType->documentCategory ? $feeType->documentCategory->name : 'Uncategorized';
+                $categoryCode = $feeType->documentCategory ? $feeType->documentCategory->slug : 'uncategorized';
+                
+                return [
+                    'id' => $feeType->id,
+                    'code' => $feeType->code,
+                    'name' => $feeType->name,
+                    'category' => $categoryName,
+                    'category_display' => $categoryName,
+                    'document_category' => $feeType->documentCategory ? [
+                        'id' => $feeType->documentCategory->id,
+                        'name' => $feeType->documentCategory->name,
+                        'code' => $categoryCode,
+                        'slug' => $feeType->documentCategory->slug,
+                    ] : null,
+                ];
+            });
+    }
+
+    private function formatFeeForFrontend($fee)
+    {
+        // Format the fee for frontend display
+        $formatted = [
+            'id' => $fee->id,
+            'fee_code' => $fee->fee_code,
+            'or_number' => $fee->or_number,
+            'certificate_number' => $fee->certificate_number,
+            'purpose' => $fee->purpose,
+            'payer_name' => $fee->payer_name,
+            'address' => $fee->address,
+            'purok' => $fee->purok,
+            'zone' => $fee->zone,
+            'billing_period' => $fee->billing_period,
+            'issue_date' => $fee->issue_date?->toDateString(),
+            'due_date' => $fee->due_date?->toDateString(),
+            'period_start' => $fee->period_start?->toDateString(),
+            'period_end' => $fee->period_end?->toDateString(),
+            'base_amount' => (float) $fee->base_amount,
+            'surcharge_amount' => (float) $fee->surcharge_amount,
+            'penalty_amount' => (float) $fee->penalty_amount,
+            'discount_amount' => (float) $fee->discount_amount,
+            'total_amount' => (float) $fee->total_amount,
+            'amount_paid' => (float) $fee->amount_paid,
+            'balance' => (float) $fee->balance,
+            'status' => $fee->status,
+            'remarks' => $fee->remarks,
+            'formatted_issue_date' => $fee->issue_date?->format('M d, Y') ?? 'N/A',
+            'formatted_due_date' => $fee->due_date?->format('M d, Y') ?? 'N/A',
+            'formatted_total' => '₱' . number_format($fee->total_amount, 2),
+            'formatted_balance' => '₱' . number_format($fee->balance, 2),
+            'formatted_amount_paid' => '₱' . number_format($fee->amount_paid, 2),
+            'is_overdue' => $fee->isOverdue(),
+            'days_overdue' => $fee->days_overdue,
+        ];
+        
+        // Add fee type with document category
+        if ($fee->feeType) {
+            $categoryName = $fee->feeType->documentCategory ? $fee->feeType->documentCategory->name : 'Uncategorized';
+            $categoryCode = $fee->feeType->documentCategory ? $fee->feeType->documentCategory->slug : 'uncategorized';
+            
+            $formatted['fee_type'] = [
+                'id' => $fee->feeType->id,
+                'code' => $fee->feeType->code,
+                'name' => $fee->feeType->name,
+                'category' => $categoryName,
+                'category_display' => $categoryName,
+                'document_category' => $fee->feeType->documentCategory ? [
+                    'id' => $fee->feeType->documentCategory->id,
+                    'name' => $fee->feeType->documentCategory->name,
+                    'code' => $categoryCode,
+                    'slug' => $fee->feeType->documentCategory->slug,
+                ] : null,
+            ];
+        }
+        
+        return $formatted;
+    }
     
     public function show(Fee $fee)
     {
@@ -73,7 +171,7 @@ class ResidentFeeController extends Controller
         }
         
         $fee->load([
-            'feeType:id,code,name,category',
+            'feeType.documentCategory:id,name,slug',
             'resident:id,first_name,last_name,middle_name,contact_number',
             'household:id,household_number',
             'paymentItems.payment' => function ($query) {
@@ -81,7 +179,7 @@ class ResidentFeeController extends Controller
             }
         ]);
         
-        $formattedFee = $this->formatFeeForFrontend($fee, true);
+        $formattedFee = $this->formatFeeForFrontend($fee);
         $paymentHistory = $this->getPaymentHistory($fee);
         
         return Inertia::render('resident/Fees/Show', [
@@ -157,16 +255,20 @@ class ResidentFeeController extends Controller
                     });
                 }
             })
-            ->with(['feeType:id,code,name,category', 'resident', 'household'])
+            ->with([
+                'feeType.documentCategory:id,name,slug',
+                'resident', 
+                'household'
+            ])
             ->latest('issue_date');
         
         // Apply filters
-        $this->applyFilters($query, $request);
+        $this->applyFilters($query, $request, $residentIds);
         
         return $query;
     }
     
-    private function applyFilters($query, Request $request): void
+    private function applyFilters($query, Request $request, array $residentIds): void
     {
         if ($request->filled('search')) {
             $search = $request->search;
@@ -186,14 +288,19 @@ class ResidentFeeController extends Controller
             $query->where('status', $request->status);
         }
         
+        // FIXED: Filter by fee type ID (not code)
         if ($request->filled('fee_type') && $request->fee_type !== 'all') {
-            $query->whereHas('feeType', function ($q) use ($request) {
-                $q->where('code', $request->fee_type);
-            });
+            $query->where('fee_type_id', $request->fee_type);
         }
         
+        // FIXED: Handle year filter properly
         if ($request->filled('year') && $request->year !== 'all') {
             $query->whereYear('issue_date', $request->year);
+        }
+        
+        // FIXED: Add resident filter
+        if ($request->filled('resident') && $request->resident !== 'all') {
+            $query->where('resident_id', $request->resident);
         }
     }
     
@@ -211,6 +318,7 @@ class ResidentFeeController extends Controller
                     });
                 }
             })
+            ->whereNotNull('issue_date') // Add this to exclude null dates
             ->selectRaw('YEAR(issue_date) as year')
             ->distinct()
             ->orderBy('year', 'desc')
@@ -220,44 +328,21 @@ class ResidentFeeController extends Controller
             ->toArray();
     }
     
-    private function getAvailableFeeTypes(array $residentIds, Resident $resident)
-    {
-        return FeeType::query()
-            ->where('is_active', true)
-            ->whereIn('id', function ($query) use ($residentIds, $resident) {
-                $query->select('fee_type_id')
-                    ->from('fees')
-                    ->where(function ($q) use ($residentIds) {
-                        $q->where('payer_type', 'resident')
-                            ->whereIn('resident_id', $residentIds);
-                    })
-                    ->orWhere(function ($q) use ($resident) {
-                        $q->where('payer_type', 'household')
-                            ->where('household_id', $resident->household_id);
-                    });
-            })
-            ->get(['id', 'code', 'name', 'category'])
-            ->map(function ($type) {
-                return [
-                    'id' => $type->id,
-                    'code' => $type->code,
-                    'name' => $type->name,
-                    'category' => $type->category,
-                ];
-            });
-    }
-    
     private function getHouseholdResidents(array $residentIds)
     {
         return Resident::query()
             ->whereIn('id', $residentIds)
+            ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name', 'middle_name'])
             ->map(function ($resident) {
                 return [
                     'id' => $resident->id,
-                    'full_name' => $resident->full_name,
+                    'first_name' => $resident->first_name,
+                    'last_name' => $resident->last_name,
+                    'middle_name' => $resident->middle_name,
                 ];
-            });
+            })
+            ->toArray();
     }
     
     private function authorizeFeeAccess(Fee $fee, Resident $resident): bool
@@ -266,87 +351,6 @@ class ResidentFeeController extends Controller
         
         return ($fee->payer_type === 'resident' && in_array($fee->resident_id, $residentIds)) ||
                ($fee->payer_type === 'household' && $fee->household_id === $resident->household_id);
-    }
-    
-    private function formatFeeForFrontend(Fee $fee, bool $detailed = false): array
-    {
-        $isOwnFee = $this->isOwnFee($fee);
-        $requirementsSubmitted = $this->parseRequirements($fee->requirements_submitted);
-        
-        // Create category_display from category if it doesn't exist
-        $categoryDisplay = $fee->feeType ? ucwords(str_replace('_', ' ', $fee->feeType->category)) : null;
-        
-        $baseData = [
-            'id' => $fee->id,
-            'fee_code' => $fee->fee_code,
-            'or_number' => $fee->or_number,
-            'certificate_number' => $fee->certificate_number,
-            'purpose' => $fee->purpose,
-            'payer_name' => $fee->payer_name,
-            'address' => $fee->address,
-            'purok' => $fee->purok,
-            'zone' => $fee->zone,
-            'billing_period' => $fee->billing_period,
-            'issue_date' => $fee->issue_date?->format('Y-m-d'),
-            'due_date' => $fee->due_date?->format('Y-m-d'),
-            'period_start' => $fee->period_start?->format('Y-m-d'),
-            'period_end' => $fee->period_end?->format('Y-m-d'),
-            'base_amount' => (float) $fee->base_amount,
-            'surcharge_amount' => (float) $fee->surcharge_amount,
-            'penalty_amount' => (float) $fee->penalty_amount,
-            'discount_amount' => (float) $fee->discount_amount,
-            'total_amount' => (float) $fee->total_amount,
-            'amount_paid' => (float) $fee->amount_paid,
-            'balance' => (float) $fee->balance,
-            'status' => $fee->status,
-            'remarks' => $fee->remarks,
-            'payer_type' => $fee->payer_type,
-            'resident_id' => $fee->resident_id,
-            'household_id' => $fee->household_id,
-            'is_own_fee' => $isOwnFee,
-            'formatted_issue_date' => $fee->issue_date?->format('M d, Y') ?? 'N/A',
-            'formatted_due_date' => $fee->due_date?->format('M d, Y') ?? 'N/A',
-            'formatted_total' => '₱' . number_format($fee->total_amount, 2),
-            'formatted_balance' => '₱' . number_format($fee->balance, 2),
-            'formatted_amount_paid' => '₱' . number_format($fee->amount_paid, 2),
-            'formatted_base_amount' => '₱' . number_format($fee->base_amount, 2),
-            'formatted_surcharge' => '₱' . number_format($fee->surcharge_amount, 2),
-            'formatted_penalty' => '₱' . number_format($fee->penalty_amount, 2),
-            'formatted_discount' => '₱' . number_format($fee->discount_amount, 2),
-            'is_overdue' => $this->checkIfOverdue($fee),
-            'days_overdue' => $this->calculateDaysOverdue($fee),
-            'requirements_submitted' => $requirementsSubmitted,
-            'fee_type' => $fee->feeType ? [
-                'id' => $fee->feeType->id,
-                'code' => $fee->feeType->code,
-                'name' => $fee->feeType->name,
-                'category' => $fee->feeType->category,
-                'category_display' => $categoryDisplay, // Generated from category
-            ] : null,
-        ];
-        
-        if ($detailed) {
-            $baseData = array_merge($baseData, [
-                'property_description' => $fee->property_description,
-                'business_type' => $fee->business_type,
-                'business_name' => $fee->business_name,
-                'area' => $fee->area ? (float) $fee->area : null,
-                'valid_from' => $fee->valid_from?->format('Y-m-d'),
-                'valid_until' => $fee->valid_until?->format('Y-m-d'),
-                'waiver_reason' => $fee->waiver_reason,
-                'formatted_valid_from' => $fee->valid_from?->format('M d, Y') ?? 'N/A',
-                'formatted_valid_until' => $fee->valid_until?->format('M d, Y') ?? 'N/A',
-                'resident_info' => $fee->resident ? [
-                    'id' => $fee->resident->id,
-                    'full_name' => $fee->resident->full_name,
-                    'first_name' => $fee->resident->first_name,
-                    'last_name' => $fee->resident->last_name,
-                    'contact_number' => $fee->resident->contact_number,
-                ] : null,
-            ]);
-        }
-        
-        return $baseData;
     }
     
     private function checkIfOverdue(Fee $fee): bool
@@ -479,7 +483,7 @@ class ResidentFeeController extends Controller
     
     private function getSanitizedFilters(Request $request): array
     {
-        return $request->only(['search', 'status', 'fee_type', 'year']);
+        return $request->only(['search', 'status', 'fee_type', 'year', 'resident']);
     }
     
     private function renderEmptyFeePage(Request $request)
@@ -506,6 +510,9 @@ class ResidentFeeController extends Controller
                 'current_year_paid' => 0,
                 'current_year_balance' => 0,
             ],
+            'availableYears' => [],
+            'availableFeeTypes' => [],
+            'householdResidents' => [],
             'hasProfile' => false,
             'filters' => $this->getSanitizedFilters($request),
         ]);

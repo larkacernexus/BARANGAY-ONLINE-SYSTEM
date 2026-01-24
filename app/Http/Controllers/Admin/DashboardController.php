@@ -127,28 +127,34 @@ class DashboardController extends Controller
         $endOfWeek = Carbon::now()->endOfWeek();
 
         // Get payment stats by certificate type
-        $certificateStats = Payment::selectRaw('certificate_type, COUNT(*) as count, SUM(total_amount) as total')
-            ->whereBetween('payment_date', [$startOfMonth, $endOfMonth])
-            ->where('status', 'completed')
-            ->groupBy('certificate_type')
-            ->get()
-            ->map(function ($item) {
-                $typeName = match($item->certificate_type) {
-                    'barangay_clearance' => 'Barangay Clearance',
-                    'business_permit' => 'Business Permit',
-                    'indigency_certificate' => 'Indigency Certificate',
-                    'residency_certificate' => 'Residency Certificate',
-                    'cedula' => 'Cedula',
-                    default => ucwords(str_replace('_', ' ', $item->certificate_type))
-                };
-                
+$certificateStats = Payment::with(['items.clearanceRequest.clearanceType'])
+    ->whereBetween('payment_date', [$startOfMonth, $endOfMonth])
+    ->where('status', 'completed')
+    ->get()
+    ->flatMap(function ($payment) {
+        return $payment->items->map(function ($item) use ($payment) {
+            if ($item->clearanceRequest && $item->clearanceRequest->clearanceType) {
                 return [
-                    'type' => $typeName,
-                    'original_type' => $item->certificate_type,
-                    'count' => (int)$item->count,
-                    'amount' => number_format($item->total ?? 0, 2)
+                    'type' => $item->clearanceRequest->clearanceType->name,
+                    'original_type' => $item->clearanceRequest->clearanceType->code,
+                    'count' => 1,
+                    'amount' => $item->total_amount
                 ];
-            });
+            }
+            return null;
+        })->filter();
+    })
+    ->groupBy('original_type')
+    ->map(function ($items, $typeCode) {
+        $first = $items->first();
+        return [
+            'type' => $first['type'] ?? $typeCode,
+            'original_type' => $typeCode,
+            'count' => $items->count(),
+            'amount' => number_format($items->sum('amount'), 2)
+        ];
+    })
+    ->values();
 
         // Get payment stats by payment method
         $methodStats = Payment::selectRaw('payment_method, COUNT(*) as count, SUM(total_amount) as total')

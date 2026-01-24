@@ -5,40 +5,45 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
+use Illuminate\Notifications\Notifiable; 
+
 
 class Payment extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, LogsActivity, Notifiable; 
 
-    protected $fillable = [
-        'or_number',
-        'payer_type',
-        'payer_id',
-        'payer_name',
-        'contact_number',
-        'address',
-        'household_number',
-        'purok',
-        'payment_date',
-        'period_covered',
-        'payment_method',
-        'reference_number',
-        'subtotal',
-        'surcharge',
-        'penalty',
-        'discount',
-        'discount_type',
-        'total_amount',
-        'purpose',
-        'remarks',
-        'is_cleared',
-        'clearance_type', // Changed from certificate_type
-        'validity_date',
-        'collection_type',
-        'status',
-        'method_details',
-        'recorded_by',
-    ];
+protected $fillable = [
+    'status',
+    'collection_type',
+    'or_number',
+    'payer_type',
+    'payer_id',
+    'payer_name',
+    'contact_number',
+    'address',
+    'household_number',
+    'purok',
+    'payment_date',
+    'period_covered',
+    'payment_method',
+    'reference_number',
+    'subtotal',
+    'surcharge',
+    'penalty',
+    'discount',
+    'discount_type',
+    'total_amount',
+    'purpose',
+    'remarks',
+    'is_cleared',
+    'clearance_code',
+    'certificate_type',
+    'validity_date',
+    'method_details',
+    'recorded_by',
+];
 
     protected $casts = [
         'payment_date' => 'datetime',
@@ -62,19 +67,46 @@ class Payment extends Model
         'payment_method_display',
         'status_display',
         'collection_type_display',
-        'clearance_type_display', // Changed from certificate_type_display
+        'clearance_type_display',
         'is_cleared_display',
         'has_surcharge',
         'has_penalty',
         'has_discount',
         'payer_details',
-        'is_clearance_payment', // New attribute
+        'is_clearance_payment',
+        'recorded_by_user_name',
+        'has_clearance_request', // NEW: Check if any item has clearance request
     ];
 
     protected $attributes = [
         'status' => 'completed',
         'collection_type' => 'manual',
     ];
+
+    /**
+     * ACTIVITY LOG CONFIGURATION
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'or_number',
+                'payer_name',
+                'total_amount',
+                'payment_method',
+                'status',
+                'recorded_by', // MOST IMPORTANT for audit
+                'clearance_type',
+                'is_cleared',
+                'remarks',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(function(string $eventName) {
+                return "Payment {$eventName} - OR#{$this->or_number}";
+            })
+            ->useLogName('payments');
+    }
 
     // Relationships
     public function items()
@@ -97,9 +129,35 @@ class Payment extends Model
         return $this->belongsTo(User::class, 'recorded_by');
     }
 
-    public function clearanceRequest()
+    // REMOVED: clearanceRequest() relationship
+    // This is now accessed through payment items
+
+    public function clearanceType()
     {
-        return $this->belongsTo(ClearanceRequest::class, 'clearance_request_id');
+        return $this->belongsTo(ClearanceType::class, 'clearance_type_id');
+    }
+
+    // NEW: Get clearance requests through items
+    public function clearanceRequests()
+    {
+        return $this->hasManyThrough(
+            ClearanceRequest::class,
+            PaymentItem::class,
+            'payment_id', // Foreign key on PaymentItem table
+            'id', // Foreign key on ClearanceRequest table
+            'id', // Local key on Payment table
+            'clearance_request_id' // Local key on PaymentItem table
+        );
+    }
+
+    // NEW: Get first clearance request (for single clearance payments)
+    public function firstClearanceRequest()
+    {
+        return $this->items()
+            ->with('clearanceRequest')
+            ->whereNotNull('clearance_request_id')
+            ->first()
+            ?->clearanceRequest;
     }
 
     // Accessors
@@ -163,54 +221,42 @@ class Payment extends Model
         return $types[$this->collection_type] ?? ucfirst($this->collection_type);
     }
 
-    public function getClearanceTypeDisplayAttribute() // Changed from getCertificateTypeDisplayAttribute
+    public function getClearanceTypeDisplayAttribute()
     {
         if (!$this->clearance_type) {
             return null;
         }
 
-        // Common clearance types with display names
+        if ($this->clearanceType) {
+            return $this->clearanceType->name;
+        }
+
         $types = [
-            // Barangay Clearances
             'BRGY_CLEARANCE' => 'Barangay Clearance',
             'BARANGAY_CLEARANCE' => 'Barangay Clearance',
             'clearance' => 'Barangay Clearance',
-            
-            // Business Clearances
             'BUSINESS_CLEARANCE' => 'Business Clearance',
             'BUSINESS_PERMIT' => 'Business Permit',
-            
-            // Police/NBI Clearances
             'POLICE_CLEARANCE' => 'Police Clearance Endorsement',
             'NBI_CLEARANCE' => 'NBI Clearance Endorsement',
             'NBI_CLEARANCE_ENDORSEMENT' => 'NBI Clearance Endorsement',
-            
-            // Certificates
             'INDIGENCY_CERT' => 'Certificate of Indigency',
             'INDIGENCY_CERTIFICATE' => 'Certificate of Indigency',
             'RESIDENCY_CERT' => 'Certificate of Residency',
             'RESIDENCY_CERTIFICATE' => 'Certificate of Residency',
             'GOOD_MORAL_CERT' => 'Good Moral Character Certificate',
-            
-            // Travel
             'TRAVEL_CLEARANCE' => 'Travel Clearance',
-            
-            // Employment
             'EMPLOYMENT_CLEARANCE' => 'Employment Clearance',
             'SCHOLARSHIP_CLEARANCE' => 'Scholarship Clearance',
-            
-            // Other
             'CEDULA' => 'Cedula',
             'OTHER' => 'Other Certificate',
             'other' => 'Other Certificate',
         ];
 
-        // First check for exact match
         if (isset($types[$this->clearance_type])) {
             return $types[$this->clearance_type];
         }
         
-        // Check for case-insensitive match
         $lowercaseType = strtolower($this->clearance_type);
         foreach ($types as $key => $value) {
             if (strtolower($key) === $lowercaseType) {
@@ -218,36 +264,17 @@ class Payment extends Model
             }
         }
         
-        // If no match, try to find partial matches
-        if (str_contains(strtolower($this->clearance_type), 'indigen')) {
-            return 'Certificate of Indigency';
-        }
-        if (str_contains(strtolower($this->clearance_type), 'residen')) {
-            return 'Certificate of Residency';
-        }
-        if (str_contains(strtolower($this->clearance_type), 'business')) {
-            return 'Business Clearance';
-        }
-        if (str_contains(strtolower($this->clearance_type), 'nbi')) {
-            return 'NBI Clearance Endorsement';
-        }
-        if (str_contains(strtolower($this->clearance_type), 'police')) {
-            return 'Police Clearance Endorsement';
-        }
-        if (str_contains(strtolower($this->clearance_type), 'travel')) {
-            return 'Travel Clearance';
-        }
-        if (str_contains(strtolower($this->clearance_type), 'employ')) {
-            return 'Employment Clearance';
-        }
-        if (str_contains(strtolower($this->clearance_type), 'scholarship')) {
-            return 'Scholarship Clearance';
-        }
-        if (str_contains(strtolower($this->clearance_type), 'good moral')) {
-            return 'Good Moral Character Certificate';
-        }
+        // Partial matches
+        if (str_contains($lowercaseType, 'indigen')) return 'Certificate of Indigency';
+        if (str_contains($lowercaseType, 'residen')) return 'Certificate of Residency';
+        if (str_contains($lowercaseType, 'business')) return 'Business Clearance';
+        if (str_contains($lowercaseType, 'nbi')) return 'NBI Clearance Endorsement';
+        if (str_contains($lowercaseType, 'police')) return 'Police Clearance Endorsement';
+        if (str_contains($lowercaseType, 'travel')) return 'Travel Clearance';
+        if (str_contains($lowercaseType, 'employ')) return 'Employment Clearance';
+        if (str_contains($lowercaseType, 'scholarship')) return 'Scholarship Clearance';
+        if (str_contains($lowercaseType, 'good moral')) return 'Good Moral Character Certificate';
         
-        // Default: return the original value with proper casing
         return ucwords(str_replace('_', ' ', $this->clearance_type));
     }
 
@@ -275,9 +302,7 @@ class Payment extends Model
     {
         if ($this->payer_type === 'resident') {
             $resident = $this->resident;
-            if (!$resident) {
-                return null;
-            }
+            if (!$resident) return null;
 
             return [
                 'id' => $resident->id,
@@ -297,9 +322,7 @@ class Payment extends Model
 
         if ($this->payer_type === 'household') {
             $household = $this->household;
-            if (!$household) {
-                return null;
-            }
+            if (!$household) return null;
 
             return [
                 'id' => $household->id,
@@ -324,7 +347,53 @@ class Payment extends Model
 
     public function getIsClearancePaymentAttribute()
     {
-        return !empty($this->clearance_type) || !empty($this->clearance_request_id);
+        return !empty($this->clearance_type) || $this->has_clearance_request;
+    }
+
+    /**
+     * NEW: Check if payment has clearance request through items
+     */
+    public function getHasClearanceRequestAttribute()
+    {
+        if (!$this->relationLoaded('items')) {
+            $this->load('items');
+        }
+        
+        return $this->items->contains(function ($item) {
+            return !empty($item->clearance_request_id);
+        });
+    }
+
+    /**
+     * Get recorder's name for audit reports
+     */
+    public function getRecordedByUserNameAttribute()
+    {
+        if (!$this->recorded_by) {
+            return 'System';
+        }
+        
+        if (!$this->relationLoaded('recorder')) {
+            $this->load('recorder');
+        }
+        
+        return $this->recorder ? $this->recorder->name : 'Unknown';
+    }
+
+    /**
+     * Get all audit activities for this payment
+     */
+    public function getAuditTrailAttribute()
+    {
+        if (!class_exists(\Spatie\Activitylog\Models\Activity::class)) {
+            return collect();
+        }
+        
+        return \Spatie\Activitylog\Models\Activity::where('subject_type', self::class)
+            ->where('subject_id', $this->id)
+            ->with('causer')
+            ->latest()
+            ->get();
     }
 
     // Scopes
@@ -368,7 +437,9 @@ class Payment extends Model
     public function scopeClearancePayments($query)
     {
         return $query->whereNotNull('clearance_type')
-                    ->orWhereNotNull('clearance_request_id');
+                    ->orWhereHas('items', function ($q) {
+                        $q->whereNotNull('clearance_request_id');
+                    });
     }
 
     public function scopeByClearanceType($query, $clearanceType)
@@ -376,9 +447,25 @@ class Payment extends Model
         return $query->where('clearance_type', $clearanceType);
     }
 
-    public function scopeWithClearanceRequest($query)
+    // REMOVED: scopeWithClearanceRequest()
+    // Use with(['items.clearanceRequest']) instead
+
+    /**
+     * NEW SCOPES for Audit Reports
+     */
+    public function scopeRecordedBy($query, $userId)
     {
-        return $query->with('clearanceRequest.clearanceType');
+        return $query->where('recorded_by', $userId);
+    }
+
+    public function scopeWithRecorder($query)
+    {
+        return $query->with('recorder');
+    }
+
+    public function scopeBetweenDates($query, $startDate, $endDate)
+    {
+        return $query->whereBetween('payment_date', [$startDate, $endDate]);
     }
 
     // Static methods
@@ -399,6 +486,20 @@ class Payment extends Model
         return "BAR-{$date}-{$newNumber}";
     }
 
+    /**
+     * Generate audit report data
+     */
+    public static function getAuditReportData($startDate = null, $endDate = null)
+    {
+        $query = self::with(['recorder', 'items.clearanceRequest']);
+        
+        if ($startDate && $endDate) {
+            $query->betweenDates($startDate, $endDate);
+        }
+        
+        return $query->latest('payment_date')->get();
+    }
+
     // Helper methods
     public function isClearancePayment()
     {
@@ -410,19 +511,65 @@ class Payment extends Model
         return $this->clearance_type_display;
     }
 
-    public function linkToClearanceRequest(ClearanceRequest $clearanceRequest)
+    // REMOVED: linkToClearanceRequest() method
+    // This should be handled in PaymentItem or controller
+
+    /**
+     * NEW: Link clearance request to payment via item
+     */
+    public function addClearanceRequestItem(ClearanceRequest $clearanceRequest, $amount)
     {
-        $this->clearance_request_id = $clearanceRequest->id;
-        $this->clearance_type = $clearanceRequest->clearanceType->code ?? $clearanceRequest->clearance_type;
-        $this->save();
-        
-        return $this;
+        return $this->items()->create([
+            'clearance_request_id' => $clearanceRequest->id,
+            'fee_name' => $clearanceRequest->clearanceType->name ?? 'Clearance Fee',
+            'fee_code' => $clearanceRequest->clearanceType->code ?? 'CLEARANCE',
+            'description' => 'Payment for ' . ($clearanceRequest->clearanceType->name ?? 'Clearance'),
+            'base_amount' => $amount,
+            'total_amount' => $amount,
+            'category' => 'clearance',
+        ]);
     }
 
+    /**
+     * Get payment summary for audit reports
+     */
+    public function getAuditSummary()
+    {
+        // Load clearance request through items if needed
+        $clearanceRequest = null;
+        if ($this->has_clearance_request && !$this->relationLoaded('items')) {
+            $this->load(['items.clearanceRequest']);
+            $clearanceItem = $this->items->firstWhere('clearance_request_id', '!=', null);
+            $clearanceRequest = $clearanceItem?->clearanceRequest;
+        }
 
-public function clearanceType()
-{
-    return $this->belongsTo(ClearanceType::class, 'clearance_type_id');
-}
-    
+        return [
+            'or_number' => $this->or_number,
+            'date' => $this->formatted_date,
+            'payer' => $this->payer_name,
+            'amount' => $this->formatted_total,
+            'recorded_by' => $this->recorded_by_user_name,
+            'method' => $this->payment_method_display,
+            'clearance_type' => $this->clearance_type_display,
+            'clearance_request' => $clearanceRequest ? [
+                'id' => $clearanceRequest->id,
+                'request_number' => $clearanceRequest->request_number,
+                'status' => $clearanceRequest->status,
+            ] : null,
+            'status' => $this->status_display,
+        ];
+    }
+
+    /**
+     * NEW: Get all clearance requests associated with this payment
+     */
+    public function getAllClearanceRequests()
+    {
+        return $this->items()
+            ->with('clearanceRequest')
+            ->whereNotNull('clearance_request_id')
+            ->get()
+            ->pluck('clearanceRequest')
+            ->filter();
+    }
 }

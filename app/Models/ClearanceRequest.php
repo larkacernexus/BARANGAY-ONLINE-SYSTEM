@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Illuminate\Notifications\Notifiable;
 
 class ClearanceRequest extends Model
 {
-    use LogsActivity;
+    use LogsActivity, Notifiable;
 
     protected $fillable = [
         // Resident & Type
@@ -108,6 +109,11 @@ class ClearanceRequest extends Model
     public function payment(): HasOne
     {
         return $this->hasOne(Payment::class);
+    }
+
+     public function paymentItem(): HasOne
+    {
+        return $this->hasOne(PaymentItem::class, 'clearance_request_id');
     }
 
     public function payments(): HasMany

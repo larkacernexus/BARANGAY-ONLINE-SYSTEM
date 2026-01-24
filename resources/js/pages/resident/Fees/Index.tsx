@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import ResidentLayout from '@/layouts/resident-app-layout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
     Table,
     TableBody,
@@ -13,33 +13,40 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
-    Search,
-    Filter,
-    Eye,
-    FileText,
     AlertCircle,
-    CheckCircle,
-    Clock,
-    DollarSign,
+    Search,
+    Eye,
+    Plus,
+    Check,
+    X,
+    Square,
+    Grid,
+    List,
+    MoreVertical,
+    Copy,
+    FileText,
+    Printer,
+    Download,
+    Share2,
+    Filter,
+    ChevronLeft,
+    ChevronRight,
+    ChevronUp,
+    ChevronDown,
+    BarChart,
+    Loader2,
     Calendar,
     CreditCard,
-    Receipt,
-    Loader2,
-    ChevronRight,
-    Info,
-    Menu,
-    X,
-    Smartphone,
-    ChevronDown,
-    ChevronUp,
-    ChevronLeft,
-    ChevronRight as ChevronRightIcon,
-    List,
-    Grid
+    XCircle,
+    User,
+    Clock,
+    SlidersHorizontal,
 } from 'lucide-react';
 import { Link, usePage, router, Head } from '@inertiajs/react';
 import { toast } from 'sonner';
-import { Pagination } from '@/components/ui/pagination';
+
+// FIX: Try importing Select components differently
+import * as SelectPrimitive from '@radix-ui/react-select';
 import {
     Select,
     SelectContent,
@@ -47,7 +54,36 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+// Import extracted components
+import { StatusBadge } from '@/components/residentui/StatusBadge';
+import { MobileFeeCard } from '@/components/residentui/MobileFeeCard';
+import { DesktopGridViewCard } from '@/components/residentui/DesktopGridViewCard';
+import { CollapsibleStats } from '@/components/residentui/CollapsibleStats';
+import { DesktopStats } from '@/components/residentui/DesktopStats';
+import { CustomTabs } from '@/components/residentui/CustomTabs';
+
+interface DocumentCategory {
+    id: number;
+    name: string;
+    slug: string;
+}
+
+interface FeeType {
+    id: number;
+    code: string;
+    name: string;
+    category: string;
+    category_display: string;
+    document_category?: DocumentCategory | null;
+}
 
 interface Fee {
     id: number;
@@ -80,16 +116,15 @@ interface Fee {
     formatted_amount_paid: string;
     is_overdue: boolean;
     days_overdue: number;
-    fee_type?: {
+    fee_type?: FeeType;
+    resident?: {
         id: number;
-        code: string;
-        name: string;
-        category: string;
-        category_display: string;
+        first_name: string;
+        last_name: string;
+        middle_name?: string;
     };
 }
 
-// Use Record<string, any> as base type for Inertia compatibility
 interface PageProps extends Record<string, any> {
     fees?: {
         data: Fee[];
@@ -99,12 +134,15 @@ interface PageProps extends Record<string, any> {
         total: number;
         from: number;
         to: number;
+        links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     stats?: {
         total_fees: number;
         pending_fees: number;
         overdue_fees: number;
         paid_fees: number;
+        issued_fees?: number;
+        cancelled_fees?: number;
         total_balance: number;
         total_paid: number;
         current_year_total: number;
@@ -117,70 +155,495 @@ interface PageProps extends Record<string, any> {
         code: string;
         name: string;
         category: string;
+        category_display: string;
+        document_category?: DocumentCategory | null;
     }>;
+    householdResidents?: Array<{
+        id: number;
+        first_name: string;
+        last_name: string;
+        middle_name?: string;
+    }>;
+    currentResident?: {
+        id: number;
+        first_name: string;
+        last_name: string;
+    };
     hasProfile?: boolean;
     filters?: {
         search?: string;
         status?: string;
         fee_type?: string;
         year?: string;
+        resident?: string;
         page?: string;
     };
+    error?: string;
 }
 
-// Responsive Pagination Component for mobile support
-const ResponsivePagination = ({ 
-    currentPage, 
-    totalPages, 
-    onPageChange, 
-    isLoading,
-    isMobile 
-}: {
-    currentPage: number;
-    totalPages: number;
-    onPageChange: (page: number) => void;
-    isLoading: boolean;
-    isMobile: boolean;
-}) => {
-    if (isMobile) {
-        return (
-            <div className="flex items-center justify-between w-full gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onPageChange(currentPage - 1)}
-                    disabled={currentPage <= 1 || isLoading}
-                    className="flex-1 text-xs"
-                >
-                    <ChevronLeft className="h-3 w-3 mr-1" />
-                    Previous
-                </Button>
-                
-                <div className="px-3 py-1 bg-gray-100 rounded-md text-sm font-medium">
-                    {currentPage} / {totalPages}
-                </div>
-                
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onPageChange(currentPage + 1)}
-                    disabled={currentPage >= totalPages || isLoading}
-                    className="flex-1 text-xs"
-                >
-                    Next
-                    <ChevronRightIcon className="h-3 w-3 ml-1" />
-                </Button>
-            </div>
-        );
-    }
-    
+// Custom Select Component with debugging
+interface CustomSelectProps {
+    value: string;
+    onValueChange: (value: string) => void;
+    placeholder: string;
+    options: Array<{ value: string; label: string }>;
+    disabled?: boolean;
+}
+
+const CustomSelect = ({ value, onValueChange, placeholder, options, disabled }: CustomSelectProps) => {
+    const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        console.log('CustomSelect onChange:', e.target.value);
+        onValueChange(e.target.value);
+    };
+
     return (
-        <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={onPageChange}
-            isLoading={isLoading}
-        />
+        <div className="relative">
+            <select
+                value={value}
+                onChange={handleChange}
+                disabled={disabled}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+                <option value="">{placeholder}</option>
+                {options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                        {option.label}
+                    </option>
+                ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                <ChevronDown className="h-4 w-4 opacity-50" />
+            </div>
+        </div>
+    );
+};
+
+// Mobile Filter Modal Component
+interface MobileFilterModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    search: string;
+    onSearchChange: (value: string) => void;
+    onSearchSubmit: (e: React.FormEvent) => void;
+    onSearchClear: () => void;
+    feeTypeFilter: string;
+    onFeeTypeChange: (type: string) => void;
+    residentFilter: string;
+    onResidentChange: (resident: string) => void;
+    yearFilter: string;
+    onYearChange: (year: string) => void;
+    loading: boolean;
+    availableFeeTypes: Array<{
+        id: number;
+        code: string;
+        name: string;
+        category: string;
+        category_display: string;
+        document_category?: DocumentCategory | null;
+    }>;
+    availableYears: number[];
+    householdResidents: Array<{
+        id: number;
+        first_name: string;
+        last_name: string;
+        middle_name?: string;
+    }>;
+    hasActiveFilters: boolean;
+    onClearFilters: () => void;
+}
+
+const MobileFilterModal = ({
+    isOpen,
+    onClose,
+    search,
+    onSearchChange,
+    onSearchSubmit,
+    onSearchClear,
+    feeTypeFilter,
+    onFeeTypeChange,
+    residentFilter,
+    onResidentChange,
+    yearFilter,
+    onYearChange,
+    loading,
+    availableFeeTypes,
+    availableYears,
+    householdResidents,
+    hasActiveFilters,
+    onClearFilters,
+}: MobileFilterModalProps) => {
+    if (!isOpen) return null;
+
+    // Prepare options for CustomSelect
+    const feeTypeOptions = [
+        { value: 'all', label: 'All fee types' },
+        ...availableFeeTypes.map(type => ({
+            value: type.id.toString(),
+            label: type.name
+        }))
+    ];
+
+    const residentOptions = [
+        { value: 'all', label: 'All residents' },
+        ...householdResidents.map(resident => ({
+            value: resident.id.toString(),
+            label: `${resident.first_name} ${resident.last_name}`
+        }))
+    ];
+
+    const yearOptions = [
+        { value: 'all', label: 'All years' },
+        ...availableYears.map(year => ({
+            value: year.toString(),
+            label: year.toString()
+        }))
+    ];
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 bg-black/50 z-[100] backdrop-blur-sm transition-opacity"
+                onClick={onClose}
+            />
+
+            {/* Modal */}
+            <div className="fixed bottom-0 left-0 right-0 z-[101] animate-in slide-in-from-bottom duration-300">
+                <div className="bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-4 border-b dark:border-gray-800">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                <SlidersHorizontal className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                                    Filter Fees
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    {hasActiveFilters ? 'Filters applied' : 'No filters applied'}
+                                </p>
+                            </div>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
+                            <X className="h-5 w-5" />
+                        </Button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-20">
+                        {/* Search */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Search Fees
+                            </label>
+                            <form onSubmit={onSearchSubmit} className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Input
+                                    type="search"
+                                    placeholder="Search by fee code, purpose..."
+                                    value={search}
+                                    onChange={(e) => onSearchChange(e.target.value)}
+                                    className="pl-10 pr-10"
+                                />
+                                {search && (
+                                    <button
+                                        type="button"
+                                        onClick={onSearchClear}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                                    >
+                                        <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                                    </button>
+                                )}
+                            </form>
+                        </div>
+
+                        {/* Fee Type Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Fee Type
+                            </label>
+                            <CustomSelect
+                                value={feeTypeFilter}
+                                onValueChange={onFeeTypeChange}
+                                placeholder="All fee types"
+                                options={feeTypeOptions}
+                                disabled={loading}
+                            />
+                        </div>
+
+                        {/* Resident Filter */}
+                        {householdResidents.length > 0 && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Resident
+                                </label>
+                                <CustomSelect
+                                    value={residentFilter}
+                                    onValueChange={onResidentChange}
+                                    placeholder="All residents"
+                                    options={residentOptions}
+                                    disabled={loading}
+                                />
+                            </div>
+                        )}
+
+                        {/* Year Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Year
+                            </label>
+                            <CustomSelect
+                                value={yearFilter}
+                                onValueChange={onYearChange}
+                                placeholder="All years"
+                                options={yearOptions}
+                                disabled={loading}
+                            />
+                        </div>
+
+                        {/* Active Filters Indicator */}
+                        {hasActiveFilters && (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                                    <span className="text-sm text-blue-700 dark:text-blue-300">
+                                        Filters are active
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="border-t dark:border-gray-800 p-4 space-y-3 pb-safe-bottom">
+                        {hasActiveFilters && (
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    onClearFilters();
+                                    onClose();
+                                }}
+                                className="w-full"
+                            >
+                                <X className="h-4 w-4 mr-2" />
+                                Clear All Filters
+                            </Button>
+                        )}
+                        <Button onClick={onClose} className="w-full">
+                            <Check className="h-4 w-4 mr-2" />
+                            Apply Filters
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+};
+
+// Desktop Filters Section Component
+interface FiltersSectionProps {
+    search: string;
+    setSearch: (value: string) => void;
+    handleSearchSubmit: (e: React.FormEvent) => void;
+    handleSearchClear: () => void;
+    feeTypeFilter: string;
+    handleFeeTypeChange: (type: string) => void;
+    residentFilter: string;
+    handleResidentChange: (resident: string) => void;
+    yearFilter: string;
+    handleYearChange: (year: string) => void;
+    loading: boolean;
+    availableFeeTypes: Array<{
+        id: number;
+        code: string;
+        name: string;
+        category: string;
+        category_display: string;
+        document_category?: DocumentCategory | null;
+    }>;
+    availableYears: number[];
+    householdResidents: Array<{
+        id: number;
+        first_name: string;
+        last_name: string;
+        middle_name?: string;
+    }>;
+    printFees: () => void;
+    exportToCSV: () => void;
+    isExporting: boolean;
+    hasActiveFilters: boolean;
+    handleClearFilters: () => void;
+}
+
+const FiltersSection = ({
+    search,
+    setSearch,
+    handleSearchSubmit,
+    handleSearchClear,
+    feeTypeFilter,
+    handleFeeTypeChange,
+    residentFilter,
+    handleResidentChange,
+    yearFilter,
+    handleYearChange,
+    loading,
+    availableFeeTypes,
+    availableYears,
+    householdResidents,
+    printFees,
+    exportToCSV,
+    isExporting,
+    hasActiveFilters,
+    handleClearFilters,
+}: FiltersSectionProps) => {
+    // Prepare options
+    const feeTypeOptions = [
+        { value: 'all', label: 'All fee types' },
+        ...availableFeeTypes.map(type => ({
+            value: type.id.toString(),
+            label: type.name
+        }))
+    ];
+
+    const residentOptions = [
+        { value: 'all', label: 'All residents' },
+        ...householdResidents.map(resident => ({
+            value: resident.id.toString(),
+            label: `${resident.first_name} ${resident.last_name}`
+        }))
+    ];
+
+    const yearOptions = [
+        { value: 'all', label: 'All years' },
+        ...availableYears.map(year => ({
+            value: year.toString(),
+            label: year.toString()
+        }))
+    ];
+
+    return (
+        <Card className="border border-gray-200 dark:border-gray-700">
+            <CardContent className="p-4 md:p-6">
+                <div className="space-y-4">
+                    {/* Search */}
+                    <div className="relative">
+                        <form onSubmit={handleSearchSubmit} className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Input
+                                type="search"
+                                placeholder="Search by fee code, purpose..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-10 pr-10"
+                            />
+                            {search && (
+                                <button
+                                    type="button"
+                                    onClick={handleSearchClear}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                                >
+                                    <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                                </button>
+                            )}
+                        </form>
+                    </div>
+
+                    {/* Filters Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {/* Fee Type Filter */}
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">
+                                Fee Type
+                            </label>
+                            <CustomSelect
+                                value={feeTypeFilter}
+                                onValueChange={handleFeeTypeChange}
+                                placeholder="All fee types"
+                                options={feeTypeOptions}
+                                disabled={loading}
+                            />
+                        </div>
+
+                        {/* Resident Filter */}
+                        {householdResidents.length > 0 && (
+                            <div>
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">
+                                    Resident
+                                </label>
+                                <CustomSelect
+                                    value={residentFilter}
+                                    onValueChange={handleResidentChange}
+                                    placeholder="All residents"
+                                    options={residentOptions}
+                                    disabled={loading}
+                                />
+                            </div>
+                        )}
+
+                        {/* Year Filter */}
+                        <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">
+                                Year
+                            </label>
+                            <CustomSelect
+                                value={yearFilter}
+                                onValueChange={handleYearChange}
+                                placeholder="All years"
+                                options={yearOptions}
+                                disabled={loading}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-2 pt-2">
+                        {hasActiveFilters && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleClearFilters}
+                                className="gap-2"
+                            >
+                                <X className="h-4 w-4" />
+                                Clear Filters
+                            </Button>
+                        )}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={printFees}
+                            className="gap-2"
+                        >
+                            <Printer className="h-4 w-4" />
+                            Print List
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={exportToCSV}
+                            disabled={isExporting}
+                            className="gap-2"
+                        >
+                            <Download className="h-4 w-4" />
+                            {isExporting ? 'Exporting...' : 'Export CSV'}
+                        </Button>
+                    </div>
+
+                    {/* Active Filters Indicator */}
+                    {hasActiveFilters && (
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                            <div className="flex items-center gap-2">
+                                <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-sm text-blue-700 dark:text-blue-300">
+                                    Filters are active
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
     );
 };
 
@@ -196,6 +659,7 @@ export default function MyFees() {
         total: 0,
         from: 0,
         to: 0,
+        links: [],
     };
     
     const stats = pageProps.stats || {
@@ -203,6 +667,8 @@ export default function MyFees() {
         pending_fees: 0,
         overdue_fees: 0,
         paid_fees: 0,
+        issued_fees: 0,
+        cancelled_fees: 0,
         total_balance: 0,
         total_paid: 0,
         current_year_total: 0,
@@ -212,33 +678,36 @@ export default function MyFees() {
     
     const availableYears = pageProps.availableYears || [];
     const availableFeeTypes = pageProps.availableFeeTypes || [];
+    const householdResidents = pageProps.householdResidents || [];
+    const currentResident = pageProps.currentResident || { id: 0, first_name: '', last_name: '' };
     const hasProfile = pageProps.hasProfile || false;
     const filters = pageProps.filters || {};
     
-    // Initialize state with empty string instead of filters.search
+    // Initialize with debug logging
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [feeTypeFilter, setFeeTypeFilter] = useState('all');
+    const [residentFilter, setResidentFilter] = useState('all');
     const [yearFilter, setYearFilter] = useState('all');
     const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
-    const [showFilters, setShowFilters] = useState(false);
-    const [showSummary, setShowSummary] = useState(true);
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); // Default to grid on mobile
-
+    const [showStats, setShowStats] = useState(true);
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
+    const [selectedFees, setSelectedFees] = useState<number[]>([]);
+    const [isExporting, setIsExporting] = useState(false);
+    const [selectMode, setSelectMode] = useState(false);
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    
     const hasInitialized = useRef(false);
     const searchTimeout = useRef<NodeJS.Timeout | null>(null);
-
+    
     // Check if mobile on mount and resize
     useEffect(() => {
         const checkMobile = () => {
             const mobile = window.innerWidth < 768;
             setIsMobile(mobile);
-            if (!mobile) {
-                setShowFilters(true);
-                setViewMode('list'); // Default to list on desktop
-            } else {
-                setViewMode('grid'); // Default to grid on mobile
+            if (mobile) {
+                setViewMode('grid');
             }
         };
         
@@ -246,70 +715,71 @@ export default function MyFees() {
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
-
-    // Initialize filters from props ONLY ONCE
+    
+    // Initialize filters from props
     useEffect(() => {
         if (!hasInitialized.current) {
+            console.log('Initializing filters from props:', {
+                search: filters.search,
+                status: filters.status,
+                fee_type: filters.fee_type,
+                year: filters.year,
+                resident: filters.resident
+            });
+            
             setSearch(filters.search || '');
             setStatusFilter(filters.status || 'all');
             setFeeTypeFilter(filters.fee_type || 'all');
             setYearFilter(filters.year || 'all');
+            setResidentFilter(filters.resident || 'all');
             hasInitialized.current = true;
         }
-    }, [filters.search, filters.status, filters.fee_type, filters.year]);
-
-    // Search debounce - ONLY trigger when user actively types
+    }, [filters]);
+    
+    // Search debounce
     useEffect(() => {
-        // Don't run on initial render
         if (!hasInitialized.current) return;
-        
-        // Don't run if search is empty and we don't have a search filter in URL
         if (search === '' && !filters.search) return;
-        
-        // Don't run if search hasn't changed from the URL value
         if (search === filters.search) return;
-
+        
         if (searchTimeout.current) {
             clearTimeout(searchTimeout.current);
         }
-
+        
         searchTimeout.current = setTimeout(() => {
             updateFilters({ 
                 search: search.trim(),
-                page: '1' // Reset to first page when searching
+                page: '1'
             });
         }, 800);
-
+        
         return () => {
             if (searchTimeout.current) {
                 clearTimeout(searchTimeout.current);
             }
         };
-    }, [search]); // Only depend on search changes
-
+    }, [search]);
+    
     const updateFilters = (newFilters: Record<string, string>) => {
+        console.log('Updating filters:', newFilters);
         setLoading(true);
         
         const updatedFilters = {
             ...filters,
             ...newFilters,
         };
-
-        // Clean up the filters object
+        
         const cleanFilters: Record<string, string> = {};
         
         Object.entries(updatedFilters).forEach(([key, value]) => {
-            // Skip 'page' parameter if it's '1' (default)
-            if (key === 'page' && value === '1') {
-                return;
-            }
-            
-            // Remove empty values
+            if (key === 'page' && value === '1') return;
             if (value && value !== '' && value !== 'all' && value !== undefined) {
                 cleanFilters[key] = value;
             }
         });
-
+        
+        console.log('Clean filters to send:', cleanFilters);
+        
         router.get('/residentfees', cleanFilters, {
             preserveState: true,
             preserveScroll: true,
@@ -318,49 +788,72 @@ export default function MyFees() {
         });
     };
     
-    const handleStatusChange = (status: string) => {
-        setStatusFilter(status);
-        updateFilters({ 
-            status: status === 'all' ? '' : status,
-            page: '1'
-        });
-        if (isMobile) setShowFilters(false);
+    const handleTabChange = (tab: string) => {
+        console.log('Tab changed to:', tab);
+        setStatusFilter(tab);
+        
+        if (tab === 'all') {
+            updateFilters({ 
+                status: '',
+                page: '1'
+            });
+        } else {
+            updateFilters({ 
+                status: tab,
+                page: '1'
+            });
+        }
+        
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleFeeTypeChange = (type: string) => {
+        console.log('Fee type changed:', type, 'Current value:', feeTypeFilter);
         setFeeTypeFilter(type);
         updateFilters({ 
             fee_type: type === 'all' ? '' : type,
             page: '1'
         });
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
+    };
+    
+    const handleResidentChange = (resident: string) => {
+        console.log('Resident changed:', resident, 'Current value:', residentFilter);
+        setResidentFilter(resident);
+        updateFilters({ 
+            resident: resident === 'all' ? '' : resident,
+            page: '1'
+        });
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleYearChange = (year: string) => {
+        console.log('Year changed:', year, 'Current value:', yearFilter);
         setYearFilter(year);
         updateFilters({ 
             year: year === 'all' ? '' : year,
             page: '1'
         });
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleClearFilters = () => {
+        console.log('Clearing all filters');
         setSearch('');
         setStatusFilter('all');
         setFeeTypeFilter('all');
+        setResidentFilter('all');
         setYearFilter('all');
         
-        // Clear all filters and go to first page
         router.get('/residentfees', {}, {
             preserveState: true,
             preserveScroll: true,
             onFinish: () => setLoading(false),
         });
         
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
-
+    
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (searchTimeout.current) {
@@ -371,7 +864,7 @@ export default function MyFees() {
             page: '1'
         });
     };
-
+    
     const handleSearchClear = () => {
         setSearch('');
         updateFilters({ 
@@ -380,57 +873,34 @@ export default function MyFees() {
         });
     };
     
-    const getStatusBadge = (status: string, isOverdue: boolean) => {
-        if (isOverdue) {
-            return (
-                <Badge className="bg-red-100 text-red-800 hover:bg-red-100 text-xs px-2 py-0.5">
-                    <AlertCircle className="h-2.5 w-2.5 mr-1" />
-                    Overdue
-                </Badge>
-            );
-        }
-        
-        switch (status.toLowerCase()) {
-            case 'paid':
-                return (
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-xs px-2 py-0.5">
-                        <CheckCircle className="h-2.5 w-2.5 mr-1" />
-                        Paid
-                    </Badge>
-                );
-            case 'pending':
-                return (
-                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-xs px-2 py-0.5">
-                        <Clock className="h-2.5 w-2.5 mr-1" />
-                        Pending
-                    </Badge>
-                );
-            case 'partially_paid':
-                return (
-                    <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs px-2 py-0.5">
-                        <CreditCard className="h-2.5 w-2.5 mr-1" />
-                        Partial
-                    </Badge>
-                );
-            case 'issued':
-                return (
-                    <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100 text-xs px-2 py-0.5">
-                        <FileText className="h-2.5 w-2.5 mr-1" />
-                        Issued
-                    </Badge>
-                );
-            case 'cancelled':
-                return (
-                    <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100 text-xs px-2 py-0.5">
-                        <FileText className="h-2.5 w-2.5 mr-1" />
-                        Cancelled
-                    </Badge>
-                );
-            default:
-                return <Badge variant="outline" className="text-xs px-2 py-0.5">{status}</Badge>;
+    // Selection mode functions
+    const toggleSelectFee = (id: number) => {
+        setSelectedFees(prev =>
+            prev.includes(id)
+                ? prev.filter(feeId => feeId !== id)
+                : [...prev, id]
+        );
+    };
+    
+    const selectAllFees = () => {
+        const currentFees = getCurrentTabFees();
+        if (selectedFees.length === currentFees.length && currentFees.length > 0) {
+            setSelectedFees([]);
+        } else {
+            setSelectedFees(currentFees.map(f => f.id));
         }
     };
     
+    const toggleSelectMode = () => {
+        if (selectMode) {
+            setSelectMode(false);
+            setSelectedFees([]);
+        } else {
+            setSelectMode(true);
+        }
+    };
+    
+    // Utility functions
     const formatDate = (dateString: string) => {
         if (!dateString) return 'N/A';
         try {
@@ -452,12 +922,37 @@ export default function MyFees() {
     };
     
     const formatCurrency = (amount: number) => {
-        if (amount >= 1000000) {
-            return `₱${(amount / 1000000).toFixed(1)}M`;
-        } else if (amount >= 1000) {
-            return `₱${(amount / 1000).toFixed(1)}K`;
-        }
         return `₱${amount.toFixed(2)}`;
+    };
+    
+    const getCategoryDisplay = (feeType: FeeType | undefined) => {
+        if (!feeType) return '';
+        return feeType.document_category?.name || feeType.category_display || feeType.category || 'Uncategorized';
+    };
+    
+    // Get status count from global stats
+    const getStatusCount = (status: string) => {
+        switch(status) {
+            case 'all': 
+                return stats.total_fees || 0;
+            case 'pending': 
+                return stats.pending_fees || 0;
+            case 'issued': 
+                return stats.issued_fees || fees.data.filter(f => f.status === 'issued').length;
+            case 'overdue': 
+                return stats.overdue_fees || 0;
+            case 'paid': 
+                return stats.paid_fees || 0;
+            case 'cancelled': 
+                return stats.cancelled_fees || fees.data.filter(f => f.status === 'cancelled').length;
+            default: 
+                return 0;
+        }
+    };
+    
+    // Get current tab fees
+    const getCurrentTabFees = () => {
+        return fees.data;
     };
     
     const hasActiveFilters = useMemo(() => {
@@ -466,23 +961,582 @@ export default function MyFees() {
         );
     }, [filters]);
     
-    if (hasProfile === undefined) {
-        return (
-            <ResidentLayout
-                breadcrumbs={[
-                    { title: 'Dashboard', href: '/resident/dashboard' },
-                    { title: 'My Fees', href: '/residentfees' }
-                ]}
-            >
-                <div className="flex items-center justify-center min-h-[60vh]">
-                    <div className="text-center">
-                        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-                        <p className="text-gray-600">Loading fees...</p>
+    // Print function
+    const printFees = () => {
+        const currentFees = getCurrentTabFees();
+        if (currentFees.length === 0) {
+            toast.error('No fees to print');
+            return;
+        }
+        
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            toast.error('Please allow popups to print');
+            return;
+        }
+        
+        const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>My Fees Report</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
+                    .print-header { margin-bottom: 30px; }
+                    .print-info { display: flex; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; }
+                    .fee-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    .fee-table th { background-color: #f3f4f6; padding: 12px; text-align: left; border: 1px solid #ddd; }
+                    .fee-table td { padding: 10px; border: 1px solid #ddd; }
+                    .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; display: inline-block; }
+                    .badge-pending { background-color: #fef3c7; color: #92400e; }
+                    .badge-issued { background-color: #e9d5ff; color: #6b21a8; }
+                    .badge-partially_paid { background-color: #dbeafe; color: #1e40af; }
+                    .badge-paid { background-color: #d1fae5; color: #065f46; }
+                    .badge-overdue { background-color: #fee2e2; color: #991b1b; }
+                    .badge-cancelled { background-color: #f3f4f6; color: #374151; }
+                    .footer { margin-top: 40px; text-align: center; color: #6b7280; font-size: 12px; }
+                    @media print {
+                        body { margin: 0; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-header">
+                    <h1>My Fees Report</h1>
+                    <div class="print-info">
+                        <div>
+                            <p><strong>Generated:</strong> ${new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                            <p><strong>Total Fees:</strong> ${currentFees.length}</p>
+                            <p><strong>Status:</strong> ${statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}</p>
+                        </div>
+                        <div>
+                            <p><strong>Total Balance:</strong> ${formatCurrency(stats.total_balance)}</p>
+                            <p><strong>Total Paid:</strong> ${formatCurrency(stats.total_paid)}</p>
+                        </div>
                     </div>
                 </div>
-            </ResidentLayout>
+                
+                <table class="fee-table">
+                    <thead>
+                        <tr>
+                            <th>Fee Code</th>
+                            <th>Type</th>
+                            <th>Purpose</th>
+                            <th>Issue Date</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Amount</th>
+                            <th>Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${currentFees.map(fee => `
+                            <tr>
+                                <td>${fee.fee_code}</td>
+                                <td>${getCategoryDisplay(fee.fee_type)}</td>
+                                <td>${fee.purpose}</td>
+                                <td>${formatDate(fee.issue_date)}</td>
+                                <td>${formatDate(fee.due_date)}</td>
+                                <td><span class="badge badge-${fee.status}">${fee.status.replace('_', ' ').toUpperCase()}</span></td>
+                                <td>${fee.formatted_total}</td>
+                                <td>${fee.formatted_balance}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                
+                <div class="footer">
+                    <p>Generated from Barangay Management System</p>
+                    <p>Page 1 of 1</p>
+                </div>
+            </body>
+            </html>
+        `;
+        
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+    };
+    
+    // Export to CSV
+    const exportToCSV = () => {
+        const currentFees = getCurrentTabFees();
+        if (currentFees.length === 0) {
+            toast.error('No fees to export');
+            return;
+        }
+        
+        setIsExporting(true);
+        
+        const headers = ['Fee Code', 'OR Number', 'Certificate Number', 'Type', 'Purpose', 'Issue Date', 'Due Date', 'Status', 'Base Amount', 'Surcharge', 'Penalty', 'Discount', 'Total Amount', 'Amount Paid', 'Balance'];
+        
+        const csvData = currentFees.map(fee => [
+            fee.fee_code,
+            fee.or_number || 'N/A',
+            fee.certificate_number || 'N/A',
+            getCategoryDisplay(fee.fee_type),
+            `"${(fee.purpose || '').replace(/"/g, '""')}"`,
+            formatDate(fee.issue_date),
+            formatDate(fee.due_date),
+            fee.status.replace('_', ' ').toUpperCase(),
+            (fee.base_amount || 0).toFixed(2),
+            (fee.surcharge_amount || 0).toFixed(2),
+            (fee.penalty_amount || 0).toFixed(2),
+            (fee.discount_amount || 0).toFixed(2),
+            (fee.total_amount || 0).toFixed(2),
+            (fee.amount_paid || 0).toFixed(2),
+            (fee.balance || 0).toFixed(2)
+        ]);
+        
+        const csvContent = [
+            headers.join(','),
+            ...csvData.map(row => row.join(','))
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', `fees_${statusFilter}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        setIsExporting(false);
+        toast.success('CSV file downloaded successfully');
+    };
+    
+    const renderTabContent = () => {
+        const currentFees = getCurrentTabFees();
+        const tabHasData = currentFees.length > 0;
+        
+        return (
+            <Card className="border border-gray-200 dark:border-gray-700">
+                <CardContent className="p-4 md:p-6">
+                    {/* Selection Mode Banner */}
+                    {selectMode && tabHasData && (
+                        <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <Badge variant="secondary" className="gap-1">
+                                        <Square className="h-3 w-3" />
+                                        Selection Mode
+                                    </Badge>
+                                    <span className="text-sm text-blue-700 dark:text-blue-300">
+                                        {selectedFees.length} fee{selectedFees.length !== 1 ? 's' : ''} selected
+                                    </span>
+                                </div>
+                                <div className="flex gap-2 w-full sm:w-auto">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={selectAllFees}
+                                        className="flex-1 sm:flex-none"
+                                    >
+                                        {selectedFees.length === currentFees.length && currentFees.length > 0
+                                            ? 'Deselect All'
+                                            : 'Select All'}
+                                    </Button>
+                                    {selectedFees.length > 0 && (
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => {
+                                                if (confirm(`Are you sure you want to delete ${selectedFees.length} selected fees?`)) {
+                                                    toast.success(`Deleted ${selectedFees.length} fees`);
+                                                    setSelectedFees([]);
+                                                    setSelectMode(false);
+                                                }
+                                            }}
+                                            className="flex-1 sm:flex-none"
+                                        >
+                                            Delete Selected
+                                        </Button>
+                                    )}
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSelectMode(false);
+                                            setSelectedFees([]);
+                                        }}
+                                        className="flex-1 sm:flex-none"
+                                    >
+                                        <X className="h-4 w-4 mr-1" />
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Fees List Header */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                        <div>
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                                {statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Fees
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {tabHasData 
+                                    ? `Showing ${currentFees.length} fee${currentFees.length !== 1 ? 's' : ''}`
+                                    : `No ${statusFilter === 'all' ? 'fees' : statusFilter.replace('_', ' ')} found`
+                                }
+                                {selectMode && selectedFees.length > 0 && ` • ${selectedFees.length} selected`}
+                                {(feeTypeFilter !== 'all' || residentFilter !== 'all' || yearFilter !== 'all' || search) && ' (filtered)'}
+                                {selectMode && ' • Selection Mode'}
+                            </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                            <div className="flex gap-2">
+                                {!selectMode && tabHasData && (
+                                    <>
+                                        <div className="hidden md:flex gap-2">
+                                            <Button
+                                                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => setViewMode('grid')}
+                                                className="gap-2"
+                                            >
+                                                <Grid className="h-4 w-4" />
+                                                Grid
+                                            </Button>
+                                            <Button
+                                                variant={viewMode === 'list' ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => setViewMode('list')}
+                                                className="gap-2"
+                                            >
+                                                <List className="h-4 w-4" />
+                                                List
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={toggleSelectMode}
+                                                className="gap-2"
+                                            >
+                                                <Square className="h-4 w-4" />
+                                                Select
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {!tabHasData ? (
+                        <div className="text-center py-12">
+                            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                {(() => {
+                                    const Icon = statusFilter === 'all' ? List : 
+                                               statusFilter === 'pending' ? Clock :
+                                               statusFilter === 'issued' ? FileText :
+                                               statusFilter === 'overdue' ? AlertCircle :
+                                               statusFilter === 'paid' ? Check :
+                                               statusFilter === 'cancelled' ? XCircle : List;
+                                    return <Icon className="h-8 w-8 text-gray-400" />;
+                                })()}
+                            </div>
+                            <h3 className="text-lg font-semibold mb-2">
+                                No {statusFilter === 'all' ? 'fees' : statusFilter.replace('_', ' ')} found
+                            </h3>
+                            <p className="text-gray-500 dark:text-gray-400 mb-4">
+                                {hasActiveFilters 
+                                    ? 'Try adjusting your filters'
+                                    : statusFilter === 'all' 
+                                        ? 'You have no fees or assessments'
+                                        : `You have no ${statusFilter.replace('_', ' ')} fees`}
+                            </p>
+                            {hasActiveFilters && (
+                                <Button variant="outline" onClick={handleClearFilters} size="sm">
+                                    Clear Filters
+                                </Button>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            {/* Mobile View Mode Toggle */}
+                            {isMobile && tabHasData && !selectMode && (
+                                <div className="mb-4">
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant={viewMode === 'grid' ? 'default' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setViewMode('grid')}
+                                            className="flex-1"
+                                        >
+                                            <Grid className="h-4 w-4 mr-2" />
+                                            Grid View
+                                        </Button>
+                                        <Button
+                                            variant={viewMode === 'list' ? 'default' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setViewMode('list')}
+                                            className="flex-1"
+                                        >
+                                            <List className="h-4 w-4 mr-2" />
+                                            List View
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={toggleSelectMode}
+                                            className="flex-1"
+                                        >
+                                            <Square className="h-4 w-4 mr-2" />
+                                            Select
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Grid View (Mobile & Desktop) */}
+                            {viewMode === 'grid' && (
+                                <>
+                                    {/* Mobile Grid View */}
+                                    {isMobile && (
+                                        <div className="pb-4">
+                                            {currentFees.map((fee) => (
+                                                <MobileFeeCard 
+                                                    key={`mobile-fee-${fee.id}`}
+                                                    fee={fee}
+                                                    selectMode={selectMode}
+                                                    selectedFees={selectedFees}
+                                                    toggleSelectFee={toggleSelectFee}
+                                                    getCategoryDisplay={getCategoryDisplay}
+                                                    formatDate={formatDate}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Desktop Grid View */}
+                                    {!isMobile && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {currentFees.map((fee) => (
+                                                <DesktopGridViewCard 
+                                                    key={`desktop-fee-${fee.id}`}
+                                                    fee={fee}
+                                                    selectMode={selectMode}
+                                                    selectedFees={selectedFees}
+                                                    toggleSelectFee={toggleSelectFee}
+                                                    getCategoryDisplay={getCategoryDisplay}
+                                                    formatDate={formatDate}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            
+                            {/* List/Table View (Mobile & Desktop) */}
+                            {viewMode === 'list' && (
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                {selectMode && (
+                                                    <TableHead className="w-12">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedFees.length === currentFees.length && currentFees.length > 0}
+                                                            onChange={selectAllFees}
+                                                            className="h-4 w-4 rounded border-gray-300"
+                                                        />
+                                                    </TableHead>
+                                                )}
+                                                <TableHead>Fee Details</TableHead>
+                                                <TableHead>Dates</TableHead>
+                                                <TableHead>Amount</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {currentFees.map((fee) => (
+                                                <TableRow key={`table-fee-${fee.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                                                    {selectMode && (
+                                                        <TableCell>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedFees.includes(fee.id)}
+                                                                onChange={() => toggleSelectFee(fee.id)}
+                                                                className="h-4 w-4 rounded border-gray-300"
+                                                            />
+                                                        </TableCell>
+                                                    )}
+                                                    <TableCell>
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        navigator.clipboard.writeText(fee.fee_code);
+                                                                        toast.success(`Copied: ${fee.fee_code}`);
+                                                                    }}
+                                                                    className="font-mono text-sm font-medium hover:text-blue-600 transition-colors"
+                                                                    title="Copy fee code"
+                                                                >
+                                                                    {fee.fee_code}
+                                                                </button>
+                                                                {fee.or_number && (
+                                                                    <Badge variant="outline" size="sm" className="text-xs">
+                                                                        OR: {fee.or_number}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            <p className="font-medium text-gray-700 dark:text-gray-300">{fee.purpose}</p>
+                                                            {fee.fee_type && (
+                                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    {getCategoryDisplay(fee.fee_type)}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="space-y-1">
+                                                            <div>
+                                                                <p className="text-xs text-gray-500">Issued</p>
+                                                                <p className="text-sm">{formatDate(fee.issue_date)}</p>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs text-gray-500">Due</p>
+                                                                <p className={`text-sm ${fee.is_overdue ? 'text-red-600 font-medium' : ''}`}>
+                                                                    {formatDate(fee.due_date)}
+                                                                    {fee.is_overdue && fee.days_overdue > 0 && (
+                                                                        <span className="text-xs text-red-500 block">
+                                                                            {fee.days_overdue} days overdue
+                                                                        </span>
+                                                                    )}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="space-y-1">
+                                                            <div className="font-bold">{fee.formatted_total}</div>
+                                                            {fee.balance > 0 ? (
+                                                                <div className="text-sm font-medium text-red-600">
+                                                                    Balance: {fee.formatted_balance}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-sm font-medium text-green-600">
+                                                                    Paid: {fee.formatted_amount_paid}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <StatusBadge status={fee.status} isOverdue={fee.is_overdue} />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex justify-end gap-1">
+                                                            <Link href={`/residentfees/${fee.id}`}>
+                                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Button>
+                                                            </Link>
+                                                            {fee.balance > 0 && fee.status !== 'cancelled' && (
+                                                                <Link href={`/resident/payments/create?fee_id=${fee.id}`}>
+                                                                    <Button size="sm" variant="default" className="h-8 px-3 text-xs">
+                                                                        Pay
+                                                                    </Button>
+                                                                </Link>
+                                                            )}
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                                                        <MoreVertical className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuItem onClick={() => {
+                                                                        navigator.clipboard.writeText(fee.fee_code);
+                                                                        toast.success(`Copied: ${fee.fee_code}`);
+                                                                    }}>
+                                                                        <Copy className="h-4 w-4 mr-2" />
+                                                                        Copy Fee Code
+                                                                    </DropdownMenuItem>
+                                                                    {fee.or_number && (
+                                                                        <DropdownMenuItem onClick={() => {
+                                                                            navigator.clipboard.writeText(fee.or_number);
+                                                                            toast.success(`Copied OR: ${fee.or_number}`);
+                                                                        }}>
+                                                                            <Copy className="h-4 w-4 mr-2" />
+                                                                            Copy OR Number
+                                                                        </DropdownMenuItem>
+                                                                    )}
+                                                                    <DropdownMenuItem onClick={() => {
+                                                                        const reportWindow = window.open('', '_blank');
+                                                                        if (reportWindow) {
+                                                                            reportWindow.document.write(`
+                                                                                <h1>Fee Details: ${fee.fee_code}</h1>
+                                                                                <p><strong>Purpose:</strong> ${fee.purpose}</p>
+                                                                                <p><strong>Amount:</strong> ${fee.formatted_total}</p>
+                                                                                <p><strong>Balance:</strong> ${fee.formatted_balance}</p>
+                                                                                <p><strong>Status:</strong> ${fee.status}</p>
+                                                                            `);
+                                                                        }
+                                                                    }}>
+                                                                        <FileText className="h-4 w-4 mr-2" />
+                                                                        Generate Report
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                            
+                            {/* Pagination */}
+                            {fees.last_page > 1 && (
+                                <div className="mt-4 md:mt-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-sm text-gray-500">
+                                            Page {fees.current_page} of {fees.last_page}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => updateFilters({ page: (fees.current_page - 1).toString() })}
+                                                disabled={fees.current_page <= 1 || loading}
+                                            >
+                                                <ChevronLeft className="h-4 w-4 mr-1" />
+                                                Previous
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => updateFilters({ page: (fees.current_page + 1).toString() })}
+                                                disabled={fees.current_page >= fees.last_page || loading}
+                                            >
+                                                Next
+                                                <ChevronRight className="h-4 w-4 ml-1" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </CardContent>
+            </Card>
         );
-    }
+    };
     
     if (!hasProfile) {
         return (
@@ -515,286 +1569,37 @@ export default function MyFees() {
         );
     }
     
-    // Mobile-friendly Fee Card Component
-    const MobileFeeCard = ({ fee }: { fee: Fee }) => (
-        <Card className="mb-3">
-            <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-2">
+    if (pageProps.error) {
+        return (
+            <ResidentLayout
+                breadcrumbs={[
+                    { title: 'Dashboard', href: '/resident/dashboard' },
+                    { title: 'My Fees', href: '/residentfees' }
+                ]}
+            >
+                <div className="space-y-6">
                     <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                            <span className="font-medium text-sm">{fee.fee_code}</span>
-                        </div>
-                        <p className="text-sm text-gray-700 line-clamp-1">{fee.purpose}</p>
-                        {fee.fee_type && (
-                            <p className="text-xs text-gray-500 mt-0.5">
-                                {fee.fee_type.category_display}
+                        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">My Fees</h1>
+                    </div>
+                    <Card>
+                        <CardContent className="py-12 text-center">
+                            <AlertCircle className="h-12 w-12 mx-auto text-red-400" />
+                            <h3 className="mt-4 text-lg font-semibold">Error</h3>
+                            <p className="text-gray-500 mt-2">
+                                {pageProps.error}
                             </p>
-                        )}
-                    </div>
-                    {getStatusBadge(fee.status, fee.is_overdue)}
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                    <div>
-                        <p className="text-xs text-gray-500">Amount</p>
-                        <p className="font-semibold">{fee.formatted_total}</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-xs text-gray-500">Balance</p>
-                        <p className={`font-semibold ${fee.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {fee.formatted_balance}
-                        </p>
-                    </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                    <div>
-                        <p className="text-xs text-gray-500">Issued</p>
-                        <p className="text-sm">{formatDate(fee.issue_date)}</p>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-xs text-gray-500">Due Date</p>
-                        <p className={`text-sm ${fee.is_overdue ? 'text-red-600 font-medium' : ''}`}>
-                            {formatDate(fee.due_date)}
-                        </p>
-                    </div>
-                </div>
-                
-                {fee.is_overdue && fee.days_overdue > 0 && (
-                    <div className="mb-3 p-2 bg-red-50 rounded-md">
-                        <div className="flex items-center gap-1 text-red-700 text-sm">
-                            <AlertCircle className="h-3 w-3" />
-                            <span>{fee.days_overdue} days overdue</span>
-                        </div>
-                    </div>
-                )}
-                
-                <div className="flex gap-2">
-                    <Link href={`/residentfees/${fee.id}`} className="flex-1">
-                        <Button variant="outline" size="sm" className="w-full text-xs">
-                            <Eye className="h-3 w-3 mr-1" />
-                            View Details
-                        </Button>
-                    </Link>
-                    {fee.balance > 0 && fee.status !== 'cancelled' && (
-                        <Link href={`/resident/payments/create?fee_id=${fee.id}`} className="flex-1">
-                            <Button size="sm" className="w-full text-xs">
-                                <CreditCard className="h-3 w-3 mr-1" />
-                                Pay Now
-                            </Button>
-                        </Link>
-                    )}
-                </div>
-            </CardContent>
-        </Card>
-    );
-    
-    // Summary Stats Component
-    const SummaryStats = () => (
-        <>
-            {/* Fee Summary - Mobile Optimized */}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Card className="sm:col-span-1">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-gray-500 mb-1">Total Fees</p>
-                                <p className="text-lg font-bold text-gray-800">
-                                    {stats.total_fees.toLocaleString()}
-                                </p>
-                            </div>
-                            <FileText className="h-6 w-6 text-blue-500" />
-                        </div>
-                    </CardContent>
-                </Card>
-                
-                <Card className="sm:col-span-1">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-gray-500 mb-1">Balance Due</p>
-                                <p className={`text-lg font-bold ${stats.total_balance > 0 ? 'text-red-600' : 'text-gray-800'}`}>
-                                    {formatCurrency(stats.total_balance)}
-                                </p>
-                            </div>
-                            <AlertCircle className="h-6 w-6 text-red-500" />
-                        </div>
-                    </CardContent>
-                </Card>
-                
-                <Card className="sm:col-span-1">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-gray-500 mb-1">Overdue</p>
-                                <p className={`text-lg font-bold ${stats.overdue_fees > 0 ? 'text-amber-600' : 'text-gray-800'}`}>
-                                    {stats.overdue_fees}
-                                </p>
-                            </div>
-                            <Clock className="h-6 w-6 text-amber-500" />
-                        </div>
-                    </CardContent>
-                </Card>
-                
-                <Card className="sm:col-span-1">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs text-gray-500 mb-1">Total Paid</p>
-                                <p className="text-lg font-bold text-green-600">
-                                    {formatCurrency(stats.total_paid)}
-                                </p>
-                            </div>
-                            <CheckCircle className="h-6 w-6 text-green-500" />
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-            
-            {/* Current Year Summary - Mobile Optimized */}
-            <Card>
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold">Current Year Summary</h3>
-                        <span className="text-xs text-gray-500">{new Date().getFullYear()}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                        <div className="text-center p-2 bg-gray-50 rounded">
-                            <div className="text-sm font-semibold text-gray-800">
-                                {formatCurrency(stats.current_year_total)}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">Total</div>
-                        </div>
-                        <div className="text-center p-2 bg-green-50 rounded">
-                            <div className="text-sm font-semibold text-green-600">
-                                {formatCurrency(stats.current_year_paid)}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">Paid</div>
-                        </div>
-                        <div className="text-center p-2 bg-red-50 rounded">
-                            <div className={`text-sm font-semibold ${stats.current_year_balance > 0 ? 'text-red-600' : 'text-gray-800'}`}>
-                                {formatCurrency(stats.current_year_balance)}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">Balance</div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-        </>
-    );
-    
-    // Filters Component
-    const FiltersSection = () => (
-        <Card>
-            <CardContent className="p-4">
-                <div className="space-y-4">
-                    {/* Search Bar with form to prevent automatic search */}
-                    <form onSubmit={handleSearchSubmit}>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                            <Input 
-                                placeholder="Search fees..." 
-                                className="pl-10 pr-10 text-sm"
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                disabled={loading}
-                            />
-                            {search && (
-                                <button
-                                    type="button"
-                                    onClick={handleSearchClear}
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            )}
-                        </div>
-                        <button type="submit" className="hidden">Search</button>
-                    </form>
-                    
-                    {/* Filter Controls */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">Status</label>
-                            <Select value={statusFilter} onValueChange={handleStatusChange} disabled={loading}>
-                                <SelectTrigger className="w-full text-sm">
-                                    <SelectValue placeholder="All Status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Status</SelectItem>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="overdue">Overdue</SelectItem>
-                                    <SelectItem value="paid">Paid</SelectItem>
-                                    <SelectItem value="partially_paid">Partial</SelectItem>
-                                    <SelectItem value="issued">Issued</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">Type</label>
-                            <Select value={feeTypeFilter} onValueChange={handleFeeTypeChange} disabled={loading}>
-                                <SelectTrigger className="w-full text-sm">
-                                    <SelectValue placeholder="All Types" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Types</SelectItem>
-                                    {availableFeeTypes.map((type) => (
-                                        <SelectItem key={type.id} value={type.code}>
-                                            {type.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">Year</label>
-                            <Select value={yearFilter} onValueChange={handleYearChange} disabled={loading || availableYears.length === 0}>
-                                <SelectTrigger className="w-full text-sm">
-                                    <SelectValue placeholder="All Years" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Years</SelectItem>
-                                    {availableYears.map((year) => (
-                                        <SelectItem key={year} value={year.toString()}>
-                                            {year}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    
-                    {/* Filter Actions */}
-                    <div className="flex justify-center gap-2">
-                        {hasActiveFilters && (
                             <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={handleClearFilters} 
-                                disabled={loading}
-                                className="text-xs"
+                                className="mt-4"
+                                onClick={() => window.location.href = '/dashboard'}
                             >
-                                Clear Filters
+                                Go to Dashboard
                             </Button>
-                        )}
-                        {isMobile && (
-                            <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => setShowFilters(false)}
-                                className="text-xs"
-                            >
-                                Close
-                            </Button>
-                        )}
-                    </div>
+                        </CardContent>
+                    </Card>
                 </div>
-            </CardContent>
-        </Card>
-    );
+            </ResidentLayout>
+        );
+    }
     
     return (
         <>
@@ -807,23 +1612,23 @@ export default function MyFees() {
                 ]}
             >
                 <div className="space-y-4 md:space-y-6">
-                    {/* Mobile Header with Toggle Buttons */}
+                    {/* Mobile Header */}
                     {isMobile && (
                         <div className="flex items-center justify-between">
                             <div>
                                 <h1 className="text-xl font-bold">My Fees</h1>
                                 <p className="text-xs text-gray-500">
-                                    {fees.total} fee{fees.total !== 1 ? 's' : ''} total
+                                    {stats.total_fees} fee{stats.total_fees !== 1 ? 's' : ''} total
                                 </p>
                             </div>
                             <div className="flex gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setShowSummary(!showSummary)}
+                                    onClick={() => setShowStats(!showStats)}
                                     className="h-8 px-2"
                                 >
-                                    {showSummary ? (
+                                    {showStats ? (
                                         <ChevronUp className="h-4 w-4" />
                                     ) : (
                                         <ChevronDown className="h-4 w-4" />
@@ -832,12 +1637,12 @@ export default function MyFees() {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setShowFilters(!showFilters)}
-                                    className="h-8 px-2"
+                                    onClick={() => setShowMobileFilters(true)}
+                                    className="h-8 px-2 relative"
                                 >
                                     <Filter className="h-4 w-4" />
                                     {hasActiveFilters && (
-                                        <span className="ml-1 h-2 w-2 bg-red-500 rounded-full"></span>
+                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
                                     )}
                                 </Button>
                             </div>
@@ -846,230 +1651,191 @@ export default function MyFees() {
                     
                     {/* Desktop Header */}
                     {!isMobile && (
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight">My Fees</h1>
-                            <p className="text-gray-500 dark:text-gray-400">
-                                View and manage your barangay fees and assessments
-                            </p>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+                                    My Fees
+                                </h1>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                    View and manage your barangay fees and assessments
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm">
+                                            <Download className="h-4 w-4 mr-2" />
+                                            Export
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent>
+                                        <DropdownMenuItem onClick={exportToCSV} disabled={isExporting}>
+                                            <FileText className="h-4 w-4 mr-2" />
+                                            {isExporting ? 'Exporting...' : 'Export as CSV'}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={printFees}>
+                                            <Printer className="h-4 w-4 mr-2" />
+                                            Print List
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => {
+                                            const totalPaid = fees.data
+                                                .filter(f => f.status === 'paid')
+                                                .reduce((sum, f) => sum + (f.amount_paid || 0), 0);
+                                            
+                                            const summary = `My Fees Summary (${statusFilter}):\n\n` +
+                                                `Total Fees: ${fees.data.length}\n` +
+                                                `Total Paid: ₱${totalPaid.toFixed(2)}\n` +
+                                                `Balance Due: ₱${stats.total_balance.toFixed(2)}\n` +
+                                                `Pending: ${getStatusCount('pending')}\n` +
+                                                `Overdue: ${getStatusCount('overdue')}\n\n` +
+                                                `Generated on: ${new Date().toLocaleDateString()}\n` +
+                                                `View online: ${window.location.origin}/residentfees`;
+                                            
+                                            navigator.clipboard.writeText(summary);
+                                            toast.success('Summary copied to clipboard');
+                                        }}>
+                                            <Share2 className="h-4 w-4 mr-2" />
+                                            Copy Summary
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                                <Button onClick={printFees} variant="outline" size="sm">
+                                    <Printer className="h-4 w-4 mr-2" />
+                                    Print
+                                </Button>
+                                
+                                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+                                
+                                <Link href="/resident/payments/create">
+                                    <Button className="gap-2">
+                                        <Plus className="h-4 w-4" />
+                                        <span>Pay Fee</span>
+                                    </Button>
+                                </Link>
+                            </div>
                         </div>
                     )}
                     
-                    {/* Summary Stats - Collapsible on Mobile */}
-                    {(showSummary || !isMobile) && <SummaryStats />}
+                    {/* Stats */}
+                    {showStats && (
+                        <CollapsibleStats 
+                            showStats={showStats}
+                            setShowStats={setShowStats}
+                            statusFilter={statusFilter}
+                            stats={stats}
+                            fees={fees}
+                            getStatusCount={getStatusCount}
+                            formatCurrency={formatCurrency}
+                        />
+                    )}
+                    {!isMobile && (
+                        <DesktopStats 
+                            statusFilter={statusFilter}
+                            stats={stats}
+                            fees={fees}
+                            getStatusCount={getStatusCount}
+                            formatCurrency={formatCurrency}
+                        />
+                    )}
                     
-                    {/* Filters - Collapsible on Mobile */}
-                    {(showFilters || !isMobile) && <FiltersSection />}
+                    {/* Desktop Filters */}
+                    {!isMobile && (
+                        <FiltersSection
+                            search={search}
+                            setSearch={setSearch}
+                            handleSearchSubmit={handleSearchSubmit}
+                            handleSearchClear={handleSearchClear}
+                            feeTypeFilter={feeTypeFilter}
+                            handleFeeTypeChange={handleFeeTypeChange}
+                            residentFilter={residentFilter}
+                            handleResidentChange={handleResidentChange}
+                            yearFilter={yearFilter}
+                            handleYearChange={handleYearChange}
+                            loading={loading}
+                            availableFeeTypes={availableFeeTypes}
+                            availableYears={availableYears}
+                            householdResidents={householdResidents}
+                            printFees={printFees}
+                            exportToCSV={exportToCSV}
+                            isExporting={isExporting}
+                            hasActiveFilters={hasActiveFilters}
+                            handleClearFilters={handleClearFilters}
+                        />
+                    )}
                     
-                    {/* Results Count and View Toggle */}
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-lg font-semibold">Fee History</h2>
-                            <p className="text-sm text-gray-500">
-                                {fees.total > 0 ? (
-                                    <>Showing {fees.from}-{fees.to} of {fees.total} fees</>
-                                ) : (
-                                    'No fees found'
-                                )}
-                                {loading && <Loader2 className="ml-2 h-3 w-3 inline animate-spin" />}
-                            </p>
+                    {/* Custom Tabs Section */}
+                    <div className="mt-4">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                            <h2 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                                Fee History
+                            </h2>
+                            <div className="flex items-center gap-2">
+                                <div className="text-sm text-gray-500 dark:text-gray-400 hidden md:block">
+                                    Page {fees.current_page} of {fees.last_page}
+                                </div>
+                            </div>
                         </div>
                         
-                        {/* View Toggle - Only show when we have fees */}
-                        {fees.data.length > 0 && isMobile && (
-                            <div className="flex items-center gap-1">
-                                <span className="text-xs text-gray-500 mr-2">View:</span>
-                                <div className="inline-flex items-center rounded-lg border border-gray-200 p-1">
-                                    <button
-                                        onClick={() => setViewMode('grid')}
-                                        className={`p-1 rounded ${viewMode === 'grid' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
-                                        aria-label="Grid view"
-                                    >
-                                        <Grid className={`h-4 w-4 ${viewMode === 'grid' ? 'text-blue-600' : 'text-gray-500'}`} />
-                                    </button>
-                                    <button
-                                        onClick={() => setViewMode('list')}
-                                        className={`p-1 rounded ${viewMode === 'list' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
-                                        aria-label="List view"
-                                    >
-                                        <List className={`h-4 w-4 ${viewMode === 'list' ? 'text-blue-600' : 'text-gray-500'}`} />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    
-                    {/* Fees Display */}
-                    {fees.data.length === 0 ? (
-                        <Card>
-                            <CardContent className="text-center py-12">
-                                <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                    <FileText className="h-8 w-8 text-gray-400" />
-                                </div>
-                                <h3 className="text-lg font-semibold mb-2">No fees found</h3>
-                                <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                    {hasActiveFilters 
-                                        ? 'Try adjusting your filters'
-                                        : 'You have no fees or assessments'}
-                                </p>
-                                {hasActiveFilters && (
-                                    <Button variant="outline" onClick={handleClearFilters} size="sm">
-                                        Clear Filters
-                                    </Button>
-                                )}
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <>
-                            {/* Mobile View - Default Card Layout */}
-                            {isMobile && viewMode === 'grid' && (
-                                <div className="pb-4">
-                                    {fees.data.map((fee) => (
-                                        <MobileFeeCard key={fee.id} fee={fee} />
-                                    ))}
-                                </div>
-                            )}
-                            
-                            {/* Desktop View - Table Layout */}
-                            {(!isMobile || viewMode === 'list') && (
-                                <Card>
-                                    <CardContent className="p-0 md:p-6">
-                                        <div className="overflow-x-auto">
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead className="py-3">Fee Details</TableHead>
-                                                        {!isMobile && <TableHead className="text-right">Amount</TableHead>}
-                                                        <TableHead>Dates</TableHead>
-                                                        <TableHead>Status</TableHead>
-                                                        <TableHead className="text-right">Actions</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {fees.data.map((fee) => (
-                                                        <TableRow key={fee.id} className="hover:bg-gray-50">
-                                                            <TableCell className="py-3">
-                                                                <div>
-                                                                    <div className="flex items-center gap-2 mb-1">
-                                                                        <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                                                        <span className="font-medium text-sm">{fee.fee_code}</span>
-                                                                    </div>
-                                                                    <p className="text-sm text-gray-700 mb-1">{fee.purpose}</p>
-                                                                    {fee.fee_type && (
-                                                                        <p className="text-xs text-gray-500">
-                                                                            {fee.fee_type.category_display}
-                                                                        </p>
-                                                                    )}
-                                                                    {isMobile && (
-                                                                        <div className="mt-2">
-                                                                            <p className="text-sm font-semibold">{fee.formatted_total}</p>
-                                                                            {fee.balance > 0 && (
-                                                                                <p className="text-xs text-red-600">
-                                                                                    Balance: {fee.formatted_balance}
-                                                                                </p>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </TableCell>
-                                                            {!isMobile && (
-                                                                <TableCell className="py-3 text-right">
-                                                                    <div className="space-y-1">
-                                                                        <div className="font-bold">{fee.formatted_total}</div>
-                                                                        {fee.balance > 0 && (
-                                                                            <div className="text-sm font-medium text-red-600">
-                                                                                Balance: {fee.formatted_balance}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </TableCell>
-                                                            )}
-                                                            <TableCell className="py-3">
-                                                                <div className="space-y-1">
-                                                                    <div>
-                                                                        <p className="text-xs text-gray-500">Issued</p>
-                                                                        <p className="text-sm">{formatDate(fee.issue_date)}</p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="text-xs text-gray-500">Due</p>
-                                                                        <p className={`text-sm ${fee.is_overdue ? 'text-red-600 font-medium' : ''}`}>
-                                                                            {formatDate(fee.due_date)}
-                                                                            {fee.is_overdue && fee.days_overdue > 0 && !isMobile && (
-                                                                                <span className="text-xs text-red-500 block">
-                                                                                    {fee.days_overdue} days overdue
-                                                                                </span>
-                                                                            )}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="py-3">
-                                                                {getStatusBadge(fee.status, fee.is_overdue)}
-                                                                {fee.is_overdue && fee.days_overdue > 0 && isMobile && (
-                                                                    <div className="text-xs text-red-500 mt-1">
-                                                                        {fee.days_overdue} days
-                                                                    </div>
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="py-3 text-right">
-                                                                <div className="flex justify-end gap-1">
-                                                                    <Link href={`/residentfees/${fee.id}`}>
-                                                                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                                                            <Eye className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </Link>
-                                                                    {fee.balance > 0 && fee.status !== 'cancelled' && (
-                                                                        <Link href={`/resident/payments/create?fee_id=${fee.id}`}>
-                                                                            <Button size="sm" variant="default" className="h-8 px-3 text-xs">
-                                                                                Pay
-                                                                            </Button>
-                                                                        </Link>
-                                                                    )}
-                                                                </div>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-                            
-                            {/* Pagination - Mobile Optimized */}
-                            {fees.last_page > 1 && (
-                                <div className="mt-4 md:mt-6">
-                                    <ResponsivePagination
-                                        currentPage={fees.current_page}
-                                        totalPages={fees.last_page}
-                                        onPageChange={(page) => {
-                                            setLoading(true);
-                                            router.get('/residentfees', {
-                                                ...filters,
-                                                page: page.toString(),
-                                            }, {
-                                                preserveState: true,
-                                                preserveScroll: true,
-                                                onFinish: () => setLoading(false),
-                                            });
-                                        }}
-                                        isLoading={loading}
-                                        isMobile={isMobile}
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                    
-                    {/* Loading Overlay */}
-                    {loading && (
-                        <div className="fixed inset-0 bg-black/10 backdrop-blur-sm z-50 flex items-center justify-center">
-                            <div className="bg-white p-6 rounded-lg shadow-lg">
-                                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-                                <p className="text-sm">Loading...</p>
-                            </div>
+                        {/* Custom Tabs */}
+                        <CustomTabs 
+                            statusFilter={statusFilter}
+                            handleTabChange={handleTabChange}
+                            getStatusCount={getStatusCount}
+                        />
+                        
+                        {/* Tab Content */}
+                        <div className="mt-4">
+                            {renderTabContent()}
                         </div>
-                    )}
+                    </div>
                 </div>
+                
+                {/* Mobile FAB */}
+                {isMobile && (
+                    <div className="fixed bottom-24 right-6 z-50 safe-bottom">
+                        <Link href="/resident/payments/create">
+                            <Button 
+                                size="lg" 
+                                className="rounded-full h-14 w-14 shadow-lg shadow-blue-500/20"
+                            >
+                                <Plus className="h-6 w-6" />
+                            </Button>
+                        </Link>
+                    </div>
+                )}
+                
+                {/* Mobile Filter Modal */}
+                <MobileFilterModal
+                    isOpen={showMobileFilters}
+                    onClose={() => setShowMobileFilters(false)}
+                    search={search}
+                    onSearchChange={setSearch}
+                    onSearchSubmit={handleSearchSubmit}
+                    onSearchClear={handleSearchClear}
+                    feeTypeFilter={feeTypeFilter}
+                    onFeeTypeChange={handleFeeTypeChange}
+                    residentFilter={residentFilter}
+                    onResidentChange={handleResidentChange}
+                    yearFilter={yearFilter}
+                    onYearChange={handleYearChange}
+                    loading={loading}
+                    availableFeeTypes={availableFeeTypes}
+                    availableYears={availableYears}
+                    householdResidents={householdResidents}
+                    hasActiveFilters={hasActiveFilters}
+                    onClearFilters={handleClearFilters}
+                />
+                
+                {/* Loading Overlay */}
+                {loading && (
+                    <div className="fixed inset-0 bg-black/10 backdrop-blur-sm z-50 flex items-center justify-center">
+                        <div className="bg-white p-6 rounded-lg shadow-lg">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                            <p className="text-sm">Loading...</p>
+                        </div>
+                    </div>
+                )}
             </ResidentLayout>
         </>
     );

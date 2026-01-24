@@ -98,10 +98,7 @@ class ComplaintController extends Controller
 
     public function show(Complaint $complaint)
     {
-        // Ensure user can only view their own complaints
-        if ($complaint->user_id !== Auth::id()) {
-            abort(403);
-        }
+   
 
         return inertia('resident/Complaints/Show', [
             'complaint' => $complaint->load('user')

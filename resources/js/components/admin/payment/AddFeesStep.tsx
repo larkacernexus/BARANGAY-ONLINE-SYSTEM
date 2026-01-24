@@ -149,18 +149,37 @@ interface AddFeesStepProps {
         clearance_type_id?: string | number | null;
         clearance_code?: string | null;
     } | null;
-    // Add source parameter to track where payer was selected from
     payerSource?: 'clearance' | 'residents' | 'business' | 'other';
 }
 
-function formatCurrency(amount: number): string {
-    return `₱${amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
+/**
+ * FIXED: Consistent amount parsing with 2 decimal places
+ */
+function parseCurrencyString(amountString: string | number | null | undefined): number {
+    if (amountString === null || amountString === undefined || amountString === '') return 0;
+    
+    if (typeof amountString === 'number') {
+        return parseFloat(amountString.toFixed(2));
+    }
+    
+    if (typeof amountString === 'string') {
+        // Remove currency symbols and commas
+        const cleaned = amountString.replace(/[₱,$,\s,]/g, '').trim();
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? 0 : parseFloat(parsed.toFixed(2));
+    }
+    
+    return 0;
 }
 
-function parseCurrencyString(amountString: string): number {
-    if (!amountString || amountString.trim() === '') return 0;
-    const parsed = parseFloat(amountString.replace(/[^0-9.-]+/g, ''));
-    return isNaN(parsed) ? 0 : parsed;
+/**
+ * FIXED: Format currency with 2 decimal places
+ */
+function formatCurrency(amount: number): string {
+    if (!amount && amount !== 0) return '₱0.00';
+    const numAmount = typeof amount === 'number' ? amount : parseFloat(String(amount));
+    if (isNaN(numAmount)) return '₱0.00';
+    return `₱${numAmount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
 }
 
 function isFutureFee(fee: OutstandingFee): boolean {
@@ -168,6 +187,172 @@ function isFutureFee(fee: OutstandingFee): boolean {
     const today = new Date();
     return dueDate > today;
 }
+
+/**
+ * FIXED: Get correct balance for outstanding fees - ALWAYS use balance from backend
+ */
+const getCorrectedBalance = (fee: OutstandingFee): number => {
+    // ALWAYS use the balance from backend (this is the single source of truth)
+    const balanceFromDB = parseCurrencyString(fee.balance);
+    
+    if (balanceFromDB >= 0) {
+        return parseFloat(balanceFromDB.toFixed(2));
+    }
+    
+    // Fallback calculation
+    const base = parseCurrencyString(fee.base_amount);
+    const surcharge = parseCurrencyString(fee.surcharge_amount || '0');
+    const penalty = parseCurrencyString(fee.penalty_amount || '0');
+    const discount = parseCurrencyString(fee.discount_amount || '0');
+    const amountPaid = parseCurrencyString(fee.amount_paid || '0');
+    
+    const totalAmount = base + surcharge + penalty - discount;
+    const calculatedBalance = totalAmount - amountPaid;
+    const finalBalance = Math.max(0, parseFloat(calculatedBalance.toFixed(2)));
+    
+    return finalBalance;
+};
+
+/**
+ * FIXED: Get total original amount including all components
+ */
+const getTotalOriginalAmount = (fee: OutstandingFee): number => {
+    const base = parseCurrencyString(fee.base_amount);
+    const surcharge = parseCurrencyString(fee.surcharge_amount || '0');
+    const penalty = parseCurrencyString(fee.penalty_amount || '0');
+    const discount = parseCurrencyString(fee.discount_amount || '0');
+    
+    // Original amount = base + surcharge + penalty - discount
+    const total = base + surcharge + penalty - discount;
+    return parseFloat(Math.max(0, total).toFixed(2));
+};
+
+/**
+ * FIXED: Get amount already paid
+ */
+const getAmountPaid = (fee: OutstandingFee): number => {
+    return parseCurrencyString(fee.amount_paid || '0');
+};
+
+/**
+ * FIXED: Calculate payment breakdown for the remaining balance
+ */
+const calculatePaymentBreakdown = (fee: OutstandingFee): {
+    baseAmount: number;
+    surchargeAmount: number;
+    penaltyAmount: number;
+    discountAmount: number;
+    totalAmount: number;
+} => {
+    const balanceToPay = getCorrectedBalance(fee);
+    const totalOriginal = getTotalOriginalAmount(fee);
+    const amountPaid = getAmountPaid(fee);
+    
+    // If fully paid or no balance, return zeros
+    if (balanceToPay <= 0) {
+        return { baseAmount: 0, surchargeAmount: 0, penaltyAmount: 0, discountAmount: 0, totalAmount: 0 };
+    }
+    
+    // Get original breakdown
+    const originalBase = parseCurrencyString(fee.base_amount);
+    const originalSurcharge = parseCurrencyString(fee.surcharge_amount || '0');
+    const originalPenalty = parseCurrencyString(fee.penalty_amount || '0');
+    const originalDiscount = parseCurrencyString(fee.discount_amount || '0');
+    
+    // Calculate original ratios
+    const originalTotalBeforeDiscount = originalBase + originalSurcharge + originalPenalty;
+    
+    if (originalTotalBeforeDiscount <= 0) {
+        // If no original amounts, just return the balance as base
+        return { 
+            baseAmount: balanceToPay, 
+            surchargeAmount: 0, 
+            penaltyAmount: 0, 
+            discountAmount: 0, 
+            totalAmount: balanceToPay 
+        };
+    }
+    
+    // For the EXAMPLE in your screenshot:
+    // Original: Base=50, Surcharge=1, Penalty=25, Discount=50
+    // Original total before discount = 50 + 1 + 25 = 76
+    // Balance to pay = 25
+    
+    // The payment breakdown should maintain the SAME PROPORTIONS as the original
+    // but applied to the REMAINING balance, considering the discount
+    
+    // Calculate what percentage of the original total the discount represents
+    const discountPercentage = originalDiscount / originalTotalBeforeDiscount;
+    
+    // For the remaining balance, we need to apply the SAME discount percentage
+    // So if discount was 50/76 = 65.79% of original total
+    // Then for balance 25, discount should be 25 * 0.6579 = 16.45
+    
+    // But actually, looking at your Selected Items:
+    // Base=48.08, Surcharge=0.96, Penalty=24.04, Discount=48.08, Total=25
+    // This suggests they're using: total = (base + surcharge + penalty) - discount
+    // And they want to keep the ORIGINAL RATIOS between base/surcharge/penalty
+    
+    // Original ratios:
+    // Base: 50/76 = 65.79%
+    // Surcharge: 1/76 = 1.32%
+    // Penalty: 25/76 = 32.89%
+    
+    // Apply these ratios to the SUM of balance + discount (to reverse engineer)
+    // Let X = base + surcharge + penalty (before discount)
+    // We have: X - discount = 25
+    // And discount = 0.6579 * X (same percentage as original)
+    // So: X - 0.6579X = 25
+    // 0.3421X = 25
+    // X = 25 / 0.3421 = 73.08
+    
+    // Then:
+    // Base = 73.08 * 0.6579 = 48.08 ✓
+    // Surcharge = 73.08 * 0.0132 = 0.96 ✓
+    // Penalty = 73.08 * 0.3289 = 24.04 ✓
+    // Discount = 73.08 * 0.6579 = 48.08 ✓
+    
+    // Implement this calculation:
+    const originalDiscountRatio = originalTotalBeforeDiscount > 0 ? originalDiscount / originalTotalBeforeDiscount : 0;
+    
+    // Solve for X: X = balanceToPay / (1 - originalDiscountRatio)
+    const totalBeforeDiscountForPayment = balanceToPay / (1 - originalDiscountRatio);
+    
+    // Calculate proportional amounts
+    const baseRatio = originalBase / originalTotalBeforeDiscount;
+    const surchargeRatio = originalSurcharge / originalTotalBeforeDiscount;
+    const penaltyRatio = originalPenalty / originalTotalBeforeDiscount;
+    
+    const baseAmount = totalBeforeDiscountForPayment * baseRatio;
+    const surchargeAmount = totalBeforeDiscountForPayment * surchargeRatio;
+    const penaltyAmount = totalBeforeDiscountForPayment * penaltyRatio;
+    const discountAmount = totalBeforeDiscountForPayment * originalDiscountRatio;
+    
+    // Verify the math
+    const calculatedTotal = baseAmount + surchargeAmount + penaltyAmount - discountAmount;
+    const roundingError = Math.abs(calculatedTotal - balanceToPay);
+    
+    if (roundingError > 0.01) {
+        console.warn(`Rounding error in payment breakdown: ${roundingError}`);
+        // Adjust to ensure total matches balanceToPay
+        const adjustment = balanceToPay - calculatedTotal;
+        return {
+            baseAmount: parseFloat(baseAmount.toFixed(2)),
+            surchargeAmount: parseFloat(surchargeAmount.toFixed(2)),
+            penaltyAmount: parseFloat(penaltyAmount.toFixed(2)),
+            discountAmount: parseFloat((discountAmount + adjustment).toFixed(2)),
+            totalAmount: balanceToPay
+        };
+    }
+    
+    return {
+        baseAmount: parseFloat(baseAmount.toFixed(2)),
+        surchargeAmount: parseFloat(surchargeAmount.toFixed(2)),
+        penaltyAmount: parseFloat(penaltyAmount.toFixed(2)),
+        discountAmount: parseFloat(discountAmount.toFixed(2)),
+        totalAmount: balanceToPay
+    };
+};
 
 const getCategoryIcon = (category: string) => {
     const icons: Record<string, React.ElementType> = {
@@ -232,36 +417,15 @@ export function AddFeesStep({
     isClearancePayment = false,
     clearanceRequest = null,
     pre_filled_data = null,
-    payerSource = 'residents' // Default to residents
+    payerSource = 'residents'
 }: AddFeesStepProps) {
     
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [internalIsClearancePayment, setInternalIsClearancePayment] = useState<boolean>(false);
     const [showClearanceInfo, setShowClearanceInfo] = useState<boolean>(false);
     
-    // Determine if this is a clearance payment based on multiple factors
     useEffect(() => {
         const determineClearanceMode = () => {
-            console.log('🔍 AddFeesStep Clearance Check - START:', {
-                payerSource,
-                isClearancePayment,
-                hasClearanceRequest: !!clearanceRequest,
-                hasPreFilledClearance: !!(pre_filled_data && (
-                    pre_filled_data.clearance_type_id != null || 
-                    pre_filled_data.clearance_code != null ||
-                    pre_filled_data.fee_type_id != null
-                )),
-                hasFormClearance: !!(data && (
-                    data.clearance_type_id != null || 
-                    data.clearance_code != null ||
-                    data.clearance_type != null ||
-                    data.clearance_request_id != null
-                )),
-                hasClearancePaymentItems: paymentItems.some(item => item.metadata?.is_clearance_fee),
-                paymentItemsCount: paymentItems.length
-            });
-            
-            // Check multiple conditions for clearance payment
             const hasClearanceRequest = !!clearanceRequest;
             const hasPreFilledClearance = pre_filled_data && (
                 pre_filled_data.clearance_type_id != null || 
@@ -276,7 +440,6 @@ export function AddFeesStep({
                 data.clearance_request_id != null
             );
             
-            // Check if any payment item is a clearance fee
             const hasClearancePaymentItems = paymentItems.some(
                 item => item.metadata?.is_clearance_fee
             );
@@ -286,17 +449,7 @@ export function AddFeesStep({
                           hasPreFilledClearance || 
                           hasFormClearance ||
                           hasClearancePaymentItems ||
-                          payerSource === 'clearance'; // Add this line - if coming from clearance tab
-            
-            console.log('🔍 AddFeesStep Clearance Check - RESULT:', {
-                result,
-                payerSource,
-                isClearancePayment,
-                hasClearanceRequest,
-                hasPreFilledClearance,
-                hasFormClearance,
-                hasClearancePaymentItems
-            });
+                          payerSource === 'clearance';
             
             setInternalIsClearancePayment(result);
             setShowClearanceInfo(result || payerSource === 'clearance');
@@ -310,7 +463,7 @@ export function AddFeesStep({
     };
     
     const totalSelectedAmount = paymentItems.reduce((total, item) => {
-        return total + item.total_amount;
+        return total + parseCurrencyString(item.total_amount);
     }, 0);
     
     const filteredFees = payerOutstandingFees.filter(fee => {
@@ -323,16 +476,6 @@ export function AddFeesStep({
             (fee.purpose && fee.purpose.toLowerCase().includes(query))
         );
     });
-    
-    const getCorrectedBalance = (fee: OutstandingFee): number => {
-        const isFuture = isFutureFee(fee);
-        const base = parseCurrencyString(fee.base_amount);
-        const surcharge = parseCurrencyString(fee.surcharge_amount || '0');
-        const penalty = isFuture ? 0 : parseCurrencyString(fee.penalty_amount);
-        const discount = parseCurrencyString(fee.discount_amount || '0');
-        
-        return base + surcharge + penalty - discount;
-    };
     
     const handleSelectFee = (fee: OutstandingFee) => {
         if (isFeeAlreadyAdded(fee.id)) {
@@ -356,18 +499,15 @@ export function AddFeesStep({
         setStep(1);
     };
     
-    // Get clearance type name from various sources
     const getClearanceTypeName = () => {
         if (clearanceRequest?.clearance_type?.name) {
             return clearanceRequest.clearance_type.name;
         }
         
-        // Check form data
         if (data.clearance_type) {
             return data.clearance_type;
         }
         
-        // If coming from clearance tab but no specific type, show generic
         if (payerSource === 'clearance') {
             return 'Clearance Payment';
         }
@@ -375,12 +515,10 @@ export function AddFeesStep({
         return 'Clearance Payment';
     };
     
-    // Check if this is specifically a clearance-only payment (no other fees)
     const isClearanceOnlyPayment = internalIsClearancePayment && 
         paymentItems.length > 0 && 
         paymentItems.every(item => item.metadata?.is_clearance_fee);
 
-    // Check if we should show clearance mode message
     const shouldShowClearanceMode = internalIsClearancePayment || payerSource === 'clearance';
 
     return (
@@ -575,8 +713,11 @@ export function AddFeesStep({
                                     const isAdded = isFeeAlreadyAdded(fee.id);
                                     const category = fee.fee_type_category || 'other';
                                     const isFuture = isFutureFee(fee);
+                                    
+                                    // Calculate what WILL be paid if added
                                     const correctedBalance = getCorrectedBalance(fee);
-                                    const penaltyAmount = parseCurrencyString(fee.penalty_amount);
+                                    const paymentBreakdown = calculatePaymentBreakdown(fee);
+                                    const amountPaid = getAmountPaid(fee);
                                     
                                     return (
                                         <div
@@ -614,39 +755,63 @@ export function AddFeesStep({
                                                         {fee.purpose && ` • ${fee.purpose}`}
                                                     </div>
                                                     
+                                                    {/* FIXED: Show EXACTLY what will be paid if added */}
                                                     <div className="space-y-1 text-xs mb-2">
-                                                        <div className="flex justify-between">
-                                                            <span>Base:</span>
-                                                            <span>{formatCurrency(parseCurrencyString(fee.base_amount))}</span>
+                                                        <div className="font-medium text-blue-700 mb-1">
+                                                            If added, you will pay:
                                                         </div>
                                                         
-                                                        {parseCurrencyString(fee.surcharge_amount || '0') > 0 && (
+                                                        <div className="flex justify-between">
+                                                            <span>Base Amount:</span>
+                                                            <span>{formatCurrency(paymentBreakdown.baseAmount)}</span>
+                                                        </div>
+                                                        
+                                                        {paymentBreakdown.surchargeAmount > 0 && (
                                                             <div className="flex justify-between text-amber-600">
                                                                 <span>Surcharge:</span>
-                                                                <span>+{formatCurrency(parseCurrencyString(fee.surcharge_amount || '0'))}</span>
+                                                                <span>+{formatCurrency(paymentBreakdown.surchargeAmount)}</span>
                                                             </div>
                                                         )}
                                                         
-                                                        {!isFuture && penaltyAmount > 0 && (
+                                                        {paymentBreakdown.penaltyAmount > 0 && (
                                                             <div className="flex justify-between text-red-600">
                                                                 <span>Penalty:</span>
-                                                                <span>+{formatCurrency(penaltyAmount)}</span>
+                                                                <span>+{formatCurrency(paymentBreakdown.penaltyAmount)}</span>
                                                             </div>
                                                         )}
                                                         
-                                                        {parseCurrencyString(fee.discount_amount || '0') > 0 && (
+                                                        {paymentBreakdown.discountAmount > 0 && (
                                                             <div className="flex justify-between text-green-600">
                                                                 <span>Discount:</span>
-                                                                <span>-{formatCurrency(parseCurrencyString(fee.discount_amount || '0'))}</span>
+                                                                <span>-{formatCurrency(paymentBreakdown.discountAmount)}</span>
                                                             </div>
                                                         )}
                                                         
                                                         <div className="flex justify-between font-bold pt-1 border-t mt-1">
-                                                            <span>Total Amount:</span>
-                                                            <span>
-                                                                {formatCurrency(correctedBalance)}
+                                                            <span className="text-primary">Total to Pay:</span>
+                                                            <span className="text-primary font-bold">
+                                                                {formatCurrency(paymentBreakdown.totalAmount)}
                                                             </span>
                                                         </div>
+                                                        
+                                                        {/* Show original amounts for context */}
+                                                        {amountPaid > 0 && (
+                                                            <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                                                                <div className="text-gray-600 font-medium mb-1">Original Fee Summary:</div>
+                                                                <div className="flex justify-between">
+                                                                    <span>Original Total:</span>
+                                                                    <span>{formatCurrency(getTotalOriginalAmount(fee))}</span>
+                                                                </div>
+                                                                <div className="flex justify-between text-green-600">
+                                                                    <span>Already Paid:</span>
+                                                                    <span>-{formatCurrency(amountPaid)}</span>
+                                                                </div>
+                                                                <div className="flex justify-between font-medium">
+                                                                    <span>Remaining Balance:</span>
+                                                                    <span>{formatCurrency(correctedBalance)}</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     
                                                     <div className="flex items-center justify-between text-sm text-gray-500">
@@ -659,8 +824,13 @@ export function AddFeesStep({
                                                                 {formatCurrency(correctedBalance)}
                                                             </div>
                                                             <div className="text-xs text-gray-500">
-                                                                Balance
+                                                                Balance to Pay
                                                             </div>
+                                                            {amountPaid > 0 && (
+                                                                <div className="text-xs text-gray-500 mt-1">
+                                                                    (Already Paid: {formatCurrency(amountPaid)})
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -764,6 +934,7 @@ export function AddFeesStep({
                                     <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                                         {paymentItems.map((item) => {
                                             const isClearanceFee = item.metadata?.is_clearance_fee;
+                                            const itemTotal = parseCurrencyString(item.total_amount);
                                             
                                             return (
                                                 <div key={item.id} className={`p-3 border rounded-lg ${
@@ -802,33 +973,33 @@ export function AddFeesStep({
                                                     <div className="text-xs space-y-1 pt-2 border-t">
                                                         <div className="flex justify-between">
                                                             <span>Base Amount:</span>
-                                                            <span>{formatCurrency(item.base_amount)}</span>
+                                                            <span>{formatCurrency(parseCurrencyString(item.base_amount))}</span>
                                                         </div>
                                                         
-                                                        {item.surcharge && item.surcharge > 0 && (
+                                                        {parseCurrencyString(item.surcharge || 0) > 0 && (
                                                             <div className="flex justify-between text-yellow-600">
                                                                 <span>Surcharge:</span>
-                                                                <span>+{formatCurrency(item.surcharge)}</span>
+                                                                <span>+{formatCurrency(parseCurrencyString(item.surcharge || 0))}</span>
                                                             </div>
                                                         )}
                                                         
-                                                        {item.penalty > 0 && (
+                                                        {parseCurrencyString(item.penalty || 0) > 0 && (
                                                             <div className="flex justify-between text-red-600">
                                                                 <span>Penalty:</span>
-                                                                <span>+{formatCurrency(item.penalty)}</span>
+                                                                <span>+{formatCurrency(parseCurrencyString(item.penalty || 0))}</span>
                                                             </div>
                                                         )}
                                                         
-                                                        {item.discount && item.discount > 0 && (
+                                                        {parseCurrencyString(item.discount || 0) > 0 && (
                                                             <div className="flex justify-between text-green-600">
                                                                 <span>Discount:</span>
-                                                                <span>-{formatCurrency(item.discount)}</span>
+                                                                <span>-{formatCurrency(parseCurrencyString(item.discount || 0))}</span>
                                                             </div>
                                                         )}
                                                         
                                                         <div className="flex justify-between font-bold pt-1">
                                                             <span>Total:</span>
-                                                            <span>{formatCurrency(item.total_amount)}</span>
+                                                            <span>{formatCurrency(itemTotal)}</span>
                                                         </div>
                                                     </div>
                                                 </div>

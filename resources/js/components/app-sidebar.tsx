@@ -33,7 +33,20 @@ import {
   X,
   Shield,
   Key,
-  ShieldCheck
+  ShieldCheck,
+  Activity,
+  BarChartBig,
+  FileBarChart2,
+  MessageSquareWarning,
+  AlertCircle,
+  LogIn,
+  Monitor,
+  Bell,
+  Megaphone,
+  Tag,
+  Folder,
+  Download,
+  FileArchive
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useState, useRef } from 'react';
@@ -59,29 +72,64 @@ interface QuickAction {
   title: string;
   href: string;
   icon: LucideIcon;
-  color: 'blue' | 'green' | 'purple' | 'orange';
+  color: 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'indigo';
 }
 
-// Main navigation items
+// Main navigation items - ADDED FORMS HERE
 const mainNav = [
   { title: 'Dashboard', href: DASHBOARD_URL, icon: LayoutGrid },
   { title: 'Residents', href: '/residents', icon: Users },
   { title: 'Households', href: '/households', icon: Home },
   { title: 'Puroks', href: '/admin/puroks', icon: MapPin },
+  { title: 'Complaints', href: '/admincomplaints', icon: MessageSquareWarning },
+  { title: 'Announcements', href: '/announcements', icon: Bell },
+  { title: 'Forms', href: '/admin/forms', icon: FileArchive }, // ADDED FORMS TO MAIN NAV
   { title: 'Users', href: '/users', icon: UserCog },
-  { title: 'Roles', href: '/admin/roles', icon: Shield }, // ADDED THIS
-  { title: 'Permissions', href: '/admin/permissions', icon: Key }, // ADDED THIS
 ];
 
-// Menu groups for popup
+// Menu groups for popup - ADDED FORMS GROUP HERE
 const menuGroups: MenuGroup[] = [
   {
-    title: 'Access Control', // ADDED THIS NEW GROUP
+    title: 'Forms & Documents', // NEW GROUP FOR FORMS
+    icon: FileArchive,
+    items: [
+      { title: 'All Forms', href: '/admin/forms', icon: FileText },
+      { title: 'Upload New Form', href: '/admin/forms/create', icon: PlusCircle },
+      { title: 'Active Forms', href: '/admin/forms?status=active', icon: FileText },
+      { title: 'Archived Forms', href: '/admin/forms?status=inactive', icon: FileArchive },
+      { title: 'Most Downloaded', href: '/admin/forms?sort=downloads', icon: Download },
+      { title: 'Public Forms', href: '/downloadable-forms', icon: Folder, description: 'Resident view' },
+    ]
+  },
+  {
+    title: 'Announcements',
+    icon: Bell,
+    items: [
+      { title: 'All Announcements', href: '/announcements', icon: Megaphone },
+      { title: 'Create Announcement', href: '/announcements/create', icon: PlusCircle },
+      { title: 'Active Announcements', href: '/announcements?status=active', icon: Bell },
+      { title: 'Archived', href: '/announcements?status=inactive', icon: FileText },
+      { title: 'Announcement Types', href: '/announcement-types', icon: Tag },
+    ]
+  },
+  {
+    title: 'Access Control', 
     icon: ShieldCheck,
     items: [
       { title: 'Role Permissions', href: '/admin/role-permissions', icon: ShieldCheck },
       { title: 'User Roles', href: '/admin/user-roles', icon: UserCog },
       { title: 'Permission Audit', href: '/admin/permission-audit', icon: ClipboardList },
+    ]
+  },
+  {
+    title: 'Security',
+    icon: Shield,
+    items: [
+      { title: 'Login Activity', href: '/reports/login-logs', icon: LogIn },
+      { title: 'Failed Attempts', href: '/reports/login-logs?status=failed', icon: AlertCircle },
+      { title: 'User Sessions', href: '/security/sessions', icon: Monitor },
+      { title: 'Security Audit', href: '/security/security-audit', icon: ShieldCheck },
+      { title: 'Access Logs', href: '/security/access-logs', icon: FileText },
     ]
   },
   {
@@ -107,23 +155,28 @@ const menuGroups: MenuGroup[] = [
   },
   {
     title: 'Reports',
-    icon: BarChart3,
+    icon: FileBarChart2,
     items: [
       { title: 'Collections Report', href: '/reports/collections', icon: BarChart3 },
-      { title: 'Revenue Analytics', href: '/reports/revenue', icon: BarChart3 },
-      { title: 'Audit Logs', href: '/audit-logs', icon: ClipboardList },
+      { title: 'Revenue Analytics', href: '/reports/revenue', icon: BarChartBig },
+      { title: 'Audit Logs', href: '/reports/audit-logs', icon: ClipboardList },
+      { title: 'Activity Logs', href: '/reports/activity-logs', icon: Activity },
+      { title: 'Announcement Stats', href: '/reports/announcements', icon: Bell },
+      { title: 'Forms Downloads', href: '/reports/forms-downloads', icon: Download },
     ]
   }
 ];
 
-// Quick Actions
+// Quick Actions - ADDED FORMS QUICK ACTION
 const quickActions: QuickAction[] = [
   { title: 'Add Resident', href: '/residents/create', icon: Users, color: 'blue' },
   { title: 'Register Household', href: '/households/create', icon: Home, color: 'green' },
   { title: 'Add Purok', href: '/admin/puroks/create', icon: MapPin, color: 'purple' },
+  { title: 'Create Announcement', href: '/announcements/create', icon: Bell, color: 'red' },
+  { title: 'Upload Form', href: '/admin/forms/create', icon: FileArchive, color: 'indigo' }, // ADDED FORMS
   { title: 'Issue Clearance', href: '/clearances/create', icon: FileText, color: 'orange' },
-  { title: 'Create Role', href: '/admin/roles/create', icon: Shield, color: 'blue' }, // ADDED THIS
-  { title: 'Add Permission', href: '/admin/permissions/create', icon: Key, color: 'green' }, // ADDED THIS
+  { title: 'Create Role', href: '/admin/roles/create', icon: Shield, color: 'blue' },
+  { title: 'Add Permission', href: '/admin/permissions/create', icon: Key, color: 'green' },
 ];
 
 // Popup Menu Component
@@ -185,9 +238,14 @@ const MenuPopup = ({
               onClick={onClose}
             >
               <item.icon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              <span className="text-sm">{item.title}</span>
-              {item.title.includes('Create') || item.title.includes('Issue') || item.title.includes('Record') || item.title.includes('Add') ? (
-                <PlusCircle className="h-3 w-3 ml-auto text-green-600 dark:text-green-400" />
+              <div className="flex-1 min-w-0">
+                <span className="text-sm block truncate">{item.title}</span>
+                {item.description && (
+                  <span className="text-xs text-gray-500 truncate block">{item.description}</span>
+                )}
+              </div>
+              {item.title.includes('Create') || item.title.includes('Upload') || item.title.includes('Issue') || item.title.includes('Record') || item.title.includes('Add') ? (
+                <PlusCircle className="h-3 w-3 ml-2 text-green-600 dark:text-green-400 flex-shrink-0" />
               ) : null}
             </Link>
           ))}
@@ -218,7 +276,7 @@ const MenuWithPopup = ({
     if (!buttonRef.current) return;
     
     const rect = buttonRef.current.getBoundingClientRect();
-    const popupHeight = 300; // Approximate height of popup
+    const popupHeight = 300;
     const windowHeight = window.innerHeight;
     
     let placement: 'bottom' | 'top' = 'bottom';
@@ -226,30 +284,22 @@ const MenuWithPopup = ({
     let left = 0;
     
     if (isCollapsed) {
-      // For collapsed sidebar, popup opens to the right
       left = rect.right + 10;
       
-      // Check if there's enough space below
       if (rect.top + popupHeight > windowHeight) {
-        // Not enough space below, open above
         placement = 'top';
         top = rect.top;
       } else {
-        // Enough space below, open below
         placement = 'bottom';
         top = rect.top;
       }
     } else {
-      // For expanded sidebar, popup opens below the button
       left = rect.left;
       
-      // Check if there's enough space below
       if (rect.bottom + popupHeight > windowHeight) {
-        // Not enough space below, open above
         placement = 'top';
         top = rect.top;
       } else {
-        // Enough space below, open below
         placement = 'bottom';
         top = rect.bottom;
       }
@@ -363,7 +413,7 @@ const SimpleMenuItem = ({
   </SidebarMenuItem>
 );
 
-// Quick Action Item
+// Quick Action Item - ADDED INDIGO COLOR FOR FORMS
 const QuickActionItem = ({ 
   action, 
   isCollapsed 
@@ -376,6 +426,8 @@ const QuickActionItem = ({
     green: "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400",
     purple: "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400",
     orange: "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400",
+    red: "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400",
+    indigo: "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400", // NEW COLOR FOR FORMS
   };
 
   if (isCollapsed) {

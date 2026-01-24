@@ -10,6 +10,7 @@ use App\Models\Activity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Inertia\Inertia;
 
@@ -143,127 +144,558 @@ class ClearanceController extends Controller
         ]);
     }
     
+    public function show(ClearanceRequest $clearance)
+{
+    // First, let's validate the relationships based on your actual schema
+    $clearance->load([
+        'resident' => function ($query) {
+            $query->select(['id', 'first_name', 'middle_name', 'last_name', 'suffix', 
+                           'address', 'contact_number', 'email', 'birth_date', 
+                           'gender', 'civil_status', 'occupation', 'photo_path']);
+        },
+        'clearanceType' => function ($query) {
+            $query->select(['id', 'name', 'code', 'description', 'fee', 
+                           'processing_days', 'validity_days', 'is_active', 
+                           'requires_payment', 'requires_approval', 'is_online_only',
+                           'eligibility_criteria', 'purpose_options']);
+        },
+        'documents' => function ($query) {
+            $query->select(['id', 'clearance_request_id', 'file_path', 'file_name', 
+                           'original_name', 'file_size', 'file_type', 'mime_type',
+                           'description', 'is_verified', 'document_type_id',
+                           'created_at', 'updated_at'])
+                  ->orderBy('created_at', 'desc');
+        },
+       'paymentItem.payment' => function ($query) {
+    // CORRECTED: Based on your actual payments table structure
+    $query->select([
+        'id', 
+        'or_number', // Main receipt number
+        'reference_number', // Additional reference
+        'total_amount', 
+        'status', 
+        'payment_method', 
+        'payment_date', 
+        'subtotal',
+        'surcharge',
+        'penalty',
+        'discount',
+        'discount_type',
+        'payer_name',
+        'payer_type',
+        'remarks',
+        'purpose',
+        'is_cleared',
+        'collection_type',
+        'created_at', 
+        'updated_at'
+    ]);
+}
+    ]);
 
-        public function show(ClearanceRequest $clearance)
-    {
-        // Load all necessary relationships
-        $clearance->load([
-            'resident',
-            'clearanceType',
-            'documents',
-            'payment',
-        ]);
+    // Log the view for audit trail
+    activity()
+        ->performedOn($clearance)
+        ->causedBy(auth()->user())
+        ->withProperties(['ip' => request()->ip(), 'user_agent' => request()->userAgent()])
+        ->log('viewed_clearance_details');
 
-        // Get activity logs using Spatie
-        $activityLogs = Activity::where('subject_type', ClearanceRequest::class)
-            ->where('subject_id', $clearance->id)
-            ->orWhere('log_name', 'clearance') // If you have custom log name
-            ->with('causer')
-            ->latest()
-            ->limit(20)
-            ->get()
-            ->map(function ($log) {
-                return [
-                    'id' => $log->id,
-                    'description' => $log->description,
-                    'event' => $log->event,
-                    'properties' => $log->properties,
-                    'created_at' => $log->created_at->toDateTimeString(),
-                    'user' => $log->causer ? [
-                        'id' => $log->causer->id,
-                        'name' => $log->causer->name,
-                        'email' => $log->causer->email,
-                    ] : null,
-                ];
-            });
+    // Get activity logs with proper query
+    $activityLogs = Activity::where(function ($query) use ($clearance) {
+            $query->where('subject_type', ClearanceRequest::class)
+                  ->where('subject_id', $clearance->id);
+        })
+        ->orWhere(function ($query) use ($clearance) {
+            $query->where('log_name', 'clearance')
+                  ->where('properties->clearance_id', $clearance->id);
+        })
+        ->with(['causer' => function ($query) {
+            $query->select(['id', 'first_name', 'last_name', 'email']);
+        }])
+        ->latest()
+        ->take(50)
+        ->get()
+        ->map(function ($log) {
+            $user = $log->causer;
+            $initials = 'SYS';
+            
+            if ($user) {
+                $firstName = $user->first_name ?? '';
+                $lastName = $user->last_name ?? '';
+                $name = trim($firstName . ' ' . $lastName);
+                $initials = ($firstName && $lastName) 
+                    ? strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1))
+                    : 'US';
+            }
+            
+            return [
+                'id' => $log->id,
+                'description' => $log->description,
+                'event' => $log->event,
+                'properties' => $log->properties,
+                'created_at' => $log->created_at->toDateTimeString(),
+                'formatted_date' => $log->created_at->format('M d, Y h:i A'),
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'name' => trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')),
+                    'email' => $user->email,
+                    'photo_path' => null,
+                    'initials' => $initials,
+                ] : [
+                    'name' => 'System',
+                    'initials' => 'SYS',
+                ],
+                'icon' => $this->getActivityIcon($log->event),
+                'color' => $this->getActivityColor($log->event),
+            ];
+        });
 
-        // Check permissions
-        $canEdit = auth()->user()->can('update', $clearance);
-        $canDelete = auth()->user()->can('delete', $clearance);
-        $canProcess = auth()->user()->can('process', $clearance);
-        $canIssue = auth()->user()->can('issue', $clearance);
-        $canApprove = auth()->user()->can('approve', $clearance);
-        $canPrint = auth()->user()->can('print', $clearance);
+    // Check permissions with policy methods
+    $user = auth()->user();
+    $canEdit = $user->can('update', $clearance);
+    $canDelete = $user->can('delete', $clearance);
+    $canProcess = $user->can('process', $clearance);
+    $canIssue = $user->can('issue', $clearance);
+    $canApprove = $user->can('approve', $clearance);
+    $canPrint = $user->can('print', $clearance);
+    $canVerifyPayment = $user->can('verify-payment', $clearance);
+    $canAssignOfficer = $user->can('assign-officer', $clearance);
+    $canViewDocuments = $user->can('view-documents', $clearance);
+    $canUploadDocuments = $user->can('upload-documents', $clearance);
 
-        // Format clearance data
-        $formattedClearance = [
-            'id' => $clearance->id,
-            'reference_number' => $clearance->reference_number,
-            'clearance_number' => $clearance->clearance_number,
-            'purpose' => $clearance->purpose,
-            'specific_purpose' => $clearance->specific_purpose,
-            'clearance_type_id' => $clearance->clearance_type_id,
-            'urgency' => $clearance->urgency,
-            'fee_amount' => (float) $clearance->fee_amount,
-            'needed_date' => $clearance->needed_date?->toDateString(),
-            'additional_requirements' => $clearance->additional_requirements,
-            'admin_notes' => $clearance->admin_notes,
-            'remarks' => $clearance->remarks,
-            'status' => $clearance->status,
-            'issue_date' => $clearance->issue_date?->toDateString(),
-            'valid_until' => $clearance->valid_until?->toDateString(),
-            'created_at' => $clearance->created_at->toDateTimeString(),
-            'updated_at' => $clearance->updated_at->toDateTimeString(),
-            'processed_at' => $clearance->processed_at?->toDateTimeString(),
-            'estimated_completion_date' => $clearance->estimated_completion_date?->toDateString(),
-            'issuing_officer_name' => $clearance->issuing_officer_name,
-            'requirements_met' => $clearance->requirements_met,
-            'resident' => $clearance->resident ? [
-                'id' => $clearance->resident->id,
-                'full_name' => $clearance->resident->full_name ?? $clearance->resident->getFullName(),
-                'address' => $clearance->resident->address,
-                'contact_number' => $clearance->resident->contact_number,
-                'email' => $clearance->resident->email,
-                'birth_date' => $clearance->resident->birth_date?->toDateString(),
-                'gender' => $clearance->resident->gender,
-                'civil_status' => $clearance->resident->civil_status,
-                'occupation' => $clearance->resident->occupation,
-                'profile_photo' => $clearance->resident->profile_photo,
-            ] : null,
-            'clearance_type' => $clearance->clearanceType ? [
-                'id' => $clearance->clearanceType->id,
-                'name' => $clearance->clearanceType->name,
-                'code' => $clearance->clearanceType->code,
-                'description' => $clearance->clearanceType->description,
-                'fee' => (float) $clearance->clearanceType->fee,
-                'processing_days' => $clearance->clearanceType->processing_days,
-                'validity_days' => $clearance->clearanceType->validity_days,
-            ] : null,
-            'documents' => $clearance->documents ? $clearance->documents->map(function ($doc) {
-                return [
-                    'id' => $doc->id,
-                    'name' => $doc->name,
-                    'document_type' => $doc->document_type,
-                    'status' => $doc->status,
-                    'uploaded_at' => $doc->created_at?->toDateTimeString(),
-                ];
-            })->toArray() : [],
-            'payment' => $clearance->payment ? [
-                'id' => $clearance->payment->id,
-                'amount' => (float) $clearance->payment->amount,
-                'formatted_amount' => $clearance->payment->formatted_amount,
-                'status' => $clearance->payment->status,
-                'payment_method' => $clearance->payment->payment_method,
-                'reference_number' => $clearance->payment->reference_number,
-                'paid_at' => $clearance->payment->paid_at?->toDateTimeString(),
-            ] : null,
-            'status_display' => $clearance->status_display,
-            'urgency_display' => $clearance->urgency_display,
-            'formatted_fee' => $clearance->formatted_fee,
+    // Format payment details with null-safe checks
+    $paymentDetails = null;
+    $paymentItemDetails = null;
+    
+    if ($clearance->paymentItem && $clearance->paymentItem->payment) {
+        $payment = $clearance->paymentItem->payment;
+        $paymentDetails = [
+        'id' => $payment->id,
+        'amount' => (float) $payment->total_amount,
+        'formatted_amount' => '₱' . number_format($payment->total_amount, 2),
+        'status' => $payment->status,
+        'status_display' => $this->getPaymentStatusDisplay($payment->status),
+        'payment_method' => $payment->payment_method ?? null,
+        'payment_method_display' => $payment->payment_method ? 
+            ucwords(str_replace('_', ' ', $payment->payment_method)) : null,
+        // Both fields exist in your table
+        'or_number' => $payment->or_number, // Required field (NOT NULL)
+        'reference_number' => $payment->reference_number ?? null, // Optional field
+        'payment_date' => $payment->payment_date?->toDateTimeString(),
+        'paid_at' => $payment->payment_date?->toDateTimeString(), // Alias for frontend
+        'formatted_paid_at' => $payment->payment_date?->format('F j, Y \a\t g:i A'),
+        'formatted_payment_date' => $payment->payment_date?->format('F j, Y \a\t g:i A'),
+        'created_at' => $payment->created_at?->toDateTimeString(),
+        'updated_at' => $payment->updated_at?->toDateTimeString(),
+        'remarks' => $payment->remarks ?? null,
+        'purpose' => $payment->purpose ?? null,
+        'payer_name' => $payment->payer_name ?? null,
+        'payer_type' => $payment->payer_type ?? null,
+        'subtotal' => (float) $payment->subtotal,
+        'surcharge' => (float) $payment->surcharge,
+        'penalty' => (float) $payment->penalty,
+        'discount' => (float) $payment->discount,
+        'discount_type' => $payment->discount_type ?? null,
+        'is_cleared' => (bool) $payment->is_cleared,
+        'collection_type' => $payment->collection_type ?? 'manual',
+    ];
+        
+         $paymentItemDetails = [
+        'id' => $clearance->paymentItem->id,
+        'payment_id' => $clearance->paymentItem->payment_id,
+        'clearance_request_id' => $clearance->paymentItem->clearance_request_id,
+        'amount' => (float) $clearance->paymentItem->total_amount,
+        'description' => $clearance->paymentItem->description ?? 'Clearance Fee',
+        'fee_name' => $clearance->paymentItem->fee_name ?? null,
+        'fee_code' => $clearance->paymentItem->fee_code ?? null,
+        'base_amount' => (float) $clearance->paymentItem->base_amount,
+        'surcharge' => (float) $clearance->paymentItem->surcharge,
+        'penalty' => (float) $clearance->paymentItem->penalty,
+        'category' => $clearance->paymentItem->category ?? null,
+        'created_at' => $clearance->paymentItem->created_at?->toDateTimeString(),
+    ];
+    }
+
+    // Format documents based on your actual schema
+    $documents = $clearance->documents ? $clearance->documents->map(function ($doc) {
+        // Generate URLs based on file_path
+        $fileUrl = $doc->file_path ? Storage::url($doc->file_path) : null;
+        $thumbnailUrl = null;
+        
+        // Check if it's an image for thumbnail
+        if ($doc->mime_type && str_starts_with($doc->mime_type, 'image/')) {
+            $thumbnailUrl = $fileUrl;
+        }
+        
+        // Determine document name - use description or original_name or file_name
+        $documentName = $doc->description ?? $doc->original_name ?? $doc->file_name ?? 'Document';
+        
+        return [
+            'id' => $doc->id,
+            'name' => $documentName,
+            'document_type_id' => $doc->document_type_id,
+            'description' => $doc->description,
+            'is_verified' => (bool) $doc->is_verified,
+            'file_path' => $doc->file_path,
+            'file_name' => $doc->file_name,
+            'original_name' => $doc->original_name,
+            'file_size' => (int) $doc->file_size,
+            'formatted_file_size' => $this->formatFileSize($doc->file_size),
+            'file_type' => $doc->file_type,
+            'mime_type' => $doc->mime_type,
+            'url' => $fileUrl,
+            'thumbnail_url' => $thumbnailUrl,
+            'uploaded_at' => $doc->created_at?->toDateTimeString(),
+            'formatted_uploaded_at' => $doc->created_at?->format('M d, Y h:i A'),
+            'verified_at' => null,
+            'formatted_verified_at' => null,
+            'is_image' => $doc->mime_type && str_starts_with($doc->mime_type, 'image/'),
+            'is_pdf' => $doc->mime_type === 'application/pdf',
+            'extension' => $doc->file_type ?? pathinfo($doc->file_name ?? '', PATHINFO_EXTENSION),
         ];
+    })->toArray() : [];
 
-        return Inertia::render('admin/Clearances/Show', [
-            'clearance' => $formattedClearance,
-            'activityLogs' => $activityLogs,
+    // Calculate document statistics
+    $documentStats = [
+        'total' => count($documents),
+        'verified' => collect($documents)->where('is_verified', true)->count(),
+        'pending' => collect($documents)->where('is_verified', false)->count(),
+    ];
+
+    // Parse requirements_met from JSON if needed
+    $requirementsMet = [];
+    if ($clearance->requirements_met) {
+        try {
+            $requirementsMet = is_array($clearance->requirements_met) 
+                ? $clearance->requirements_met 
+                : json_decode($clearance->requirements_met, true);
+        } catch (\Exception $e) {
+            $requirementsMet = [];
+        }
+    }
+
+    // Format clearance data
+    $formattedClearance = [
+        // Basic Information
+        'id' => $clearance->id,
+        'resident_id' => $clearance->resident_id,
+        'clearance_type_id' => $clearance->clearance_type_id,
+        'reference_number' => $clearance->reference_number,
+        'clearance_number' => $clearance->clearance_number,
+        'purpose' => $clearance->purpose,
+        'specific_purpose' => $clearance->specific_purpose,
+        'urgency' => $clearance->urgency,
+        'fee_amount' => (float) $clearance->fee_amount,
+        'needed_date' => $clearance->needed_date?->toDateString(),
+        'formatted_needed_date' => $clearance->needed_date?->format('F d, Y'),
+        'additional_requirements' => $clearance->additional_requirements,
+        'admin_notes' => $clearance->admin_notes,
+        'remarks' => $clearance->remarks,
+        'cancellation_reason' => $clearance->cancellation_reason,
+        
+        // Status Information
+        'status' => $clearance->status,
+        'status_display' => ucfirst(str_replace('_', ' ', $clearance->status)),
+        'urgency_display' => ucfirst($clearance->urgency),
+        
+        // Dates
+        'issue_date' => $clearance->issue_date?->toDateString(),
+        'formatted_issue_date' => $clearance->issue_date?->format('F d, Y'),
+        'valid_until' => $clearance->valid_until?->toDateString(),
+        'formatted_valid_until' => $clearance->valid_until?->format('F d, Y'),
+        'created_at' => $clearance->created_at->toDateTimeString(),
+        'formatted_created_at' => $clearance->created_at->format('F d, Y h:i A'),
+        'updated_at' => $clearance->updated_at->toDateTimeString(),
+        'formatted_updated_at' => $clearance->updated_at->format('F d, Y h:i A'),
+        'processed_at' => $clearance->processed_at?->toDateTimeString(),
+        'formatted_processed_at' => $clearance->processed_at?->format('F d, Y h:i A'),
+        
+        // Officer Information
+        'issuing_officer_name' => $clearance->issuing_officer_name,
+        'processed_by' => $clearance->processed_by,
+        'issuing_officer_id' => $clearance->issuing_officer_id,
+        'requested_by_user_id' => $clearance->requested_by_user_id,
+        
+        // Requirements
+        'requirements_met' => $requirementsMet,
+        
+        // Relationships
+        'resident' => $clearance->resident ? [
+            'id' => $clearance->resident->id,
+            'full_name' => trim(
+                $clearance->resident->first_name . ' ' . 
+                ($clearance->resident->middle_name ? $clearance->resident->middle_name[0] . '. ' : '') . 
+                $clearance->resident->last_name . 
+                ($clearance->resident->suffix ? ' ' . $clearance->resident->suffix : '')
+            ),
+            'first_name' => $clearance->resident->first_name,
+            'middle_name' => $clearance->resident->middle_name,
+            'last_name' => $clearance->resident->last_name,
+            'suffix' => $clearance->resident->suffix,
+            'address' => $clearance->resident->address,
+            'contact_number' => $clearance->resident->contact_number,
+            'email' => $clearance->resident->email,
+            'birth_date' => $clearance->resident->birth_date?->toDateString(),
+            'formatted_birth_date' => $clearance->resident->birth_date?->format('F d, Y'),
+            'age' => $clearance->resident->birth_date ? 
+                $clearance->resident->birth_date->diffInYears(now()) : null,
+            'gender' => $clearance->resident->gender,
+            'gender_display' => $clearance->resident->gender ? 
+                ucfirst($clearance->resident->gender) : null,
+            'civil_status' => $clearance->resident->civil_status,
+            'civil_status_display' => $clearance->resident->civil_status ? 
+                ucfirst($clearance->resident->civil_status) : null,
+            'occupation' => $clearance->resident->occupation,
+            'photo_path' => $clearance->resident->photo_path ? 
+                Storage::url($clearance->resident->photo_path) : null,
+            'initials' => strtoupper(
+                substr($clearance->resident->first_name ?? '', 0, 1) . 
+                substr($clearance->resident->last_name ?? '', 0, 1)
+            ),
+        ] : null,
+        
+        'clearance_type' => $clearance->clearanceType ? [
+            'id' => $clearance->clearanceType->id,
+            'name' => $clearance->clearanceType->name,
+            'code' => $clearance->clearanceType->code,
+            'description' => $clearance->clearanceType->description,
+            'fee' => (float) $clearance->clearanceType->fee,
+            'processing_days' => $clearance->clearanceType->processing_days,
+            'validity_days' => $clearance->clearanceType->validity_days,
+            'is_active' => (bool) $clearance->clearanceType->is_active,
+            'requires_payment' => (bool) $clearance->clearanceType->requires_payment,
+            'requires_approval' => (bool) $clearance->clearanceType->requires_approval,
+            'is_online_only' => (bool) $clearance->clearanceType->is_online_only,
+            'eligibility_criteria' => $clearance->clearanceType->eligibility_criteria,
+            'purpose_options' => $clearance->clearanceType->purpose_options,
+            'formatted_fee' => '₱' . number_format($clearance->clearanceType->fee, 2),
+        ] : null,
+        
+        // Documents
+        'documents' => $documents,
+        'document_stats' => $documentStats,
+        
+        // Payment information
+        'payment' => $paymentDetails,
+        'payment_item' => $paymentItemDetails,
+        
+        // Formatted values
+        'formatted_fee' => '₱' . number_format($clearance->fee_amount, 2),
+        
+        // Calculated fields
+        'is_payment_required' => $clearance->clearanceType?->requires_payment ?? false,
+        'is_payment_pending' => $clearance->status === 'pending_payment',
+        'is_payment_paid' => $paymentDetails && $paymentDetails['status'] === 'completed', // Note: your table shows 'completed' not 'paid'
+        'days_since_created' => $clearance->created_at->diffInDays(now()),
+        'days_until_needed' => $clearance->needed_date ? 
+            max(0, now()->diffInDays($clearance->needed_date, false)) : null,
+        
+        // Estimated completion date based on processing days
+        'estimated_completion_date' => $clearance->clearanceType?->processing_days ? 
+            $clearance->created_at->addDays($clearance->clearanceType->processing_days)->toDateString() : null,
+        'formatted_estimated_completion_date' => $clearance->clearanceType?->processing_days ? 
+            $clearance->created_at->addDays($clearance->clearanceType->processing_days)->format('F d, Y') : null,
+    ];
+
+    return Inertia::render('admin/Clearances/Show', [
+        'clearance' => $formattedClearance,
+        'activityLogs' => $activityLogs,
+        'permissions' => [
             'canEdit' => $canEdit,
             'canDelete' => $canDelete,
             'canProcess' => $canProcess,
             'canIssue' => $canIssue,
             'canApprove' => $canApprove,
             'canPrint' => $canPrint,
-        ]);
+            'canVerifyPayment' => $canVerifyPayment,
+            'canAssignOfficer' => $canAssignOfficer,
+            'canViewDocuments' => $canViewDocuments,
+            'canUploadDocuments' => $canUploadDocuments,
+        ],
+        'config' => [
+            'app_name' => config('app.name'),
+            'app_url' => config('app.url'),
+            'max_file_size' => config('filesystems.max_upload_size', 5242880),
+            'allowed_file_types' => config('filesystems.allowed_types', ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx']),
+            'date_format' => config('app.date_format', 'F d, Y'),
+            'time_format' => config('app.time_format', 'h:i A'),
+        ],
+        'meta' => [
+            'title' => "Clearance Request: {$clearance->reference_number}",
+            'description' => "View details for clearance request {$clearance->reference_number}",
+        ],
+    ]);
+}
+    private function getUrgencyColor($urgency): string
+    {
+        $colors = [
+            'normal' => 'success',
+            'rush' => 'warning',
+            'express' => 'danger',
+        ];
+        
+        return $colors[$urgency] ?? 'secondary';
     }
-   public function edit(ClearanceRequest $clearance)
+
+    private function formatFileSize($bytes): string
+    {
+        if ($bytes == 0) return '0 Bytes';
+        
+        $k = 1024;
+        $sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        $i = floor(log($bytes) / log($k));
+        
+        return round($bytes / pow($k, $i), 2) . ' ' . $sizes[$i];
+    }
+
+    // Helper methods for the controller
+    private function getActivityIcon($event): string
+    {
+        $icons = [
+            'created' => 'add',
+            'updated' => 'edit',
+            'deleted' => 'delete',
+            'viewed' => 'visibility',
+            'approved' => 'check_circle',
+            'rejected' => 'cancel',
+            'issued' => 'description',
+            'payment' => 'payment',
+            'verified' => 'verified',
+        ];
+        
+        return $icons[$event] ?? 'info';
+    }
+
+    private function getActivityColor($event): string
+    {
+        $colors = [
+            'created' => 'success',
+            'updated' => 'info',
+            'deleted' => 'error',
+            'viewed' => 'info',
+            'approved' => 'success',
+            'rejected' => 'error',
+            'issued' => 'success',
+            'payment' => 'info',
+            'verified' => 'success',
+        ];
+        
+        return $colors[$event] ?? 'default';
+    }
+
+    private function getStatusColor(string $status): string
+    {
+        $colors = [
+            'pending' => 'amber',
+            'pending_payment' => 'orange',
+            'processing' => 'blue',
+            'approved' => 'green',
+            'issued' => 'green',
+            'rejected' => 'red',
+            'cancelled' => 'gray',
+            'expired' => 'gray',
+        ];
+        
+        return $colors[$status] ?? 'gray';
+    }
+
+    private function getPaymentStatusDisplay(string $status): string
+    {
+        $display = [
+            'pending' => 'Pending',
+            'paid' => 'Paid',
+            'failed' => 'Failed',
+            'refunded' => 'Refunded',
+            'cancelled' => 'Cancelled',
+        ];
+        
+        return $display[$status] ?? ucfirst($status);
+    }
+
+    private function getValidityStatus($clearance): ?array
+    {
+        if ($clearance->status !== 'issued' || !$clearance->valid_until) {
+            return null;
+        }
+        
+        $today = now();
+        $validUntil = $clearance->valid_until;
+        $diffDays = $today->diffInDays($validUntil, false);
+        
+        if ($diffDays > 0) {
+            return [
+                'text' => "Valid for {$diffDays} day" . ($diffDays !== 1 ? 's' : ''),
+                'color' => 'green',
+                'icon' => 'check-circle',
+                'days_remaining' => $diffDays,
+            ];
+        } elseif ($diffDays === 0) {
+            return [
+                'text' => 'Expires today',
+                'color' => 'orange',
+                'icon' => 'alert-circle',
+                'days_remaining' => 0,
+            ];
+        } else {
+            $daysExpired = abs($diffDays);
+            return [
+                'text' => "Expired {$daysExpired} day" . ($daysExpired !== 1 ? 's' : '') . " ago",
+                'color' => 'red',
+                'icon' => 'x-circle',
+                'days_expired' => $daysExpired,
+            ];
+        }
+    }
+
+    private function getNextActions($clearance, $user): array
+    {
+        $actions = [];
+        
+        switch ($clearance->status) {
+            case 'pending':
+                if ($user->can('process', $clearance)) {
+                    $actions[] = ['action' => 'process', 'label' => 'Start Processing', 'icon' => 'play'];
+                }
+                if ($clearance->clearanceType?->requires_payment) {
+                    $actions[] = ['action' => 'request_payment', 'label' => 'Request Payment', 'icon' => 'dollar-sign'];
+                }
+                break;
+                
+            case 'pending_payment':
+                if ($user->can('verify-payment', $clearance)) {
+                    $actions[] = ['action' => 'verify_payment', 'label' => 'Verify Payment', 'icon' => 'check-circle'];
+                }
+                break;
+                
+            case 'processing':
+                if ($user->can('approve', $clearance)) {
+                    $actions[] = ['action' => 'approve', 'label' => 'Approve Request', 'icon' => 'check'];
+                }
+                if ($user->can('assign-officer', $clearance) && !$clearance->assignedOfficer) {
+                    $actions[] = ['action' => 'assign_officer', 'label' => 'Assign Officer', 'icon' => 'user-plus'];
+                }
+                break;
+                
+            case 'approved':
+                if ($user->can('issue', $clearance)) {
+                    $actions[] = ['action' => 'issue', 'label' => 'Issue Certificate', 'icon' => 'shield'];
+                }
+                break;
+                
+            case 'issued':
+                if ($user->can('print', $clearance)) {
+                    $actions[] = ['action' => 'print', 'label' => 'Print Certificate', 'icon' => 'printer'];
+                }
+                if ($user->can('download', $clearance)) {
+                    $actions[] = ['action' => 'download', 'label' => 'Download PDF', 'icon' => 'download'];
+                }
+                break;
+        }
+        
+        return $actions;
+    }
+
+    public function edit(ClearanceRequest $clearance)
     {
         // Get active clearance types
         $clearanceTypes = ClearanceType::active()
@@ -321,7 +753,7 @@ class ClearanceController extends Controller
                 'gender' => $clearance->resident->gender,
                 'civil_status' => $clearance->resident->civil_status,
                 'occupation' => $clearance->resident->occupation,
-                'profile_photo' => $clearance->resident->profile_photo,
+                'photo_path' => $clearance->resident->photo_path,
             ] : null,
             'clearance_type' => $clearance->clearanceType ? [
                 'id' => $clearance->clearanceType->id,
@@ -602,87 +1034,83 @@ class ClearanceController extends Controller
     /**
      * Store a newly created clearance request in storage.
      */
-   public function store(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'resident_id' => 'required|exists:residents,id',
-        'clearance_type_id' => 'required|exists:clearance_types,id',
-        'purpose' => 'required|string|max:500',
-        'specific_purpose' => 'nullable|string|max:500',
-        'urgency' => 'required|in:normal,rush,express',
-        'needed_date' => 'required|date',
-        'additional_requirements' => 'nullable|string',
-        'fee_amount' => 'nullable|numeric|min:0',
-        // Remove 'issuing_officer' validation since it's not in your database
-    ]);
-    
-    if ($validator->fails()) {
-        return redirect()->back()
-            ->withErrors($validator)
-            ->withInput();
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'resident_id' => 'required|exists:residents,id',
+            'clearance_type_id' => 'required|exists:clearance_types,id',
+            'purpose' => 'required|string|max:500',
+            'specific_purpose' => 'nullable|string|max:500',
+            'urgency' => 'required|in:normal,rush,express',
+            'needed_date' => 'required|date',
+            'additional_requirements' => 'nullable|string',
+            'fee_amount' => 'nullable|numeric|min:0',
+        ]);
+        
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+        
+        // Get clearance type
+        $clearanceType = ClearanceType::find($request->clearance_type_id);
+        
+        // Get resident
+        $resident = Resident::find($request->resident_id);
+        
+        // Calculate fee if not provided
+        $feeAmount = $request->fee_amount;
+        if ($clearanceType && $feeAmount === null) {
+            $feeAmount = $clearanceType->fee ?? 0;
+        }
+        
+        // Adjust fee based on urgency
+        if ($request->urgency === 'rush') {
+            $feeAmount *= 1.5; // 50% surcharge for rush
+        } elseif ($request->urgency === 'express') {
+            $feeAmount *= 2.0; // 100% surcharge for express
+        }
+        
+        // Round to 2 decimal places
+        $feeAmount = round($feeAmount, 2);
+        
+        // Determine initial status
+        $status = 'pending';
+        if ($clearanceType && $clearanceType->requires_payment && $feeAmount > 0) {
+            $status = 'pending_payment';
+        }
+        
+        // Get the user ID associated with the resident
+        $requestedByUserId = null;
+        if ($resident && $resident->user) {
+            $requestedByUserId = $resident->user->id;
+        }
+        
+        // Get current admin
+        $admin = auth()->user();
+        
+        $clearanceRequest = ClearanceRequest::create([
+            'resident_id' => $request->resident_id,
+            'clearance_type_id' => $request->clearance_type_id,
+            'purpose' => $request->purpose,
+            'specific_purpose' => $request->specific_purpose,
+            'urgency' => $request->urgency,
+            'needed_date' => $request->needed_date,
+            'additional_requirements' => $request->additional_requirements,
+            'fee_amount' => $feeAmount,
+            'status' => $status,
+            // These are the correct field names from your database:
+            'issuing_officer_id' => $admin->id, // Store the user ID
+            'issuing_officer_name' => $admin->name, // Store the name for display
+            'requested_by_user_id' => $requestedByUserId, // Resident's user ID, not admin's
+            'processed_by' => $admin->id, // Admin who created it
+            'processed_at' => now(), // Admin processed it immediately
+        ]);
+        
+        return redirect()->route('clearances.index')
+            ->with('success', 'Clearance request created successfully! Reference number: ' . $clearanceRequest->reference_number);
     }
-    
-    // Get clearance type
-    $clearanceType = ClearanceType::find($request->clearance_type_id);
-    
-    // Get resident
-    $resident = Resident::find($request->resident_id);
-    
-    // Calculate fee if not provided
-    $feeAmount = $request->fee_amount;
-    if ($clearanceType && $feeAmount === null) {
-        $feeAmount = $clearanceType->fee ?? 0;
-    }
-    
-    // Adjust fee based on urgency
-    if ($request->urgency === 'rush') {
-        $feeAmount *= 1.5; // 50% surcharge for rush
-    } elseif ($request->urgency === 'express') {
-        $feeAmount *= 2.0; // 100% surcharge for express
-    }
-    
-    // Round to 2 decimal places
-    $feeAmount = round($feeAmount, 2);
-    
-    // Determine initial status
-    $status = 'pending';
-    if ($clearanceType && $clearanceType->requires_payment && $feeAmount > 0) {
-        $status = 'pending_payment';
-    }
-    
-    // Get the user ID associated with the resident
-    $requestedByUserId = null;
-    if ($resident && $resident->user) {
-        $requestedByUserId = $resident->user->id;
-    }
-    
-    // Get current admin
-    $admin = auth()->user();
-    
-    $clearanceRequest = ClearanceRequest::create([
-        'resident_id' => $request->resident_id,
-        'clearance_type_id' => $request->clearance_type_id,
-        'purpose' => $request->purpose,
-        'specific_purpose' => $request->specific_purpose,
-        'urgency' => $request->urgency,
-        'needed_date' => $request->needed_date,
-        'additional_requirements' => $request->additional_requirements,
-        'fee_amount' => $feeAmount,
-        'status' => $status,
-        // These are the correct field names from your database:
-        'issuing_officer_id' => $admin->id, // Store the user ID
-        'issuing_officer_name' => $admin->name, // Store the name for display
-        'requested_by_user_id' => $requestedByUserId, // Resident's user ID, not admin's
-        'processed_by' => $admin->id, // Admin who created it
-        'processed_at' => now(), // Admin processed it immediately
-    ]);
-    
-    return redirect()->route('clearances.index')
-        ->with('success', 'Clearance request created successfully! Reference number: ' . $clearanceRequest->reference_number);
-}
-
-
-    
     
     /**
      * Remove the specified clearance request from storage.
