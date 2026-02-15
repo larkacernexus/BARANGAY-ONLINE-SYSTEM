@@ -14,15 +14,16 @@ class ResidentMiddleware
             return redirect('/login');
         }
 
-        // STRING ROLE
-      if (auth()->user()->role_id !== 8) {
-            abort(403, 'Unauthorized');
+        $user = auth()->user();
+        
+        // ALLOW Resident AND Kagawad roles
+        $allowedRoles = ['Resident', 'Barangay Kagawad'];
+        
+        if (!$user->role || !in_array($user->role->name, $allowedRoles)) {
+            // Redirect to admin dashboard if they're not a resident or kagawad
+            return redirect('/dashboard')
+                ->with('error', 'You do not have access to the resident portal.');
         }
-
-        // NUMERIC ROLE (example)
-        // if (auth()->user()->role_as !== 2) {
-        //     abort(403, 'Unauthorized');
-        // }
 
         return $next($request);
     }

@@ -17,8 +17,8 @@ class ResidentPaymentController extends Controller
     {
         $user = auth()->user();
         
-        // Get the household associated with the authenticated user (head of household)
-        $household = Household::where('user_id', $user->id)->first();
+        // Get the household associated with the authenticated user from household_id field
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             return Inertia::render('resident/Payments/Index', [
@@ -99,10 +99,10 @@ class ResidentPaymentController extends Controller
             return $this->exportPayments($query->get());
         }
         
-        // Get paginated results with formatted data
+       // Get paginated results with formatted data
         $payments = $query->latest('payment_date')
             ->paginate(10)
-            ->through(function ($payment) use ($residents, $household) {
+            ->through(function ($payment) use ($residents, $household, $user) {
                 $formatted = $this->formatPaymentForFrontend($payment);
                 
                 // Add context about who paid
@@ -111,7 +111,8 @@ class ResidentPaymentController extends Controller
                     $formatted['paid_by'] = 'resident';
                     $formatted['resident_name'] = $resident ? $resident->full_name : 'Unknown Resident';
                     $formatted['relationship'] = 'Personal Payment';
-                    $formatted['is_self'] = $resident && $resident->is_head_of_household ?? false;
+                    // Check if the current user's resident is the payer
+                    $formatted['is_self'] = $user->current_resident_id == $payment->payer_id;
                 } else {
                     // Household payment
                     $formatted['paid_by'] = 'household';
@@ -129,7 +130,7 @@ class ResidentPaymentController extends Controller
         $paymentMethods = $this->getPaymentMethods($residentIds, $household);
         
         // Get the head resident (for display)
-        $headResident = $residents->firstWhere('id', $household->head_resident_id);
+        $headResident = $this->getHeadResident($household);
         
         return Inertia::render('resident/Payments/Index', [
             'payments' => $payments,
@@ -331,7 +332,7 @@ class ResidentPaymentController extends Controller
     public function create()
     {
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             return redirect()->route('dashboard')
@@ -358,7 +359,7 @@ class ResidentPaymentController extends Controller
         ];
         
         // Get head resident
-        $headResident = $residents->firstWhere('id', $household->head_resident_id);
+        $headResident = $this->getHeadResident($household);
         
         return Inertia::render('Resident/Payments/Pay', [
             'paymentTypes' => $paymentTypes,
@@ -376,7 +377,7 @@ class ResidentPaymentController extends Controller
     public function store(Request $request)
     {
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             return back()->with('error', 'Your account is not associated with any household.');
@@ -488,7 +489,7 @@ class ResidentPaymentController extends Controller
     public function show(Payment $payment)
     {
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             abort(403, 'You are not authorized to view this payment.');
@@ -536,7 +537,7 @@ class ResidentPaymentController extends Controller
     public function updatePaymentMethod(Request $request, Payment $payment)
     {
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         // Check authorization
         $authorized = $this->checkPaymentAuthorization($payment, $household);
@@ -570,7 +571,7 @@ class ResidentPaymentController extends Controller
     public function cancel(Request $request, Payment $payment)
     {
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         // Check authorization
         $authorized = $this->checkPaymentAuthorization($payment, $household);
@@ -596,7 +597,7 @@ class ResidentPaymentController extends Controller
     public function receipt(Payment $payment)
     {
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         // Check authorization
         $authorized = $this->checkPaymentAuthorization($payment, $household);
@@ -619,7 +620,7 @@ class ResidentPaymentController extends Controller
     public function verify(Request $request, Payment $payment)
     {
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         // Check authorization
         $authorized = $this->checkPaymentAuthorization($payment, $household);
@@ -667,7 +668,7 @@ class ResidentPaymentController extends Controller
     public function getPaymentLink(Payment $payment)
     {
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         // Check authorization
         $authorized = $this->checkPaymentAuthorization($payment, $household);
@@ -727,5 +728,24 @@ class ResidentPaymentController extends Controller
         }
         
         return false;
+    }
+    
+    /**
+     * Get the head resident of a household
+     */
+    private function getHeadResident(Household $household)
+    {
+        // First try to find through household members with is_head = true
+        $headMember = \App\Models\HouseholdMember::where('household_id', $household->id)
+            ->where('is_head', true)
+            ->first();
+            
+        if ($headMember && $headMember->resident) {
+            return $headMember->resident;
+        }
+        
+        // If no head found in household members, check residents table
+        return Resident::where('household_id', $household->id)
+            ->first();
     }
 }

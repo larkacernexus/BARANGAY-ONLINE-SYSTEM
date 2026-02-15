@@ -1058,58 +1058,98 @@ export default function FeesShow({
                             )}
 
                             {/* Requirements Tab */}
-                            {activeTab === 'requirements' && (
-                                <div>
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center gap-2">
-                                                <FileCheck className="h-5 w-5" />
-                                                Requirements
-                                            </CardTitle>
-                                            <CardDescription>
-                                                Requirements for this fee type and submitted documents
-                                            </CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-6">
-                                                {/* Fee Type Requirements */}
-                                                <div>
-                                                    <p className="text-sm font-medium text-gray-500 mb-3">Fee Type Requirements</p>
-                                                    {fee.fee_type?.requirements && fee.fee_type.requirements.length > 0 ? (
+                           {activeTab === 'requirements' && (
+                            <div>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <FileCheck className="h-5 w-5" />
+                                        Requirements
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Requirements for this fee type and submitted documents
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-6">
+                                        {/* Fee Type Requirements */}
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-500 mb-3">Fee Type Requirements</p>
+                                            {(() => {
+                                                // Safely get requirements array
+                                                const requirements = fee.fee_type?.requirements;
+                                                let requirementsArray: string[] = [];
+                                                
+                                                if (requirements) {
+                                                    if (Array.isArray(requirements)) {
+                                                        requirementsArray = requirements;
+                                                    } else if (typeof requirements === 'string') {
+                                                        try {
+                                                            const parsed = JSON.parse(requirements);
+                                                            requirementsArray = Array.isArray(parsed) ? parsed : [];
+                                                        } catch {
+                                                            requirementsArray = [];
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                if (requirementsArray.length > 0) {
+                                                    return (
                                                         <ul className="space-y-2">
-                                                            {fee.fee_type.requirements.map((req: string, index: number) => (
+                                                            {requirementsArray.map((req: string, index: number) => (
                                                                 <li key={index} className="flex items-center gap-2">
                                                                     <FileText className="h-4 w-4 text-gray-400" />
                                                                     <span className="text-sm">{req}</span>
                                                                 </li>
                                                             ))}
                                                         </ul>
-                                                    ) : (
-                                                        <p className="text-gray-500 text-sm">No requirements specified for this fee type.</p>
-                                                    )}
-                                                </div>
+                                                    );
+                                                }
+                                                return <p className="text-gray-500 text-sm">No requirements specified for this fee type.</p>;
+                                            })()}
+                                        </div>
 
-                                                {/* Submitted Requirements */}
-                                                <div className="pt-4 border-t">
-                                                    <p className="text-sm font-medium text-gray-500 mb-3">Submitted Requirements</p>
-                                                    {submittedRequirements.length > 0 ? (
+                                        {/* Submitted Requirements */}
+                                        <div className="pt-4 border-t">
+                                            <p className="text-sm font-medium text-gray-500 mb-3">Submitted Requirements</p>
+                                            {(() => {
+                                                // Safely get submitted requirements array
+                                                const submittedReqs = fee.requirements_submitted;
+                                                let submittedRequirementsArray: string[] = [];
+                                                
+                                                if (submittedReqs) {
+                                                    if (Array.isArray(submittedReqs)) {
+                                                        submittedRequirementsArray = submittedReqs;
+                                                    } else if (typeof submittedReqs === 'string') {
+                                                        try {
+                                                            const parsed = JSON.parse(submittedReqs);
+                                                            submittedRequirementsArray = Array.isArray(parsed) ? parsed : [];
+                                                        } catch {
+                                                            submittedRequirementsArray = [];
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                if (submittedRequirementsArray.length > 0) {
+                                                    return (
                                                         <ul className="space-y-2">
-                                                            {submittedRequirements.map((req: string, index: number) => (
+                                                            {submittedRequirementsArray.map((req: string, index: number) => (
                                                                 <li key={index} className="flex items-center gap-2">
                                                                     <CheckCircle className="h-4 w-4 text-green-500" />
                                                                     <span className="text-sm">{req}</span>
                                                                 </li>
                                                             ))}
                                                         </ul>
-                                                    ) : (
-                                                        <p className="text-gray-500 text-sm">No requirements submitted for this fee.</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </div>
-                            )}
+                                                    );
+                                                }
+                                                return <p className="text-gray-500 text-sm">No requirements submitted for this fee.</p>;
+                                            })()}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
 
                             {/* Payment History Tab */}
                             {activeTab === 'history' && (

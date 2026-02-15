@@ -16,10 +16,8 @@ class User extends Authenticatable
     use HasFactory, Notifiable, CausesActivity, LogsActivity;
 
     protected $fillable = [
-        'first_name',
-        'last_name',
-        'email',
         'username',
+        'email',
         'contact_number',
         'position',
         'role_id',
@@ -31,9 +29,9 @@ class User extends Authenticatable
         'two_factor_secret',
         'two_factor_recovery_codes',
         'two_factor_confirmed_at',
-        'two_factor_enabled_at',          // Add this
-        'two_factor_last_used_at',        // Add this
-        'two_factor_used_recovery_codes', // Add this
+        'two_factor_enabled_at',
+        'two_factor_last_used_at',
+        'two_factor_used_recovery_codes',
         'remember_token',
         'last_login_at',
         'last_login_ip',
@@ -45,7 +43,9 @@ class User extends Authenticatable
         'failed_login_attempts',
         'last_failed_login_at',
         'account_locked_until',
-        // 'current_session_id', // REMOVE this - it's not in your table
+        'resident_id',
+        'household_id',
+        'current_resident_id',
     ];
 
     protected $hidden = [
@@ -61,8 +61,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'require_password_change' => 'boolean',
-            'two_factor_enabled_at' => 'datetime',     // Add this
-            'two_factor_last_used_at' => 'datetime',   // Add this
+            'two_factor_enabled_at' => 'datetime',
+            'two_factor_last_used_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password_changed_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
@@ -83,22 +83,26 @@ class User extends Authenticatable
     {
         return LogOptions::defaults()
             ->logOnly(['first_name', 'last_name', 'email', 'username', 'contact_number', 
-                      'position',  'role_id', 'status'])
+                      'position', 'role_id', 'status', 'household_id', 'current_resident_id'])
             ->logOnlyDirty()
             ->setDescriptionForEvent(fn(string $eventName) => "User {$eventName}")
             ->dontSubmitEmptyLogs()
             ->useLogName('user');
     }
 
-    // Rest of your methods remain the same...
     public function role()
     {
         return $this->belongsTo(Role::class);
     }
 
-    public function department()
+    public function household()
     {
-        return $this->belongsTo(Department::class);
+        return $this->belongsTo(Household::class);
+    }
+
+    public function currentResident()
+    {
+        return $this->belongsTo(Resident::class, 'current_resident_id');
     }
 
     public function customPermissions()
@@ -221,6 +225,15 @@ class User extends Authenticatable
         });
     }
 
+    public function scopeWithHousehold($query)
+    {
+        return $query->whereNotNull('household_id');
+    }
+
+    public function scopeWithoutHousehold($query)
+    {
+        return $query->whereNull('household_id');
+    }
 
     public function scopeRequiresPasswordChange($query)
     {
@@ -238,19 +251,19 @@ class User extends Authenticatable
             'last_login_at' => now(),
             'last_login_ip' => $ipAddress,
             'login_count' => $this->login_count + 1,
+            'failed_login_attempts' => 0,
+            'account_locked_until' => null,
         ]);
-    }
-
- 
-
-    public function residentDocuments()
-    {
-        return $this->hasMany(ResidentDocument::class, 'resident_id');
     }
 
     public function isAdministrator(): bool
     {
         return $this->hasRole('Administrator');
+    }
+
+    public function isHouseholdHead(): bool
+    {
+        return $this->role && $this->role->name === 'Household Head';
     }
 
     public function isActive(): bool
@@ -285,8 +298,6 @@ class User extends Authenticatable
             ->withTimestamps()
             ->withPivot('created_at', 'updated_at');
     }
-
-    // NEW METHODS FOR SESSION MANAGEMENT
 
     /**
      * Get current active session
@@ -331,5 +342,63 @@ class User extends Authenticatable
             ->whereNull('logout_at')
             ->latest('login_at')
             ->first();
+    }
+
+    /**
+     * Check if this user account belongs to a household
+     */
+    public function belongsToHousehold(): bool
+    {
+        return !is_null($this->household_id);
+    }
+
+    /**
+     * Get the household head's current resident
+     */
+    public function getCurrentHeadResidentAttribute()
+    {
+        if (!$this->belongsToHousehold()) {
+            return null;
+        }
+        return $this->currentResident;
+    }
+
+    /**
+     * Transfer this user account to a different resident in the same household
+     */
+    public function transferToResident(Resident $newResident): bool
+    {
+        if (!$this->belongsToHousehold()) {
+            return false;
+        }
+
+        // Verify new resident belongs to the same household
+        if ($newResident->household_id !== $this->household_id) {
+            return false;
+        }
+
+        $this->update([
+            'current_resident_id' => $newResident->id,
+            'first_name' => $newResident->first_name,
+            'last_name' => $newResident->last_name,
+            'contact_number' => $this->household->contact_number,
+            'email' => $this->household->email ?? $newResident->email,
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Deactivate household user account
+     */
+    public function deactivateHouseholdAccount(): void
+    {
+        if ($this->belongsToHousehold()) {
+            $this->update([
+                'status' => 'inactive',
+                'household_id' => null,
+                'current_resident_id' => null,
+            ]);
+        }
     }
 }

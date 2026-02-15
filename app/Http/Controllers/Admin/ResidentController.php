@@ -10,6 +10,7 @@ use App\Models\HouseholdMember;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -131,46 +132,77 @@ class ResidentController extends Controller
     }
 
     // Show the form for creating a new resident
-    public function create()
-    {
-        // Get households that don't have a head
-        $householdsWithoutHead = Household::whereDoesntHave('householdMembers', function ($query) {
-            $query->where('is_head', true);
-        })->orderBy('household_number')->get();
+public function create()
+{
+    // Get ALL households
+    $allHouseholds = Household::with(['headMember.resident'])
+        ->orderBy('household_number')
+        ->get()
+        ->map(function($household) {
+            $hasHead = $household->headMember->isNotEmpty();
+            $headName = $hasHead && $household->headMember->first()->resident 
+                ? $household->headMember->first()->resident->full_name 
+                : 'No Head';
 
-        return Inertia::render('admin/Residents/Create', [
-            'households' => $householdsWithoutHead,
-            'puroks' => $this->getPuroksForSelect(),
-            'civilStatusOptions' => $this->getCivilStatusOptions(),
-            'genderOptions' => $this->getGenderOptions(),
-            'educationOptions' => $this->getEducationOptions(),
-            'relationshipOptions' => [
-                ['value' => 'head', 'label' => 'Head of Household'],
-                ['value' => 'spouse', 'label' => 'Spouse'],
-                ['value' => 'son', 'label' => 'Son'],
-                ['value' => 'daughter', 'label' => 'Daughter'],
-                ['value' => 'father', 'label' => 'Father'],
-                ['value' => 'mother', 'label' => 'Mother'],
-                ['value' => 'brother', 'label' => 'Brother'],
-                ['value' => 'sister', 'label' => 'Sister'],
-                ['value' => 'grandfather', 'label' => 'Grandfather'],
-                ['value' => 'grandmother', 'label' => 'Grandmother'],
-                ['value' => 'grandson', 'label' => 'Grandson'],
-                ['value' => 'granddaughter', 'label' => 'Granddaughter'],
-                ['value' => 'uncle', 'label' => 'Uncle'],
-                ['value' => 'aunt', 'label' => 'Aunt'],
-                ['value' => 'nephew', 'label' => 'Nephew'],
-                ['value' => 'niece', 'label' => 'Niece'],
-                ['value' => 'cousin', 'label' => 'Cousin'],
-                ['value' => 'son_in_law', 'label' => 'Son-in-law'],
-                ['value' => 'daughter_in_law', 'label' => 'Daughter-in-law'],
-                ['value' => 'father_in_law', 'label' => 'Father-in-law'],
-                ['value' => 'mother_in_law', 'label' => 'Mother-in-law'],
-                ['value' => 'other_relative', 'label' => 'Other Relative'],
-                ['value' => 'non_relative', 'label' => 'Non-relative'],
-            ],
-        ]);
-    }
+            return [
+                'id' => $household->id,
+                'household_number' => $household->household_number,
+                'head_of_family' => $household->head_of_family,
+                'head_resident_id' => $household->head_resident_id,
+                'has_head' => $hasHead,
+                'head_name' => $headName,
+                'member_count' => $household->member_count,
+            ];
+        });
+
+    // Add special options
+    $householdsWithOptions = $allHouseholds->prepend([
+        'id' => 0,
+        'household_number' => 'NEW_HOUSEHOLD',
+        'head_of_family' => 'Create New Household',
+        'has_head' => false,
+        'head_name' => 'New Household',
+        'member_count' => 0,
+    ]);
+
+    return Inertia::render('admin/Residents/Create', [
+        'households' => $householdsWithOptions,
+        'puroks' => $this->getPuroksForSelect(),
+        'civilStatusOptions' => $this->getCivilStatusOptions(),
+        'genderOptions' => $this->getGenderOptions(),
+        'educationOptions' => $this->getEducationOptions(),
+        'relationshipOptions' => [
+            ['value' => 'head', 'label' => 'Head of Household'],
+            ['value' => 'spouse', 'label' => 'Spouse'],
+            ['value' => 'son', 'label' => 'Son'],
+            ['value' => 'daughter', 'label' => 'Daughter'],
+            ['value' => 'father', 'label' => 'Father'],
+            ['value' => 'mother', 'label' => 'Mother'],
+            ['value' => 'brother', 'label' => 'Brother'],
+            ['value' => 'sister', 'label' => 'Sister'],
+            ['value' => 'grandfather', 'label' => 'Grandfather'],
+            ['value' => 'grandmother', 'label' => 'Grandmother'],
+            ['value' => 'grandson', 'label' => 'Grandson'],
+            ['value' => 'granddaughter', 'label' => 'Granddaughter'],
+            ['value' => 'uncle', 'label' => 'Uncle'],
+            ['value' => 'aunt', 'label' => 'Aunt'],
+            ['value' => 'nephew', 'label' => 'Nephew'],
+            ['value' => 'niece', 'label' => 'Niece'],
+            ['value' => 'cousin', 'label' => 'Cousin'],
+            ['value' => 'son_in_law', 'label' => 'Son-in-law'],
+            ['value' => 'daughter_in_law', 'label' => 'Daughter-in-law'],
+            ['value' => 'father_in_law', 'label' => 'Father-in-law'],
+            ['value' => 'mother_in_law', 'label' => 'Mother-in-law'],
+            ['value' => 'other_relative', 'label' => 'Other Relative'],
+            ['value' => 'non_relative', 'label' => 'Non-relative'],
+        ],
+        'householdCreationOptions' => [
+            ['value' => 'none', 'label' => 'No Household'],
+            ['value' => 'new', 'label' => 'Create New Household'],
+            ['value' => 'existing', 'label' => 'Select Existing Household'],
+        ],
+    ]);
+}
 
     // Store a newly created resident
     public function store(Request $request)
@@ -774,6 +806,279 @@ public function update(Request $request, Resident $resident)
             ['value' => 'college', 'label' => 'College'],
             ['value' => 'vocational', 'label' => 'Vocational'],
             ['value' => 'postgraduate', 'label' => 'Postgraduate'],
+        ];
+    }
+
+     public function import()
+    {
+        return Inertia::render('admin/Residents/Import');
+    }
+
+    /**
+     * Process CSV import
+     */
+    public function processImport(Request $request)
+    {
+        $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt|max:10240', // 10MB max
+            'has_headers' => 'boolean',
+        ]);
+
+        $file = $request->file('csv_file');
+        $hasHeaders = $request->boolean('has_headers', true);
+        $results = [
+            'total' => 0,
+            'successful' => 0,
+            'failed' => 0,
+            'errors' => [],
+            'successes' => [],
+        ];
+
+        try {
+            $handle = fopen($file->getRealPath(), 'r');
+            
+            // Skip headers if present
+            if ($hasHeaders) {
+                fgetcsv($handle);
+            }
+
+            $rowNumber = $hasHeaders ? 2 : 1;
+            
+            DB::beginTransaction();
+
+            while (($row = fgetcsv($handle)) !== false) {
+                $results['total']++;
+                
+                // Skip empty rows
+                if (empty(array_filter($row))) {
+                    $rowNumber++;
+                    continue;
+                }
+
+                // Validate required field count
+                if (count($row) < 11) { // Minimum required fields
+                    $results['failed']++;
+                    $results['errors'][] = [
+                        'row' => $rowNumber,
+                        'error' => 'Insufficient columns. Expected at least 11 fields.',
+                        'data' => $row
+                    ];
+                    $rowNumber++;
+                    continue;
+                }
+
+                // Map CSV columns to database fields
+                $data = $this->mapCsvToResidentData($row, $rowNumber);
+
+                // Validate resident data
+                $validator = Validator::make($data, [
+                    'first_name' => 'required|string|max:255',
+                    'last_name' => 'required|string|max:255',
+                    'middle_name' => 'nullable|string|max:255',
+                    'suffix' => 'nullable|string|max:10',
+                    'birth_date' => 'required|date',
+                    'gender' => 'required|in:male,female,other',
+                    'civil_status' => 'required|in:single,married,widowed,separated',
+                    'contact_number' => 'nullable|string|max:20',
+                    'email' => 'nullable|email|max:255',
+                    'address' => 'required|string',
+                    'purok_id' => 'required|exists:puroks,id',
+                    'household_id' => 'nullable|exists:households,id',
+                    'occupation' => 'nullable|string|max:255',
+                    'education' => 'nullable|string|max:255',
+                    'religion' => 'nullable|string|max:255',
+                    'is_voter' => 'boolean',
+                    'is_pwd' => 'boolean',
+                    'is_senior' => 'boolean',
+                    'place_of_birth' => 'nullable|string|max:255',
+                    'remarks' => 'nullable|string',
+                    'status' => 'nullable|in:active,inactive',
+                ]);
+
+                if ($validator->fails()) {
+                    $results['failed']++;
+                    $results['errors'][] = [
+                        'row' => $rowNumber,
+                        'error' => implode(', ', $validator->errors()->all()),
+                        'data' => $row
+                    ];
+                    $rowNumber++;
+                    continue;
+                }
+
+                // Create resident
+                try {
+                    // Calculate age
+                    $data['age'] = Carbon::parse($data['birth_date'])->age;
+                    
+                    // Generate resident ID
+                    $data['resident_id'] = $this->generateResidentId();
+                    
+                    // Set default status if not provided
+                    if (!isset($data['status'])) {
+                        $data['status'] = 'active';
+                    }
+
+                    $resident = Resident::create($data);
+
+                    // Handle household membership if household_id is provided
+                    if (!empty($data['household_id'])) {
+                        $household = Household::find($data['household_id']);
+                        
+                        if ($household) {
+                            HouseholdMember::create([
+                                'household_id' => $household->id,
+                                'resident_id' => $resident->id,
+                                'relationship_to_head' => 'member', // Default, can be updated later
+                                'is_head' => false,
+                            ]);
+
+                            // Update member count
+                            $household->update([
+                                'member_count' => $household->householdMembers()->count()
+                            ]);
+                            
+                            // Update direct household_id on resident
+                            $resident->update(['household_id' => $household->id]);
+                        }
+                    }
+
+                    $results['successful']++;
+                    $results['successes'][] = [
+                        'row' => $rowNumber,
+                        'resident_id' => $data['resident_id'],
+                        'name' => trim($data['first_name'] . ' ' . $data['last_name']),
+                        'message' => 'Successfully imported'
+                    ];
+
+                } catch (\Exception $e) {
+                    $results['failed']++;
+                    $results['errors'][] = [
+                        'row' => $rowNumber,
+                        'error' => 'Database error: ' . $e->getMessage(),
+                        'data' => $row
+                    ];
+                }
+
+                $rowNumber++;
+            }
+
+            fclose($handle);
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Import completed',
+                'results' => $results
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Import failed: ' . $e->getMessage(),
+                'results' => $results
+            ], 500);
+        }
+    }
+
+      public function downloadGuide()
+    {
+        $guideContent = "RESIDENTS IMPORT GUIDE
+===========================
+
+REQUIRED FORMAT: CSV (Comma Separated Values)
+ENCODING: UTF-8
+
+COLUMN ORDER (21 columns):
+1. first_name    - First name (required)
+2. last_name     - Last name (required)
+3. middle_name   - Middle name (optional)
+4. suffix        - Suffix: Jr., Sr., III, etc. (optional)
+5. birth_date    - Date of birth: YYYY-MM-DD (required)
+6. gender        - male, female, or other (required)
+7. civil_status  - single, married, widowed, separated (required)
+8. contact_number - 11-digit mobile number (required)
+9. email         - Email address (optional)
+10. address      - Complete address (required)
+11. purok_id     - Purok ID (must exist in database) (required)
+12. household_id - Household ID (optional, must exist or leave empty)
+13. occupation   - Occupation/profession (optional)
+14. education    - Highest education (optional)
+15. religion     - Religion (optional)
+16. is_voter     - 1 for yes, 0 for no (required)
+17. is_pwd       - 1 for yes, 0 for no (required)
+18. is_senior    - 1 for yes, 0 for no (required)
+19. place_of_birth - City/Municipality, Province (optional)
+20. remarks      - Additional notes (optional)
+21. status       - active or inactive (optional, defaults to active)
+
+VALIDATION RULES:
+- Email must be valid format
+- Contact numbers must be 11 digits
+- Birth dates must be valid
+- Purok ID must exist in puroks table
+- Household ID must exist in households table or be empty
+- Boolean fields: 1 = true, 0 = false
+
+IMPORTANT NOTES:
+- Do NOT include id, resident_id, photo_path, age, created_at, updated_at
+- These are auto-generated or calculated
+- Maximum file size: 10MB
+- Maximum rows per import: 1000
+
+TIPS:
+- Save CSV in UTF-8 encoding
+- Do not modify column headers
+- Dates must be YYYY-MM-DD format
+- For text with commas, enclose in double quotes
+- Example: \"Manila, Philippines\"";
+
+        return response($guideContent, 200, [
+            'Content-Type' => 'text/plain',
+            'Content-Disposition' => 'attachment; filename="residents_import_guide.txt"',
+        ]);
+    }
+
+      public function downloadTemplate()
+    {
+        $csvTemplate = "first_name,last_name,middle_name,suffix,birth_date,gender,civil_status,contact_number,email,address,purok_id,household_id,occupation,education,religion,is_voter,is_pwd,is_senior,place_of_birth,remarks,status\n";
+        $csvTemplate .= "Juan,Dela Cruz,Santos,Jr.,1990-05-15,male,single,09123456789,juan@example.com,123 Main Street,1,1,Farmer,College Graduate,Roman Catholic,1,0,0,Manila City,\"Active resident\",active\n";
+        $csvTemplate .= "Maria,Santos,,,1985-08-20,female,married,09187654321,maria@example.com,456 Oak Street,2,2,Teacher,College Graduate,Roman Catholic,1,0,0,Quezon City,,active\n";
+        $csvTemplate .= "Pedro,Gonzales,Reyes,,1978-03-10,male,married,09151112222,,789 Pine Street,3,,Driver,High School Graduate,Roman Catholic,0,1,0,Cebu City,PWD ID: 2023-001,active\n";
+        $csvTemplate .= "Ana,Ramos,Tan,,1955-11-30,female,widowed,09223334444,ana@example.com,321 Maple Street,4,3,Retired,College Graduate,Roman Catholic,1,0,1,Davao City,Senior Citizen,active";
+
+        return response($csvTemplate, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="residents_import_template.csv"',
+        ]);
+    }
+        private function mapCsvToResidentData(array $row, int $rowNumber): array
+    {
+        // Default mapping - adjust based on your CSV structure
+        return [
+            'first_name' => $row[0] ?? null,
+            'last_name' => $row[1] ?? null,
+            'middle_name' => $row[2] ?? null,
+            'suffix' => $row[3] ?? null,
+            'birth_date' => $row[4] ?? null,
+            'gender' => strtolower($row[5] ?? ''),
+            'civil_status' => strtolower($row[6] ?? ''),
+            'contact_number' => $row[7] ?? null,
+            'email' => $row[8] ?? null,
+            'address' => $row[9] ?? null,
+            'purok_id' => $row[10] ?? null,
+            'household_id' => $row[11] ?? null,
+            'occupation' => $row[12] ?? null,
+            'education' => $row[13] ?? null,
+            'religion' => $row[14] ?? null,
+            'is_voter' => (bool)($row[15] ?? 0),
+            'is_pwd' => (bool)($row[16] ?? 0),
+            'is_senior' => (bool)($row[17] ?? 0),
+            'place_of_birth' => $row[18] ?? null,
+            'remarks' => $row[19] ?? null,
+            'status' => $row[20] ?? 'active',
         ];
     }
 }

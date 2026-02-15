@@ -26,7 +26,8 @@ import {
     Unlock,
     FileText,
     Filter,
-    X
+    X,
+    MessageCircle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,10 +48,17 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import DeveloperContactModal from '@/components/developer-contact-modal';
 
 interface PermissionsIndexProps {
     permissions: Paginated<Permission>;
-    modules: string[];
+    modules: string[] | Array<{ name: string; display_name?: string; description?: string; icon?: string }>;
     filters: FilterParams;
     stats?: Stats[] | any;
 }
@@ -68,6 +76,7 @@ export default function PermissionsIndex({
     });
     const [localSearch, setLocalSearch] = useState(initialFilters.search || '');
     const [isSearching, setIsSearching] = useState(false);
+    const [showDeveloperModal, setShowDeveloperModal] = useState(false);
 
     const [currentPage, setCurrentPage] = useState(permissions.meta?.current_page || 1);
     const [itemsPerPage] = useState(permissions.meta?.per_page || 10);
@@ -88,7 +97,7 @@ export default function PermissionsIndex({
         
         const totalPermissions = permissions.meta?.total || 0;
         const activePermissions = permissions.data.filter(p => p.is_active).length;
-        const totalModules = modules?.length || 0;
+        const totalModules = Array.isArray(modules) ? modules.length : 0;
         const totalRolesAssigned = permissions.data.reduce((sum, p) => sum + (p.roles_count || 0), 0);
         
         return [
@@ -241,6 +250,11 @@ export default function PermissionsIndex({
         }
     };
 
+    // Handle contact developer
+    const handleContactDeveloper = () => {
+        setShowDeveloperModal(true);
+    };
+
     const hasActiveFilters = filters.search || filters.module !== 'all' || filters.status !== 'all';
 
     // Calculate pagination
@@ -252,9 +266,17 @@ export default function PermissionsIndex({
     // Get unique modules from permissions if not provided
     const availableModules = useMemo(() => {
         if (modules && modules.length > 0) {
-            return modules;
+            // Handle both string arrays and object arrays
+            if (typeof modules[0] === 'string') {
+                return modules as string[];
+            } else if (typeof modules[0] === 'object' && modules[0] !== null) {
+                // Extract module names from objects
+                const moduleObjects = modules as Array<{ name: string; [key: string]: any }>;
+                return moduleObjects.map(m => m.name).filter(Boolean);
+            }
         }
-        return Array.from(new Set(permissions.data.map(p => p.module))).filter(Boolean);
+        // Fallback: get modules from permissions data
+        return Array.from(new Set(permissions.data.map(p => p.module))).filter(Boolean) as string[];
     }, [modules, permissions.data]);
 
     return (
@@ -266,6 +288,24 @@ export default function PermissionsIndex({
             ]}
         >
             <Head title="Permissions Management" />
+
+            {/* Developer Contact Modal */}
+            <DeveloperContactModal
+                isOpen={showDeveloperModal}
+                onClose={() => setShowDeveloperModal(false)}
+                developerDetails={{
+                    name: "System Security Team",
+                    email: "security.team@yourcompany.com",
+                    phone: "+1 (555) 987-6543",
+                    department: "Security & Permissions",
+                    company: "Your Company",
+                    website: "https://security.yourcompany.com/permissions",
+                    officeHours: "Monday - Friday, 8:00 AM - 5:00 PM",
+                    specialization: "Role-Based Access Control",
+                    responseTime: "24-48 business hours",
+                    notes: "All permission requests go through security review. Please include justification and which user roles need access."
+                }}
+            />
 
             <div className="space-y-6">
                 {/* Header */}
@@ -284,13 +324,25 @@ export default function PermissionsIndex({
                                 <span className="sm:hidden">Roles</span>
                             </Button>
                         </Link>
-                        <Link href={route('permissions.create')}>
-                            <Button className="h-9">
-                                <Plus className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">Create Permission</span>
-                                <span className="sm:hidden">Create</span>
-                            </Button>
-                        </Link>
+                        
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button 
+                                        variant="outline"
+                                        className="h-9 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                                        onClick={handleContactDeveloper}
+                                    >
+                                        <MessageCircle className="h-4 w-4 mr-2" />
+                                        <span className="hidden sm:inline">Request Permission</span>
+                                        <span className="sm:hidden">Request</span>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                    <p className="text-sm max-w-xs">Contact the security team to request new permissions</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </div>
                 </div>
 
@@ -471,7 +523,7 @@ export default function PermissionsIndex({
                                                                 <p className="text-gray-500 dark:text-gray-400">
                                                                     {hasActiveFilters 
                                                                         ? 'Try changing your filters or search criteria.'
-                                                                        : 'Get started by creating a permission.'}
+                                                                        : 'Permissions are managed by the system developer. Contact administrator for assistance.'}
                                                                 </p>
                                                             </div>
                                                             <div className="flex items-center gap-3">
@@ -485,12 +537,23 @@ export default function PermissionsIndex({
                                                                         Clear Filters
                                                                     </Button>
                                                                 )}
-                                                                <Link href={route('permissions.create')}>
-                                                                    <Button className="h-8" disabled={isSearching}>
-                                                                        <Plus className="h-3 w-3 mr-1" />
-                                                                        Create First Permission
-                                                                    </Button>
-                                                                </Link>
+                                                                <TooltipProvider>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button 
+                                                                                variant="outline"
+                                                                                className="h-8 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                                                                                onClick={handleContactDeveloper}
+                                                                            >
+                                                                                <MessageCircle className="h-3 w-3 mr-1" />
+                                                                                Request Permission
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent side="top">
+                                                                            <p className="text-sm max-w-xs">Contact the security team to request new permissions</p>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                </TooltipProvider>
                                                             </div>
                                                         </div>
                                                     </TableCell>
@@ -557,9 +620,9 @@ export default function PermissionsIndex({
                                                                     title={permission.module}
                                                                 >
                                                                     <span className="truncate">
-                                                                        {permission.module.length > moduleLength 
+                                                                        {permission.module && permission.module.length > moduleLength 
                                                                             ? permission.module.substring(0, moduleLength) + '...' 
-                                                                            : permission.module}
+                                                                            : permission.module || 'N/A'}
                                                                     </span>
                                                                 </Badge>
                                                             </TableCell>
@@ -791,10 +854,24 @@ export default function PermissionsIndex({
                                     <BarChart3 className="h-3 w-3 mr-2" />
                                     <span className="truncate">Usage Report</span>
                                 </Button>
-                                <Button variant="outline" size="sm" className="w-full justify-start h-8 col-span-2" disabled={isSearching}>
-                                    <RefreshCw className="h-3 w-3 mr-2" />
-                                    <span className="truncate">Sync Permissions</span>
-                                </Button>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                className="w-full justify-start h-8 col-span-2 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                                                onClick={handleContactDeveloper}
+                                            >
+                                                <MessageCircle className="h-3 w-3 mr-2" />
+                                                <span className="truncate">Request New Permission</span>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top">
+                                            <p className="text-sm max-w-xs">Contact the security team to request new permissions</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
                         </CardContent>
                     </Card>
@@ -816,11 +893,11 @@ export default function PermissionsIndex({
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <span 
                                                         className="text-sm font-medium truncate"
-                                                        title={module}
+                                                        title={module || 'N/A'}
                                                     >
-                                                        {module.length > moduleLength 
+                                                        {module && module.length > moduleLength 
                                                             ? module.substring(0, moduleLength) + '...' 
-                                                            : module}
+                                                            : module || 'N/A'}
                                                     </span>
                                                     <Badge variant="outline" className="text-xs">
                                                         {modulePermissions.length}

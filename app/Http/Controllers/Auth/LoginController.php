@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
@@ -21,28 +20,18 @@ class LoginController extends Controller
     public function create(Request $request)
     {
         if (auth()->check()) {
-            return redirect()->intended('/dashboard');
+            // Redirect based on user's role
+            return $this->redirectBasedOnRole(auth()->user());
         }
         
         $lastLogin = null;
         $failedAttempts = 0;
         $isLocked = false;
-        $rateLimitRemaining = null;
-        $rateLimitReset = null;
-        
-        // Check rate limiting for IP
-        $throttleKey = 'login:' . $request->ip();
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-            $rateLimitRemaining = 0;
-            $rateLimitReset = RateLimiter::availableIn($throttleKey);
-        } else {
-            $rateLimitRemaining = 5 - RateLimiter::attempts($throttleKey);
-        }
         
         // Get user by email from input
         $email = old('email');
         if ($email) {
-            $user = User::where('email', $email)->first();
+            $user = User::with('role')->where('email', $email)->first();
             
             if ($user) {
                 // Get last successful login
@@ -70,158 +59,149 @@ class LoginController extends Controller
                 'ip' => $lastLogin->ip_address,
                 'device' => $this->formatDeviceInfo($lastLogin),
                 'location' => $this->getLocation($lastLogin->ip_address),
-                'session_id' => $lastLogin->session_id, // Added
             ] : null,
             'failedLoginCount' => $failedAttempts,
             'isLocked' => $isLocked,
             'unlockTime' => $isLocked ? Carbon::now()->addMinutes(15)->toISOString() : null,
-            'rateLimitRemaining' => $rateLimitRemaining,
-            'rateLimitReset' => $rateLimitReset,
         ]);
     }
     
     /**
      * Handle a login request.
      */
-public function store(Request $request)
-{
-    // Validate credentials
-    $request->validate([
-        'email' => 'required|string|email',
-        'password' => 'required|string',
-    ]);
-    
-    // Throttle login attempts by IP + email
-    $throttleKey = 'login:' . $request->ip() . '|' . $request->email;
-    
-    if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-        $seconds = RateLimiter::availableIn($throttleKey);
-        
-        throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
-        ]);
-    }
-    
-    // Find user
-    $user = User::where('email', $request->email)->first();
-    
-    // Check if user exists
-    if (!$user) {
-        $this->logFailedAttempt($request, null, 'User not found');
-        RateLimiter::hit($throttleKey);
-        
-        throw ValidationException::withMessages([
-            'email' => __('auth.failed'),
-        ]);
-    }
-    
-    // Check if user account is active
-    if ($user->status !== 'active') {
-        $this->logFailedAttempt($request, $user, 'Account not active');
-        RateLimiter::hit($throttleKey);
-        
-        throw ValidationException::withMessages([
-            'email' => 'Your account is not active. Please contact administrator.',
-        ]);
-    }
-    
-    // Check if account is locked
-    if ($this->isAccountLocked($user)) {
-        throw ValidationException::withMessages([
-            'email' => 'Account temporarily locked due to too many failed attempts. Please try again later.',
-        ]);
-    }
-    
-    // Check password manually
-    if (!Hash::check($request->password, $user->password)) {
-        $this->logFailedAttempt($request, $user, 'Invalid password');
-        $this->incrementFailedAttempts($user);
-        RateLimiter::hit($throttleKey);
-        
-        throw ValidationException::withMessages([
-            'email' => __('auth.failed'),
-        ]);
-    }
-    
-    // Reset failed attempts on successful login
-    $this->resetFailedAttempts($user);
-    
-    // Check if password change is required
-    // if ($user->require_password_change) {
-    //     Auth::logout();
-    //     return redirect()->route('password.change')
-    //         ->with('message', 'Password change required. Please set a new password.');
-    // }
-    
-    // Log the user in manually FIRST - This creates the session
-    Auth::login($user, $request->boolean('remember'));
-    
-    // Now get the session ID (it exists in the sessions table)
-    $sessionId = session()->getId();
-    
-    // Log successful login WITH the session ID
-    $this->logSuccessfulLogin($request, $user, $sessionId);
-    
-    // Regenerate session ID for security
-    $request->session()->regenerate();
-    $newSessionId = session()->getId();
-    
-    // Update login log with new session ID after regeneration
-    $this->updateLoginLogSessionId($user->id, $sessionId, $newSessionId);
-    
-    // Clear rate limiter
-    RateLimiter::clear($throttleKey);
-    
-    // Update user's last login info
-    $user->update([
-        'last_login_at' => Carbon::now(),
-        'last_login_ip' => $request->ip(),
-        'login_count' => $user->login_count + 1,
-        'current_session_id' => $newSessionId, // Store current session ID
-    ]);
-    
-    return redirect()->intended('/dashboard')
-        ->with('status', 'Login successful');
-}
-
-/**
- * Log successful login.
- */
-private function logSuccessfulLogin(Request $request, User $user, string $sessionId): void
-{
-    UserLoginLog::create([
-        'user_id' => $user->id,
-        'session_id' => $sessionId, // Use the provided session ID
-        'ip_address' => $request->ip(),
-        'user_agent' => $request->userAgent(),
-        'login_at' => Carbon::now(),
-        'is_successful' => true,
-        'device_type' => $this->getDeviceType($request),
-        'browser' => $this->getBrowser($request),
-        'platform' => $this->getPlatform($request),
-    ]);
-}
-    
-    /**
-     * Log the user out.
-     */
-    public function destroy(Request $request)
+    public function store(Request $request)
     {
-        // Log logout with current session ID
-        if (auth()->check()) {
-            $this->logLogout(auth()->user(), session()->getId());
+        // Validate credentials
+        $request->validate([
+            'email' => 'required|string|email',
+            'password' => 'required|string',
+        ]);
+        
+        // Throttle login attempts by IP + email
+        $throttleKey = 'login:' . $request->ip() . '|' . $request->email;
+        
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            
+            throw ValidationException::withMessages([
+                'email' => trans('auth.throttle', [
+                    'seconds' => $seconds,
+                    'minutes' => ceil($seconds / 60),
+                ]),
+            ]);
         }
         
-        Auth::logout();
+        // Find user with role relationship
+        $user = User::with('role')->where('email', $request->email)->first();
         
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        // Check if user exists
+        if (!$user) {
+            $this->logFailedAttempt($request, null, 'User not found');
+            RateLimiter::hit($throttleKey);
+            
+            throw ValidationException::withMessages([
+                'email' => __('auth.failed'),
+            ]);
+        }
         
-        return redirect('/')
-            ->with('status', 'You have been logged out.');
+        // Check if user account is active
+        if (!$user->isActive()) {
+            $this->logFailedAttempt($request, $user, 'Account not active');
+            RateLimiter::hit($throttleKey);
+            
+            throw ValidationException::withMessages([
+                'email' => 'Your account is not active. Please contact administrator.',
+            ]);
+        }
+        
+        // Check if account is locked
+        if ($this->isAccountLocked($user)) {
+            throw ValidationException::withMessages([
+                'email' => 'Account temporarily locked due to too many failed attempts. Please try again later.',
+            ]);
+        }
+        
+        // Check password manually
+        if (!Hash::check($request->password, $user->password)) {
+            $this->logFailedAttempt($request, $user, 'Invalid password');
+            $this->incrementFailedAttempts($user);
+            RateLimiter::hit($throttleKey);
+            
+            throw ValidationException::withMessages([
+                'email' => __('auth.failed'),
+            ]);
+        }
+        
+        // Check if user has any role assigned
+        if (!$user->role) {
+            $this->logFailedAttempt($request, $user, 'No role assigned');
+            
+            throw ValidationException::withMessages([
+                'email' => 'Your account does not have any role assigned. Please contact administrator.',
+            ]);
+        }
+        
+        // Reset failed attempts on successful login
+        $this->resetFailedAttempts($user);
+        
+        // Log the user in
+        Auth::login($user, $request->boolean('remember'));
+        $request->session()->regenerate();
+        
+        // Log successful login
+        $this->logSuccessfulLogin($request, $user);
+        
+        // Update user's last login info
+        $user->recordLogin($request->ip());
+        
+        // Clear rate limiter
+        RateLimiter::clear($throttleKey);
+        
+        // Redirect based on user's role
+        return $this->redirectBasedOnRole($user);
+    }
+    
+    /**
+     * Get user's role name.
+     */
+    private function getRoleName(User $user): ?string
+    {
+        return $user->role ? $user->role->name : null;
+    }
+    
+    /**
+     * Redirect user based on their role.
+     */
+    private function redirectBasedOnRole(User $user)
+    {
+        $roleName = $this->getRoleName($user);
+        
+        if (!$roleName) {
+            Auth::logout();
+            return redirect()->route('login')
+                ->withErrors([
+                    'email' => 'Your account does not have any role assigned. Please contact administrator.',
+                ]);
+        }
+        
+        // Store role in session
+        session()->put([
+            'user.role' => $roleName,
+            'user.permissions' => $user->getPermissionNames(),
+            'user.full_name' => $user->full_name,
+            'user.show_password_change_modal' => $user->require_password_change || is_null($user->password_changed_at),
+        ]);
+        
+        // Define redirect logic
+        $residentRoles = ['Resident', 'Barangay Kagawad'];
+        
+        if (in_array($roleName, $residentRoles)) {
+            return redirect()->intended('/residentdashboard')
+                ->with('status', 'Login successful');
+        } else {
+            return redirect()->intended('/dashboard')
+                ->with('status', 'Login successful');
+        }
     }
     
     /**
@@ -247,13 +227,36 @@ private function logSuccessfulLogin(Request $request, User $user, string $sessio
     }
     
     /**
+     * Log successful login.
+     */
+    private function logSuccessfulLogin(Request $request, User $user): void
+    {
+        $roleName = $this->getRoleName($user);
+        
+        UserLoginLog::create([
+            'user_id' => $user->id,
+            'session_id' => session()->getId(),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'login_at' => Carbon::now(),
+            'is_successful' => true,
+            'device_type' => $this->getDeviceType($request),
+            'browser' => $this->getBrowser($request),
+            'platform' => $this->getPlatform($request),
+            'user_role' => $roleName,
+        ]);
+    }
+    
+    /**
      * Log failed login attempt.
      */
     private function logFailedAttempt(Request $request, ?User $user, string $reason): void
     {
+        $roleName = $user ? $this->getRoleName($user) : null;
+        
         UserLoginLog::create([
             'user_id' => $user?->id,
-            'session_id' => null, // No session for failed attempts
+            'session_id' => null,
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'login_at' => Carbon::now(),
@@ -262,47 +265,7 @@ private function logSuccessfulLogin(Request $request, User $user, string $sessio
             'device_type' => $this->getDeviceType($request),
             'browser' => $this->getBrowser($request),
             'platform' => $this->getPlatform($request),
-        ]);
-    }
-    
-
-    /**
-     * Update login log with new session ID after regeneration.
-     */
-    private function updateLoginLogSessionId(int $userId, string $oldSessionId, string $newSessionId): void
-    {
-        // Update the most recent login log for this user
-        UserLoginLog::where('user_id', $userId)
-            ->where('session_id', $oldSessionId)
-            ->where('is_successful', true)
-            ->whereNull('logout_at')
-            ->latest('login_at')
-            ->first()
-            ?->update(['session_id' => $newSessionId]);
-    }
-    
-    /**
-     * Log logout.
-     */
-    private function logLogout(User $user, string $sessionId): void
-    {
-        // Find login log by session_id
-        $latestLogin = UserLoginLog::where('user_id', $user->id)
-            ->where('session_id', $sessionId)
-            ->where('is_successful', true)
-            ->whereNull('logout_at')
-            ->latest('login_at')
-            ->first();
-            
-        if ($latestLogin) {
-            $latestLogin->update([
-                'logout_at' => Carbon::now(),
-            ]);
-        }
-        
-        $user->update([
-            'last_logout_at' => Carbon::now(),
-            'current_session_id' => null, // Clear current session
+            'user_role' => $roleName,
         ]);
     }
     
@@ -325,6 +288,7 @@ private function logSuccessfulLogin(Request $request, User $user, string $sessio
         $user->update([
             'failed_login_attempts' => 0,
             'last_failed_login_at' => null,
+            'account_locked_until' => null,
         ]);
     }
     
@@ -388,30 +352,92 @@ private function logSuccessfulLogin(Request $request, User $user, string $sessio
      */
     private function getLocation(string $ip): ?string
     {
-        // Implement IP geolocation here if needed
-        // Example using a service:
-        // try {
-        //     $response = Http::get("http://ip-api.com/json/{$ip}");
-        //     $data = $response->json();
-        //     return $data['city'] . ', ' . $data['country'];
-        // } catch (\Exception $e) {
-        //     return null;
-        // }
+        // Return null for now, implement IP geolocation if needed
         return null;
     }
     
     /**
-     * Get login logs for current session (helper method).
+     * Log the user out.
      */
-    public function getCurrentSessionLogs()
+    public function destroy(Request $request)
     {
-        if (!auth()->check()) {
-            return collect();
+        // Find and update the login log for this session
+        if (auth()->check()) {
+            $loginLog = UserLoginLog::where('user_id', auth()->id())
+                ->where('session_id', session()->getId())
+                ->where('is_successful', true)
+                ->whereNull('logout_at')
+                ->latest('login_at')
+                ->first();
+                
+            if ($loginLog) {
+                $loginLog->update([
+                    'logout_at' => Carbon::now(),
+                    'session_duration' => Carbon::now()->diffInSeconds($loginLog->login_at),
+                ]);
+            }
         }
         
-        return UserLoginLog::where('user_id', auth()->id())
-            ->where('session_id', session()->getId())
-            ->orderBy('login_at', 'desc')
-            ->get();
+        Auth::logout();
+        
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        
+        return redirect('/')
+            ->with('status', 'You have been logged out.');
+    }
+
+    /**
+     * Show password change form (optional)
+     */
+    public function showChangeForm(Request $request)
+    {
+        // Only allow access if logged in
+        if (!auth()->check()) {
+            return redirect()->route('login');
+        }
+
+        return inertia('auth/change-password', [
+            'require_password_change' => false,
+        ]);
+    }
+
+    /**
+     * Handle password change request (optional)
+     */
+    public function changePassword(Request $request)
+    {
+        $user = Auth::user();
+        
+        // Validate current password and new password
+        $request->validate([
+            'current_password' => 'required|current_password',
+            'new_password' => 'required|min:8|confirmed|different:current_password',
+        ]);
+
+        // Update password
+        $user->update([
+            'password' => Hash::make($request->new_password),
+            'require_password_change' => false,
+            'password_changed_at' => Carbon::now(),
+        ]);
+
+        return redirect()->back()
+            ->with('success', 'Password changed successfully.');
+    }
+    
+    /**
+     * Mark password as changed (dismiss modal)
+     */
+    public function dismissPasswordChange(Request $request)
+    {
+        $user = Auth::user();
+        
+        $user->update([
+            'require_password_change' => false,
+            'password_changed_at' => Carbon::now(),
+        ]);
+        
+        return response()->json(['success' => true]);
     }
 }

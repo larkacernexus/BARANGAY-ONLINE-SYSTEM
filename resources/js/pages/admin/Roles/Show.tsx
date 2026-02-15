@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
-import { Role, Permission } from '@/types';
 import {
     Shield,
     Users,
@@ -29,6 +28,8 @@ import {
     Settings,
     Bell,
     Activity,
+    User as UserIcon,
+    Hash,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,22 +48,37 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-interface RolesShowProps {
-    role: Role & {
-        permissions?: Permission[];
-        users_count?: number;
-        users?: Array<{
-            id: number;
-            name: string;
-            email: string;
-            avatar?: string;
-            created_at: string;
-        }>;
-    };
-    allPermissions?: Permission[];
+interface Permission {
+    id: number;
+    name: string;
+    display_name: string;
+    module: string;
+    description?: string;
 }
 
-export default function RolesShow({ role, allPermissions = [] }: RolesShowProps) {
+interface RecentUser {
+    id: number;
+    name: string;
+    email: string;
+    username: string;
+    status: 'active' | 'inactive';
+}
+
+interface RolesShowProps {
+    role: {
+        id: number;
+        name: string;
+        description: string;
+        is_system_role: boolean;
+        created_at: string;
+        updated_at: string;
+        users_count?: number;
+        permissions?: Permission[];
+        recent_users?: RecentUser[];
+    };
+}
+
+export default function RolesShow({ role }: RolesShowProps) {
     const [copySuccess, setCopySuccess] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState('overview');
 
@@ -105,6 +121,12 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                 onSuccess: () => {
                     router.visit(route('roles.index'));
                 },
+                onError: (errors) => {
+                    // Handle errors from controller
+                    if (errors.error) {
+                        alert(errors.error);
+                    }
+                },
             });
         }
     };
@@ -122,36 +144,97 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
             .slice(0, 2);
     };
 
-    // Group permissions by module/group
+    const getStatusBadge = (status: string) => {
+        const variants = {
+            active: 'bg-green-100 text-green-800 hover:bg-green-100',
+            inactive: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+            pending: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100',
+        };
+        return variants[status as keyof typeof variants] || variants.inactive;
+    };
+
+    // Group permissions by module
     const groupedPermissions = role.permissions?.reduce((groups, permission) => {
-        const group = permission.group || 'General';
-        if (!groups[group]) {
-            groups[group] = [];
+        const module = permission.module || 'General';
+        if (!groups[module]) {
+            groups[module] = [];
         }
-        groups[group].push(permission);
+        groups[module].push(permission);
         return groups;
     }, {} as Record<string, Permission[]>) || {};
 
-    // Statistics
+    // Statistics based on actual data
     const statistics = [
-        { label: 'Total Users', value: role.users_count || 0, icon: Users },
-        { label: 'Permissions', value: role.permissions?.length || 0, icon: Key },
-        { label: 'Active Users', value: Math.floor((role.users_count || 0) * 0.8), icon: UserCheck }, // Example
-        { label: 'Last Activity', value: 'Today', icon: Activity }, // Example
+        { 
+            label: 'Total Users', 
+            value: role.users_count || 0, 
+            icon: Users,
+            description: 'Users assigned to this role'
+        },
+        { 
+            label: 'Permissions', 
+            value: role.permissions?.length || 0, 
+            icon: Key,
+            description: 'Total permissions granted'
+        },
+        { 
+            label: 'Active Users', 
+            value: role.recent_users?.filter(u => u.status === 'active').length || 0, 
+            icon: UserCheck,
+            description: 'Currently active users'
+        },
+        { 
+            label: 'System Role', 
+            value: role.is_system_role ? 'Yes' : 'No', 
+            icon: Shield,
+            description: 'Predefined system role'
+        },
     ];
 
     // System role warnings
     const systemWarnings = role.is_system_role ? [
         'System roles cannot be deleted',
-        'System roles have predefined permissions',
         'Changes to system roles may affect system functionality',
     ] : [];
+
+    const handleManagePermissions = () => {
+        router.get(route('roles.permissions', role.id));
+    };
+
+    const handleExportDetails = () => {
+        const data = {
+            id: role.id,
+            name: role.name,
+            description: role.description,
+            is_system_role: role.is_system_role,
+            users_count: role.users_count,
+            permissions: role.permissions?.map(p => ({
+                id: p.id,
+                name: p.name,
+                display_name: p.display_name,
+                module: p.module,
+            })) || [],
+            created_at: role.created_at,
+            updated_at: role.updated_at,
+        };
+        
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `role-${role.name.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
 
     return (
         <AdminLayout
             title={`Role: ${role.name}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Dashboard', href: route('dashboard') },
                 { title: 'Roles', href: route('roles.index') },
                 { title: role.name, href: route('roles.show', role.id) }
             ]}
@@ -220,18 +303,21 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem asChild>
-                                    <Link href={route('roles.edit', role.id)} className="flex items-center cursor-pointer">
-                                        <Edit className="mr-2 h-4 w-4" />
-                                        <span>Edit Role</span>
-                                    </Link>
-                                </DropdownMenuItem>
+                                {!role.is_system_role && (
+                                    <DropdownMenuItem asChild>
+                                        <Link href={route('roles.edit', role.id)} className="flex items-center cursor-pointer">
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            <span>Edit Role</span>
+                                        </Link>
+                                    </DropdownMenuItem>
+                                )}
                                 
-                                <DropdownMenuItem asChild>
-                                    <Link href={route('roles.permissions', role.id)} className="flex items-center cursor-pointer">
-                                        <Key className="mr-2 h-4 w-4" />
-                                        <span>Manage Permissions</span>
-                                    </Link>
+                                <DropdownMenuItem 
+                                    onClick={handleManagePermissions}
+                                    className="flex items-center cursor-pointer"
+                                >
+                                    <Key className="mr-2 h-4 w-4" />
+                                    <span>Manage Permissions</span>
                                 </DropdownMenuItem>
 
                                 <DropdownMenuItem 
@@ -240,6 +326,14 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                 >
                                     <Printer className="mr-2 h-4 w-4" />
                                     <span>Print Details</span>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem 
+                                    onClick={handleExportDetails}
+                                    className="flex items-center cursor-pointer"
+                                >
+                                    <Download className="mr-2 h-4 w-4" />
+                                    <span>Export as JSON</span>
                                 </DropdownMenuItem>
 
                                 <DropdownMenuItem 
@@ -270,12 +364,14 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                             </DropdownMenuContent>
                         </DropdownMenu>
 
-                        <Link href={route('roles.edit', role.id)}>
-                            <Button size="sm">
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit Role
-                            </Button>
-                        </Link>
+                        {!role.is_system_role && (
+                            <Link href={route('roles.edit', role.id)}>
+                                <Button size="sm">
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit Role
+                                </Button>
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -307,10 +403,7 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                             <CardContent>
                                 <div className="text-xl sm:text-2xl font-bold">{stat.value}</div>
                                 <div className="text-xs text-gray-500 mt-1">
-                                    {index === 0 ? 'Users assigned to this role' : 
-                                     index === 1 ? 'Total permissions granted' :
-                                     index === 2 ? 'Currently active users' :
-                                     'Latest activity time'}
+                                    {stat.description}
                                 </div>
                             </CardContent>
                         </Card>
@@ -321,7 +414,7 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
                     <TabsList className="grid grid-cols-4 w-full max-w-md">
                         <TabsTrigger value="overview">Overview</TabsTrigger>
-                        <TabsTrigger value="permissions">Permissions</TabsTrigger>
+                        <TabsTrigger value="permissions">Permissions ({role.permissions?.length || 0})</TabsTrigger>
                         <TabsTrigger value="users">Users ({role.users_count || 0})</TabsTrigger>
                         <TabsTrigger value="details">Details</TabsTrigger>
                     </TabsList>
@@ -410,18 +503,20 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid grid-cols-2 gap-3">
-                                        <Link href={route('roles.permissions', role.id)}>
-                                            <Button variant="outline" className="w-full justify-start h-10">
-                                                <Key className="h-4 w-4 mr-2" />
-                                                Manage Permissions
-                                            </Button>
-                                        </Link>
+                                        <Button 
+                                            variant="outline" 
+                                            className="w-full justify-start h-10"
+                                            onClick={handleManagePermissions}
+                                            disabled={role.is_system_role}
+                                        >
+                                            <Key className="h-4 w-4 mr-2" />
+                                            Manage Permissions
+                                        </Button>
                                         
                                         <Button 
                                             variant="outline" 
                                             className="w-full justify-start h-10"
                                             onClick={() => {
-                                                // Navigate to user management with role filter
                                                 router.get(route('users.index'), { role: role.id });
                                             }}
                                         >
@@ -432,12 +527,7 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                         <Button 
                                             variant="outline" 
                                             className="w-full justify-start h-10"
-                                            onClick={() => handleCopyToClipboard(JSON.stringify({
-                                                id: role.id,
-                                                name: role.name,
-                                                description: role.description,
-                                                permissions: role.permissions?.map(p => p.name)
-                                            }, null, 2), 'Role details')}
+                                            onClick={handleExportDetails}
                                         >
                                             <FileText className="h-4 w-4 mr-2" />
                                             Export Details
@@ -447,10 +537,11 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                             variant="outline" 
                                             className="w-full justify-start h-10"
                                             onClick={() => {
-                                                if (confirm('Duplicate this role with all permissions?')) {
-                                                    router.post(route('roles.duplicate', role.id));
-                                                }
+                                                router.get(route('roles.create'), {
+                                                    duplicate: role.id,
+                                                });
                                             }}
+                                            disabled={role.is_system_role}
                                         >
                                             <Copy className="h-4 w-4 mr-2" />
                                             Duplicate Role
@@ -473,16 +564,31 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                 <CardContent>
                                     {Object.keys(groupedPermissions).length > 0 ? (
                                         <div className="space-y-4">
-                                            {Object.entries(groupedPermissions).slice(0, 3).map(([group, permissions]) => (
-                                                <div key={group}>
+                                            {Object.entries(groupedPermissions).slice(0, 3).map(([module, permissions]) => (
+                                                <div key={module}>
                                                     <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                        {group} ({permissions.length})
+                                                        {module} ({permissions.length})
                                                     </div>
                                                     <div className="flex flex-wrap gap-2">
                                                         {permissions.slice(0, 5).map(permission => (
-                                                            <Badge key={permission.id} variant="outline" className="text-xs">
-                                                                {permission.name}
-                                                            </Badge>
+                                                            <TooltipProvider key={permission.id}>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Badge variant="outline" className="text-xs cursor-help">
+                                                                            {permission.display_name}
+                                                                        </Badge>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>
+                                                                        <div className="max-w-xs">
+                                                                            <div className="font-medium">{permission.display_name}</div>
+                                                                            <div className="text-xs text-gray-500">{permission.name}</div>
+                                                                            {permission.description && (
+                                                                                <div className="text-xs mt-1">{permission.description}</div>
+                                                                            )}
+                                                                        </div>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
                                                         ))}
                                                         {permissions.length > 5 && (
                                                             <Badge variant="secondary" className="text-xs">
@@ -494,12 +600,14 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                             ))}
                                             {Object.keys(groupedPermissions).length > 3 && (
                                                 <div className="pt-2">
-                                                    <Link href="#permissions" onClick={() => setActiveTab('permissions')}>
-                                                        <Button variant="link" className="p-0 h-auto">
-                                                            View all {Object.keys(groupedPermissions).length} permission groups
-                                                            <ChevronRight className="h-4 w-4 ml-1" />
-                                                        </Button>
-                                                    </Link>
+                                                    <Button 
+                                                        variant="link" 
+                                                        className="p-0 h-auto"
+                                                        onClick={() => setActiveTab('permissions')}
+                                                    >
+                                                        View all {Object.keys(groupedPermissions).length} permission modules
+                                                        <ChevronRight className="h-4 w-4 ml-1" />
+                                                    </Button>
                                                 </div>
                                             )}
                                         </div>
@@ -507,11 +615,15 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                         <div className="text-center py-8">
                                             <Key className="h-12 w-12 mx-auto text-gray-300 dark:text-gray-700 mb-3" />
                                             <p className="text-gray-500 dark:text-gray-400">No permissions assigned</p>
-                                            <Link href={route('roles.permissions', role.id)}>
-                                                <Button variant="outline" size="sm" className="mt-3">
-                                                    Assign Permissions
-                                                </Button>
-                                            </Link>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                className="mt-3"
+                                                onClick={handleManagePermissions}
+                                                disabled={role.is_system_role}
+                                            >
+                                                Assign Permissions
+                                            </Button>
                                         </div>
                                     )}
                                 </CardContent>
@@ -530,25 +642,27 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                             Assigned Permissions
                                         </CardTitle>
                                         <CardDescription>
-                                            {role.permissions?.length || 0} permissions assigned
+                                            {role.permissions?.length || 0} permissions across {Object.keys(groupedPermissions).length} modules
                                         </CardDescription>
                                     </div>
-                                    <Link href={route('roles.permissions', role.id)}>
-                                        <Button size="sm">
-                                            <Settings className="h-4 w-4 mr-2" />
-                                            Manage Permissions
-                                        </Button>
-                                    </Link>
+                                    <Button 
+                                        size="sm"
+                                        onClick={handleManagePermissions}
+                                        disabled={role.is_system_role}
+                                    >
+                                        <Settings className="h-4 w-4 mr-2" />
+                                        Manage Permissions
+                                    </Button>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 {Object.keys(groupedPermissions).length > 0 ? (
                                     <div className="space-y-6">
-                                        {Object.entries(groupedPermissions).map(([group, permissions]) => (
-                                            <div key={group} className="space-y-3">
+                                        {Object.entries(groupedPermissions).map(([module, permissions]) => (
+                                            <div key={module} className="space-y-3">
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                                        {group}
+                                                        {module}
                                                     </h3>
                                                     <Badge variant="outline" className="text-sm">
                                                         {permissions.length} permissions
@@ -556,32 +670,36 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                                 </div>
                                                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                                                     {permissions.map(permission => (
-                                                        <div 
-                                                            key={permission.id}
-                                                            className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-md"
-                                                        >
-                                                            <div>
-                                                                <div className="font-medium text-sm">
-                                                                    {permission.name}
+                                                        <Card key={permission.id} className="overflow-hidden">
+                                                            <CardHeader className="pb-2">
+                                                                <CardTitle className="text-sm font-medium">
+                                                                    {permission.display_name}
+                                                                </CardTitle>
+                                                            </CardHeader>
+                                                            <CardContent className="pb-3">
+                                                                <div className="space-y-2">
+                                                                    <code className="text-xs text-gray-500 block">
+                                                                        {permission.name}
+                                                                    </code>
+                                                                    {permission.description && (
+                                                                        <p className="text-xs text-gray-600">
+                                                                            {permission.description}
+                                                                        </p>
+                                                                    )}
                                                                 </div>
-                                                                {permission.description && (
-                                                                    <div className="text-xs text-gray-500 mt-1">
-                                                                        {permission.description}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Check className="h-4 w-4 text-green-500" />
+                                                            </CardContent>
+                                                            <CardFooter className="pt-0">
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
-                                                                    className="h-6 w-6 p-0"
+                                                                    className="h-6 px-2"
                                                                     onClick={() => handleCopyToClipboard(permission.name, 'Permission name')}
                                                                 >
-                                                                    <Copy className="h-3 w-3" />
+                                                                    <Copy className="h-3 w-3 mr-1" />
+                                                                    Copy
                                                                 </Button>
-                                                            </div>
-                                                        </div>
+                                                            </CardFooter>
+                                                        </Card>
                                                     ))}
                                                 </div>
                                             </div>
@@ -596,12 +714,13 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                         <p className="text-gray-500 dark:text-gray-400 mb-6">
                                             This role doesn't have any permissions assigned yet.
                                         </p>
-                                        <Link href={route('roles.permissions', role.id)}>
-                                            <Button>
-                                                <Settings className="h-4 w-4 mr-2" />
-                                                Assign Permissions
-                                            </Button>
-                                        </Link>
+                                        <Button 
+                                            onClick={handleManagePermissions}
+                                            disabled={role.is_system_role}
+                                        >
+                                            <Settings className="h-4 w-4 mr-2" />
+                                            Assign Permissions
+                                        </Button>
                                     </div>
                                 )}
                             </CardContent>
@@ -635,26 +754,24 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                {role.users && role.users.length > 0 ? (
+                                {role.recent_users && role.recent_users.length > 0 ? (
                                     <div className="space-y-4">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>User</TableHead>
                                                     <TableHead>Email</TableHead>
-                                                    <TableHead>Joined</TableHead>
+                                                    <TableHead>Username</TableHead>
+                                                    <TableHead>Status</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {role.users.map(user => (
+                                                {role.recent_users.map(user => (
                                                     <TableRow key={user.id}>
                                                         <TableCell>
                                                             <div className="flex items-center gap-3">
                                                                 <Avatar className="h-8 w-8">
-                                                                    {user.avatar ? (
-                                                                        <AvatarImage src={user.avatar} alt={user.name} />
-                                                                    ) : null}
                                                                     <AvatarFallback>
                                                                         {getInitials(user.name)}
                                                                     </AvatarFallback>
@@ -668,16 +785,18 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>{user.email}</TableCell>
+                                                        <TableCell>{user.username}</TableCell>
                                                         <TableCell>
-                                                            <div className="text-sm text-gray-500">
-                                                                {formatTimeAgo(user.created_at)}
-                                                            </div>
+                                                            <Badge className={getStatusBadge(user.status)}>
+                                                                {user.status}
+                                                            </Badge>
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             <div className="flex justify-end gap-2">
                                                                 <Link href={`/users/${user.id}`}>
                                                                     <Button variant="ghost" size="sm" className="h-8">
                                                                         <Eye className="h-3 w-3" />
+                                                                        <span className="sr-only">View</span>
                                                                     </Button>
                                                                 </Link>
                                                                 <Button
@@ -687,6 +806,7 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                                                     onClick={() => handleCopyToClipboard(user.email, 'User email')}
                                                                 >
                                                                     <Copy className="h-3 w-3" />
+                                                                    <span className="sr-only">Copy email</span>
                                                                 </Button>
                                                             </div>
                                                         </TableCell>
@@ -694,7 +814,7 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                                 ))}
                                             </TableBody>
                                         </Table>
-                                        {role.users_count && role.users_count > role.users.length && (
+                                        {role.users_count && role.users_count > (role.recent_users?.length || 0) && (
                                             <div className="text-center pt-4">
                                                 <Button 
                                                     variant="outline"
@@ -719,7 +839,7 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                         <Button 
                                             variant="outline"
                                             onClick={() => {
-                                                router.get(route('users.index'), { role: role.id, assign: true });
+                                                router.get(route('users.index'), { assign_role: role.id });
                                             }}
                                         >
                                             <UserCheck className="h-4 w-4 mr-2" />
@@ -807,7 +927,7 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                         <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
                                             <div className="flex items-center gap-3">
                                                 <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                                                    <Edit className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                                    <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                                 </div>
                                                 <div>
                                                     <div className="text-sm font-medium">Role created</div>
@@ -824,9 +944,9 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                                                     <Key className="h-4 w-4 text-green-600 dark:text-green-400" />
                                                 </div>
                                                 <div>
-                                                    <div className="text-sm font-medium">Permissions updated</div>
+                                                    <div className="text-sm font-medium">Permissions assigned</div>
                                                     <div className="text-xs text-gray-500">
-                                                        Last updated {formatTimeAgo(role.updated_at)}
+                                                        {role.permissions?.length || 0} permissions granted
                                                     </div>
                                                 </div>
                                             </div>
@@ -874,19 +994,20 @@ export default function RolesShow({ role, allPermissions = [] }: RolesShowProps)
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-md">
-                                    <div>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-md">
+                                    <div className="flex-1">
                                         <div className="font-medium text-red-800 dark:text-red-300">
                                             Delete this role
                                         </div>
                                         <div className="text-sm text-red-600 dark:text-red-400 mt-1">
-                                            Once deleted, this role cannot be recovered. Users will lose access.
+                                            Once deleted, this role cannot be recovered. Users assigned to this role will lose their role-based permissions.
                                         </div>
                                     </div>
                                     <Button 
                                         variant="destructive"
                                         onClick={handleDelete}
                                         disabled={!canDeleteRole()}
+                                        className="whitespace-nowrap"
                                     >
                                         <Trash2 className="h-4 w-4 mr-2" />
                                         Delete Role

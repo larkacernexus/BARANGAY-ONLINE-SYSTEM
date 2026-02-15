@@ -1,5 +1,6 @@
 <?php
 
+// bootstrap/app.php
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,13 +25,15 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\HandleAppearance::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
-            // \App\Http\Middleware\LogUserAccess::class, // ← COMMENT THIS OUT FOR NOW
+            // \App\Http\Middleware\LogUserAccess::class,
         ]);
         
-        // Route middleware aliases
+        // Route middleware aliases - ADD PERMISSION MIDDLEWARE HERE
         $middleware->alias([
-            'admin'    => \App\Http\Middleware\AdminMiddleware::class,
-            'resident' => \App\Http\Middleware\ResidentMiddleware::class,
+            'admin'      => \App\Http\Middleware\AdminMiddleware::class,
+            'resident'   => \App\Http\Middleware\ResidentMiddleware::class,
+            'permission' => \App\Http\Middleware\CheckPermission::class, // Add this line
+            'role'       => \App\Http\Middleware\CheckRole::class,       // Optional: add role middleware
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

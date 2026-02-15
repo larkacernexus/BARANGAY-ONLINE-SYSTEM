@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class ClearanceType extends Model
 {
@@ -16,6 +17,7 @@ class ClearanceType extends Model
         'code',
         'description',
         'fee',
+        'is_discountable', // NEW
         'processing_days',
         'validity_days',
         'is_active',
@@ -29,6 +31,7 @@ class ClearanceType extends Model
 
     protected $casts = [
         'fee' => 'decimal:2',
+        'is_discountable' => 'boolean', // NEW
         'is_active' => 'boolean',
         'requires_payment' => 'boolean',
         'requires_approval' => 'boolean',
@@ -54,6 +57,7 @@ class ClearanceType extends Model
             'code' => 'BRGY_CLEARANCE',
             'description' => 'General barangay clearance for various purposes',
             'fee' => 100.00,
+            'is_discountable' => true, // NEW
             'processing_days' => 1,
             'validity_days' => 30,
         ],
@@ -62,6 +66,7 @@ class ClearanceType extends Model
             'code' => 'BUSINESS_CLEARANCE',
             'description' => 'Clearance for business registration and permits',
             'fee' => 300.00,
+            'is_discountable' => false, // NEW
             'processing_days' => 3,
             'validity_days' => 365,
         ],
@@ -70,6 +75,7 @@ class ClearanceType extends Model
             'code' => 'POLICE_CLEARANCE',
             'description' => 'Barangay endorsement for police clearance',
             'fee' => 50.00,
+            'is_discountable' => true, // NEW
             'processing_days' => 2,
             'validity_days' => 30,
         ],
@@ -78,6 +84,7 @@ class ClearanceType extends Model
             'code' => 'NBI_CLEARANCE',
             'description' => 'Barangay endorsement for NBI clearance',
             'fee' => 50.00,
+            'is_discountable' => true, // NEW
             'processing_days' => 2,
             'validity_days' => 30,
         ],
@@ -86,6 +93,7 @@ class ClearanceType extends Model
             'code' => 'TRAVEL_CLEARANCE',
             'description' => 'Clearance for domestic/international travel',
             'fee' => 150.00,
+            'is_discountable' => true, // NEW
             'processing_days' => 2,
             'validity_days' => 60,
         ],
@@ -94,6 +102,7 @@ class ClearanceType extends Model
             'code' => 'EMPLOYMENT_CLEARANCE',
             'description' => 'Clearance for employment purposes',
             'fee' => 100.00,
+            'is_discountable' => true, // NEW
             'processing_days' => 2,
             'validity_days' => 30,
         ],
@@ -102,6 +111,7 @@ class ClearanceType extends Model
             'code' => 'SCHOLARSHIP_CLEARANCE',
             'description' => 'Clearance for scholarship applications',
             'fee' => 50.00,
+            'is_discountable' => true, // NEW
             'processing_days' => 2,
             'validity_days' => 30,
         ],
@@ -110,6 +120,7 @@ class ClearanceType extends Model
             'code' => 'INDIGENCY_CERT',
             'description' => 'Certificate for indigent residents',
             'fee' => 0.00,
+            'is_discountable' => false, // NEW
             'processing_days' => 3,
             'validity_days' => 90,
             'requires_payment' => false,
@@ -119,6 +130,7 @@ class ClearanceType extends Model
             'code' => 'RESIDENCY_CERT',
             'description' => 'Proof of residency certificate',
             'fee' => 50.00,
+            'is_discountable' => true, // NEW
             'processing_days' => 1,
             'validity_days' => 90,
         ],
@@ -127,11 +139,11 @@ class ClearanceType extends Model
             'code' => 'GOOD_MORAL_CERT',
             'description' => 'Certificate of good moral character',
             'fee' => 100.00,
+            'is_discountable' => true, // NEW
             'processing_days' => 3,
             'validity_days' => 30,
         ],
     ];
-
 
     public function documentRequirements(): HasMany
     {
@@ -174,6 +186,11 @@ class ClearanceType extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeDiscountable($query) // NEW
+    {
+        return $query->where('is_discountable', true);
     }
 
     public function scopeRequiresPayment($query)
@@ -224,29 +241,27 @@ class ClearanceType extends Model
         return now()->addWeekdays($this->processing_days)->format('F j, Y');
     }
 
-public function getDocumentRequirementsAttribute(): array
-{
-    $requirements = [];
-    
-    // Check if the relationship exists and is loaded
-    if (property_exists($this, 'documentRequirements') && $this->relationLoaded('documentRequirements')) {
-        foreach ($this->documentRequirements as $requirement) {
-            // Make sure documentType relationship is loaded
-            if ($requirement->relationLoaded('documentType')) {
-                $docType = $requirement->documentType;
-                $requirements[] = [
-                    'id' => $requirement->document_type_id,
-                    'name' => $docType->name ?? 'Unknown',
-                    'description' => $docType->description ?? '',
-                    'is_required' => (bool) $requirement->is_required,
-                    'sort_order' => (int) $requirement->sort_order,
-                ];
+    public function getDocumentRequirementsAttribute(): array
+    {
+        $requirements = [];
+        
+        if (property_exists($this, 'documentRequirements') && $this->relationLoaded('documentRequirements')) {
+            foreach ($this->documentRequirements as $requirement) {
+                if ($requirement->relationLoaded('documentType')) {
+                    $docType = $requirement->documentType;
+                    $requirements[] = [
+                        'id' => $requirement->document_type_id,
+                        'name' => $docType->name ?? 'Unknown',
+                        'description' => $docType->description ?? '',
+                        'is_required' => (bool) $requirement->is_required,
+                        'sort_order' => (int) $requirement->sort_order,
+                    ];
+                }
             }
         }
+        
+        return $requirements;
     }
-    
-    return $requirements;
-}
 
     public function isEligible(Resident $resident): bool
     {
@@ -373,9 +388,10 @@ public function getDocumentRequirementsAttribute(): array
     }
 
     public function clearanceRequests()
-{
-    return $this->hasMany(ClearanceRequest::class);
-}
+    {
+        return $this->hasMany(ClearanceRequest::class);
+    }
+
     public function getDocumentTypesManually()
     {
         return DB::table('document_requirements as dr')

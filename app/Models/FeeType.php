@@ -1,5 +1,4 @@
 <?php
-// app/Models/FeeType.php
 
 namespace App\Models;
 
@@ -13,18 +12,14 @@ class FeeType extends Model
 
     protected $fillable = [
         'code',
+        'document_category_id',
         'name',
         'short_name',
-        'document_category_id', // Changed from 'category'
         'base_amount',
         'amount_type',
         'computation_formula',
         'unit',
-        'has_senior_discount',
-        'has_pwd_discount',
-        'has_solo_parent_discount',
-        'has_indigent_discount',
-        'discount_percentage',
+        'is_discountable',
         'has_surcharge',
         'surcharge_percentage',
         'surcharge_fixed',
@@ -36,7 +31,6 @@ class FeeType extends Model
         'applicable_to',
         'applicable_puroks',
         'requirements',
-        'approval_needed',
         'effective_date',
         'expiry_date',
         'is_active',
@@ -50,15 +44,11 @@ class FeeType extends Model
 
     protected $casts = [
         'base_amount' => 'decimal:2',
+        'is_discountable' => 'boolean',
         'surcharge_percentage' => 'decimal:2',
         'surcharge_fixed' => 'decimal:2',
         'penalty_percentage' => 'decimal:2',
         'penalty_fixed' => 'decimal:2',
-        'discount_percentage' => 'decimal:2',
-        'has_senior_discount' => 'boolean',
-        'has_pwd_discount' => 'boolean',
-        'has_solo_parent_discount' => 'boolean',
-        'has_indigent_discount' => 'boolean',
         'has_surcharge' => 'boolean',
         'has_penalty' => 'boolean',
         'is_active' => 'boolean',
@@ -72,6 +62,13 @@ class FeeType extends Model
         'computation_formula' => 'array',
         'applicable_puroks' => 'array',
         'requirements' => 'array',
+    ];
+
+    protected $appends = [
+        'display_name',
+        'category_display',
+        'applicable_to_display',
+        'frequency_display',
     ];
 
     // Relationships
@@ -96,6 +93,11 @@ class FeeType extends Model
         return $query->where('is_active', true);
     }
 
+    public function scopeDiscountable($query)
+    {
+        return $query->where('is_discountable', true);
+    }
+
     public function scopeByDocumentCategory($query, $documentCategoryId)
     {
         return $query->where('document_category_id', $documentCategoryId);
@@ -104,14 +106,14 @@ class FeeType extends Model
     public function scopeApplicableTo($query, $type)
     {
         return $query->where('applicable_to', $type)
-                    ->orWhere('applicable_to', 'all_residents');
+            ->orWhere('applicable_to', 'all_residents');
     }
 
     public function scopeForPurok($query, $purok)
     {
-        return $query->where(function($q) use ($purok) {
+        return $query->where(function ($q) use ($purok) {
             $q->where('applicable_puroks', 'like', "%{$purok}%")
-              ->orWhereNull('applicable_puroks');
+                ->orWhereNull('applicable_puroks');
         });
     }
 
@@ -121,10 +123,8 @@ class FeeType extends Model
         switch ($this->amount_type) {
             case 'fixed':
                 return $this->base_amount;
-                
             case 'computed':
                 return $this->computeAmount($parameters);
-                
             default:
                 return $this->base_amount;
         }
@@ -132,14 +132,11 @@ class FeeType extends Model
 
     private function computeAmount($parameters)
     {
-        // Implement computation based on formula
-        // Example: area * rate, or business_size * multiplier
-        return $this->base_amount; // Default
+        return $this->base_amount;
     }
 
     public function getCategoryDisplayAttribute()
     {
-        // Now get category from document_category relationship
         return $this->documentCategory ? $this->documentCategory->name : 'Uncategorized';
     }
 
@@ -154,7 +151,7 @@ class FeeType extends Model
             'specific_zone' => 'Specific Zone',
             'visitors' => 'Visitors',
         ];
-        
+
         return $types[$this->applicable_to] ?? $this->applicable_to;
     }
 
@@ -169,17 +166,12 @@ class FeeType extends Model
             'bi_annual' => 'Bi-Annual',
             'custom' => 'Custom',
         ];
-        
+
         return $frequencies[$this->frequency] ?? $this->frequency;
     }
 
     public function getDisplayNameAttribute()
     {
         return "{$this->name} ({$this->code})";
-    }
-
-    public function discountFeeTypes()
-    {
-        return $this->hasMany(DiscountFeeType::class);
     }
 }

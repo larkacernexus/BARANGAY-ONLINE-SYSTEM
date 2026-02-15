@@ -1,805 +1,615 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+// pages/Roles.tsx
+import { router, usePage } from '@inertiajs/react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { toast } from 'sonner';
+import debounce from 'lodash/debounce';
 import AdminLayout from '@/layouts/admin-app-layout';
-import { Role, Paginated, FilterParams, Stats } from '@/types';
-import {
-    Search,
-    Download,
-    Plus,
-    Users,
-    Shield,
-    Edit,
-    Eye,
-    Trash2,
-    MoreVertical,
-    Copy,
-    ChevronLeft,
-    ChevronRight,
-    Key,
-} from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { RolesIndexProps, Role } from '@/types';
+import { 
+    filterRoles,
+    getSelectionStats,
+    formatForClipboard,
+    truncateText,
+    getTruncationLength,
+    getRoleTypeBadgeVariant,
+    formatDate,
+    canDeleteRole,
+    getQuickFilterActions,
+    normalizeStats,
+    FilterState,
+    BulkOperation,
+    SelectionMode,
+    SelectionStats
+} from '@/admin-utils/rolesUtils';
+
+// Import reusable components
+import { TooltipProvider } from '@/components/ui/tooltip';
+import RolesHeader from '@/components/admin/roles/RolesHeader';
+import RolesStats from '@/components/admin/roles/RolesStats';
+import RolesFilters from '@/components/admin/roles/RolesFilters';
+import RolesContent from '@/components/admin/roles/RolesContent';
+import RolesDialogs from '@/components/admin/roles/RolesDialogs';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { route } from 'ziggy-js';
+import { Key } from 'lucide-react';
 
-interface RolesIndexProps {
-    roles: Paginated<Role>;
-    filters: FilterParams;
-    stats?: Stats[] | any;
-}
-
-export default function RolesIndex({ 
-    roles, 
-    filters: initialFilters, 
-    stats: propsStats 
-}: RolesIndexProps) {
-    // State for local filter changes (not yet applied)
-    const [localFilters, setLocalFilters] = useState<FilterParams>({
+export default function Roles() {
+    const { props } = usePage<RolesIndexProps>();
+    const { roles, filters: initialFilters, stats: propsStats } = props;
+    
+    // State management
+    const [search, setSearch] = useState(initialFilters.search || '');
+    const [filtersState, setFiltersState] = useState<FilterState>({
         search: initialFilters.search || '',
-        type: initialFilters.type || 'all',
+        type: initialFilters.type || 'all'
     });
-
-    // State for currently applied filters
-    const [appliedFilters, setAppliedFilters] = useState<FilterParams>({
-        search: initialFilters.search || '',
-        type: initialFilters.type || 'all',
-    });
-
-    const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
-    const [deleting, setDeleting] = useState(false);
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+    const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+    
+    // Bulk selection states
+    const [selectedRoles, setSelectedRoles] = useState<number[]>([]);
+    const [isBulkMode, setIsBulkMode] = useState(false);
+    const [isSelectAll, setIsSelectAll] = useState(false);
+    const [selectionMode, setSelectionMode] = useState<SelectionMode>('page');
+    
+    // Dialog states
+    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+    const [showBulkTypeDialog, setShowBulkTypeDialog] = useState(false);
+    const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
+    const [bulkEditValue, setBulkEditValue] = useState<string>('');
+    const [expandedRole, setExpandedRole] = useState<number | null>(null);
 
-    // Normalize stats to always be an array
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Normalize stats
     const stats = useMemo(() => {
-        if (Array.isArray(propsStats)) {
-            return propsStats;
-        }
-        
-        // If stats is an object, convert to array
-        if (propsStats && typeof propsStats === 'object' && !Array.isArray(propsStats)) {
-            return Object.entries(propsStats).map(([label, value]) => ({
-                label: typeof label === 'string' ? label.replace(/_/g, ' ') : 'Stat',
-                value: typeof value === 'number' || typeof value === 'string' ? value : String(value),
-            })) as Stats[];
-        }
-        
-        // Generate default stats from available data
-        const totalRoles = roles.meta?.total || 0;
-        const systemRoles = roles.data.filter(r => r.is_system_role).length;
-        const customRoles = roles.data.filter(r => !r.is_system_role).length;
-        const totalUsers = roles.data.reduce((sum, r) => sum + (r.users_count || 0), 0);
-        
-        return [
-            { label: 'Total Roles', value: totalRoles },
-            { label: 'System Roles', value: systemRoles },
-            { label: 'Custom Roles', value: customRoles },
-            { label: 'Total Users', value: totalUsers },
-        ] as Stats[];
-    }, [propsStats, roles]);
+        return normalizeStats(propsStats, roles.data);
+    }, [propsStats, roles.data]);
 
-    // Track window resize
+    // Debounced search
+    const debouncedSearch = useCallback(
+        debounce((value: string) => {
+            const params = {
+                ...filtersState,
+                search: value
+            };
+            
+            // Clean up empty values
+            Object.keys(params).forEach(key => {
+                const k = key as keyof typeof params;
+                if (!params[k] || params[k] === 'all') {
+                    delete params[k];
+                }
+            });
+            
+            router.get('/roles', params, {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+            });
+        }, 500),
+        [filtersState]
+    );
+
+    // Handle search change
+    useEffect(() => {
+        if (search !== initialFilters.search) {
+            debouncedSearch(search);
+        }
+        return () => debouncedSearch.cancel();
+    }, [search, debouncedSearch, initialFilters.search]);
+
+    // Handle window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
         const handleResize = () => {
-            setWindowWidth(window.innerWidth);
+            const width = window.innerWidth;
+            setWindowWidth(width);
+            setIsMobile(width < 768);
         };
 
         window.addEventListener('resize', handleResize);
+        handleResize();
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Sync applied filters when initial filters change
+    // Reset to first page when filters change
     useEffect(() => {
-        setAppliedFilters({
-            search: initialFilters.search || '',
-            type: initialFilters.type || 'all',
-        });
-        // Also update local filters to match
-        setLocalFilters({
-            search: initialFilters.search || '',
-            type: initialFilters.type || 'all',
-        });
-    }, [initialFilters]);
+        setCurrentPage(1);
+    }, [search, filtersState]);
 
-    // Get responsive truncation length
-    const getTruncationLength = (type: 'name' | 'description' = 'name'): number => {
-        if (typeof window === 'undefined') return 30;
+    // Reset selection when exiting bulk mode
+    useEffect(() => {
+        if (!isBulkMode) {
+            setSelectedRoles([]);
+            setIsSelectAll(false);
+        }
+    }, [isBulkMode]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
         
-        const width = window.innerWidth;
-        if (width < 640) { // Mobile
-            return type === 'name' ? 15 : 20;
-        }
-        if (width < 768) { // Tablet
-            return type === 'name' ? 20 : 25;
-        }
-        if (width < 1024) { // Small desktop
-            return type === 'name' ? 25 : 30;
-        }
-        // Large desktop
-        return type === 'name' ? 30 : 35;
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    };
-
-    const handleFilterChange = (key: keyof FilterParams, value: string) => {
-        setLocalFilters(prev => ({ ...prev, [key]: value }));
-    };
-
-    const applyFilters = () => {
-        setAppliedFilters({ ...localFilters });
-        router.get(route('roles.index'), localFilters, {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
-    const resetFilters = () => {
-        const resetFilterState = {
-            search: '',
-            type: 'all',
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ctrl/Cmd + A to select all
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            // Escape key
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedRoles.length > 0) {
+                        setSelectedRoles([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            // Ctrl/Cmd + Shift + B to toggle bulk mode
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            // Ctrl/Cmd + F to focus search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            // Delete key for bulk delete
+            if (e.key === 'Delete' && isBulkMode && selectedRoles.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
         };
-        setLocalFilters(resetFilterState);
-        setAppliedFilters(resetFilterState);
-        router.get(route('roles.index'), resetFilterState, {
-            preserveState: true,
-            replace: true,
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedRoles, isMobile]);
+
+    // Filter roles
+    const filteredRoles = useMemo(() => {
+        return filterRoles(
+            roles.data,
+            filtersState.search,
+            filtersState
+        );
+    }, [roles.data, filtersState]);
+
+    // Get current page roles
+    const currentPageRoles = useMemo(() => {
+        return roles.data;
+    }, [roles.data]);
+
+    // Selection handlers
+    const handleSelectAllOnPage = () => {
+        const pageIds = currentPageRoles.map(role => role.id);
+        if (isSelectAll) {
+            setSelectedRoles(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            const newSelected = [...new Set([...selectedRoles, ...pageIds])];
+            setSelectedRoles(newSelected);
+        }
+        setIsSelectAll(!isSelectAll);
+        setSelectionMode('page');
+    };
+
+    const handleSelectAllFiltered = () => {
+        const allIds = filteredRoles.map(role => role.id);
+        if (selectedRoles.length === allIds.length && allIds.every(id => selectedRoles.includes(id))) {
+            setSelectedRoles(prev => prev.filter(id => !allIds.includes(id)));
+        } else {
+            const newSelected = [...new Set([...selectedRoles, ...allIds])];
+            setSelectedRoles(newSelected);
+            setSelectionMode('filtered');
+        }
+    };
+
+    const handleSelectAll = () => {
+        if (confirm(`This will select ALL ${roles.meta?.total || 0} roles. This action may take a moment.`)) {
+            const pageIds = currentPageRoles.map(role => role.id);
+            setSelectedRoles(pageIds);
+            setSelectionMode('all');
+        }
+    };
+
+    const handleItemSelect = (id: number) => {
+        setSelectedRoles(prev => {
+            if (prev.includes(id)) {
+                return prev.filter(itemId => itemId !== id);
+            } else {
+                return [...prev, id];
+            }
         });
     };
 
-    const resetLocalChanges = () => {
-        setLocalFilters({ ...appliedFilters });
+    // Check if all items on current page are selected
+    useEffect(() => {
+        const allPageIds = currentPageRoles.map(role => role.id);
+        const allSelected = allPageIds.every(id => selectedRoles.includes(id));
+        setIsSelectAll(allSelected);
+    }, [selectedRoles, currentPageRoles]);
+
+    // Get selected roles data
+    const selectedRolesData = useMemo(() => {
+        return filteredRoles.filter(role => selectedRoles.includes(role.id));
+    }, [selectedRoles, filteredRoles]);
+
+    // Calculate selection stats
+    const selectionStats = useMemo(() => {
+        return getSelectionStats(selectedRolesData);
+    }, [selectedRolesData]);
+
+    // Bulk operations
+    const handleBulkOperation = async (operation: BulkOperation) => {
+        if (selectedRoles.length === 0) {
+            toast.error('Please select at least one role');
+            return;
+        }
+
+        setIsPerformingBulkAction(true);
+
+        try {
+            switch (operation) {
+                case 'delete':
+                    const deletableRoles = selectedRolesData.filter(role => canDeleteRole(role));
+                    if (deletableRoles.length === 0) {
+                        toast.error('No deletable roles selected. System roles or roles with users cannot be deleted.');
+                        break;
+                    }
+                    
+                    await router.post('/roles/bulk-action', {
+                        action: 'delete',
+                        role_ids: deletableRoles.map(r => r.id),
+                    }, {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            toast.success(`${deletableRoles.length} role(s) deleted successfully`);
+                            setSelectedRoles([]);
+                            setShowBulkDeleteDialog(false);
+                        },
+                        onError: (errors) => {
+                            toast.error('Failed to delete roles');
+                        }
+                    });
+                    break;
+
+                case 'change_type':
+                    await router.post('/roles/bulk-action', {
+                        action: 'change_type',
+                        role_ids: selectedRoles,
+                        is_system_role: bulkEditValue === 'system'
+                    }, {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            toast.success(`${selectedRoles.length} role(s) type updated`);
+                            setShowBulkTypeDialog(false);
+                            setBulkEditValue('');
+                            setSelectedRoles([]);
+                        },
+                        onError: (errors) => {
+                            toast.error('Failed to update role types');
+                        }
+                    });
+                    break;
+
+                case 'export':
+                case 'export_csv':
+                    const exportData = formatForClipboard(selectedRolesData);
+                    const blob = new Blob([exportData], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `roles-export-${new Date().toISOString().split('T')[0]}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    toast.success(`Exported ${selectedRoles.length} roles successfully`);
+                    break;
+
+                case 'export_permissions':
+                    const permissionData = selectedRolesData.map(role => ({
+                        'Role': role.name,
+                        'Permissions': role.permissions?.map(p => p.name).join('; ') || 'None',
+                        'Total Permissions': role.permissions_count || 0,
+                    }));
+                    
+                    const permissionCsv = [
+                        Object.keys(permissionData[0]).join(','),
+                        ...permissionData.map(row => Object.values(row).join(','))
+                    ].join('\n');
+                    
+                    const permissionBlob = new Blob([permissionCsv], { type: 'text/csv' });
+                    const permissionUrl = window.URL.createObjectURL(permissionBlob);
+                    const permissionA = document.createElement('a');
+                    permissionA.href = permissionUrl;
+                    permissionA.download = `roles-permissions-export-${new Date().toISOString().split('T')[0]}.csv`;
+                    document.body.appendChild(permissionA);
+                    permissionA.click();
+                    document.body.removeChild(permissionA);
+                    window.URL.revokeObjectURL(permissionUrl);
+                    
+                    toast.success(`Exported permissions for ${selectedRoles.length} role(s)`);
+                    break;
+
+                case 'duplicate':
+                    await router.post('/roles/bulk-action', {
+                        action: 'duplicate',
+                        role_ids: selectedRoles,
+                    }, {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            toast.success(`${selectedRoles.length} role(s) duplicated successfully`);
+                            setSelectedRoles([]);
+                        },
+                        onError: (errors) => {
+                            toast.error('Failed to duplicate roles');
+                        }
+                    });
+                    break;
+
+                case 'archive':
+                    await router.post('/roles/bulk-action', {
+                        action: 'archive',
+                        role_ids: selectedRoles,
+                    }, {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            toast.success(`${selectedRoles.length} role(s) archived`);
+                            setSelectedRoles([]);
+                        },
+                        onError: (errors) => {
+                            toast.error('Failed to archive roles');
+                        }
+                    });
+                    break;
+
+                case 'generate_report':
+                    const idsParam = selectedRoles.join(',');
+                    window.open(`/roles/generate-bulk-report?ids=${idsParam}`, '_blank');
+                    toast.success(`Generating report for ${selectedRoles.length} role(s)`);
+                    break;
+
+                default:
+                    toast.error('Operation not supported yet');
+            }
+        } catch (error) {
+            console.error('Bulk operation error:', error);
+            toast.error('An error occurred during the bulk operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
     };
 
-    const confirmDelete = (role: Role) => {
+    // Copy selected data to clipboard
+    const handleCopySelectedData = () => {
+        if (selectedRolesData.length === 0) {
+            toast.error('No data to copy');
+            return;
+        }
+        
+        const csv = formatForClipboard(selectedRolesData);
+        
+        navigator.clipboard.writeText(csv).then(() => {
+            toast.success('Data copied to clipboard');
+        }).catch(() => {
+            toast.error('Failed to copy to clipboard');
+        });
+    };
+
+    // Individual role operations
+    const handleDelete = (role: Role) => {
         if (canDeleteRole(role)) {
-            setRoleToDelete(role);
-            if (confirm(`Are you sure you want to delete role "${role.name}"? This action cannot be undone.`)) {
-                deleteRole(role);
+            if (confirm(`Are you sure you want to delete role "${role.name}"?`)) {
+                router.delete(`/roles/${role.id}`, {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setSelectedRoles(selectedRoles.filter(id => id !== role.id));
+                        toast.success('Role deleted successfully');
+                    },
+                    onError: () => {
+                        toast.error('Failed to delete role');
+                    }
+                });
             }
         } else {
             if (role.is_system_role) {
-                alert('System roles cannot be deleted.');
+                toast.error('System roles cannot be deleted.');
             } else if (role.users_count && role.users_count > 0) {
-                alert('Cannot delete role that has users assigned. Please reassign users first.');
+                toast.error('Cannot delete role that has users assigned. Please reassign users first.');
             }
         }
-    };
-
-    const deleteRole = (role: Role) => {
-        setDeleting(true);
-        router.delete(route('roles.destroy', role.id), {
-            preserveScroll: true,
-            onSuccess: () => {
-                setRoleToDelete(null);
-                setDeleting(false);
-                router.reload({ only: ['roles'] });
-            },
-            onError: () => {
-                setDeleting(false);
-            },
-        });
-    };
-
-    const canDeleteRole = (role: Role) => {
-        return !role.is_system_role && (role.users_count || 0) === 0;
     };
 
     const handleCopyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text).then(() => {
-            console.log(`Copied ${label} to clipboard:`, text);
+            toast.success(`${label} copied to clipboard`);
+        }).catch(() => {
+            toast.error('Failed to copy to clipboard');
+        });
+    };
+
+    const handleClearFilters = () => {
+        setSearch('');
+        setFiltersState({
+            search: '',
+            type: 'all'
+        });
+        router.get('/roles');
+    };
+
+    const handleClearSelection = () => {
+        setSelectedRoles([]);
+        setIsSelectAll(false);
+    };
+
+    const updateFilter = (key: keyof FilterState, value: string) => {
+        setFiltersState(prev => ({ ...prev, [key]: value }));
+    };
+
+    const toggleRoleExpansion = (roleId: number) => {
+        setExpandedRole(expandedRole === roleId ? null : roleId);
+    };
+
+    const hasActiveFilters = 
+        search || 
+        filtersState.type !== 'all';
+
+    // Pagination data
+    const totalItems = roles.meta?.total || filteredRoles.length;
+    const totalPages = roles.meta?.last_page || 1;
+    const currentPageNum = roles.meta?.current_page || 1;
+    const itemsPerPage = roles.meta?.per_page || 10;
+    const startIndex = (currentPageNum - 1) * itemsPerPage + 1;
+    const endIndex = Math.min(currentPageNum * itemsPerPage, totalItems);
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        router.get(`/roles?page=${page}`, {
+            preserveState: true,
+            preserveScroll: true,
         });
     };
 
     const handleExport = () => {
-        const exportUrl = new URL(route('roles.export'), window.location.origin);
-        if (appliedFilters.search) exportUrl.searchParams.append('search', appliedFilters.search);
-        if (appliedFilters.type !== 'all') exportUrl.searchParams.append('type', appliedFilters.type);
-        window.open(exportUrl.toString(), '_blank');
+        const queryParams = new URLSearchParams();
+        if (search) queryParams.append('search', search);
+        if (filtersState.type !== 'all') queryParams.append('type', filtersState.type);
+        window.location.href = `/roles/export?${queryParams.toString()}`;
     };
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            applyFilters();
-        }
-    };
-
-    // Check if there are unsaved filter changes
-    const hasUnsavedFilters = 
-        localFilters.search !== appliedFilters.search || 
-        localFilters.type !== appliedFilters.type;
-
-    // Check if there are active filters applied
-    const hasActiveFilters = appliedFilters.search || appliedFilters.type !== 'all';
-
-    // Calculate pagination
-    const totalItems = roles.meta?.total || 0;
-    const totalPages = roles.meta?.last_page || 1;
-    const startIndex = (roles.meta?.current_page || 1) - 1 * (roles.meta?.per_page || 10) + 1;
-    const endIndex = Math.min((roles.meta?.current_page || 1) * (roles.meta?.per_page || 10), totalItems);
 
     return (
         <AdminLayout
             title="Roles Management"
             breadcrumbs={[
                 { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Roles', href: route('roles.index') }
+                { title: 'Roles', href: '/roles' }
             ]}
         >
-            <Head title="Roles Management" />
+            <TooltipProvider>
+                <div className="space-y-4 sm:space-y-6">
+                    <RolesHeader 
+                        isBulkMode={isBulkMode}
+                        setIsBulkMode={setIsBulkMode}
+                        isMobile={isMobile}
+                    />
 
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Roles Management</h1>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
-                            Manage user roles and their permissions
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Link href={route('permissions.index')}>
-                            <Button variant="outline" className="h-9">
-                                <Key className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">Permissions</span>
-                                <span className="sm:hidden">Perms</span>
-                            </Button>
-                        </Link>
-                        <Link href={route('roles.create')}>
-                            <Button className="h-9">
-                                <Plus className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">Create Role</span>
-                                <span className="sm:hidden">Create</span>
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
+                    <RolesStats stats={stats} />
 
-                {/* Stats Cards */}
-                {stats.length > 0 && (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        {stats.map((stat, index) => (
-                            <Card key={index} className="overflow-hidden">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-gray-500">
-                                        {stat.label}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-xl sm:text-2xl font-bold">{stat.value}</div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                    <RolesFilters
+                        search={search}
+                        setSearch={setSearch}
+                        filtersState={filtersState}
+                        updateFilter={updateFilter}
+                        showAdvancedFilters={showAdvancedFilters}
+                        setShowAdvancedFilters={setShowAdvancedFilters}
+                        handleClearFilters={handleClearFilters}
+                        hasActiveFilters={hasActiveFilters}
+                        isMobile={isMobile}
+                        totalItems={totalItems}
+                        startIndex={startIndex}
+                        endIndex={endIndex}
+                        searchInputRef={searchInputRef}
+                        handleExport={handleExport}
+                    />
 
-                {/* Search and Filters */}
-                <Card className="overflow-hidden">
-                    <CardContent className="pt-6">
-                        <div className="flex flex-col space-y-4">
-                            <div className="flex flex-col md:flex-row gap-4">
-                                <div className="flex-1 relative">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                                    <Input 
-                                        placeholder="Search roles by name or description..." 
-                                        className="pl-10"
-                                        value={localFilters.search || ''}
-                                        onChange={(e) => handleFilterChange('search', e.target.value)}
-                                        onKeyPress={handleKeyPress}
-                                    />
-                                </div>
-                                <div className="flex gap-2">
-                                    <select 
-                                        className="border rounded px-3 py-2 text-sm w-32"
-                                        value={localFilters.type || 'all'}
-                                        onChange={(e) => handleFilterChange('type', e.target.value)}
-                                    >
-                                        <option value="all">All Types</option>
-                                        <option value="custom">Custom Roles</option>
-                                        <option value="system">System Roles</option>
-                                    </select>
-                                    
-                                    <Button 
-                                        variant="default"
-                                        className="h-9"
-                                        onClick={applyFilters}
-                                        disabled={!hasUnsavedFilters}
-                                    >
-                                        Apply Filters
-                                    </Button>
-                                    
-                                    <Button 
-                                        variant="outline"
-                                        className="h-9"
-                                        onClick={handleExport}
-                                    >
-                                        <Download className="h-4 w-4 mr-2" />
-                                        <span className="hidden sm:inline">Export</span>
-                                    </Button>
-                                </div>
-                            </div>
+                    <RolesContent
+                        roles={roles.data}
+                        stats={stats}
+                        isBulkMode={isBulkMode}
+                        setIsBulkMode={setIsBulkMode}
+                        isSelectAll={isSelectAll}
+                        selectedRoles={selectedRoles}
+                        isMobile={isMobile}
+                        hasActiveFilters={hasActiveFilters}
+                        currentPage={currentPageNum}
+                        totalPages={totalPages}
+                        totalItems={totalItems}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={handlePageChange}
+                        onSelectAllOnPage={handleSelectAllOnPage}
+                        onSelectAllFiltered={handleSelectAllFiltered}
+                        onSelectAll={handleSelectAll}
+                        onItemSelect={handleItemSelect}
+                        onClearFilters={handleClearFilters}
+                        onClearSelection={handleClearSelection}
+                        onDelete={handleDelete}
+                        onCopyToClipboard={handleCopyToClipboard}
+                        onCopySelectedData={handleCopySelectedData}
+                        onBulkOperation={handleBulkOperation}
+                        setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                        setShowBulkTypeDialog={setShowBulkTypeDialog}
+                        filtersState={filtersState}
+                        isPerformingBulkAction={isPerformingBulkAction}
+                        selectionMode={selectionMode}
+                        selectionStats={selectionStats}
+                        windowWidth={windowWidth}
+                        toggleRoleExpansion={toggleRoleExpansion}
+                        expandedRole={expandedRole}
+                        bulkEditValue={bulkEditValue}
+                        setBulkEditValue={setBulkEditValue}
+                    />
 
-                            {/* Active filters indicator and clear button */}
-                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                                <div className="text-sm text-gray-500">
-                                    Showing {startIndex} to {endIndex} of {totalItems} roles
-                                    {appliedFilters.search && ` matching "${appliedFilters.search}"`}
-                                    {appliedFilters.type !== 'all' && ` (${appliedFilters.type} roles)`}
+                    {/* Keyboard Shortcuts Help */}
+                    {isBulkMode && !isMobile && (
+                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border hidden sm:block">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Key className="h-4 w-4 text-gray-500" />
+                                    <span className="text-sm font-medium">Keyboard Shortcuts</span>
                                 </div>
-                                
-                                <div className="flex gap-2">
-                                    {hasUnsavedFilters && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={resetLocalChanges}
-                                            className="h-8"
-                                        >
-                                            Reset Changes
-                                        </Button>
-                                    )}
-                                    
-                                    {hasActiveFilters && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={resetFilters}
-                                            className="text-red-600 hover:text-red-700 h-8"
-                                        >
-                                            Clear All Filters
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Roles Table */}
-                <Card className="overflow-hidden">
-                    <CardHeader className="flex flex-row items-center justify-between pb-3">
-                        <CardTitle className="text-lg sm:text-xl">Roles List</CardTitle>
-                        <div className="text-sm text-gray-500">
-                            Page {roles.meta?.current_page || 1} of {totalPages}
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <div className="min-w-full inline-block align-middle">
-                                <div className="overflow-hidden">
-                                    <Table className="min-w-full">
-                                        <TableHeader>
-                                            <TableRow className="bg-gray-50 dark:bg-gray-800">
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px]">
-                                                    Role Name
-                                                </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
-                                                    Type
-                                                </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
-                                                    Users
-                                                </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
-                                                    Description
-                                                </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
-                                                    Created
-                                                </TableHead>
-                                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[80px]">
-                                                    Actions
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {roles.data.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                                                        <div className="flex flex-col items-center justify-center space-y-4">
-                                                            <Shield className="h-16 w-16 text-gray-300 dark:text-gray-700" />
-                                                            <div>
-                                                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                                                                    No roles found
-                                                                </h3>
-                                                                <p className="text-gray-500 dark:text-gray-400">
-                                                                    {hasActiveFilters 
-                                                                        ? 'Try changing your filters or search criteria.'
-                                                                        : 'Get started by creating a role.'}
-                                                                </p>
-                                                            </div>
-                                                            <div className="flex items-center gap-3">
-                                                                {hasActiveFilters && (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        onClick={resetFilters}
-                                                                        className="h-8"
-                                                                    >
-                                                                        Clear Filters
-                                                                    </Button>
-                                                                )}
-                                                                <Link href={route('roles.create')}>
-                                                                    <Button className="h-8">
-                                                                        <Plus className="h-3 w-3 mr-1" />
-                                                                        Create First Role
-                                                                    </Button>
-                                                                </Link>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                roles.data.map((role) => {
-                                                    const nameLength = getTruncationLength('name');
-                                                    const descLength = getTruncationLength('description');
-                                                    
-                                                    return (
-                                                        <TableRow key={role.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                                                            <TableCell className="px-4 py-3 whitespace-nowrap">
-                                                                <div 
-                                                                    className="flex items-center gap-3 cursor-text select-text"
-                                                                    onDoubleClick={(e) => {
-                                                                        const selection = window.getSelection();
-                                                                        if (selection) {
-                                                                            const range = document.createRange();
-                                                                            range.selectNodeContents(e.currentTarget);
-                                                                            selection.removeAllRanges();
-                                                                            selection.addRange(range);
-                                                                        }
-                                                                    }}
-                                                                    title={`Double-click to select all\nRole: ${role.name}\nDescription: ${role.description || 'No description'}`}
-                                                                >
-                                                                    <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                                                        role.is_system_role 
-                                                                            ? 'bg-purple-100 dark:bg-purple-900/30' 
-                                                                            : 'bg-green-100 dark:bg-green-900/30'
-                                                                    }`}>
-                                                                        <Shield className={`h-4 w-4 ${
-                                                                            role.is_system_role 
-                                                                                ? 'text-purple-600 dark:text-purple-400' 
-                                                                                : 'text-green-600 dark:text-green-400'
-                                                                        }`} />
-                                                                    </div>
-                                                                    <div className="min-w-0">
-                                                                        <div 
-                                                                            className="font-medium text-gray-900 dark:text-white truncate"
-                                                                            data-full-text={role.name}
-                                                                        >
-                                                                            {role.name.length > nameLength 
-                                                                                ? role.name.substring(0, nameLength) + '...' 
-                                                                                : role.name}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
-                                                                            ID: {role.id}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3">
-                                                                <Badge 
-                                                                    variant={role.is_system_role ? "outline" : "default"}
-                                                                    className={role.is_system_role 
-                                                                        ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300"
-                                                                        : "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300"
-                                                                    }
-                                                                >
-                                                                    {role.is_system_role ? 'System' : 'Custom'}
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3">
-                                                                <div className="flex items-center gap-2">
-                                                                    <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                                                    <span className="truncate">{role.users_count || 0}</span>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3">
-                                                                <div 
-                                                                    className="text-sm text-gray-600 dark:text-gray-400 truncate"
-                                                                    title={role.description || 'No description'}
-                                                                >
-                                                                    {role.description 
-                                                                        ? (role.description.length > descLength 
-                                                                            ? role.description.substring(0, descLength) + '...' 
-                                                                            : role.description)
-                                                                        : <span className="text-gray-400 italic">No description</span>
-                                                                    }
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3">
-                                                                <div 
-                                                                    className="text-sm text-gray-500 dark:text-gray-400 truncate"
-                                                                    title={formatDate(role.created_at)}
-                                                                >
-                                                                    {formatDate(role.created_at)}
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
-                                                                <DropdownMenu>
-                                                                    <DropdownMenuTrigger asChild>
-                                                                        <Button 
-                                                                            variant="ghost" 
-                                                                            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                                                        >
-                                                                            <span className="sr-only">Open menu</span>
-                                                                            <MoreVertical className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end" className="w-48">
-                                                                        <DropdownMenuItem asChild>
-                                                                            <Link href={route('roles.show', role.id)} className="flex items-center cursor-pointer">
-                                                                                <Eye className="mr-2 h-4 w-4" />
-                                                                                <span>View Details</span>
-                                                                            </Link>
-                                                                        </DropdownMenuItem>
-                                                                        
-                                                                        <DropdownMenuItem asChild>
-                                                                            <Link href={route('roles.edit', role.id)} className="flex items-center cursor-pointer">
-                                                                                <Edit className="mr-2 h-4 w-4" />
-                                                                                <span>Edit Role</span>
-                                                                            </Link>
-                                                                        </DropdownMenuItem>
-                                                                        
-                                                                        <DropdownMenuItem asChild>
-                                                                            <Link href={route('roles.permissions', role.id)} className="flex items-center cursor-pointer">
-                                                                                <Key className="mr-2 h-4 w-4" />
-                                                                                <span>Manage Permissions</span>
-                                                                            </Link>
-                                                                        </DropdownMenuItem>
-                                                                        
-                                                                        <DropdownMenuSeparator />
-                                                                        
-                                                                        <DropdownMenuItem 
-                                                                            onClick={() => handleCopyToClipboard(role.name, 'Role Name')}
-                                                                            className="flex items-center cursor-pointer"
-                                                                        >
-                                                                            <Copy className="mr-2 h-4 w-4" />
-                                                                            <span>Copy Name</span>
-                                                                        </DropdownMenuItem>
-                                                                        
-                                                                        {role.description && (
-                                                                            <DropdownMenuItem 
-                                                                                onClick={() => handleCopyToClipboard(role.description || '', 'Role Description')}
-                                                                                className="flex items-center cursor-pointer"
-                                                                            >
-                                                                                <Copy className="mr-2 h-4 w-4" />
-                                                                                <span>Copy Description</span>
-                                                                            </DropdownMenuItem>
-                                                                        )}
-                                                                        
-                                                                        <DropdownMenuSeparator />
-                                                                        
-                                                                        <DropdownMenuItem 
-                                                                            className={`flex items-center cursor-pointer ${
-                                                                                canDeleteRole(role) 
-                                                                                    ? 'text-red-600 focus:text-red-700 focus:bg-red-50' 
-                                                                                    : 'text-gray-400 cursor-not-allowed'
-                                                                            }`}
-                                                                            onClick={() => canDeleteRole(role) ? confirmDelete(role) : null}
-                                                                            disabled={!canDeleteRole(role)}
-                                                                        >
-                                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                                            <span>Delete Role</span>
-                                                                            {!canDeleteRole(role) && (
-                                                                                <span className="ml-auto text-xs text-gray-500">
-                                                                                    {role.is_system_role ? 'System' : 'Has users'}
-                                                                                </span>
-                                                                            )}
-                                                                        </DropdownMenuItem>
-                                                                    </DropdownMenuContent>
-                                                                </DropdownMenu>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    );
-                                                })
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-4 pt-4 px-4 border-t">
-                                <div className="text-sm text-gray-500">
-                                    Showing {startIndex} to {endIndex} of {totalItems} results
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            const prevPage = Math.max(1, (roles.meta?.current_page || 1) - 1);
-                                            router.get(route('roles.index'), { ...appliedFilters, page: prevPage }, {
-                                                preserveState: true,
-                                                replace: true,
-                                            });
-                                        }}
-                                        disabled={(roles.meta?.current_page || 1) === 1}
-                                        className="h-8"
-                                    >
-                                        <ChevronLeft className="h-4 w-4 mr-1" />
-                                        Previous
-                                    </Button>
-                                    <div className="flex items-center gap-1">
-                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                            let pageNum;
-                                            const currentPage = roles.meta?.current_page || 1;
-                                            
-                                            if (totalPages <= 5) {
-                                                pageNum = i + 1;
-                                            } else if (currentPage <= 3) {
-                                                pageNum = i + 1;
-                                            } else if (currentPage >= totalPages - 2) {
-                                                pageNum = totalPages - 4 + i;
-                                            } else {
-                                                pageNum = currentPage - 2 + i;
-                                            }
-                                            return (
-                                                <Button
-                                                    key={pageNum}
-                                                    variant={currentPage === pageNum ? "default" : "outline"}
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        router.get(route('roles.index'), { ...appliedFilters, page: pageNum }, {
-                                                            preserveState: true,
-                                                            replace: true,
-                                                        });
-                                                    }}
-                                                    className="h-8 w-8 p-0"
-                                                >
-                                                    {pageNum}
-                                                </Button>
-                                            );
-                                        })}
-                                    </div>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            const nextPage = Math.min(totalPages, (roles.meta?.current_page || 1) + 1);
-                                            router.get(route('roles.index'), { ...appliedFilters, page: nextPage }, {
-                                                preserveState: true,
-                                                replace: true,
-                                            });
-                                        }}
-                                        disabled={(roles.meta?.current_page || 1) === totalPages}
-                                        className="h-8"
-                                    >
-                                        Next
-                                        <ChevronRight className="h-4 w-4 ml-1" />
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Quick Actions & Info */}
-                <div className="grid gap-6 sm:grid-cols-2">
-                    <Card className="overflow-hidden">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg">Quick Actions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-2 gap-3">
-                                <Link href={route('permissions.index')}>
-                                    <Button variant="outline" size="sm" className="w-full justify-start h-8">
-                                        <Key className="h-3 w-3 mr-2" />
-                                        <span className="truncate">Permissions</span>
-                                    </Button>
-                                </Link>
-                                
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="w-full justify-start h-8"
-                                    onClick={handleExport}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsBulkMode(false)}
+                                    className="h-7 text-xs"
+                                    disabled={isPerformingBulkAction}
                                 >
-                                    <Download className="h-3 w-3 mr-2" />
-                                    <span className="truncate">Export CSV</span>
-                                </Button>
-                                
-                                <Link href={route('users.index')}>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        className="w-full justify-start h-8"
-                                    >
-                                        <Users className="h-3 w-3 mr-2" />
-                                        <span className="truncate">User Management</span>
-                                    </Button>
-                                </Link>
-                                
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="w-full justify-start h-8"
-                                    onClick={() => {
-                                        alert('Role hierarchy feature coming soon!');
-                                    }}
-                                >
-                                    <Shield className="h-3 w-3 mr-2" />
-                                    <span className="truncate">Role Hierarchy</span>
+                                    Exit Bulk Mode
                                 </Button>
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="overflow-hidden">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg">Role Summary</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {roles.data.length > 0 ? (
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-medium">Total Roles</span>
-                                        <Badge variant="outline">{roles.meta?.total || 0}</Badge>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-medium">System Roles</span>
-                                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                                            {roles.data.filter(r => r.is_system_role).length}
-                                        </Badge>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-medium">Custom Roles</span>
-                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                            {roles.data.filter(r => !r.is_system_role).length}
-                                        </Badge>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-medium">Total Users Assigned</span>
-                                        <Badge variant="outline">
-                                            {roles.data.reduce((sum, r) => sum + (r.users_count || 0), 0)}
-                                        </Badge>
-                                    </div>
-                                    <div className="pt-2">
-                                        <div className="text-xs text-gray-500">
-                                            Roles with most users:
-                                        </div>
-                                        {roles.data
-                                            .sort((a, b) => (b.users_count || 0) - (a.users_count || 0))
-                                            .slice(0, 3)
-                                            .map((role) => (
-                                                <div key={role.id} className="flex items-center justify-between mt-2">
-                                                    <span className="text-sm truncate">{role.name}</span>
-                                                    <Badge variant="secondary" className="text-xs">
-                                                        {role.users_count || 0} users
-                                                    </Badge>
-                                                </div>
-                                            ))
-                                        }
-                                    </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+A</kbd>
+                                    <span>Select page</span>
                                 </div>
-                            ) : (
-                                <p className="text-gray-500 text-center py-4 text-sm">No role data available</p>
-                            )}
-                        </CardContent>
-                    </Card>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Shift+Ctrl+A</kbd>
+                                    <span>Select filtered</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Delete</kbd>
+                                    <span>Delete selected</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
+                                    <span>Exit/clear</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            </div>
+            </TooltipProvider>
+
+            <RolesDialogs
+                showBulkDeleteDialog={showBulkDeleteDialog}
+                setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                showBulkTypeDialog={showBulkTypeDialog}
+                setShowBulkTypeDialog={setShowBulkTypeDialog}
+                isPerformingBulkAction={isPerformingBulkAction}
+                selectedRoles={selectedRoles}
+                handleBulkOperation={handleBulkOperation}
+                selectionStats={selectionStats}
+                bulkEditValue={bulkEditValue}
+                setBulkEditValue={setBulkEditValue}
+            />
         </AdminLayout>
     );
 }

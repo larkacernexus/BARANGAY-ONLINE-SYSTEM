@@ -9,9 +9,6 @@ use Inertia\Inertia;
 
 class PermissionController extends Controller
 {
-    /**
-     * Display a listing of permissions.
-     */
     public function index(Request $request)
     {
         $query = Permission::withCount('roles')->latest();
@@ -36,24 +33,23 @@ class PermissionController extends Controller
 
         $permissions = $query->paginate(30)->withQueryString();
 
-        $modules = Permission::distinct()->pluck('module')->sort()->values();
+        $modules = Permission::getModules();
+        $availableModules = Permission::distinct()->pluck('module')->sort()->values();
 
         return Inertia::render('admin/Permissions/Index', [
             'permissions' => $permissions,
             'modules' => $modules,
+            'available_modules' => $availableModules,
             'filters' => $request->only(['search', 'module', 'status']),
             'stats' => [
                 'total_permissions' => Permission::count(),
                 'active_permissions' => Permission::where('is_active', true)->count(),
-                'modules_count' => $modules->count(),
+                'modules_count' => $availableModules->count(),
                 'assigned_permissions' => Permission::has('roles')->count(),
             ],
         ]);
     }
 
-    /**
-     * Show the form for creating a new permission.
-     */
     public function create()
     {
         return Inertia::render('admin/Permissions/Create', [
@@ -61,9 +57,6 @@ class PermissionController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created permission in storage.
-     */
     public function store(Request $request)
     {
         $request->validate([
@@ -86,9 +79,6 @@ class PermissionController extends Controller
             ->with('success', 'Permission created successfully.');
     }
 
-    /**
-     * Display the specified permission.
-     */
     public function show(Permission $permission)
     {
         $permission->load(['roles' => function ($query) {
@@ -119,9 +109,6 @@ class PermissionController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for editing the specified permission.
-     */
     public function edit(Permission $permission)
     {
         return Inertia::render('admin/Permissions/Edit', [
@@ -137,9 +124,6 @@ class PermissionController extends Controller
         ]);
     }
 
-    /**
-     * Update the specified permission in storage.
-     */
     public function update(Request $request, Permission $permission)
     {
         $request->validate([
@@ -162,9 +146,6 @@ class PermissionController extends Controller
             ->with('success', 'Permission updated successfully.');
     }
 
-    /**
-     * Remove the specified permission from storage.
-     */
     public function destroy(Permission $permission)
     {
         if ($permission->roles()->exists()) {
@@ -178,9 +159,6 @@ class PermissionController extends Controller
             ->with('success', 'Permission deleted successfully.');
     }
 
-    /**
-     * Toggle permission active status.
-     */
     public function toggleStatus(Permission $permission)
     {
         $permission->update(['is_active' => !$permission->is_active]);
@@ -189,15 +167,5 @@ class PermissionController extends Controller
 
         return redirect()->back()
             ->with('success', "Permission {$status} successfully.");
-    }
-
-    /**
-     * Get modules for API.
-     */
-    public function modules()
-    {
-        $modules = Permission::distinct()->pluck('module')->sort()->values();
-
-        return response()->json($modules);
     }
 }

@@ -25,7 +25,7 @@ class ResidentClearanceController extends Controller
         $user = auth()->user();
         
         // Get the household associated with the authenticated user
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             if ($request->header('X-Inertia')) {
@@ -127,7 +127,7 @@ class ResidentClearanceController extends Controller
         ];
         
         // Get the head resident
-        $headResident = $residents->firstWhere('id', $household->head_resident_id);
+        $headResident = $this->getHeadResident($household);
         
         return Inertia::render('resident/Clearances/Index', [
             'clearances' => $clearances,
@@ -147,7 +147,7 @@ public function show(ClearanceRequest $clearance)
     $user = auth()->user();
     
     // Get the user's household
-    $household = Household::where('user_id', $user->id)->first();
+    $household = $user->household_id ? Household::find($user->household_id) : null;
     
     if (!$household) {
         abort(403, 'You are not associated with any household.');
@@ -188,12 +188,12 @@ public function show(ClearanceRequest $clearance)
     {
         $user = Auth::user();
         
-        // Find the household where this user is the head
-        $household = Household::where('user_id', $user->id)->first();
+        // Find the household where this user belongs (using household_id from users table)
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             return redirect()->route('resident.dashboard')
-                ->with('error', 'You are not registered as a household head.');
+                ->with('error', 'You are not registered with any household.');
         }
         
         // Get the household head member record
@@ -316,24 +316,28 @@ public function show(ClearanceRequest $clearance)
             })
             ->toArray();
         
-        // Format the head resident data
-        $residentData = [
-            'id' => (int) $headResident->id,
-            'first_name' => $headResident->first_name,
-            'last_name' => $headResident->last_name,
-            'middle_name' => $headResident->middle_name,
-            'full_name' => $headResident->full_name,
-            'address' => $headResident->address,
-            'contact_number' => $headResident->contact_number,
-            'purok_name' => $headResident->purok_name,
-            'household_id' => $headMember->household_id,
-            'is_head' => true,
-        ];
+        // Get current resident data
+        $currentResident = $user->current_resident_id ? Resident::find($user->current_resident_id) : null;
+        
+        // Format the resident data
+        $residentData = $currentResident ? [
+            'id' => (int) $currentResident->id,
+            'first_name' => $currentResident->first_name,
+            'last_name' => $currentResident->last_name,
+            'middle_name' => $currentResident->middle_name,
+            'full_name' => $currentResident->full_name,
+            'address' => $currentResident->address,
+            'contact_number' => $currentResident->contact_number,
+            'purok_name' => $currentResident->purok_name,
+            'household_id' => $currentResident->household_id,
+            'is_head' => $this->isHeadOfHousehold($household, $currentResident),
+        ] : null;
         
         Log::info('Clearance request form loaded', [
             'user_id' => $user->id,
             'clearance_types' => $clearanceTypes->count(),
             'household_members' => count($householdMembers),
+            'current_resident' => $residentData ? $residentData['full_name'] : 'None',
         ]);
         
         return Inertia::render('resident/Clearances/Request', [
@@ -396,7 +400,7 @@ public function show(ClearanceRequest $clearance)
         ]);
 
         // Get the user's household
-        $userHousehold = Household::where('user_id', $user->id)->first();
+        $userHousehold = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$userHousehold) {
             Log::error('Household not found for user', [
@@ -679,5 +683,37 @@ public function show(ClearanceRequest $clearance)
         }
         
         return [];
+    }
+    
+    /**
+     * Get the head resident of a household
+     */
+    private function getHeadResident(Household $household)
+    {
+        // First try to find through household members with is_head = true
+        $headMember = HouseholdMember::where('household_id', $household->id)
+            ->where('is_head', true)
+            ->first();
+            
+        if ($headMember && $headMember->resident) {
+            return $headMember->resident;
+        }
+        
+        // If no head found in household members, check residents table
+        return Resident::where('household_id', $household->id)
+            ->first();
+    }
+    
+    /**
+     * Check if resident is head of household
+     */
+    private function isHeadOfHousehold(Household $household, Resident $resident): bool
+    {
+        $headMember = HouseholdMember::where('household_id', $household->id)
+            ->where('resident_id', $resident->id)
+            ->where('is_head', true)
+            ->first();
+            
+        return $headMember ? true : false;
     }
 }

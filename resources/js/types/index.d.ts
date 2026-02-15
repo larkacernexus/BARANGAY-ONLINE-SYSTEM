@@ -159,6 +159,7 @@ export interface PermissionFormData {
 }
 
 export interface Role {
+    is_system_role: any;
     id: number;
     name: string;
     display_name?: string;
@@ -290,6 +291,8 @@ export interface FeeType {
 
 // ==================== HOUSEHOLDS MODULE ====================
 export interface Household {
+    household_number: any;
+    head_of_family: any;
     id: number;
     name: string;
     purok_id: number;
@@ -329,6 +332,37 @@ export interface DashboardPageProps extends PageProps {
     charts?: {
         resident_distribution?: Array<{ purok: string; count: number }>;
         fee_collection?: Array<{ month: string; amount: number }>;
+    };
+}
+
+export interface PageProps {
+    auth: {
+        user: {
+            id: number;
+            name: string;
+            email: string;
+            role: string;
+            role_id: number;
+            is_admin: boolean;
+            permissions: string[];
+            can: {
+                view_dashboard: boolean;
+                manage_users: boolean;
+                manage_residents: boolean;
+                manage_payments: boolean;
+                view_reports: boolean;
+            };
+        } | null;
+    };
+    flash: {
+        success?: string;
+        error?: string;
+        warning?: string;
+        info?: string;
+    };
+    ziggy: {
+        location: string;
+        query: Record<string, any>;
     };
 }
 
@@ -548,3 +582,288 @@ export type {
     Household,
     Role,
 };
+
+
+
+//ADMIN RESIDENTS 
+
+export interface HouseholdMembership {
+    id: number;
+    household_id: number;
+    resident_id: number;
+    relationship_to_head: string;
+    is_head: boolean;
+    household?: {
+        id: number;
+        household_number: string;
+        head_of_family: string;
+    };
+}
+
+export interface Resident {
+    id: number;
+    first_name: string;
+    last_name: string;
+    middle_name?: string;
+    age: number;
+    gender: string;
+    contact_number: string;
+    address: string;
+    purok_id?: number;
+    purok?: {
+        id: number;
+        name: string;
+    };
+    status: string;
+    created_at: string;
+    household_memberships?: HouseholdMembership[];
+    full_name?: string;
+    birth_date?: string;
+    civil_status?: string;
+    occupation?: string;
+    educational_attainment?: string;
+    is_voter?: boolean;
+    is_4ps_beneficiary?: boolean;
+    is_pwd?: boolean;
+    photo_path?: string;
+    photo_url?: string;
+}
+
+export interface ResidentsProps {
+    residents: {
+        data: Resident[];
+        current_page: number;
+        last_page: number;
+        total: number;
+        per_page: number;
+        from: number;
+        to: number;
+    };
+    stats: {
+        total: number;
+        active: number;
+        newThisMonth: number;
+        totalHouseholds: number;
+        avgAge: number;
+        maleCount: number;
+        femaleCount: number;
+        otherCount: number;
+        voterCount: number;
+        seniorCount: number;
+        pwdCount: number;
+        headCount: number;
+    };
+    filters: {
+        search?: string;
+        status?: string;
+        purok_id?: string;
+        gender?: string;
+        min_age?: string;
+        max_age?: string;
+        civil_status?: string;
+        is_voter?: string;
+        is_head?: string;
+        is_4ps?: string;
+        sort_by?: string;
+        sort_order?: string;
+    };
+    puroks: Array<{ id: number, name: string }>;
+    civilStatusOptions: string[];
+    ageRanges: Array<{ label: string, min: number, max: number }>;
+    allResidents: Resident[];
+}
+
+export type BulkOperation = 'export' | 'print' | 'delete' | 'update_status' | 'update_purok' | 'mark_voter' | 'mark_pwd' | 'add_to_household' | 'generate_ids' | 'send_message' | 'export_csv' | 'export_pdf';
+export type BulkEditField = 'status' | 'purok_id' | 'is_voter' | 'is_pwd' | 'civil_status';
+
+export interface FilterState {
+    status: string;
+    purok_id: string;
+    gender: string;
+    min_age: string;
+    max_age: string;
+    civil_status: string;
+    is_voter: string;
+    is_head: string;
+    sort_by: string;
+    sort_order: string;
+}
+
+export interface SelectionStats {
+    total: number;
+    active: number;
+    male: number;
+    female: number;
+    other: number;
+    voters: number;
+    seniors: number;
+    pwds: number;
+    heads: number;
+    avgAge: number;
+    hasPhotos: number;
+}
+
+// HOUSEHOLDS
+
+// Add to existing types
+export interface Form {
+    id: number;
+    title: string;
+    description: string;
+    category: string;
+    issuing_agency: string;
+    file_path: string;
+    file_name: string;
+    file_size: number;
+    file_type: string;
+    download_count: number;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    created_by?: {
+        id: number;
+        name: string;
+        email: string;
+    };
+}
+
+export interface PaginationData {
+    current_page: number;
+    data: Form[];
+    from: number;
+    last_page: number;
+    per_page: number;
+    to: number;
+    total: number;
+}
+
+export interface Filters {
+    search?: string;
+    category?: string;
+    agency?: string;
+    status?: string;
+    from_date?: string;
+    to_date?: string;
+    sort_by?: string;
+    sort_order?: string;
+}
+
+export interface Stats {
+    total: number;
+    active: number;
+    downloads: number;
+    categories_count: number;
+    agencies_count: number;
+}
+
+export type BulkOperation = 'delete' | 'activate' | 'deactivate' | 'export' | 'download';
+export type SelectionMode = 'page' | 'filtered' | 'all';
+
+
+
+// ANNOUNCEMENTS
+
+
+export interface Announcement {
+    id: number;
+    title: string;
+    content: string;
+    type: string;
+    type_label: string;
+    priority: number;
+    priority_label: string;
+    is_active: boolean;
+    start_date: string | null;
+    end_date: string | null;
+    created_at: string;
+    updated_at: string;
+    is_currently_active: boolean;
+    days_remaining: number | null;
+}
+
+export interface AnnouncementFilters {
+    search?: string;
+    type?: string;
+    status?: string;
+    from_date?: string;
+    to_date?: string;
+    sort_by?: string;
+    sort_order?: string;
+}
+
+export interface AnnouncementStats {
+    total: number;
+    active: number;
+    expired: number;
+    upcoming: number;
+}
+
+export * from './residents.types';
+export * from './payments.types';
+export * from './officials.types';
+
+// Add to existing types
+export interface PageProps {
+    auth: any;
+    flash: {
+        success?: string;
+        error?: string;
+        warning?: string;
+        info?: string;
+    };
+    errors: Record<string, string>;
+}
+
+export interface FilterState {
+    search?: string;
+    status?: string;
+    position?: string;
+    committee?: string;
+    type?: string;
+    sort_by?: string;
+    sort_order?: string;
+}
+
+export interface SelectionMode {
+    mode: 'page' | 'filtered' | 'all';
+}
+
+export interface SelectionStats {
+    total: number;
+    current: number;
+    former: number;
+    regular: number;
+    exOfficio: number;
+    withCommittee: number;
+    withoutCommittee: number;
+    hasContact: number;
+    noContact: number;
+}
+
+
+export interface Role {
+    id: number;
+    name: string;
+    slug: string;
+    description?: string;
+    is_system_role: boolean;
+    users_count?: number;
+    permissions_count?: number;
+    permissions?: Permission[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface Permission {
+    id: number;
+    name: string;
+    slug: string;
+    description?: string;
+    module: string;
+}
+
+export interface RolesIndexProps {
+    roles: Paginated<Role>;
+    filters: FilterParams;
+    stats?: Stats[] | any;
+}

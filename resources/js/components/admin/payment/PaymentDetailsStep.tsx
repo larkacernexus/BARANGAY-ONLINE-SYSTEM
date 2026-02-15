@@ -1,5 +1,6 @@
 // resources/js/components/admin/payment/PaymentDetailsStep.tsx
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,38 +14,45 @@ import {
     CreditCard,
     Calculator,
     Receipt,
-    Save,
-    ChevronRight,
-    DollarSign,
     Building,
     FileText,
     AlertCircle,
     Smartphone,
-    Landmark,
-    CheckCircle,
     Banknote,
-    FileCheck,
-    Shield,
-    AlertTriangle,
     Home,
-    Package,
     User,
     Users,
     Phone,
     MapPin,
-    Calendar,
     FileDigit,
     Lock,
     Check,
-    CalendarDays,
     FileBadge,
-    CircleAlert,
     RefreshCw,
     UserCircle,
-    Mail,
     MapPinHouse,
-    Hash
+    Hash,
+    IdCard,
+    Shield,
+    Heart,
+    HeartHandshake,
+    Baby,
+    HandHeart,
+    Calendar,
+    Award,
+    Briefcase,
+    UsersRound,
+    Eye,
+    Tag,
+    Percent,
+    CheckCircle2,
+    XCircle,
+    AlertTriangle,
+    DollarSign,
+    Wallet,
+    TrendingUp,
 } from 'lucide-react';
+import { PaymentItem, PaymentFormData, DiscountRule } from './paymentCreate/types';
 
 interface ClearanceType {
     id: string | number;
@@ -58,56 +66,104 @@ interface ClearanceType {
     requires_payment: boolean;
     requires_approval: boolean;
     is_online_only: boolean;
+    has_senior_discount?: boolean;
+    senior_discount_percentage?: number;
+    has_pwd_discount?: boolean;
+    pwd_discount_percentage?: number;
+    has_solo_parent_discount?: boolean;
+    solo_parent_discount_percentage?: number;
+    has_indigent_discount?: boolean;
+    indigent_discount_percentage?: number;
+    is_discountable?: boolean;
 }
 
-interface PaymentItem {
-    id: number;
-    fee_id: string | number;
-    fee_name: string;
-    fee_code: string;
-    description: string;
-    base_amount: number;
-    surcharge: number;
-    penalty: number;
-    discount: number;
-    total_amount: number;
+interface FeeType {
+    id: string | number;
+    name: string;
+    code: string;
+    base_amount: number | string;
     category: string;
-    period_covered: string;
-    months_late?: number;
-    metadata?: {
-        is_clearance_fee?: boolean;
-        clearance_request_id?: string | number;
-        clearance_type_id?: string | number;
-    };
+    is_discountable?: boolean;
+    has_senior_discount?: boolean;
+    senior_discount_percentage?: number;
+    has_pwd_discount?: boolean;
+    pwd_discount_percentage?: number;
+    has_solo_parent_discount?: boolean;
+    solo_parent_discount_percentage?: number;
+    has_indigent_discount?: boolean;
+    indigent_discount_percentage?: number;
+    has_surcharge?: boolean;
+    surcharge_rate?: number;
+    surcharge_fixed?: number;
+    has_penalty?: boolean;
+    penalty_rate?: number;
+    penalty_fixed?: number;
 }
 
-interface PaymentFormData {
-    payer_type: string;
-    payer_id: string | number;
-    payer_name: string;
-    contact_number: string;
-    address: string;
-    household_number: string;
-    purok: string;
-    items: PaymentItem[];
-    payment_date: string;
-    period_covered: string;
-    or_number: string;
-    payment_method: string;
-    reference_number: string;
-    subtotal: number;
-    surcharge: number;
-    penalty: number;
-    discount: number;
-    discount_type: string;
-    total_amount: number;
-    purpose: string;
-    remarks: string;
-    is_cleared: boolean;
-    clearance_type_id: string | number;
-    validity_date: string;
-    collection_type: 'manual' | 'system';
-    clearance_request_id?: string | number;
+interface DiscountEligibility {
+    type: string;
+    label: string;
+    percentage: number;
+    id_number?: string;
+    has_id?: boolean;
+}
+
+interface HouseholdInfo {
+    id?: string | number;
+    household_number?: string;
+    contact_number?: string;
+    email?: string;
+    address?: string;
+    full_address?: string;
+    purok?: string;
+    purok_id?: string | number;
+    member_count?: number;
+    head_of_household?: {
+        id: string | number;
+        name: string;
+        contact_number?: string;
+        is_current_resident?: boolean;
+    };
+    head_name?: string;
+    head_id?: string | number;
+    resident_role?: string;
+    is_head?: boolean;
+    has_user_account?: boolean;
+    members?: any[];
+}
+
+interface ResidentDetails {
+    id: number | string;
+    name: string;
+    first_name?: string;
+    last_name?: string;
+    middle_name?: string;
+    suffix?: string;
+    contact_number?: string;
+    email?: string;
+    address?: string;
+    birthdate?: string;
+    age?: number;
+    gender?: string;
+    civil_status?: string;
+    occupation?: string;
+    is_voter?: boolean;
+    is_senior?: boolean;
+    is_pwd?: boolean;
+    is_solo_parent?: boolean;
+    is_indigent?: boolean;
+    senior_id_number?: string;
+    pwd_id_number?: string;
+    solo_parent_id_number?: string;
+    indigent_id_number?: string;
+    household_id?: string | number;
+    household_number?: string;
+    purok?: string;
+    purok_id?: string | number;
+    is_household_head?: boolean;
+    household_info?: HouseholdInfo | null;
+    discount_eligibility_list?: DiscountEligibility[];
+    has_special_classification?: boolean;
 }
 
 interface PaymentDetailsStepProps {
@@ -115,9 +171,11 @@ interface PaymentDetailsStepProps {
     setData: (data: any) => void;
     setStep: (step: number) => void;
     paymentItems: PaymentItem[];
-    selectedDiscountType: string;
-    handleDiscountTypeChange: (type: string) => void;
+    selectedDiscountCode: string;
     discountTypes: Record<string, string>;
+    discountRules?: DiscountRule[];
+    discountCodeToIdMap?: Record<string, number>;
+    handleDiscountCodeChange: (code: string) => void;
     processing: boolean;
     handlePurposeChange: (value: string) => void;
     handlePeriodCoveredChange: (value: string) => void;
@@ -129,16 +187,25 @@ interface PaymentDetailsStepProps {
     isClearancePayment?: boolean;
     clearanceRequest?: any;
     selectedClearanceType?: ClearanceType | null;
-    getClearanceTypeNameById?: (id: string | number) => string;
-    selectedResident?: any;
+    getClearanceTypeName?: (id: string | number) => string;
+    selectedResident?: ResidentDetails | null;
     selectedHousehold?: any;
+    payerSource?: 'residents' | 'households' | 'clearance' | 'fees' | 'other';
+    feeTypes?: FeeType[];
 }
 
-function formatCurrency(amount: number): string {
-    if (!amount && amount !== 0) return '₱0.00';
+// ========== HELPER FUNCTIONS ==========
+function formatCurrency(amount: number | undefined | null): string {
+    if (amount === undefined || amount === null || isNaN(amount)) return '₱0.00';
     const numAmount = typeof amount === 'number' ? amount : parseFloat(String(amount));
     if (isNaN(numAmount)) return '₱0.00';
     return `₱${numAmount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
+}
+
+// FIXED: Added null check for percentage
+function formatPercentage(percent: number | undefined | null): string {
+    if (percent === undefined || percent === null || isNaN(percent)) return '0%';
+    return `${percent.toFixed(1)}%`;
 }
 
 function generateORNumber(): string {
@@ -156,9 +223,11 @@ export function PaymentDetailsStep({
     setData,
     setStep,
     paymentItems,
-    selectedDiscountType,
-    handleDiscountTypeChange,
+    selectedDiscountCode,
     discountTypes,
+    discountRules = [],
+    discountCodeToIdMap = {},
+    handleDiscountCodeChange,
     processing,
     handlePurposeChange,
     handlePeriodCoveredChange,
@@ -170,104 +239,351 @@ export function PaymentDetailsStep({
     isClearancePayment = false,
     clearanceRequest = null,
     selectedClearanceType = null,
-    getClearanceTypeNameById = (id: string | number) => 'Clearance',
+    getClearanceTypeName = (id: string | number) => 'Clearance',
     selectedResident = null,
-    selectedHousehold = null
+    selectedHousehold = null,
+    payerSource = 'residents',
+    feeTypes = []
 }: PaymentDetailsStepProps) {
+    
+    // ========== DEBUG LOGGING ==========
+    console.log('🔍 PaymentDetailsStep - Data:', {
+        subtotal: data.subtotal,
+        surcharge: data.surcharge,
+        penalty: data.penalty,
+        discount: data.discount,
+        amount_paid: data.amount_paid,
+        total_amount: data.total_amount
+    });
+
+    // ========== STATE DECLARATIONS ==========
     const [purposeError, setPurposeError] = useState<string>('');
-    const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
     const [isCleared, setIsCleared] = useState(data.is_cleared || false);
     const [validityDate, setValidityDate] = useState(data.validity_date || '');
     const [clearanceError, setClearanceError] = useState<string>('');
     const [autoGeneratedOR, setAutoGeneratedOR] = useState<boolean>(false);
     
+    // Amount paid state
+    const [amountTendered, setAmountTendered] = useState<string>(
+        data.amount_paid ? data.amount_paid.toString() : ''
+    );
+    
+    // ========== CORRECTED CALCULATIONS ==========
+    // Original amount BEFORE discount (subtotal + surcharge + penalty)
+    const originalTotal = (data.subtotal || 0) + (data.surcharge || 0) + (data.penalty || 0);
+    
+    // Discount amount
+    const discountAmount = data.discount || 0;
+    
+    // Calculate discount percentage for display (with safe division)
+    const discountPercentage = originalTotal > 0 ? (discountAmount / originalTotal) * 100 : 0;
+    
+    // Amount due AFTER discount (what the payer SHOULD pay)
+    const amountDue = originalTotal - discountAmount;
+    
+    // Amount actually paid (cash received)
+    const amountPaid = data.amount_paid || 0;
+    
+    // Calculate if payment is correct
+    const isExactAmount = Math.abs(amountPaid - amountDue) < 0.01;
+    const isOverpaid = amountPaid > amountDue + 0.01;
+    const isUnderpaid = amountPaid < amountDue - 0.01 && amountPaid > 0;
+    const isUnpaid = amountPaid <= 0;
+    
+    // Calculate balance/change
+    const balance = Math.max(0, amountDue - amountPaid);
+    const change = Math.max(0, amountPaid - amountDue);
+    
+    // Payment status
+    const paymentStatus = isUnpaid ? 'unpaid' : 
+                         (isUnderpaid ? 'partial' : 
+                         (isExactAmount ? 'paid' : 
+                         (isOverpaid ? 'overpaid' : 'unknown')));
+    
+    // Log for debugging
+    console.log('💰 CORRECTED CALCULATIONS:', {
+        originalTotal: originalTotal,
+        discount: discountAmount,
+        discountPercentage: discountPercentage,
+        amountDue: amountDue,
+        amountPaid: amountPaid,
+        isExactAmount,
+        isOverpaid,
+        isUnderpaid,
+        balance,
+        change,
+        paymentStatus
+    });
+
     const isClearanceFeePayment = isClearancePayment || paymentItems.some(item => 
         item.metadata?.is_clearance_fee || item.category === 'clearance'
     );
 
-    // Get clearance item
+    const isFeePayment = payerSource === 'fees' || paymentItems.some(item => 
+        item.metadata?.is_outstanding_fee === true && !item.metadata?.is_clearance_fee
+    );
+
     const clearanceItem = paymentItems.find(item => 
         item.metadata?.is_clearance_fee || item.category === 'clearance'
     );
 
-    // Calculate totals based on payment items - FIXED VERSION
-    const calculateTotals = (items: PaymentItem[]) => {
-        console.log('🧮 PaymentDetailsStep - Calculating totals from items:', items);
-        
-        let subtotal = 0;
-        let surcharge = 0;
-        let penalty = 0;
-        let total = 0;
+    const feeItems = paymentItems.filter(item => 
+        !(item.metadata?.is_clearance_fee || item.category === 'clearance')
+    );
 
-        items.forEach(item => {
-            console.log('📦 Processing item:', {
-                name: item.fee_name,
-                base_amount: item.base_amount,
-                surcharge: item.surcharge,
-                penalty: item.penalty,
-                discount: item.discount,
-                total_amount: item.total_amount
-            });
-            
-            subtotal += item.base_amount || 0;
-            surcharge += item.surcharge || 0;
-            penalty += item.penalty || 0;
-            // The total_amount field should already be set correctly (balance to pay)
-            total += item.total_amount || 0;
-        });
+    const selectedDiscountRule = discountRules.find(rule => rule.code === selectedDiscountCode);
 
-        console.log('🧮 Calculated totals:', { subtotal, surcharge, penalty, total });
-        return { subtotal, surcharge, penalty, total };
+    // Get display values with fallbacks
+    const displayPayerName = data.payer_name || (selectedResident?.name) || 'Unknown';
+    const displayContactNumber = data.contact_number || (selectedResident?.contact_number) || '';
+    const displayAddress = data.address || (selectedResident?.address) || '';
+    const displayHouseholdNumber = data.household_number || (selectedResident?.household_number) || '';
+    const displayPurok = data.purok || (selectedResident?.purok) || '';
+
+    // ========== DISCOUNT ELIGIBILITY CHECKING ==========
+    
+    const DISCOUNT_PRIORITY: Record<string, number> = {
+        'senior': 1,
+        'pwd': 2,
+        'indigent': 3,
+        'solo_parent': 4
     };
 
-    // Auto-update totals when payment items change
-    useEffect(() => {
-        console.log('🔄 PaymentDetailsStep - Payment items changed:', {
-            itemsCount: paymentItems.length,
-            items: paymentItems
-        });
-        
-        const { subtotal, surcharge, penalty, total } = calculateTotals(paymentItems);
-        
-        console.log('📊 Setting form data with totals:', { 
-            subtotal, 
-            surcharge, 
-            penalty, 
-            total,
-            currentData: data
-        });
-        
-        // Only update if values are different to avoid infinite loops
-        if (data.subtotal !== subtotal || data.surcharge !== surcharge || 
-            data.penalty !== penalty || data.total_amount !== total) {
-            setData(prev => ({
-                ...prev,
-                subtotal: subtotal,
-                surcharge: surcharge,
-                penalty: penalty,
-                total_amount: total,
-            }));
-        }
-    }, [paymentItems]);
+    const isFeeTypeDiscountable = useCallback((feeTypeId?: string | number): boolean => {
+        if (!feeTypeId) return false;
+        const feeType = feeTypes.find(ft => ft.id == feeTypeId);
+        return feeType?.is_discountable === true;
+    }, [feeTypes]);
 
-    // Auto-generate OR number
+    const isResidentEligibleForDiscount = useCallback((
+        resident: ResidentDetails | null,
+        discountType: string,
+        feeTypeId?: string | number
+    ): { eligible: boolean; percentage: number; id_number?: string } => {
+        if (!resident) return { eligible: false, percentage: 0 };
+        
+        const feeType = feeTypeId ? feeTypes.find(ft => ft.id == feeTypeId) : null;
+        
+        switch (discountType) {
+            case 'senior':
+                if (!resident.is_senior) return { eligible: false, percentage: 0 };
+                if (feeType && !feeType.has_senior_discount) return { eligible: false, percentage: 0 };
+                return {
+                    eligible: true,
+                    percentage: feeType?.senior_discount_percentage || 20,
+                    id_number: resident.senior_id_number
+                };
+                
+            case 'pwd':
+                if (!resident.is_pwd) return { eligible: false, percentage: 0 };
+                if (feeType && !feeType.has_pwd_discount) return { eligible: false, percentage: 0 };
+                return {
+                    eligible: true,
+                    percentage: feeType?.pwd_discount_percentage || 20,
+                    id_number: resident.pwd_id_number
+                };
+                
+            case 'solo_parent':
+                if (!resident.is_solo_parent) return { eligible: false, percentage: 0 };
+                if (feeType && !feeType.has_solo_parent_discount) return { eligible: false, percentage: 0 };
+                return {
+                    eligible: true,
+                    percentage: feeType?.solo_parent_discount_percentage || 10,
+                    id_number: resident.solo_parent_id_number
+                };
+                
+            case 'indigent':
+                if (!resident.is_indigent) return { eligible: false, percentage: 0 };
+                if (feeType && !feeType.has_indigent_discount) return { eligible: false, percentage: 0 };
+                return {
+                    eligible: true,
+                    percentage: feeType?.indigent_discount_percentage || 25,
+                    id_number: resident.indigent_id_number
+                };
+                
+            default:
+                return { eligible: false, percentage: 0 };
+        }
+    }, [feeTypes]);
+
+    const getBestDiscountForFee = useCallback((feeItem: PaymentItem): DiscountEligibility | null => {
+        if (!selectedResident) return null;
+        
+        const feeTypeId = feeItem.fee_type_id;
+        const availableDiscounts: DiscountEligibility[] = [];
+        
+        const discountTypes = ['senior', 'pwd', 'solo_parent', 'indigent'];
+        
+        for (const type of discountTypes) {
+            const eligibility = isResidentEligibleForDiscount(selectedResident, type, feeTypeId);
+            if (eligibility.eligible) {
+                availableDiscounts.push({
+                    type,
+                    label: type === 'senior' ? 'Senior Citizen' :
+                           type === 'pwd' ? 'Person with Disability' :
+                           type === 'solo_parent' ? 'Solo Parent' : 'Indigent',
+                    percentage: eligibility.percentage,
+                    id_number: eligibility.id_number,
+                    has_id: !!eligibility.id_number
+                });
+            }
+        }
+        
+        if (availableDiscounts.length === 0) return null;
+        
+        availableDiscounts.sort((a, b) => 
+            (DISCOUNT_PRIORITY[a.type] || 999) - (DISCOUNT_PRIORITY[b.type] || 999)
+        );
+        
+        return availableDiscounts[0];
+    }, [selectedResident, isResidentEligibleForDiscount]);
+
+    const getAllPossibleDiscounts = useMemo(() => {
+        if (!selectedResident) return [];
+        
+        const discountSet = new Set<string>();
+        const discounts: DiscountEligibility[] = [];
+        
+        feeItems.forEach(item => {
+            const bestDiscount = getBestDiscountForFee(item);
+            if (bestDiscount && !discountSet.has(bestDiscount.type)) {
+                discountSet.add(bestDiscount.type);
+                discounts.push(bestDiscount);
+            }
+        });
+        
+        if (clearanceItem && selectedClearanceType) {
+            const clearanceDiscounts = [];
+            
+            if (selectedResident.is_senior && selectedClearanceType.has_senior_discount) {
+                clearanceDiscounts.push({
+                    type: 'senior',
+                    label: 'Senior Citizen',
+                    percentage: selectedClearanceType.senior_discount_percentage || 20,
+                    id_number: selectedResident.senior_id_number,
+                    has_id: !!selectedResident.senior_id_number
+                });
+            }
+            
+            if (selectedResident.is_pwd && selectedClearanceType.has_pwd_discount) {
+                clearanceDiscounts.push({
+                    type: 'pwd',
+                    label: 'Person with Disability',
+                    percentage: selectedClearanceType.pwd_discount_percentage || 20,
+                    id_number: selectedResident.pwd_id_number,
+                    has_id: !!selectedResident.pwd_id_number
+                });
+            }
+            
+            if (selectedResident.is_solo_parent && selectedClearanceType.has_solo_parent_discount) {
+                clearanceDiscounts.push({
+                    type: 'solo_parent',
+                    label: 'Solo Parent',
+                    percentage: selectedClearanceType.solo_parent_discount_percentage || 10,
+                    id_number: selectedResident.solo_parent_id_number,
+                    has_id: !!selectedResident.solo_parent_id_number
+                });
+            }
+            
+            if (selectedResident.is_indigent && selectedClearanceType.has_indigent_discount) {
+                clearanceDiscounts.push({
+                    type: 'indigent',
+                    label: 'Indigent',
+                    percentage: selectedClearanceType.indigent_discount_percentage || 25,
+                    id_number: selectedResident.indigent_id_number,
+                    has_id: !!selectedResident.indigent_id_number
+                });
+            }
+            
+            if (clearanceDiscounts.length > 0) {
+                clearanceDiscounts.sort((a, b) => 
+                    (DISCOUNT_PRIORITY[a.type] || 999) - (DISCOUNT_PRIORITY[b.type] || 999)
+                );
+                const bestClearanceDiscount = clearanceDiscounts[0];
+                if (!discountSet.has(bestClearanceDiscount.type)) {
+                    discountSet.add(bestClearanceDiscount.type);
+                    discounts.push(bestClearanceDiscount);
+                }
+            }
+        }
+        
+        discounts.sort((a, b) => 
+            (DISCOUNT_PRIORITY[a.type] || 999) - (DISCOUNT_PRIORITY[b.type] || 999)
+        );
+        
+        return discounts;
+    }, [selectedResident, feeItems, clearanceItem, selectedClearanceType, getBestDiscountForFee]);
+
+    const isDiscountRuleApplicable = useCallback((rule: DiscountRule): boolean => {
+        if (!selectedResident) return true;
+        
+        const ruleTypeMap: Record<string, string> = {
+            'SENIOR': 'senior',
+            'SENIOR_CITIZEN': 'senior',
+            'PWD': 'pwd',
+            'SOLO_PARENT': 'solo_parent',
+            'INDIGENT': 'indigent'
+        };
+        
+        const residentType = ruleTypeMap[rule.code];
+        if (!residentType) return true;
+        
+        const eligibility = isResidentEligibleForDiscount(selectedResident, residentType);
+        return eligibility.eligible;
+    }, [selectedResident, isResidentEligibleForDiscount]);
+
+    const filteredDiscountRules = useMemo(() => {
+        return discountRules.filter(rule => isDiscountRuleApplicable(rule));
+    }, [discountRules, isDiscountRuleApplicable]);
+
+    const getDiscountWarningMessage = useMemo(() => {
+        const possibleDiscounts = getAllPossibleDiscounts;
+        
+        if (possibleDiscounts.length > 1) {
+            return {
+                message: `You're eligible for multiple discounts (${possibleDiscounts.map(d => d.label).join(', ')}). Only one discount can be applied.`,
+                type: 'warning'
+            };
+        }
+        
+        if (possibleDiscounts.length === 1) {
+            return {
+                message: `You're eligible for ${possibleDiscounts[0].label} discount.`,
+                type: 'info'
+            };
+        }
+        
+        return null;
+    }, [getAllPossibleDiscounts]);
+
+    // ========== EFFECTS ==========
     useEffect(() => {
         if (!data.or_number || data.or_number.trim() === '') {
             const newOR = generateORNumber();
-            setData('or_number', newOR);
+            if (typeof setData === 'function') {
+                if (setData.length === 2) {
+                    setData('or_number', newOR);
+                } else {
+                    setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
+                }
+            }
             setAutoGeneratedOR(true);
         }
     }, []);
 
-    // Set default payment date
     useEffect(() => {
         if (!data.payment_date) {
             const today = new Date().toISOString().split('T')[0];
-            setData('payment_date', today);
+            if (typeof setData === 'function') {
+                if (setData.length === 2) {
+                    setData('payment_date', today);
+                } else {
+                    setData((prev: PaymentFormData) => ({ ...prev, payment_date: today }));
+                }
+            }
         }
     }, []);
 
-    // Auto-set validity date
     useEffect(() => {
         if (selectedClearanceType && selectedClearanceType.validity_days && !data.validity_date) {
             const today = new Date();
@@ -276,13 +592,79 @@ export function PaymentDetailsStep({
             
             const formattedDate = validUntil.toISOString().split('T')[0];
             setValidityDate(formattedDate);
-            setData('validity_date', formattedDate);
+            
+            if (typeof setData === 'function') {
+                if (setData.length === 2) {
+                    setData('validity_date', formattedDate);
+                } else {
+                    setData((prev: PaymentFormData) => ({ ...prev, validity_date: formattedDate }));
+                }
+            }
         }
-    }, [selectedClearanceType, data.validity_date]);
+    }, [selectedClearanceType]);
 
+    // Auto-set amount paid to amount due if not set
+    useEffect(() => {
+        if (!data.amount_paid && amountDue > 0) {
+            const dueValue = amountDue.toFixed(2);
+            setAmountTendered(dueValue);
+            
+            if (typeof setData === 'function') {
+                if (setData.length === 2) {
+                    setData('amount_paid', amountDue);
+                } else {
+                    setData((prev: PaymentFormData) => ({ ...prev, amount_paid: amountDue }));
+                }
+            }
+        }
+    }, [amountDue, data.amount_paid]);
+
+    // ========== HANDLER FUNCTIONS ==========
     const handlePaymentMethodChange = (methodId: string) => {
-        setData('payment_method', methodId);
-        setData('reference_number', '');
+        if (typeof setData === 'function') {
+            if (setData.length === 2) {
+                setData('payment_method', methodId);
+                setData('reference_number', '');
+            } else {
+                setData((prev: PaymentFormData) => ({ 
+                    ...prev, 
+                    payment_method: methodId,
+                    reference_number: '' 
+                }));
+            }
+        }
+    };
+
+    const handleAmountTenderedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value.replace(/[^0-9.]/g, '');
+        setAmountTendered(value);
+        
+        const numericValue = parseFloat(value) || 0;
+        
+        if (typeof setData === 'function') {
+            if (setData.length === 2) {
+                setData('amount_paid', numericValue);
+            } else {
+                setData((prev: PaymentFormData) => ({ ...prev, amount_paid: numericValue }));
+            }
+        }
+    };
+
+    const handleQuickAmount = (amount: number) => {
+        const newAmount = amount.toFixed(2);
+        setAmountTendered(newAmount);
+        
+        if (typeof setData === 'function') {
+            if (setData.length === 2) {
+                setData('amount_paid', amount);
+            } else {
+                setData((prev: PaymentFormData) => ({ ...prev, amount_paid: amount }));
+            }
+        }
+    };
+
+    const handleExactAmount = () => {
+        handleQuickAmount(amountDue);
     };
 
     const handleClearanceTypeSelect = (value: string) => {
@@ -295,18 +677,52 @@ export function PaymentDetailsStep({
 
     const handleClearedChange = (checked: boolean) => {
         setIsCleared(checked);
-        setData('is_cleared', checked);
+        if (typeof setData === 'function') {
+            if (setData.length === 2) {
+                setData('is_cleared', checked);
+            } else {
+                setData((prev: PaymentFormData) => ({ ...prev, is_cleared: checked }));
+            }
+        }
     };
 
     const handleValidityDateChange = (value: string) => {
         setValidityDate(value);
-        setData('validity_date', value);
+        if (typeof setData === 'function') {
+            if (setData.length === 2) {
+                setData('validity_date', value);
+            } else {
+                setData((prev: PaymentFormData) => ({ ...prev, validity_date: value }));
+            }
+        }
     };
 
     const handleRegenerateOR = () => {
         const newOR = generateORNumber();
-        setData('or_number', newOR);
+        if (typeof setData === 'function') {
+            if (setData.length === 2) {
+                setData('or_number', newOR);
+            } else {
+                setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
+            }
+        }
         setAutoGeneratedOR(true);
+    };
+
+    const handleDiscountSelect = (code: string) => {
+        if (code === 'no_discount') {
+            handleDiscountCodeChange('');
+            return;
+        }
+        
+        const warning = getDiscountWarningMessage;
+        if (warning && warning.type === 'warning' && !selectedDiscountCode) {
+            if (!confirm(`${warning.message}\n\nAre you sure you want to apply this discount?`)) {
+                return;
+            }
+        }
+        
+        handleDiscountCodeChange(code);
     };
 
     const validateForm = () => {
@@ -322,38 +738,50 @@ export function PaymentDetailsStep({
         
         if (!data.or_number || data.or_number.trim() === '') {
             const newOR = generateORNumber();
-            setData('or_number', newOR);
+            if (typeof setData === 'function') {
+                if (setData.length === 2) {
+                    setData('or_number', newOR);
+                } else {
+                    setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
+                }
+            }
             setAutoGeneratedOR(true);
         }
         
         if (!data.payment_date) {
-            setData('payment_date', new Date().toISOString().split('T')[0]);
+            const today = new Date().toISOString().split('T')[0];
+            if (typeof setData === 'function') {
+                if (setData.length === 2) {
+                    setData('payment_date', today);
+                } else {
+                    setData((prev: PaymentFormData) => ({ ...prev, payment_date: today }));
+                }
+            }
         }
         
         if (isClearanceFeePayment && clearanceTypes.length > 0) {
             if (!data.clearance_type_id || String(data.clearance_type_id).trim() === '') {
-                setClearanceError('Please select a clearance type for clearance payment');
+                setClearanceError('Please select a clearance type');
                 isValid = false;
             }
         }
         
-        // Validate that total amount is greater than 0
-        if (data.total_amount <= 0) {
-            setPurposeError('Total amount must be greater than 0. Please check your payment items.');
+        if (originalTotal <= 0) {
+            setPurposeError('Total amount must be greater than 0');
+            isValid = false;
+        }
+
+        if (selectedDiscountRule?.requires_verification && !data.verification_id_number) {
+            alert('This discount requires verification. Please provide ID number.');
+            isValid = false;
+        }
+
+        if (amountPaid < 0) {
+            alert('Amount paid cannot be negative.');
             isValid = false;
         }
         
         return isValid;
-    };
-
-    const formatDateDisplay = (dateString: string) => {
-        if (!dateString) return '';
-        try {
-            const [year, month, day] = dateString.split('-');
-            return `${day}/${month}/${year}`;
-        } catch {
-            return dateString;
-        }
     };
 
     const handleFormSubmit = (e: React.FormEvent) => {
@@ -361,12 +789,36 @@ export function PaymentDetailsStep({
         
         if (!data.or_number || data.or_number.trim() === '') {
             const newOR = generateORNumber();
-            setData('or_number', newOR);
+            if (typeof setData === 'function') {
+                if (setData.length === 2) {
+                    setData('or_number', newOR);
+                } else {
+                    setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
+                }
+            }
             setAutoGeneratedOR(true);
         }
         
         if (!data.payment_date) {
-            setData('payment_date', new Date().toISOString().split('T')[0]);
+            const today = new Date().toISOString().split('T')[0];
+            if (typeof setData === 'function') {
+                if (setData.length === 2) {
+                    setData('payment_date', today);
+                } else {
+                    setData((prev: PaymentFormData) => ({ ...prev, payment_date: today }));
+                }
+            }
+        }
+        
+        // Show warning if amount paid doesn't match amount due
+        if (!isExactAmount && amountPaid > 0) {
+            const message = isOverpaid 
+                ? `You are overpaying by ${formatCurrency(change)}. Change of ${formatCurrency(change)} will be given. Continue?`
+                : `You are underpaying by ${formatCurrency(balance)}. Remaining balance of ${formatCurrency(balance)} will be recorded as partial payment. Continue?`;
+            
+            if (!confirm(message)) {
+                return;
+            }
         }
         
         if (validateForm()) {
@@ -377,698 +829,831 @@ export function PaymentDetailsStep({
         }
     };
 
-    // Calculate totals for display
-    const displayTotals = calculateTotals(paymentItems);
-    const discountAmount = data.discount || 0;
-    // Use data.total_amount directly (already calculated correctly)
-    const finalTotal = data.total_amount || 0;
-
-    console.log('📋 PaymentDetailsStep - Final display:', {
-        displayTotals,
-        dataTotals: {
-            subtotal: data.subtotal,
-            surcharge: data.surcharge,
-            penalty: data.penalty,
-            total_amount: data.total_amount
-        },
-        discountAmount,
-        finalTotal
-    });
-
-    // Get payer details based on selected resident or household
-    const getPayerTypeDisplay = () => {
+    const getPayerTypeIcon = () => {
         switch (data.payer_type) {
-            case 'resident':
-                return { label: 'Individual Resident', icon: User, color: 'bg-blue-100 text-blue-700' };
-            case 'household':
-                return { label: 'Household/Family', icon: Users, color: 'bg-green-100 text-green-700' };
-            case 'business':
-                return { label: 'Business/Company', icon: Building, color: 'bg-purple-100 text-purple-700' };
-            default:
-                return { label: 'Other Payer', icon: UserCircle, color: 'bg-gray-100 text-gray-700' };
+            case 'resident': return User;
+            case 'household': return Users;
+            case 'business': return Building;
+            default: return UserCircle;
         }
     };
 
-    const payerTypeInfo = getPayerTypeDisplay();
+    const getPayerTypeLabel = () => {
+        switch (data.payer_type) {
+            case 'resident': return 'Resident';
+            case 'household': return 'Household';
+            case 'business': return 'Business';
+            default: return 'Other';
+        }
+    };
 
-    return (
-        <div className="grid gap-6 lg:grid-cols-3">
-            {/* Left Column - Payer & Payment Information */}
-            <div className="lg:col-span-2 space-y-6">
-                {/* Payer Information Card */}
-                <Card className="border border-gray-200 shadow-sm">
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 border-b">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-100 rounded-lg">
-                                    <UserCircle className="h-5 w-5 text-blue-700" />
-                                </div>
-                                <div>
-                                    <CardTitle className="text-xl font-semibold text-gray-900">
-                                        Payer Information
-                                    </CardTitle>
-                                    <CardDescription className="text-gray-600">
-                                        Details of the person or entity making the payment
-                                    </CardDescription>
-                                </div>
-                            </div>
-                            <Badge className={`${payerTypeInfo.color} border-0`}>
-                                {payerTypeInfo.label}
-                            </Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4 pt-6">
-                        {/* Payer Name and Contact */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="payerName" className="flex items-center gap-1 text-sm font-medium">
-                                    <User className="h-3.5 w-3.5 text-gray-500" />
-                                    Payer Name *
-                                </Label>
-                                <Input
-                                    id="payerName"
-                                    value={data.payer_name || ''}
-                                    onChange={(e) => setData('payer_name', e.target.value)}
-                                    required
-                                    className="bg-gray-50"
-                                    placeholder="Enter payer's full name"
-                                />
-                                {data.payer_type === 'resident' && selectedResident && (
-                                    <p className="text-xs text-green-600 flex items-center gap-1">
-                                        <CheckCircle className="h-3 w-3" />
-                                        Selected from resident records
-                                    </p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="contactNumber" className="flex items-center gap-1 text-sm font-medium">
-                                    <Phone className="h-3.5 w-3.5 text-gray-500" />
-                                    Contact Number
-                                </Label>
-                                <Input
-                                    id="contactNumber"
-                                    value={data.contact_number || ''}
-                                    onChange={(e) => setData('contact_number', e.target.value)}
-                                    className="bg-gray-50"
-                                    placeholder="e.g., 09123456789"
-                                />
-                            </div>
-                        </div>
+    const PayerIcon = getPayerTypeIcon();
 
-                        {/* Address Information */}
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="address" className="flex items-center gap-1 text-sm font-medium">
-                                    <MapPin className="h-3.5 w-3.5 text-gray-500" />
-                                    Complete Address
-                                </Label>
-                                <Textarea
-                                    id="address"
-                                    value={data.address || ''}
-                                    onChange={(e) => setData('address', e.target.value)}
-                                    className="min-h-[60px] bg-gray-50"
-                                    placeholder="Enter complete address including street, barangay, city/municipality"
-                                    rows={2}
-                                />
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="purok" className="flex items-center gap-1 text-sm font-medium">
-                                        <MapPinHouse className="h-3.5 w-3.5 text-gray-500" />
-                                        Purok/Zone
-                                    </Label>
-                                    <Input
-                                        id="purok"
-                                        value={data.purok || ''}
-                                        onChange={(e) => setData('purok', e.target.value)}
-                                        className="bg-gray-50"
-                                        placeholder="Purok number or name"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="householdNumber" className="flex items-center gap-1 text-sm font-medium">
-                                        <Hash className="h-3.5 w-3.5 text-gray-500" />
-                                        Household Number
-                                    </Label>
-                                    <Input
-                                        id="householdNumber"
-                                        value={data.household_number || ''}
-                                        onChange={(e) => setData('household_number', e.target.value)}
-                                        className="bg-gray-50"
-                                        placeholder="HH-0001"
-                                    />
-                                </div>
-                            </div>
-                        </div>
+    const getPaymentTypeEmphasis = () => {
+        if (isClearanceFeePayment && isFeePayment) {
+            return {
+                badge: 'Combined Payment',
+                color: 'bg-gradient-to-r from-purple-600 to-blue-600',
+                icon: <Receipt className="h-3 w-3 mr-1" />,
+                description: 'Clearance + Fees'
+            };
+        }
+        if (isClearanceFeePayment) {
+            return {
+                badge: 'Clearance Payment',
+                color: 'bg-purple-600',
+                icon: <FileBadge className="h-3 w-3 mr-1" />,
+                description: 'Clearance Certificate'
+            };
+        }
+        if (isFeePayment) {
+            return {
+                badge: 'Fee Payment',
+                color: 'bg-blue-600',
+                icon: <Receipt className="h-3 w-3 mr-1" />,
+                description: 'Barangay Fees'
+            };
+        }
+        return null;
+    };
 
-                        {/* Payer Summary */}
-                        {(selectedResident || selectedHousehold) && (
-                            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h4 className="font-medium text-sm text-gray-900">
-                                        {data.payer_type === 'resident' ? 'Resident Details' : 'Household Details'}
-                                    </h4>
-                                    <Badge variant="outline" className="text-xs">
-                                        From Records
+    const paymentEmphasis = getPaymentTypeEmphasis();
+
+    const getPaymentStatusBadge = () => {
+        switch (paymentStatus) {
+            case 'paid':
+                return {
+                    label: 'PAID',
+                    color: 'bg-green-100 text-green-800 border-green-200',
+                    icon: <CheckCircle2 className="h-3 w-3 mr-1" />
+                };
+            case 'partial':
+                return {
+                    label: 'PARTIAL',
+                    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                    icon: <AlertTriangle className="h-3 w-3 mr-1" />
+                };
+            case 'unpaid':
+                return {
+                    label: 'UNPAID',
+                    color: 'bg-gray-100 text-gray-800 border-gray-200',
+                    icon: <XCircle className="h-3 w-3 mr-1" />
+                };
+            case 'overpaid':
+                return {
+                    label: 'OVERPAID',
+                    color: 'bg-blue-100 text-blue-800 border-blue-200',
+                    icon: <TrendingUp className="h-3 w-3 mr-1" />
+                };
+            default:
+                return {
+                    label: 'UNPAID',
+                    color: 'bg-gray-100 text-gray-800 border-gray-200',
+                    icon: <XCircle className="h-3 w-3 mr-1" />
+                };
+        }
+    };
+
+    const statusBadge = getPaymentStatusBadge();
+
+    // ========== RENDER FUNCTIONS ==========
+    const renderResidentClassifications = () => {
+        if (!selectedResident) return null;
+
+        const classifications = [];
+
+        if (selectedResident.is_voter) {
+            classifications.push({
+                icon: <Vote className="h-3 w-3" />,
+                label: 'Registered Voter',
+                color: 'bg-blue-100 text-blue-800 border-blue-200',
+                idNumber: null,
+                tooltip: 'Registered Voter'
+            });
+        }
+
+        if (selectedResident.is_senior) {
+            classifications.push({
+                icon: <Heart className="h-3 w-3" />,
+                label: 'Senior Citizen',
+                color: 'bg-green-100 text-green-800 border-green-200',
+                idNumber: selectedResident.senior_id_number,
+                tooltip: 'Senior Citizen Discount Eligible'
+            });
+        }
+
+        if (selectedResident.is_pwd) {
+            classifications.push({
+                icon: <HeartHandshake className="h-3 w-3" />,
+                label: 'PWD',
+                color: 'bg-purple-100 text-purple-800 border-purple-200',
+                idNumber: selectedResident.pwd_id_number,
+                tooltip: 'Person with Disability'
+            });
+        }
+
+        if (selectedResident.is_solo_parent) {
+            classifications.push({
+                icon: <Baby className="h-3 w-3" />,
+                label: 'Solo Parent',
+                color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                idNumber: selectedResident.solo_parent_id_number,
+                tooltip: 'Solo Parent'
+            });
+        }
+
+        if (selectedResident.is_indigent) {
+            classifications.push({
+                icon: <HandHeart className="h-3 w-3" />,
+                label: 'Indigent',
+                color: 'bg-orange-100 text-orange-800 border-orange-200',
+                idNumber: selectedResident.indigent_id_number,
+                tooltip: 'Indigent Family'
+            });
+        }
+
+        if (classifications.length === 0) return null;
+
+        return (
+            <div className="mt-4 pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+                    <Award className="h-3 w-3" />
+                    Special Classifications
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {classifications.map((item, index) => (
+                        <Badge 
+                            key={index} 
+                            variant="outline" 
+                            className={`${item.color} flex items-center gap-1 px-2 py-1 cursor-help`}
+                            title={item.idNumber ? `ID: ${item.idNumber}` : item.tooltip}
+                        >
+                            {item.icon}
+                            <span className="text-xs">{item.label}</span>
+                            {item.idNumber && (
+                                <span className="text-[10px] ml-1 opacity-75 font-mono">
+                                    #{item.idNumber.split('-').pop()}
+                                </span>
+                            )}
+                        </Badge>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderDiscountEligibilities = () => {
+        if (!selectedResident) return null;
+        
+        const possibleDiscounts = getAllPossibleDiscounts;
+        
+        if (possibleDiscounts.length === 0) {
+            const hasDiscountableFees = feeItems.some(item => {
+                return isFeeTypeDiscountable(item.fee_type_id);
+            });
+            
+            if (hasDiscountableFees) {
+                return (
+                    <div className="mt-3">
+                        <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+                            <Percent className="h-3 w-3" />
+                            Discount Eligibility
+                        </div>
+                        <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                            <p className="text-xs text-gray-600 flex items-center gap-1">
+                                <XCircle className="h-3 w-3 text-gray-400" />
+                                Some fees are discountable, but you're not eligible for any discounts.
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
+            
+            return null;
+        }
+
+        return (
+            <div className="mt-3">
+                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+                    <Percent className="h-3 w-3" />
+                    Available Discounts
+                </div>
+                <div className="space-y-2">
+                    {possibleDiscounts.map((eligibility, index) => {
+                        const iconMap: Record<string, JSX.Element> = {
+                            senior: <Heart className="h-3 w-3 text-green-600" />,
+                            pwd: <HeartHandshake className="h-3 w-3 text-purple-600" />,
+                            solo_parent: <Baby className="h-3 w-3 text-yellow-600" />,
+                            indigent: <HandHeart className="h-3 w-3 text-orange-600" />
+                        };
+                        
+                        return (
+                            <div 
+                                key={index} 
+                                className={`flex items-center justify-between p-2 rounded-md border ${
+                                    index === 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200 opacity-75'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    {iconMap[eligibility.type as keyof typeof iconMap]}
+                                    <span className="text-xs font-medium">{eligibility.label}</span>
+                                    <Badge variant="secondary" className={`text-[10px] ${
+                                        index === 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                    }`}>
+                                        {formatPercentage(eligibility.percentage)}
                                     </Badge>
                                 </div>
-                                
-                                {data.payer_type === 'resident' && selectedResident && (
-                                    <div className="space-y-1 text-sm">
-                                        <div className="flex items-center gap-2">
-                                            <User className="h-3 w-3 text-gray-500" />
-                                            <span className="font-medium text-gray-900">{selectedResident.name}</span>
-                                        </div>
-                                        {selectedResident.contact_number && (
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <Phone className="h-3 w-3" />
-                                                <span>{selectedResident.contact_number}</span>
-                                            </div>
-                                        )}
-                                        {selectedResident.address && (
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <MapPin className="h-3 w-3" />
-                                                <span className="truncate">{selectedResident.address}</span>
-                                            </div>
-                                        )}
-                                        {selectedResident.household_number && (
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <Home className="h-3 w-3" />
-                                                <span>HH#: {selectedResident.household_number}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                
-                                {data.payer_type === 'household' && selectedHousehold && (
-                                    <div className="space-y-1 text-sm">
-                                        <div className="flex items-center gap-2">
-                                            <Users className="h-3 w-3 text-gray-500" />
-                                            <span className="font-medium text-gray-900">{selectedHousehold.head_name}</span>
-                                            <Badge variant="outline" className="text-xs">
-                                                Head of Family
-                                            </Badge>
-                                        </div>
-                                        {selectedHousehold.contact_number && (
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <Phone className="h-3 w-3" />
-                                                <span>{selectedHousehold.contact_number}</span>
-                                            </div>
-                                        )}
-                                        {selectedHousehold.address && (
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <MapPin className="h-3 w-3" />
-                                                <span className="truncate">{selectedHousehold.address}</span>
-                                            </div>
-                                        )}
-                                        {selectedHousehold.family_members > 0 && (
-                                            <div className="flex items-center gap-2 text-gray-600">
-                                                <User className="h-3 w-3" />
-                                                <span>{selectedHousehold.family_members} family members</span>
-                                            </div>
-                                        )}
-                                    </div>
+                                {eligibility.has_id && eligibility.id_number && (
+                                    <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1">
+                                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                        ID: {eligibility.id_number}
+                                    </span>
                                 )}
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
+                        );
+                    })}
+                    
+                    {possibleDiscounts.length > 1 && (
+                        <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md mt-2">
+                            <p className="text-xs text-yellow-800 flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                Note: Only one discount can be applied. The highest priority discount will be used.
+                            </p>
+                        </div>
+                    )}
+                    
+                    <p className="text-xs text-gray-500 mt-1">
+                        Select a discount from the dropdown below to apply
+                    </p>
+                </div>
+            </div>
+        );
+    };
 
+    const renderHouseholdInfo = () => {
+        if (!selectedResident?.household_info) return null;
+
+        const household = selectedResident.household_info;
+
+        return (
+            <div className="mt-4 pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+                    <Home className="h-3 w-3" />
+                    Household Information
+                </div>
+                <div className="space-y-2">
+                    {household.household_number && (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                            <Hash className="h-3 w-3 mr-1" />
+                            {household.household_number}
+                        </Badge>
+                    )}
+                    {household.purok && (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                            <MapPinHouse className="h-3 w-3 mr-1" />
+                            {household.purok}
+                        </Badge>
+                    )}
+
+                    {household.head_of_household && (
+                        <div className="flex items-center gap-2 text-xs">
+                            <User className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">Head:</span>
+                            <span className="font-medium text-gray-900">{household.head_of_household.name}</span>
+                        </div>
+                    )}
+
+                    {household.member_count && (
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                            <UsersRound className="h-3 w-3" />
+                            <span>{household.member_count} family members</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    const renderFeeItemsWithDiscountInfo = () => {
+        if (feeItems.length === 0) return null;
+
+        return (
+            <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+                <div className="flex items-center gap-2 text-blue-700 font-medium mb-2">
+                    <Receipt className="h-4 w-4" />
+                    <span className="text-sm">Fee Items</span>
+                    <Badge className="ml-2 bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                        {feeItems.length} item(s)
+                    </Badge>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {feeItems.map((item) => {
+                        const isDiscountable = isFeeTypeDiscountable(item.fee_type_id);
+                        const bestDiscount = getBestDiscountForFee(item);
+                        
+                        return (
+                            <div key={item.id} className="p-2 bg-white rounded border border-blue-100">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                        <div className="font-medium text-sm flex items-center gap-2">
+                                            {item.fee_name}
+                                            {isDiscountable && (
+                                                <Badge variant="outline" className="text-[10px] bg-yellow-50 text-yellow-700 border-yellow-200">
+                                                    <Tag className="h-2 w-2 mr-1" />
+                                                    Discountable
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-gray-500">{item.fee_code}</div>
+                                        
+                                        {bestDiscount && (
+                                            <div className="mt-1">
+                                                <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700">
+                                                    Eligible: {bestDiscount.label} ({formatPercentage(bestDiscount.percentage)})
+                                                </Badge>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="font-medium text-sm">
+                                        {formatCurrency(item.total_amount)}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    // ========== MAIN RENDER ==========
+    return (
+        <div className="grid gap-6 lg:grid-cols-3">
+            {/* Left Column - Payment Information */}
+            <div className="lg:col-span-2 space-y-6">
                 {/* Payment Information Card */}
-                <Card className="border border-gray-200 shadow-sm">
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 border-b">
+                <Card>
+                    <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
                                 <div className="p-2 bg-primary/10 rounded-lg">
-                                    <CreditCard className="h-5 w-5 text-primary" />
+                                    <Receipt className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-xl font-semibold text-gray-900">
-                                        Payment Information
+                                    <CardTitle className="text-xl font-semibold">
+                                        Payment Details
                                     </CardTitle>
-                                    <CardDescription className="text-gray-600">
-                                        Complete payment details and generate official receipt
+                                    <CardDescription>
+                                        Complete the payment information
                                     </CardDescription>
                                 </div>
                             </div>
-                            <Badge variant="outline" className="bg-white">
-                                Step 3 of 3
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                                {paymentEmphasis && (
+                                    <Badge className={`${paymentEmphasis.color} text-white border-0`}>
+                                        {paymentEmphasis.icon}
+                                        {paymentEmphasis.badge}
+                                    </Badge>
+                                )}
+                                <Badge variant="outline">Step 3 of 3</Badge>
+                            </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="space-y-6 pt-6">
-                        {/* Clearance Payment Info */}
+                    <CardContent className="space-y-6">
+                        {/* Clearance Type Selection */}
                         {isClearanceFeePayment && clearanceTypes.length > 0 && (
-                            <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="p-2 bg-purple-100 rounded-lg">
-                                        <FileBadge className="h-5 w-5 text-purple-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-purple-900">Clearance/Certificate Payment</h3>
-                                        <p className="text-sm text-purple-700">
-                                            This payment includes a barangay clearance or certificate.
-                                        </p>
-                                    </div>
+                            <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <FileBadge className="h-5 w-5 text-purple-600" />
+                                    <h3 className="font-medium text-purple-900">Clearance Type</h3>
                                 </div>
                                 
-                                {/* Clearance Type Selection */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="clearanceType" className="flex items-center gap-1 text-sm font-medium text-purple-800">
-                                        <FileBadge className="h-3.5 w-3.5" />
-                                        Clearance Type
-                                    </Label>
-                                    
-                                    <Select
-                                        value={String(data.clearance_type_id || "")}
-                                        onValueChange={handleClearanceTypeSelect}
-                                    >
-                                        <SelectTrigger className={`h-9 text-sm bg-white ${clearanceError ? 'border-red-300' : 'border-purple-300'}`}>
-                                            {selectedClearanceType ? (
-                                                <div className="flex items-center gap-2 text-left">
-                                                    <FileBadge className="h-3.5 w-3.5 text-purple-600" />
-                                                    <span>{selectedClearanceType.name}</span>
-                                                    <Badge variant="outline" className="ml-2 text-xs bg-purple-100 text-purple-700 border-purple-200">
-                                                        {selectedClearanceType.code}
-                                                    </Badge>
+                                <Select
+                                    value={String(data.clearance_type_id || "")}
+                                    onValueChange={handleClearanceTypeSelect}
+                                >
+                                    <SelectTrigger className={`bg-white ${clearanceError ? 'border-red-300' : ''}`}>
+                                        <SelectValue placeholder="Select clearance type..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {clearanceTypes.map((type) => (
+                                            <SelectItem key={type.id} value={String(type.id)}>
+                                                <div className="flex items-center justify-between w-full">
+                                                    <span>{type.name}</span>
+                                                    <span className="text-xs text-gray-500 ml-2">
+                                                        {type.formatted_fee || formatCurrency(Number(type.fee))}
+                                                    </span>
                                                 </div>
-                                            ) : (
-                                                <span className="text-gray-500">Select clearance type...</span>
-                                            )}
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {clearanceTypes.length > 0 ? (
-                                                clearanceTypes.map((type) => (
-                                                    <SelectItem key={type.id} value={String(type.id)} className="text-sm">
-                                                        <div className="flex items-center gap-2">
-                                                            <FileBadge className="h-3.5 w-3.5 text-purple-600 flex-shrink-0" />
-                                                            <div className="flex flex-col">
-                                                                <span>{type.name}</span>
-                                                                <span className="text-xs text-gray-500">
-                                                                    Code: {type.code} • Fee: {type.formatted_fee}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </SelectItem>
-                                                ))
-                                            ) : (
-                                                <div className="py-6 text-center">
-                                                    <CircleAlert className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                                                    <p className="text-sm text-gray-500">No clearance types available</p>
-                                                </div>
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                    
-                                    {clearanceError && (
-                                        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-2 rounded">
-                                            <AlertCircle className="h-3.5 w-3.5" />
-                                            {clearanceError}
-                                        </div>
-                                    )}
-                                    
-                                    {/* Display selected clearance type details */}
-                                    {selectedClearanceType && (
-                                        <div className="mt-2 p-3 bg-white border border-purple-100 rounded-md">
-                                            <div className="flex items-start gap-2">
-                                                <FileText className="h-4 w-4 text-purple-600 mt-0.5" />
-                                                <div className="text-sm">
-                                                    <div className="font-medium text-purple-800">
-                                                        {selectedClearanceType.name}
-                                                    </div>
-                                                    <div className="text-xs text-gray-600 mt-1">
-                                                        Code: <span className="font-mono">{selectedClearanceType.code}</span>
-                                                        {selectedClearanceType.validity_days > 0 && (
-                                                            <span> • Valid for {selectedClearanceType.validity_days} days</span>
-                                                        )}
-                                                    </div>
-                                                    {clearanceRequest?.reference_number && (
-                                                        <div className="text-xs text-gray-600 mt-1">
-                                                            Request ID: <span className="font-mono">{clearanceRequest.reference_number}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                    
-                                {/* Validity Date */}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                
+                                {clearanceError && (
+                                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3" />
+                                        {clearanceError}
+                                    </p>
+                                )}
+
                                 {selectedClearanceType && (
-                                    <div className="space-y-2 mt-4">
-                                        <Label htmlFor="validityDate" className="flex items-center gap-1 text-sm font-medium text-purple-800">
-                                            <CalendarDays className="h-3.5 w-3.5" />
-                                            Valid Until
-                                        </Label>
-                                        <div className="relative">
+                                    <div className="mt-3 grid grid-cols-2 gap-3">
+                                        <div>
+                                            <Label className="text-xs text-gray-500">Valid Until</Label>
                                             <Input
-                                                id="validityDate"
                                                 type="date"
                                                 value={validityDate}
                                                 onChange={(e) => handleValidityDateChange(e.target.value)}
-                                                className="bg-white border-purple-300"
+                                                className="mt-1 bg-white"
                                                 min={new Date().toISOString().split('T')[0]}
                                             />
                                         </div>
-                                        <p className="text-xs text-gray-500">
-                                            Clearance validity date.
-                                        </p>
-                                    </div>
-                                )}
-                                
-                                {/* Clearance Issuance Status */}
-                                {selectedClearanceType && (
-                                    <div className="mt-4 flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
-                                        <Switch
-                                            checked={isCleared}
-                                            onCheckedChange={handleClearedChange}
-                                            className="data-[state=checked]:bg-green-600"
-                                        />
-                                        <div className="flex-1">
-                                            <Label htmlFor="clearance-status" className="text-sm font-medium text-gray-900">
-                                                Mark as ready for issuance
-                                            </Label>
-                                            <p className="text-xs text-gray-600">
-                                                When checked, the clearance will be marked as ready for issuance after payment.
-                                            </p>
+                                        <div className="flex items-center">
+                                            <Switch
+                                                checked={isCleared}
+                                                onCheckedChange={handleClearedChange}
+                                                className="data-[state=checked]:bg-green-600 mr-2"
+                                            />
+                                            <Label className="text-xs">Ready to issue</Label>
                                         </div>
-                                        {isCleared && (
-                                            <Badge className="bg-green-100 text-green-800 border-green-200">
-                                                <Check className="h-3 w-3 mr-1" />
-                                                Ready to Issue
-                                            </Badge>
-                                        )}
                                     </div>
                                 )}
-                            </div>
-                        )}
-
-                        {/* Show info if no clearance types */}
-                        {isClearanceFeePayment && clearanceTypes.length === 0 && (
-                            <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <div className="p-2 bg-amber-100 rounded-lg">
-                                        <CircleAlert className="h-5 w-5 text-amber-700" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-amber-900">Clearance Payment</h3>
-                                        <p className="text-sm text-amber-700">
-                                            This payment includes a clearance fee, but no clearance types are configured.
-                                        </p>
-                                    </div>
-                                </div>
                             </div>
                         )}
 
                         {/* Receipt Details */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                                <div className="p-1.5 bg-gray-100 rounded">
-                                    <FileDigit className="h-4 w-4 text-gray-600" />
-                                </div>
-                                <h3 className="font-medium text-base text-gray-900">Receipt Details</h3>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                            <h3 className="font-medium flex items-center gap-2">
+                                <FileDigit className="h-4 w-4" />
+                                Receipt Information
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="orNumber" className="flex items-center gap-1 text-sm font-medium">
-                                        OR Number *
-                                        <Badge variant="outline" className="text-xs bg-gray-50">
-                                            {autoGeneratedOR ? 'Auto-generated' : 'Enter manually'}
-                                        </Badge>
-                                    </Label>
+                                    <Label className="text-xs">OR Number</Label>
                                     <div className="relative">
                                         <Input
-                                            id="orNumber"
                                             value={data.or_number || ''}
                                             onChange={(e) => {
-                                                setData('or_number', e.target.value);
+                                                if (typeof setData === 'function') {
+                                                    if (setData.length === 2) {
+                                                        setData('or_number', e.target.value);
+                                                    } else {
+                                                        setData((prev: PaymentFormData) => ({ ...prev, or_number: e.target.value }));
+                                                    }
+                                                }
                                                 setAutoGeneratedOR(false);
                                             }}
-                                            required
-                                            className="font-mono bg-gray-50 pr-24"
+                                            className="font-mono text-sm pr-20"
                                             placeholder="BAR-YYYYMMDD-XXX"
                                         />
-                                        <div className="absolute right-1 top-1 flex gap-1">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-7 px-2 hover:bg-gray-100 text-xs"
-                                                onClick={handleRegenerateOR}
-                                                title="Generate new OR number"
-                                            >
-                                                <RefreshCw className="h-3 w-3 mr-1" />
-                                                Refresh
-                                            </Button>
-                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="absolute right-1 top-1 h-7 text-xs"
+                                            onClick={handleRegenerateOR}
+                                        >
+                                            <RefreshCw className="h-3 w-3 mr-1" />
+                                            New
+                                        </Button>
                                     </div>
-                                    {autoGeneratedOR && (
-                                        <p className="text-xs text-green-600 flex items-center gap-1">
-                                            <CheckCircle className="h-3 w-3" />
-                                            OR number auto-generated
-                                        </p>
-                                    )}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="paymentDate" className="text-sm font-medium">
-                                        Payment Date *
-                                    </Label>
+                                    <Label className="text-xs">Payment Date</Label>
                                     <Input
-                                        id="paymentDate"
                                         type="date"
                                         value={data.payment_date || new Date().toISOString().split('T')[0]}
-                                        onChange={(e) => setData('payment_date', e.target.value)}
-                                        required
-                                        className="bg-gray-50"
+                                        onChange={(e) => {
+                                            if (typeof setData === 'function') {
+                                                if (setData.length === 2) {
+                                                    setData('payment_date', e.target.value);
+                                                } else {
+                                                    setData((prev: PaymentFormData) => ({ ...prev, payment_date: e.target.value }));
+                                                }
+                                            }
+                                        }}
                                     />
-                                    <p className="text-xs text-gray-500">
-                                        {formatDateDisplay(data.payment_date)}
-                                    </p>
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="periodCovered" className="text-sm font-medium">
-                                    Period Covered <span className="text-gray-500 font-normal">(optional)</span>
-                                </Label>
+                                <Label className="text-xs">Period Covered</Label>
                                 <Input
-                                    id="periodCovered"
-                                    placeholder="e.g., January 2024, Q1 2024, Annual 2024"
+                                    placeholder="e.g., January 2024, Q1 2024"
                                     value={data.period_covered || ''}
                                     onChange={(e) => handlePeriodCoveredChange(e.target.value)}
-                                    className="bg-gray-50"
                                 />
+                            </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Amount Paid Section - CORRECTED */}
+                        <div className="space-y-3">
+                            <h3 className="font-medium flex items-center gap-2">
+                                <Wallet className="h-4 w-4" />
+                                Payment Amount
+                            </h3>
+                            
+                            <div className="space-y-4">
+                                {/* Summary of charges */}
+                                <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Subtotal:</span>
+                                        <span>{formatCurrency(data.subtotal || 0)}</span>
+                                    </div>
+                                    {data.surcharge > 0 && (
+                                        <div className="flex justify-between text-amber-700">
+                                            <span>Surcharge:</span>
+                                            <span>+{formatCurrency(data.surcharge)}</span>
+                                        </div>
+                                    )}
+                                    {data.penalty > 0 && (
+                                        <div className="flex justify-between text-red-700">
+                                            <span>Penalty:</span>
+                                            <span>+{formatCurrency(data.penalty)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between font-medium pt-1 border-t border-gray-200 mt-1">
+                                        <span>Original Amount:</span>
+                                        <span>{formatCurrency(originalTotal)}</span>
+                                    </div>
+                                    {discountAmount > 0 && (
+                                        <div className="flex justify-between text-green-700">
+                                            <div className="flex items-center gap-1">
+                                                <span>Discount:</span>
+                                                {selectedDiscountRule && (
+                                                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                                        {selectedDiscountRule.percentage ? formatPercentage(selectedDiscountRule.percentage) : 
+                                                         selectedDiscountRule.formatted_value || 'Fixed'}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <span>-{formatCurrency(discountAmount)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between font-bold text-primary pt-1 border-t border-gray-200 mt-1">
+                                        <span>Amount Due:</span>
+                                        <span>{formatCurrency(amountDue)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Amount Tendered Input */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">Amount Tendered (Cash Received)</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₱</span>
+                                        <Input
+                                            type="text"
+                                            value={amountTendered}
+                                            onChange={handleAmountTenderedChange}
+                                            className={`pl-8 text-lg font-medium ${
+                                                !isExactAmount && amountPaid > 0 ? 'border-yellow-500' : ''
+                                            }`}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-gray-500">
+                                        Enter the cash amount received from the payer
+                                    </p>
+                                </div>
+
+                                {/* Quick Amount Buttons */}
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="default"
+                                        size="sm"
+                                        onClick={handleExactAmount}
+                                        className="text-xs bg-green-600 hover:bg-green-700 text-white"
+                                    >
+                                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                                        Pay Exact Amount ({formatCurrency(amountDue)})
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleQuickAmount(Math.ceil(amountDue / 100) * 100)}
+                                        className="text-xs"
+                                    >
+                                        Round Up
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleQuickAmount(amountDue + 100)}
+                                        className="text-xs"
+                                    >
+                                        +₱100
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleQuickAmount(amountDue + 500)}
+                                        className="text-xs"
+                                    >
+                                        +₱500
+                                    </Button>
+                                </div>
+
+                                {/* Payment Summary */}
+                                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">Amount Due:</span>
+                                        <span className="font-medium">{formatCurrency(amountDue)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">Amount Tendered:</span>
+                                        <span className="font-medium text-blue-600">{formatCurrency(amountPaid)}</span>
+                                    </div>
+                                    
+                                    <Separator />
+                                    
+                                    {isOverpaid ? (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-medium text-blue-700">Change Due:</span>
+                                            <span className="text-lg font-bold text-blue-700">{formatCurrency(change)}</span>
+                                        </div>
+                                    ) : isUnderpaid ? (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-medium text-yellow-700">Remaining Balance:</span>
+                                            <span className="text-lg font-bold text-yellow-700">{formatCurrency(balance)}</span>
+                                        </div>
+                                    ) : isExactAmount ? (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-medium text-green-700">Payment Status:</span>
+                                            <span className="text-lg font-bold text-green-700">PAID</span>
+                                        </div>
+                                    ) : null}
+
+                                    {/* Payment Status Badge */}
+                                    <div className="mt-2 flex justify-end">
+                                        <Badge className={`${statusBadge.color} flex items-center gap-1`}>
+                                            {statusBadge.icon}
+                                            {statusBadge.label}
+                                        </Badge>
+                                    </div>
+                                </div>
+
+                                {/* Amount Mismatch Warning */}
+                                {!isExactAmount && amountPaid > 0 && (
+                                    <div className={`p-3 rounded-md ${
+                                        isOverpaid 
+                                            ? 'bg-blue-50 border border-blue-200' 
+                                            : 'bg-yellow-50 border border-yellow-200'
+                                    }`}>
+                                        <p className={`text-sm flex items-center gap-2 ${
+                                            isOverpaid ? 'text-blue-800' : 'text-yellow-800'
+                                        }`}>
+                                            {isOverpaid ? (
+                                                <>
+                                                    <TrendingUp className="h-4 w-4" />
+                                                    Overpayment of {formatCurrency(change)}. Change of {formatCurrency(change)} will be given to the payer.
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <AlertTriangle className="h-4 w-4" />
+                                                    Underpayment of {formatCurrency(balance)}. Remaining balance will be recorded as partial payment.
+                                                </>
+                                            )}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         <Separator />
 
                         {/* Purpose of Payment */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-1.5 bg-amber-100 rounded">
-                                        <FileText className="h-4 w-4 text-amber-700" />
-                                    </div>
-                                    <h3 className="font-medium text-base text-gray-900">Purpose of Payment *</h3>
-                                </div>
-                                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
-                                    Required Field
-                                </Badge>
+                                <h3 className="font-medium flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Purpose of Payment
+                                </h3>
+                                <Badge variant="outline" className="text-xs">Required</Badge>
                             </div>
                             
-                            <div className="space-y-3">
-                                <Label htmlFor="purpose" className="text-sm font-medium text-gray-700">
-                                    What is this payment for?
-                                </Label>
-                                <Textarea
-                                    id="purpose"
-                                    placeholder="Enter the purpose of payment..."
-                                    value={data.purpose || ''}
-                                    onChange={(e) => handlePurposeChange(e.target.value)}
-                                    required
-                                    className={`min-h-[80px] bg-gray-50 ${purposeError ? 'border-red-300 focus-visible:ring-red-300' : ''}`}
-                                    rows={3}
-                                />
-                                {purposeError ? (
-                                    <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-2 rounded">
-                                        <AlertCircle className="h-3.5 w-3.5" />
-                                        {purposeError}
-                                    </div>
-                                ) : (
-                                    <div className="text-xs text-gray-500">
-                                        This description will appear on the official receipt.
-                                    </div>
-                                )}
-                            </div>
+                            <Textarea
+                                placeholder="Enter the purpose of payment..."
+                                value={data.purpose || ''}
+                                onChange={(e) => handlePurposeChange(e.target.value)}
+                                className={`min-h-[80px] ${purposeError ? 'border-red-300' : ''}`}
+                            />
+                            
+                            {purposeError && (
+                                <p className="text-xs text-red-600 flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" />
+                                    {purposeError}
+                                </p>
+                            )}
 
-                            {paymentItems.length > 0 && (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <Label className="text-sm text-gray-600">Quick Fill Suggestion:</Label>
-                                        <Badge variant="outline" className="text-xs bg-gray-100">
-                                            {paymentItems.length} items
-                                        </Badge>
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full border-dashed hover:border-solid"
-                                        onClick={() => {
-                                            const purpose = generatePurpose();
-                                            handlePurposeChange(purpose);
-                                            setUserModifiedPurpose(false);
-                                        }}
-                                    >
-                                        <Check className="h-3 w-3 mr-2 text-green-600" />
-                                        Use suggested purpose: {paymentItems.map(item => item.fee_name).join(', ')}
-                                    </Button>
-                                </div>
+                            {paymentItems.length > 0 && !userModifiedPurpose && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full border-dashed text-xs"
+                                    onClick={() => {
+                                        const purpose = generatePurpose();
+                                        handlePurposeChange(purpose);
+                                        setUserModifiedPurpose(false);
+                                    }}
+                                >
+                                    <Check className="h-3 w-3 mr-2" />
+                                    Use "{paymentItems.map(item => item.fee_name).join(', ')}"
+                                </Button>
                             )}
                         </div>
 
                         <Separator />
 
                         {/* Payment Method */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                                <div className="p-1.5 bg-blue-100 rounded">
-                                    <CreditCard className="h-4 w-4 text-blue-700" />
-                                </div>
-                                <h3 className="font-medium text-base text-gray-900">Payment Method</h3>
-                            </div>
+                        <div className="space-y-3">
+                            <h3 className="font-medium flex items-center gap-2">
+                                <CreditCard className="h-4 w-4" />
+                                Payment Method
+                            </h3>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { id: 'cash', icon: Banknote, name: 'Cash', description: 'Pay with physical cash', badge: 'Instant', iconColor: 'text-green-600' },
-                                    { id: 'gcash', icon: Smartphone, name: 'GCash', description: 'Mobile payment via GCash', badge: 'Popular', iconColor: 'text-blue-600' },
-                                    { id: 'maya', icon: CreditCard, name: 'Maya', description: 'Mobile payment via Maya', badge: null, iconColor: 'text-purple-600' },
-                                    { id: 'bank', icon: Landmark, name: 'Bank Transfer', description: 'Online bank transfer', badge: null, iconColor: 'text-indigo-600' },
-                                ].filter(m => ['cash', 'gcash'].includes(m.id)).map((method) => {
+                                    { id: 'cash', icon: Banknote, name: 'Cash', desc: 'Cash payment' },
+                                    { id: 'gcash', icon: Smartphone, name: 'GCash', desc: 'Mobile payment' },
+                                ].map((method) => {
                                     const Icon = method.icon;
                                     const isSelected = data.payment_method === method.id;
                                     return (
                                         <div
                                             key={method.id}
                                             onClick={() => handlePaymentMethodChange(method.id)}
-                                            className={`border rounded-lg p-4 cursor-pointer transition-all duration-200 hover:shadow-sm ${
+                                            className={`border rounded-lg p-3 cursor-pointer transition-all ${
                                                 isSelected
                                                     ? 'ring-2 ring-primary border-primary bg-primary/5'
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            } ${isSelected ? 'bg-primary/5' : 'bg-white'}`}
+                                                    : 'hover:border-gray-300'
+                                            }`}
                                         >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`p-2 rounded-lg ${isSelected ? 'bg-white shadow-sm' : 'bg-white/80'}`}>
-                                                        <Icon className={`h-5 w-5 ${method.iconColor}`} />
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-medium text-gray-900">{method.name}</div>
-                                                        <div className="text-xs text-gray-600 mt-0.5">{method.description}</div>
-                                                    </div>
-                                                </div>
-                                                {method.badge && (
-                                                    <Badge className={`${method.id === 'cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'} text-xs`}>
-                                                        {method.badge}
-                                                    </Badge>
-                                                )}
+                                            <div className="flex items-center gap-2">
+                                                <Icon className={`h-4 w-4 ${method.id === 'cash' ? 'text-green-600' : 'text-blue-600'}`} />
+                                                <span className="font-medium text-sm">{method.name}</span>
                                             </div>
-                                            {isSelected && (
-                                                <div className="mt-3 pt-3 border-t border-gray-200 flex items-center gap-2">
-                                                    <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                                                    <span className="text-xs text-gray-600">Selected payment method</span>
-                                                </div>
-                                            )}
+                                            <p className="text-xs text-gray-500 mt-1">{method.desc}</p>
                                         </div>
                                     );
                                 })}
                             </div>
-                        </div>
 
-                        {/* Reference Number for non-cash methods */}
-                        {data.payment_method !== 'cash' && (
-                            <div className="space-y-2">
-                                <Label htmlFor="referenceNumber" className="flex items-center gap-1 text-sm font-medium">
-                                    Reference Number *
-                                    <Badge variant="outline" className="text-xs">
-                                        Required
-                                    </Badge>
-                                </Label>
-                                <Input
-                                    id="referenceNumber"
-                                    placeholder={`Transaction reference`}
-                                    value={data.reference_number || ''}
-                                    onChange={(e) => setData('reference_number', e.target.value)}
-                                    required
-                                    className="bg-gray-50"
-                                />
-                            </div>
-                        )}
-
-                        {/* Advanced Options */}
-                        <div className="pt-2">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="text-xs text-gray-600 hover:text-gray-900"
-                                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                            >
-                                {showAdvancedOptions ? 'Hide' : 'Show'} Advanced Options
-                            </Button>
-                            
-                            {showAdvancedOptions && (
-                                <div className="mt-3 space-y-4 p-4 border rounded-lg bg-gray-50">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="collectionType" className="text-sm font-medium">
-                                            Collection Type
-                                        </Label>
-                                        <Select
-                                            value={data.collection_type || 'manual'}
-                                            onValueChange={(value) => setData('collection_type', value)}
-                                        >
-                                            <SelectTrigger className="h-9 text-sm bg-white">
-                                                <SelectValue placeholder="Select collection type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="manual">Manual Collection</SelectItem>
-                                                <SelectItem value="system">System Generated</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    
-                                    <div className="space-y-2">
-                                        <Label htmlFor="remarks" className="text-sm font-medium">
-                                            Remarks / Notes <span className="text-gray-500 font-normal">(optional)</span>
-                                        </Label>
-                                        <Textarea
-                                            id="remarks"
-                                            placeholder="Any additional notes or special instructions..."
-                                            rows={2}
-                                            value={data.remarks || ''}
-                                            onChange={(e) => setData('remarks', e.target.value)}
-                                            className="bg-white"
-                                        />
-                                    </div>
+                            {data.payment_method !== 'cash' && (
+                                <div className="space-y-2">
+                                    <Label className="text-xs">Reference Number</Label>
+                                    <Input
+                                        placeholder="Enter transaction reference"
+                                        value={data.reference_number || ''}
+                                        onChange={(e) => {
+                                            if (typeof setData === 'function') {
+                                                if (setData.length === 2) {
+                                                    setData('reference_number', e.target.value);
+                                                } else {
+                                                    setData((prev: PaymentFormData) => ({ ...prev, reference_number: e.target.value }));
+                                                }
+                                            }
+                                        }}
+                                    />
                                 </div>
                             )}
                         </div>
 
+                        {/* Remarks - Optional */}
+                        <div className="space-y-2">
+                            <Label className="text-xs">Remarks (Optional)</Label>
+                            <Textarea
+                                placeholder="Additional notes..."
+                                rows={2}
+                                value={data.remarks || ''}
+                                onChange={(e) => {
+                                    if (typeof setData === 'function') {
+                                        if (setData.length === 2) {
+                                            setData('remarks', e.target.value);
+                                        } else {
+                                            setData((prev: PaymentFormData) => ({ ...prev, remarks: e.target.value }));
+                                        }
+                                    }
+                                }}
+                            />
+                        </div>
+
                         {/* Action Buttons */}
-                        <div className="flex gap-3 pt-6 border-t border-gray-200">
+                        <div className="flex gap-3 pt-4">
                             <Button 
                                 type="submit" 
                                 disabled={processing} 
-                                className="flex-1 bg-gradient-to-r from-primary to-primary/90 hover:from-primary hover:to-primary shadow-sm" 
+                                className="flex-1"
                                 size="lg"
                                 onClick={handleFormSubmit}
                             >
                                 {processing ? (
-                                    <>
-                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
-                                        Processing Payment...
-                                    </>
+                                    <>Processing...</>
                                 ) : (
                                     <>
                                         <Lock className="h-4 w-4 mr-2" />
@@ -1080,9 +1665,8 @@ export function PaymentDetailsStep({
                                 type="button"
                                 variant="outline"
                                 onClick={() => setStep(2)}
-                                className="min-w-[120px] border-gray-300 hover:bg-gray-50"
+                                size="lg"
                             >
-                                <ChevronRight className="h-4 w-4 mr-2 rotate-180" />
                                 Back
                             </Button>
                         </div>
@@ -1090,301 +1674,305 @@ export function PaymentDetailsStep({
                 </Card>
             </div>
 
-            {/* Right Column - Summary & Receipt */}
+            {/* Right Column - Summary Only */}
             <div className="space-y-6">
-                {/* Payer Summary Card */}
-                <Card className="border border-gray-200 shadow-sm">
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 border-b">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-green-100 rounded-lg">
-                                <UserCircle className="h-5 w-5 text-green-700" />
+                {/* Payer Summary */}
+                <Card>
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-blue-100 rounded">
+                                <PayerIcon className="h-4 w-4 text-blue-700" />
                             </div>
-                            <CardTitle className="text-lg font-semibold text-gray-900">
-                                Payer Summary
-                            </CardTitle>
+                            <CardTitle className="text-base">Payer</CardTitle>
+                            <Badge variant="outline" className="ml-auto text-xs">
+                                {getPayerTypeLabel()}
+                            </Badge>
                         </div>
                     </CardHeader>
-                    <CardContent className="space-y-4 pt-4">
+                    <CardContent className="pt-0">
                         <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    {payerTypeInfo.icon && (
-                                        <div className={`p-1.5 rounded ${payerTypeInfo.color}`}>
-                                            {React.createElement(payerTypeInfo.icon, { className: "h-3.5 w-3.5" })}
-                                        </div>
-                                    )}
-                                    <span className="font-medium text-gray-900">Payer Type</span>
-                                </div>
-                                <Badge className={`${payerTypeInfo.color} border-0`}>
-                                    {payerTypeInfo.label}
-                                </Badge>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div className="space-y-2">
-                                <div className="flex items-start gap-2">
-                                    <User className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
-                                    <div className="flex-1">
-                                        <div className="text-xs text-gray-500 mb-0.5">Payer Name</div>
-                                        <div className="font-medium text-gray-900 text-sm">
-                                            {data.payer_name || 'Not specified'}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {data.contact_number && (
-                                    <div className="flex items-start gap-2">
-                                        <Phone className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
-                                        <div className="flex-1">
-                                            <div className="text-xs text-gray-500 mb-0.5">Contact Number</div>
-                                            <div className="font-medium text-gray-900 text-sm">
-                                                {data.contact_number}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {data.address && (
-                                    <div className="flex items-start gap-2">
-                                        <MapPin className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
-                                        <div className="flex-1">
-                                            <div className="text-xs text-gray-500 mb-0.5">Address</div>
-                                            <div className="font-medium text-gray-900 text-sm line-clamp-2">
-                                                {data.address}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {data.purok && (
-                                    <div className="flex items-start gap-2">
-                                        <MapPinHouse className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
-                                        <div className="flex-1">
-                                            <div className="text-xs text-gray-500 mb-0.5">Purok/Zone</div>
-                                            <div className="font-medium text-gray-900 text-sm">
-                                                {data.purok}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {data.household_number && (
-                                    <div className="flex items-start gap-2">
-                                        <Hash className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
-                                        <div className="flex-1">
-                                            <div className="text-xs text-gray-500 mb-0.5">Household Number</div>
-                                            <div className="font-medium text-gray-900 text-sm">
-                                                {data.household_number}
-                                            </div>
-                                        </div>
-                                    </div>
+                            <div>
+                                <p className="font-medium text-gray-900">{displayPayerName}</p>
+                                {selectedResident?.suffix && (
+                                    <span className="text-xs text-gray-500 ml-1">{selectedResident.suffix}</span>
                                 )}
                             </div>
+                            
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Phone className="h-4 w-4 text-gray-400" />
+                                <span>{displayContactNumber}</span>
+                            </div>
+                            
+                            {selectedResident?.email && (
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <Briefcase className="h-4 w-4 text-gray-400" />
+                                    <span className="text-xs">{selectedResident.email}</span>
+                                </div>
+                            )}
+                            
+                            <div className="flex items-start gap-2 text-sm text-gray-600">
+                                <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                                <span>{displayAddress}</span>
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {displayPurok && (
+                                    <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                                        <MapPinHouse className="h-3 w-3 mr-1" />
+                                        {displayPurok}
+                                    </Badge>
+                                )}
+                                {displayHouseholdNumber && (
+                                    <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                                        <Hash className="h-3 w-3 mr-1" />
+                                        {displayHouseholdNumber}
+                                    </Badge>
+                                )}
+                            </div>
+
+                            {data.payer_type === 'resident' && selectedResident && (
+                                <>
+                                    {renderResidentClassifications()}
+                                    {renderHouseholdInfo()}
+                                    {renderDiscountEligibilities()}
+                                </>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Payment Summary Card */}
-                <Card className="border border-gray-200 shadow-sm">
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 border-b">
+                {/* Payment Summary */}
+                <Card>
+                    <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-100 rounded-lg">
-                                    <Calculator className="h-5 w-5 text-blue-700" />
-                                </div>
-                                <CardTitle className="text-lg font-semibold text-gray-900">
-                                    Payment Summary
-                                </CardTitle>
-                            </div>
                             <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="bg-white">
-                                    {data.payment_method === 'cash' ? 'Cash' : data.payment_method === 'gcash' ? 'GCash' : data.payment_method}
-                                </Badge>
-                                {isClearanceFeePayment && (
-                                    <Badge className="bg-gradient-to-r from-purple-600 to-purple-700 text-white border-0">
-                                        <FileBadge className="h-3 w-3 mr-1" />
-                                        Clearance
-                                    </Badge>
-                                )}
+                                <div className="p-1.5 bg-blue-100 rounded">
+                                    <Calculator className="h-4 w-4 text-blue-700" />
+                                </div>
+                                <CardTitle className="text-base">Summary</CardTitle>
                             </div>
+                            <Badge variant="outline" className="text-xs">
+                                {paymentItems.length} item{paymentItems.length !== 1 ? 's' : ''}
+                            </Badge>
                         </div>
                     </CardHeader>
-                    <CardContent className="space-y-4 pt-4">
-                        {isClearanceFeePayment && (
-                            <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-lg">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <FileBadge className="h-4 w-4 text-purple-600" />
-                                    <span className="font-medium text-purple-800">Clearance Details</span>
+                    <CardContent className="pt-0 space-y-4">
+                        {paymentEmphasis && (
+                            <div className={`${paymentEmphasis.color} text-white p-3 rounded-lg flex items-center justify-between`}>
+                                <div className="flex items-center gap-2">
+                                    {paymentEmphasis.icon}
+                                    <span className="font-medium text-sm">{paymentEmphasis.badge}</span>
                                 </div>
-                                <div className="text-sm">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="text-gray-600">Type:</span>
-                                        <span className="font-medium text-purple-700">
-                                            {selectedClearanceType?.name || getClearanceTypeNameById(data.clearance_type_id) || 'Clearance Fee'}
-                                        </span>
-                                    </div>
-                                    {selectedClearanceType && (
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-600">Code:</span>
-                                            <span className="font-mono text-xs text-gray-700">{selectedClearanceType.code}</span>
-                                        </div>
-                                    )}
-                                    {clearanceItem && (
-                                        <div className="mt-2 pt-2 border-t border-purple-200">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-gray-600">Fee:</span>
-                                                <span className="font-medium text-purple-700">
-                                                    {formatCurrency(clearanceItem.total_amount || 0)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {clearanceRequest?.reference_number && (
-                                        <div className="mt-2 pt-2 border-t border-purple-200">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-gray-600">Request ID:</span>
-                                                <span className="font-medium text-purple-700 font-mono text-xs">
-                                                    {clearanceRequest.reference_number}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                                <span className="text-xs opacity-90">{paymentEmphasis.description}</span>
                             </div>
                         )}
 
-                        {paymentItems.length > 0 && (
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="font-medium text-sm text-gray-900">Payment Items</h4>
-                                    <Badge variant="outline" className="text-xs bg-gray-100">
-                                        {paymentItems.length} items
-                                    </Badge>
+                        {isClearanceFeePayment && selectedClearanceType && clearanceItem && (
+                            <div className="bg-purple-50 p-3 rounded-md border border-purple-200">
+                                <div className="flex items-center gap-2 text-purple-700 font-medium mb-2">
+                                    <FileBadge className="h-4 w-4" />
+                                    <span className="text-sm">Clearance Details</span>
                                 </div>
-                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                    {paymentItems.map((item, index) => {
-                                        const isClearanceItem = item.metadata?.is_clearance_fee || item.category === 'clearance';
-                                        const itemTotal = item.total_amount || 0;
-                                        return (
-                                            <div 
-                                                key={item.id} 
-                                                className={`flex items-start gap-3 p-2 border rounded hover:bg-gray-50 text-sm transition-colors ${
-                                                    isClearanceItem ? 'border-purple-200 bg-purple-50/30' : 'border-gray-100'
-                                                }`}
-                                            >
-                                                <div className={`flex-shrink-0 w-6 h-6 rounded flex items-center justify-center ${
-                                                    isClearanceItem ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
-                                                }`}>
-                                                    {isClearanceItem ? (
-                                                        <FileBadge className="h-3 w-3" />
-                                                    ) : (
-                                                        <span className="text-xs font-medium">{index + 1}</span>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-600">Type:</span>
+                                    <span className="font-medium text-purple-700">{selectedClearanceType.name}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="text-gray-600">Code:</span>
+                                    <span className="font-mono text-xs text-gray-700">{selectedClearanceType.code}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                    <span className="text-gray-600">Fee:</span>
+                                    <span className="font-medium text-purple-700">{formatCurrency(clearanceItem?.total_amount || 0)}</span>
+                                </div>
+                                {validityDate && (
+                                    <div className="flex justify-between items-center text-sm mt-1">
+                                        <span className="text-gray-600">Valid Until:</span>
+                                        <span className="text-xs text-gray-700">{new Date(validityDate).toLocaleDateString()}</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {feeItems.length > 0 && renderFeeItemsWithDiscountInfo()}
+
+                        {paymentItems.length > 0 && feeItems.length === 0 && !isClearanceFeePayment && (
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {paymentItems.map((item) => {
+                                    const isClearance = item.metadata?.is_clearance_fee || item.category === 'clearance';
+                                    return (
+                                        <div key={item.id} className="flex justify-between items-start text-sm">
+                                            <div className="flex-1">
+                                                <div className="font-medium flex items-center gap-1">
+                                                    {item.fee_name}
+                                                    {isClearance && (
+                                                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                                            Clearance
+                                                        </Badge>
                                                     )}
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className={`font-medium truncate ${
-                                                            isClearanceItem ? 'text-purple-800' : 'text-gray-900'
-                                                        }`}>
-                                                            {item.fee_name}
-                                                            {isClearanceItem && (
-                                                                <Badge variant="outline" className="ml-1 text-xs bg-purple-100 text-purple-700 border-purple-200">
-                                                                    Clearance
-                                                                </Badge>
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between text-xs text-gray-500">
-                                                        <span className="font-mono">Code: {item.fee_code}</span>
-                                                        <span className="font-medium text-gray-900">
-                                                            {formatCurrency(itemTotal)}
-                                                        </span>
-                                                    </div>
-                                                    {/* Show item breakdown */}
-                                                    <div className="text-xs text-gray-500 mt-1">
-                                                        {item.base_amount > 0 && `Base: ${formatCurrency(item.base_amount)}`}
-                                                        {item.surcharge > 0 && ` | Surcharge: ${formatCurrency(item.surcharge)}`}
-                                                        {item.penalty > 0 && ` | Penalty: ${formatCurrency(item.penalty)}`}
-                                                        {item.discount > 0 && ` | Discount: ${formatCurrency(item.discount)}`}
-                                                    </div>
-                                                </div>
+                                                <div className="text-xs text-gray-500">{item.fee_code}</div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                            <div className="font-medium">
+                                                {formatCurrency(item.total_amount)}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
 
-                        {/* Totals Section - FIXED VERSION */}
-                        <div className="space-y-2 pt-2 border-t border-gray-200">
-                            <div className="space-y-1.5">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-600">Subtotal</span>
-                                    <span className="font-medium text-gray-900">{formatCurrency(data.subtotal || displayTotals.subtotal)}</span>
-                                </div>
-                                {data.surcharge > 0 && (
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-amber-700">Surcharge</span>
-                                        <span className="font-medium text-amber-700">+{formatCurrency(data.surcharge)}</span>
-                                    </div>
-                                )}
-                                {data.penalty > 0 && (
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-red-700">Penalty</span>
-                                        <span className="font-medium text-red-700">+{formatCurrency(data.penalty)}</span>
-                                    </div>
-                                )}
-                                {data.discount > 0 && (
-                                    <div className="flex justify-between items-center text-sm">
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-green-700">Discount</span>
-                                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 px-1.5 py-0">
-                                                {discountTypes[selectedDiscountType] || selectedDiscountType}
-                                            </Badge>
-                                        </div>
-                                        <span className="font-medium text-green-700">-{formatCurrency(data.discount)}</span>
-                                    </div>
-                                )}
+                        <Separator />
+
+                        {/* Totals - CORRECTED */}
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">Subtotal</span>
+                                <span>{formatCurrency(data.subtotal || 0)}</span>
                             </div>
-                            <Separator />
-                            <div className="flex justify-between items-center pt-1">
-                                <span className="font-bold text-gray-900">Total Amount</span>
-                                <span className="text-primary font-bold text-lg">
-                                    {formatCurrency(data.total_amount)}
+                            {data.surcharge > 0 && (
+                                <div className="flex justify-between text-sm text-amber-700">
+                                    <span>Surcharge</span>
+                                    <span>+{formatCurrency(data.surcharge)}</span>
+                                </div>
+                            )}
+                            {data.penalty > 0 && (
+                                <div className="flex justify-between text-sm text-red-700">
+                                    <span>Penalty</span>
+                                    <span>+{formatCurrency(data.penalty)}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between text-sm font-medium pt-1 border-t border-gray-200">
+                                <span>Original Amount</span>
+                                <span>{formatCurrency(originalTotal)}</span>
+                            </div>
+                            {discountAmount > 0 && (
+                                <div className="flex justify-between text-sm text-green-700">
+                                    <div className="flex items-center gap-1">
+                                        <span>Discount</span>
+                                        {selectedDiscountRule && (
+                                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                                {selectedDiscountRule.percentage ? formatPercentage(selectedDiscountRule.percentage) : 
+                                                 selectedDiscountRule.formatted_value || 'Fixed'}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <span>-{formatCurrency(discountAmount)}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <Separator />
+
+                        {/* Payment Status Summary */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <span className="font-semibold text-gray-900">Amount Due</span>
+                                <span className="text-xl font-bold text-primary">
+                                    {formatCurrency(amountDue)}
                                 </span>
+                            </div>
+                            
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-gray-600">Amount Paid:</span>
+                                <span className="font-medium text-blue-600">{formatCurrency(amountPaid)}</span>
+                            </div>
+                            
+                            {isUnderpaid && (
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-600">Balance:</span>
+                                    <span className="font-medium text-yellow-600">{formatCurrency(balance)}</span>
+                                </div>
+                            )}
+                            {isOverpaid && (
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-600">Change:</span>
+                                    <span className="font-medium text-blue-600">{formatCurrency(change)}</span>
+                                </div>
+                            )}
+                            
+                            <div className="mt-2">
+                                <Badge className={`${statusBadge.color} flex items-center gap-1 w-full justify-center py-1`}>
+                                    {statusBadge.icon}
+                                    {statusBadge.label}
+                                </Badge>
                             </div>
                         </div>
 
                         {/* Discount Selection */}
-                        <div className="pt-3 border-t border-gray-200">
-                            <Label htmlFor="discountType" className="text-sm font-medium text-gray-900 mb-2">
-                                Apply Discount
-                            </Label>
+                        <div className="pt-2 space-y-2">
                             <Select
-                                value={selectedDiscountType || 'no_discount'}
-                                onValueChange={handleDiscountTypeChange}
+                                value={selectedDiscountCode || 'no_discount'}
+                                onValueChange={handleDiscountSelect}
                             >
-                                <SelectTrigger className="h-9 text-sm bg-gray-50">
+                                <SelectTrigger className="h-8 text-xs">
                                     <SelectValue placeholder="No discount" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="no_discount">
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <div className="h-2 w-2 rounded-full bg-gray-400" />
-                                            No Discount
-                                        </div>
-                                    </SelectItem>
-                                    {Object.entries(discountTypes).map(([value, label]) => (
-                                        <SelectItem key={value} value={value} className="text-sm">
+                                    <SelectItem value="no_discount">No Discount</SelectItem>
+                                    {filteredDiscountRules.map((rule) => (
+                                        <SelectItem key={rule.id} value={rule.code}>
                                             <div className="flex items-center gap-2">
-                                                <div className="h-2 w-2 rounded-full bg-green-500" />
-                                                <span>{label}</span>
+                                                <span>{rule.name}</span>
+                                                <Badge variant="outline" className="text-xs">
+                                                    {rule.percentage ? formatPercentage(rule.percentage) : 
+                                                     rule.formatted_value || 'Fixed amount'}
+                                                </Badge>
+                                                {rule.requires_verification && (
+                                                    <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
+                                                        <IdCard className="h-3 w-3 mr-1" />
+                                                        Requires ID
+                                                    </Badge>
+                                                )}
                                             </div>
                                         </SelectItem>
                                     ))}
+                                    {filteredDiscountRules.length === 0 && discountRules.length > 0 && (
+                                        <SelectItem value="no_discount" disabled>
+                                            No applicable discounts for this resident
+                                        </SelectItem>
+                                    )}
                                 </SelectContent>
                             </Select>
+                            
+                            {selectedDiscountRule?.requires_verification && data.verification_id_number && (
+                                <div className="p-2 bg-green-50 border border-green-200 rounded-md">
+                                    <p className="text-xs text-green-800 flex items-center gap-1">
+                                        <Shield className="h-3 w-3" />
+                                        Verified with ID: {data.verification_id_number}
+                                    </p>
+                                </div>
+                            )}
+                            
+                            {selectedDiscountRule?.minimum_purchase_amount && originalTotal < selectedDiscountRule.minimum_purchase_amount && (
+                                <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                                    <p className="text-xs text-yellow-800 flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3" />
+                                        Minimum purchase of {formatCurrency(selectedDiscountRule.minimum_purchase_amount)} required
+                                    </p>
+                                </div>
+                            )}
+
+                            {getDiscountWarningMessage && (
+                                <div className={`p-2 ${
+                                    getDiscountWarningMessage.type === 'warning' 
+                                        ? 'bg-yellow-50 border-yellow-200' 
+                                        : 'bg-blue-50 border-blue-200'
+                                } border rounded-md mt-2`}>
+                                    <p className={`text-xs flex items-center gap-1 ${
+                                        getDiscountWarningMessage.type === 'warning'
+                                            ? 'text-yellow-800'
+                                            : 'text-blue-800'
+                                    }`}>
+                                        {getDiscountWarningMessage.type === 'warning' ? (
+                                            <AlertTriangle className="h-3 w-3" />
+                                        ) : (
+                                            <CheckCircle2 className="h-3 w-3" />
+                                        )}
+                                        {getDiscountWarningMessage.message}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

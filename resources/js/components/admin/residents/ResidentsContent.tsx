@@ -1,0 +1,304 @@
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import { 
+    User, 
+    Download, 
+    Printer, 
+    Edit, 
+    Trash2, 
+    Copy, 
+    Users, 
+    Globe,
+    FileSpreadsheet,
+    Home,
+    CheckSquare,
+    Square,
+    UserPlus,
+    UserMinus,
+    FileDown
+} from 'lucide-react';
+
+import { ViewToggle } from '@/components/adminui/view-toggle';
+import { Pagination } from '@/components/adminui/pagination';
+import { EmptyState } from '@/components/adminui/empty-state';
+import { SelectAllFloat } from '@/components/adminui/select-all-float';
+import { GridSelectionSummary } from '@/components/adminui/grid-selection-summary';
+import ResidentsTableView from './ResidentsTableView';
+import ResidentsGridView from './ResidentsGridView';
+import ResidentBulkActions from './ResidentsBulkActions';
+import { Resident } from '@/types';
+
+interface ResidentsContentProps {
+    residents: Resident[];
+    stats?: any;
+    isBulkMode: boolean;
+    setIsBulkMode: (value: boolean) => void;
+    isSelectAll: boolean;
+    selectedResidents: number[];
+    viewMode: 'table' | 'grid';
+    setViewMode: (mode: 'table' | 'grid') => void;
+    isMobile?: boolean;
+    hasActiveFilters: boolean;
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+    onPageChange: (page: number) => void;
+    onSelectAllOnPage: () => void;
+    onSelectAllFiltered: () => void;
+    onSelectAll: () => void;
+    onItemSelect: (id: number) => void;
+    onClearFilters: () => void;
+    onClearSelection: () => void;
+    onDelete: (resident: Resident) => void;
+    onToggleStatus?: (resident: Resident) => void;
+    onViewPhoto: (resident: Resident) => void;
+    onCopyToClipboard: (text: string, label: string) => void;
+    onCopySelectedData: () => void;
+    onSort: (column: string) => void;
+    onBulkOperation: (operation: string) => void;
+    setShowBulkDeleteDialog?: (show: boolean) => void;
+    filtersState: any;
+    isPerformingBulkAction: boolean;
+    selectionMode: 'page' | 'filtered' | 'all';
+    selectionStats?: any;
+    puroks?: any[];
+    // Optional custom bulk actions
+    customBulkActions?: any;
+}
+
+export default function ResidentsContent({
+    residents,
+    stats,
+    isBulkMode,
+    setIsBulkMode,
+    isSelectAll,
+    selectedResidents,
+    viewMode,
+    setViewMode,
+    isMobile = false,
+    hasActiveFilters,
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage,
+    onPageChange,
+    onSelectAllOnPage,
+    onSelectAllFiltered,
+    onSelectAll,
+    onItemSelect,
+    onClearFilters,
+    onClearSelection,
+    onDelete,
+    onToggleStatus,
+    onViewPhoto,
+    onCopyToClipboard,
+    onCopySelectedData,
+    onSort,
+    onBulkOperation,
+    setShowBulkDeleteDialog,
+    filtersState,
+    isPerformingBulkAction,
+    selectionMode,
+    selectionStats,
+    puroks = [],
+    customBulkActions
+}: ResidentsContentProps) {
+    
+    // Toggle handler for bulk mode
+    const handleBulkModeToggle = () => {
+        setIsBulkMode(!isBulkMode);
+        if (isBulkMode) {
+            onClearSelection();
+        }
+    };
+
+    return (
+        <>
+            {/* Enhanced Bulk Actions Bar */}
+            {isBulkMode && selectedResidents.length > 0 && (
+                <ResidentBulkActions
+                    selectedResidents={selectedResidents}
+                    selectionMode={selectionMode}
+                    selectionStats={selectionStats}
+                    isPerformingBulkAction={isPerformingBulkAction}
+                    isSelectAll={isSelectAll}
+                    isMobile={isMobile}
+                    onClearSelection={onClearSelection}
+                    onSelectAllOnPage={onSelectAllOnPage}
+                    onSelectAllFiltered={onSelectAllFiltered}
+                    onSelectAll={onSelectAll}
+                    onBulkOperation={onBulkOperation}
+                    onCopySelectedData={onCopySelectedData}
+                    setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                    bulkActions={customBulkActions}
+                />
+            )}
+
+            {/* Floating Select All for Grid View */}
+            {viewMode === 'grid' && residents.length > 0 && selectedResidents.length < residents.length && isBulkMode && (
+                <SelectAllFloat
+                    isSelectAll={isSelectAll}
+                    onSelectAll={onSelectAllOnPage}
+                    selectedCount={selectedResidents.length}
+                    totalCount={residents.length}
+                    position="bottom-right"
+                />
+            )}
+
+            {/* Residents List/Grid View */}
+            <Card className="overflow-hidden border border-gray-200 dark:border-gray-700">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                            <User className="h-5 w-5 text-gray-500" />
+                            <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">
+                                Residents
+                                {selectedResidents.length > 0 && isBulkMode && (
+                                    <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+                                        {selectedResidents.length} selected
+                                    </span>
+                                )}
+                            </CardTitle>
+                        </div>
+                        {!isMobile && (
+                            <ViewToggle
+                                viewMode={viewMode}
+                                onViewModeChange={setViewMode}
+                                isMobile={isMobile}
+                            />
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {/* Grid view select all checkbox */}
+                        {viewMode === 'grid' && isBulkMode && residents.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    id="select-all-grid"
+                                    checked={isSelectAll}
+                                    onCheckedChange={onSelectAllOnPage}
+                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                />
+                                <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap">
+                                    {isSelectAll ? 'Deselect Page' : 'Select Page'}
+                                </Label>
+                            </div>
+                        )}
+                        
+                        {/* Bulk Mode Toggle */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="flex items-center gap-2">
+                                            <Switch
+                                                id="bulk-mode"
+                                                checked={isBulkMode}
+                                                onCheckedChange={handleBulkModeToggle}
+                                                className="data-[state=checked]:bg-blue-600 h-5 w-9"
+                                            />
+                                            <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap">
+                                                Bulk Mode
+                                            </Label>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Toggle bulk selection mode</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        )}
+                        
+                        {/* Page Info */}
+                        <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
+                            Page {currentPage} of {totalPages}
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {/* Empty State */}
+                    {residents.length === 0 ? (
+                        <EmptyState
+                            icon={<User className="h-12 w-12 text-gray-400" />}
+                            title="No residents found"
+                            description={hasActiveFilters 
+                                ? "No residents match your current filters. Try adjusting your search or filters."
+                                : "No residents have been added yet."}
+                            action={hasActiveFilters ? {
+                                label: "Clear Filters",
+                                onClick: onClearFilters
+                            } : undefined}
+                            className="py-12 sm:py-16"
+                        />
+                    ) : (
+                        <>
+                            {/* Table View */}
+                            {viewMode === 'table' ? (
+                                <ResidentsTableView
+                                    residents={residents}
+                                    isBulkMode={isBulkMode}
+                                    selectedResidents={selectedResidents}
+                                    filtersState={filtersState}
+                                    onItemSelect={onItemSelect}
+                                    onSort={onSort}
+                                    hasActiveFilters={hasActiveFilters}
+                                    onClearFilters={onClearFilters}
+                                    onDelete={onDelete}
+                                    onToggleStatus={onToggleStatus}
+                                    onViewPhoto={onViewPhoto}
+                                    onCopyToClipboard={onCopyToClipboard}
+                                    onSelectAllOnPage={onSelectAllOnPage}
+                                    isSelectAll={isSelectAll}
+                                />
+                            ) : (
+                                // Grid View
+                                <ResidentsGridView
+                                    residents={residents}
+                                    isBulkMode={isBulkMode}
+                                    selectedResidents={selectedResidents}
+                                    onItemSelect={onItemSelect}
+                                    hasActiveFilters={hasActiveFilters}
+                                    onClearFilters={onClearFilters}
+                                    onDelete={onDelete}
+                                    onToggleStatus={onToggleStatus}
+                                    onViewPhoto={onViewPhoto}
+                                    onCopyToClipboard={onCopyToClipboard}
+                                />
+                            )}
+
+                            {/* Grid Selection Summary */}
+                            {viewMode === 'grid' && isBulkMode && selectedResidents.length > 0 && (
+                                <GridSelectionSummary
+                                    selectedCount={selectedResidents.length}
+                                    totalCount={residents.length}
+                                    isSelectAll={isSelectAll}
+                                    onSelectAll={onSelectAllOnPage}
+                                    onClearSelection={onClearSelection}
+                                    className="mt-4 mx-4"
+                                />
+                            )}
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
+                                    <Pagination
+                                        currentPage={currentPage}
+                                        totalPages={totalPages}
+                                        totalItems={totalItems}
+                                        itemsPerPage={itemsPerPage}
+                                        onPageChange={onPageChange}
+                                        showCount={true}
+                                    />
+                                </div>
+                            )}
+                        </>
+                    )}
+                </CardContent>
+            </Card>
+        </>
+    );
+}

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\Permission;
+use App\Models\RolePermission;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -51,7 +53,7 @@ class RoleController extends Controller
     {
         $permissions = Permission::active()
             ->orderedByModule()
-            ->get(['id', 'name', 'display_name', 'module', 'description'])
+            ->get(['id', 'name', 'display_name', 'module', 'description', 'is_active'])
             ->groupBy('module');
 
         return Inertia::render('admin/Roles/Create', [
@@ -66,17 +68,19 @@ class RoleController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:100|unique:roles',
+            'name' => 'required|string|max:100|unique:roles|regex:/^[a-z_]+$/',
             'description' => 'nullable|string|max:500',
             'permissions' => 'nullable|array',
             'permissions.*' => 'exists:permissions,id',
+        ], [
+            'name.regex' => 'Role name must contain only lowercase letters and underscores.'
         ]);
 
         DB::transaction(function () use ($request) {
             $role = Role::create([
                 'name' => $request->name,
                 'description' => $request->description,
-                'is_system_role' => false,
+                'is_system_role' => $request->is_system_role ?? false,
             ]);
 
             if ($request->has('permissions')) {
@@ -209,29 +213,100 @@ class RoleController extends Controller
     }
 
     /**
-     * Get role permissions for API.
+     * Show role permissions management page
      */
-   public function permissions(Role $role)
-{
-    // Get all active permissions grouped by module
-    $permissions = Permission::active()
-        ->orderedByModule()
-        ->get(['id', 'name', 'display_name', 'description', 'module', 'is_active'])
-        ->groupBy('module');
+    public function permissions(Role $role)
+    {
+        $permissions = Permission::active()
+            ->orderedByModule()
+            ->get(['id', 'name', 'display_name', 'description', 'module', 'is_active'])
+            ->groupBy('module');
 
-    // Get current role permissions
-    $currentPermissions = $role->permissions()->pluck('permissions.id')->toArray();
+        $currentPermissions = $role->permissions()->pluck('permissions.id')->toArray();
 
-    return Inertia::render('admin/Roles/Permissions', [
-        'role' => [
-            'id' => $role->id,
-            'name' => $role->name,
-            'description' => $role->description,
-            'is_system_role' => $role->is_system_role,
-        ],
-        'permissions' => $permissions,
-        'currentPermissions' => $currentPermissions,
-        'modules' => Permission::getModules(),
-    ]);
-}
+        return Inertia::render('admin/Roles/Permissions', [
+            'role' => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'description' => $role->description,
+                'is_system_role' => $role->is_system_role,
+            ],
+            'permissions' => $permissions,
+            'currentPermissions' => $currentPermissions,
+            'modules' => Permission::getModules(),
+        ]);
+    }
+
+    /**
+     * Assign permissions to role
+     */
+    public function assignPermissions(Request $request, Role $role)
+    {
+        $validated = $request->validate([
+            'permission_ids' => 'required|array',
+            'permission_ids.*' => 'exists:permissions,id',
+        ]);
+        
+        try {
+            DB::beginTransaction();
+            
+            $grantedBy = Auth::id();
+            $assignments = [];
+            $now = now();
+            
+            foreach ($validated['permission_ids'] as $permissionId) {
+                if ($role->permissions()->where('permission_id', $permissionId)->exists()) {
+                    continue;
+                }
+                
+                $assignments[] = [
+                    'role_id' => $role->id,
+                    'permission_id' => $permissionId,
+                    'granted_by' => $grantedBy,
+                    'granted_at' => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+            
+            if (empty($assignments)) {
+                return redirect()->back()->with('warning', 'All selected permissions are already assigned to this role.');
+            }
+            
+            RolePermission::insert($assignments);
+            
+            DB::commit();
+            
+            return redirect()->route('roles.permissions', $role)
+                ->with('success', count($assignments) . ' permission(s) assigned successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->withErrors([
+                'error' => 'Failed to assign permissions: ' . $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
+     * Revoke permission from role
+     */
+    public function revokePermission(Role $role, Permission $permission)
+    {
+        if ($role->is_system_role) {
+            return redirect()->back()->withErrors([
+                'error' => 'Cannot revoke permissions from system roles.'
+            ]);
+        }
+        
+        try {
+            $role->permissions()->detach($permission->id);
+            
+            return redirect()->route('roles.permissions', $role)
+                ->with('success', 'Permission revoked successfully.');
+        } catch (\Exception $e) {
+            return redirect()->back()->withErrors([
+                'error' => 'Failed to revoke permission: ' . $e->getMessage()
+            ]);
+        }
+    }
 }

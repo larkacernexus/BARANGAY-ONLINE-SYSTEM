@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Http\Responses\LoginResponse;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 
 
@@ -21,8 +22,12 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
+    public function boot()
     {
-        //
+        // Add morph map for polymorphic relationships
+        Relation::morphMap([
+            'App\Models\Resident' => 'App\Models\Resident',
+            'App\Models\Household' => 'App\Models\Household',
+        ]);
     }
 }

@@ -52,7 +52,6 @@ export default function CreateUser({ permissions = {}, roles = [], departments =
         password_confirmation: '',
         contact_number: '',
         position: '',
-        department_id: '',
         role_id: '',
         selected_permissions: [] as number[],
         status: 'active',
@@ -183,7 +182,6 @@ export default function CreateUser({ permissions = {}, roles = [], departments =
             password_confirmation: '',
             contact_number: '',
             position: '',
-            department_id: '',
             role_id: '',
             selected_permissions: [],
             status: 'active',
@@ -195,11 +193,7 @@ export default function CreateUser({ permissions = {}, roles = [], departments =
         setSelectedRolePermissions([]);
     };
 
-    // Safe department/role finding
-    const selectedDepartment = useMemo(() => {
-        if (!Array.isArray(departments) || !data.department_id) return null;
-        return departments.find(dept => dept && dept.id && dept.id.toString() === data.department_id.toString()) || null;
-    }, [departments, data.department_id]);
+     
 
     const selectedRole = useMemo(() => {
         if (!Array.isArray(roles) || !data.role_id) return null;
@@ -391,29 +385,7 @@ export default function CreateUser({ permissions = {}, roles = [], departments =
                                     </div>
 
                                     <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="department_id">Department *</Label>
-                                            <Select 
-                                                value={data.department_id} 
-                                                onValueChange={(value) => setData('department_id', value)}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select department" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {Array.isArray(departments) && departments.map((dept) => (
-                                                        dept && dept.id && (
-                                                            <SelectItem key={dept.id} value={dept.id.toString()}>
-                                                                {dept.name || 'Unnamed Department'}
-                                                            </SelectItem>
-                                                        )
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            {errors.department_id && (
-                                                <p className="text-sm text-red-500">{errors.department_id}</p>
-                                            )}
-                                        </div>
+                                     
                                         <div className="space-y-2">
                                             <Label htmlFor="role_id">User Role *</Label>
                                             <Select 

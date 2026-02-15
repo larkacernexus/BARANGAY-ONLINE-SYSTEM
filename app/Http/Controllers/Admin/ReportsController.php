@@ -8,16 +8,16 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
-use DateInterval;
 use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Models\Activity;
 
 class ReportsController extends Controller
+
+
 {
-    /**
-     * Display collections report
-     */
-    public function collections(Request $request)
+ 
+
+ public function collections(Request $request)
     {
         // Get date range from request or default to current month
         $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->toDateString());
@@ -103,637 +103,724 @@ class ReportsController extends Controller
             ],
         ]);
     }
-
-    /**
-     * Display revenue analytics - SIMPLIFIED for Barangay
-     */
-    public function revenue(Request $request)
-    {
-        // Get period from request
-        $period = $request->input('period', 'month');
-        
-        // Calculate date range based on period
-        if ($period === 'year') {
-            $startDate = Carbon::now()->startOfYear();
-            $endDate = Carbon::now()->endOfYear();
-            $groupBy = 'month';
-        } elseif ($period === 'month') {
-            $startDate = Carbon::now()->startOfMonth();
-            $endDate = Carbon::now()->endOfMonth();
-            $groupBy = 'week';
-        } else {
-            // Default to week
-            $startDate = Carbon::now()->startOfWeek();
-            $endDate = Carbon::now()->endOfWeek();
-            $groupBy = 'day';
-        }
-        
-        // Get payments in date range with recorder
-        $payments = Payment::with('recorder')
-            ->whereBetween('payment_date', [$startDate, $endDate])
-            ->get();
-        
-        // Group by period
-        $revenueData = collect();
-        if ($groupBy === 'month') {
-            $revenueData = $payments->groupBy(function ($payment) {
-                return $payment->payment_date->format('F');
-            })->map(function ($monthPayments, $month) {
-                return [
-                    'period' => $month,
-                    'total_revenue' => $monthPayments->sum('total_amount'),
-                    'transaction_count' => $monthPayments->count(),
-                ];
-            });
-        } elseif ($groupBy === 'week') {
-            $revenueData = $payments->groupBy(function ($payment) {
-                return 'Week ' . $payment->payment_date->weekOfMonth;
-            })->map(function ($weekPayments, $week) {
-                return [
-                    'period' => $week,
-                    'total_revenue' => $weekPayments->sum('total_amount'),
-                    'transaction_count' => $weekPayments->count(),
-                ];
-            });
-        } else {
-            $revenueData = $payments->groupBy(function ($payment) {
-                return $payment->payment_date->format('D, M j');
-            })->map(function ($dayPayments, $day) {
-                return [
-                    'period' => $day,
-                    'total_revenue' => $dayPayments->sum('total_amount'),
-                    'transaction_count' => $dayPayments->count(),
-                ];
-            });
-        }
-        
-        // Get revenue by payment method
-        $revenueByMethod = $payments->groupBy('payment_method')->map(function ($methodPayments, $method) {
-            return [
-                'name' => ucfirst($method),
-                'total_revenue' => $methodPayments->sum('total_amount'),
-                'transaction_count' => $methodPayments->count(),
-            ];
-        })->values();
-        
-        // Get revenue by recorder (who collected)
-        $revenueByCollector = $payments->whereNotNull('recorder')
-            ->groupBy('recorded_by')
-            ->map(function ($userPayments, $userId) {
-                $recorder = $userPayments->first()->recorder;
-                return [
-                    'name' => $recorder ? ($recorder->first_name . ' ' . $recorder->last_name) : 'Unknown',
-                    'position' => $recorder ? $recorder->position : 'N/A',
-                    'total_revenue' => $userPayments->sum('total_amount'),
-                    'transaction_count' => $userPayments->count(),
-                    'average_amount' => $userPayments->avg('total_amount'),
-                ];
-            })->values();
-        
-        // Simple current revenue
-        $currentRevenue = $payments->sum('total_amount');
-        
-        return Inertia::render('admin/Reports/Revenue', [
-            'revenueData' => $revenueData->values(),
-            'revenueByMethod' => $revenueByMethod,
-            'revenueByCollector' => $revenueByCollector,
-            'stats' => [
-                'totalRevenue' => $currentRevenue,
-                'averageTransaction' => $payments->count() > 0 ? round($currentRevenue / $payments->count(), 2) : 0,
-                'totalTransactions' => $payments->count(),
-                'uniqueCollectors' => $revenueByCollector->count(),
-            ],
-            'filters' => [
-                'period' => $period,
-                'start_date' => $startDate->toDateString(),
-                'end_date' => $endDate->toDateString(),
-            ],
-        ]);
-    }
-
-    /**
+/**
      * Display audit logs - USING SPATIE ACTIVITY LOG
      */
-  public function auditLogs(Request $request)
-{
-    // Use Spatie Activity model - ONLY fetch Payment-related logs
-    $query = Activity::with(['causer'])
-        ->where(function ($q) {
-            $q->where('subject_type', 'App\Models\Payment')
-              ->orWhere('log_name', 'payments');
-        })
-        ->latest();
+    public function auditLogs(Request $request)
+    {
+        // Use Spatie Activity model - ONLY fetch Payment-related logs
+        $query = Activity::with(['causer'])
+            ->where(function ($q) {
+                $q->where('subject_type', 'App\Models\Payment')
+                  ->orWhere('log_name', 'payments');
+            })
+            ->latest();
 
-    // ONLY apply filters if they have actual values (not empty strings)
-    if ($request->filled('search') && !empty(trim($request->input('search')))) {
-        $search = trim($request->input('search'));
-        $query->where(function ($q) use ($search) {
-            $q->where('description', 'like', "%{$search}%")
-                ->orWhere('event', 'like', "%{$search}%")
-                ->orWhere('properties', 'like', "%{$search}%")
-                ->orWhereHas('causer', function ($q) use ($search) {
-                    $q->where('first_name', 'like', "%{$search}%")
-                      ->orWhere('last_name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
-                })
-                ->orWhereHasMorph('subject', ['App\Models\Payment'], function ($q) use ($search) {
-                    $q->where('or_number', 'like', "%{$search}%")
-                      ->orWhere('payer_name', 'like', "%{$search}%");
-                });
-        });
-    }
+        // ONLY apply filters if they have actual values (not empty strings)
+        if ($request->filled('search') && !empty(trim($request->input('search')))) {
+            $search = trim($request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                    ->orWhere('event', 'like', "%{$search}%")
+                    ->orWhere('properties', 'like', "%{$search}%")
+                    ->orWhereHas('causer', function ($q) use ($search) {
+                        $q->where('username', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%");
+                    })
+                    ->orWhereHasMorph('subject', ['App\Models\Payment'], function ($q) use ($search) {
+                        $q->where('or_number', 'like', "%{$search}%")
+                          ->orWhere('payer_name', 'like', "%{$search}%");
+                    });
+            });
+        }
 
-    // Only apply event type filter if it has a value
-    if ($request->filled('event_type') && !empty(trim($request->input('event_type')))) {
-        $query->where('event', $request->input('event_type'));
-    }
+        // Only apply event type filter if it has a value
+        if ($request->filled('event_type') && !empty(trim($request->input('event_type')))) {
+            $query->where('event', $request->input('event_type'));
+        }
 
-    // Only apply user filter if it has a value
-    if ($request->filled('user_id') && !empty(trim($request->input('user_id')))) {
-        $query->where('causer_id', $request->input('user_id'));
-    }
+        // Only apply user filter if it has a value
+        if ($request->filled('user_id') && !empty(trim($request->input('user_id')))) {
+            $query->where('causer_id', $request->input('user_id'));
+        }
 
-    // Only apply date filters if they have values
-    if ($request->filled('date_from') && !empty(trim($request->input('date_from')))) {
-        $query->whereDate('created_at', '>=', $request->input('date_from'));
-    }
-    if ($request->filled('date_to') && !empty(trim($request->input('date_to')))) {
-        $query->whereDate('created_at', '<=', $request->input('date_to'));
-    }
+        // Only apply date filters if they have values
+        if ($request->filled('date_from') && !empty(trim($request->input('date_from')))) {
+            $query->whereDate('created_at', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to') && !empty(trim($request->input('date_to')))) {
+            $query->whereDate('created_at', '<=', $request->input('date_to'));
+        }
 
-    // Log name filter is now fixed to 'payments'
-    $query->where('log_name', 'payments');
+        // Log name filter is now fixed to 'payments'
+        $query->where('log_name', 'payments');
 
-    $perPage = $request->input('per_page', 25);
-    $logs = $query->paginate($perPage);
+        $perPage = $request->input('per_page', 25);
+        $logs = $query->paginate($perPage);
 
-    // Get filter options - ONLY payment-related
-    $eventTypes = Activity::where('log_name', 'payments')
-        ->orWhere('subject_type', 'App\Models\Payment')
-        ->distinct()
-        ->pluck('event')
-        ->filter()
-        ->values();
-    
-    // Log names is now fixed to only 'payments'
-    $logNames = collect(['payments']);
-    
-    // Get users who have performed payment-related activities
-    $userIds = Activity::where('log_name', 'payments')
-        ->orWhere('subject_type', 'App\Models\Payment')
-        ->whereNotNull('causer_id')
-        ->distinct('causer_id')
-        ->pluck('causer_id');
-    
-    $users = User::whereIn('id', $userIds)
-        ->select('id', 'first_name', 'last_name', 'email')
-        ->get()
-        ->map(function ($user) {
-            return [
-                'id' => $user->id,
-                'name' => $user->first_name . ' ' . $user->last_name,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'email' => $user->email,
-            ];
-        });
-
-    // Get statistics - ONLY for payment logs
-    $stats = [
-        'total_logs' => Activity::where('log_name', 'payments')
+        // Get filter options - ONLY payment-related
+        $eventTypes = Activity::where('log_name', 'payments')
             ->orWhere('subject_type', 'App\Models\Payment')
-            ->count(),
-        'today_logs' => Activity::whereDate('created_at', today())
+            ->distinct()
+            ->pluck('event')
+            ->filter()
+            ->values();
+        
+        // Log names is now fixed to only 'payments'
+        $logNames = collect(['payments']);
+        
+        // Get users who have performed payment-related activities
+        $userIds = Activity::where('log_name', 'payments')
+            ->orWhere('subject_type', 'App\Models\Payment')
+            ->whereNotNull('causer_id')
+            ->distinct('causer_id')
+            ->pluck('causer_id');
+        
+        // FIXED: Use username instead of first_name and last_name
+        $users = User::whereIn('id', $userIds)
+            ->select('id', 'username', 'email')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->username, // Use username as the display name
+                    'username' => $user->username,
+                    'email' => $user->email,
+                ];
+            });
+
+        // Get statistics - ONLY for payment logs
+        $stats = [
+            'total_logs' => Activity::where('log_name', 'payments')
+                ->orWhere('subject_type', 'App\Models\Payment')
+                ->count(),
+            'today_logs' => Activity::whereDate('created_at', today())
+                ->where(function ($q) {
+                    $q->where('log_name', 'payments')
+                      ->orWhere('subject_type', 'App\Models\Payment');
+                })
+                ->count(),
+            'payment_logs' => Activity::where('log_name', 'payments')->count(),
+            'user_logs' => Activity::where(function ($q) {
+                    $q->where('log_name', 'payments')
+                      ->orWhere('subject_type', 'App\Models\Payment');
+                })
+                ->whereNotNull('causer_id')
+                ->distinct('causer_id')
+                ->count(),
+        ];
+
+        // Get recent activities - ONLY payment-related
+        $recentActivities = Activity::with('causer')
             ->where(function ($q) {
                 $q->where('log_name', 'payments')
                   ->orWhere('subject_type', 'App\Models\Payment');
             })
-            ->count(),
-        'payment_logs' => Activity::where('log_name', 'payments')->count(),
-        'user_logs' => Activity::where(function ($q) {
+            ->latest()
+            ->limit(10)
+            ->get()
+            ->map(function ($activity) {
+                $activityArray = $activity->toArray();
+                if ($activity->causer) {
+                    // FIXED: Use username instead of first_name + last_name
+                    $activityArray['causer']['name'] = $activity->causer->username;
+                }
+                return $activityArray;
+            });
+
+        // Get activity summary - ONLY for payment logs
+        $activitySummary = Activity::select('event', DB::raw('count(*) as count'))
+            ->where(function ($q) {
+                $q->where('log_name', 'payments')
+                  ->orWhere('subject_type', 'App\Models\Payment');
+            })
+            ->groupBy('event')
+            ->orderBy('count', 'desc')
+            ->limit(10)
+            ->get();
+
+        // Get top users by activity - ONLY for payment activities
+        $topUsers = Activity::with(['causer'])
+            ->select('causer_id', DB::raw('count(*) as activity_count'))
+            ->where(function ($q) {
                 $q->where('log_name', 'payments')
                   ->orWhere('subject_type', 'App\Models\Payment');
             })
             ->whereNotNull('causer_id')
-            ->distinct('causer_id')
-            ->count(),
-    ];
-
-    // Get recent activities - ONLY payment-related
-    $recentActivities = Activity::with('causer')
-        ->where(function ($q) {
-            $q->where('log_name', 'payments')
-              ->orWhere('subject_type', 'App\Models\Payment');
-        })
-        ->latest()
-        ->limit(10)
-        ->get()
-        ->map(function ($activity) {
-            $activityArray = $activity->toArray();
-            if ($activity->causer) {
-                $activityArray['causer']['name'] = $activity->causer->first_name . ' ' . $activity->causer->last_name;
-            }
-            return $activityArray;
-        });
-
-    // Get activity summary - ONLY for payment logs
-    $activitySummary = Activity::select('event', DB::raw('count(*) as count'))
-        ->where(function ($q) {
-            $q->where('log_name', 'payments')
-              ->orWhere('subject_type', 'App\Models\Payment');
-        })
-        ->groupBy('event')
-        ->orderBy('count', 'desc')
-        ->limit(10)
-        ->get();
-
-    // Get top users by activity - ONLY for payment activities
-    $topUsers = Activity::with(['causer'])
-        ->select('causer_id', DB::raw('count(*) as activity_count'))
-        ->where(function ($q) {
-            $q->where('log_name', 'payments')
-              ->orWhere('subject_type', 'App\Models\Payment');
-        })
-        ->whereNotNull('causer_id')
-        ->groupBy('causer_id')
-        ->orderBy('activity_count', 'desc')
-        ->limit(10)
-        ->get()
-        ->map(function ($activity) {
-            $userData = null;
-            if ($activity->causer) {
-                $userData = [
-                    'id' => $activity->causer->id,
-                    'name' => $activity->causer->first_name . ' ' . $activity->causer->last_name,
-                    'first_name' => $activity->causer->first_name,
-                    'last_name' => $activity->causer->last_name,
-                    'email' => $activity->causer->email,
+            ->groupBy('causer_id')
+            ->orderBy('activity_count', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function ($activity) {
+                $userData = null;
+                if ($activity->causer) {
+                    // FIXED: Use username instead of first_name + last_name
+                    $userData = [
+                        'id' => $activity->causer->id,
+                        'name' => $activity->causer->username,
+                        'username' => $activity->causer->username,
+                        'email' => $activity->causer->email,
+                    ];
+                }
+                
+                return [
+                    'user' => $userData,
+                    'activity_count' => $activity->activity_count,
+                    'count' => $activity->activity_count,
                 ];
-            }
-            
-            return [
-                'user' => $userData,
-                'activity_count' => $activity->activity_count,
-                'count' => $activity->activity_count,
-            ];
+            });
+
+        // Only send back filters that have actual values
+        $activeFilters = array_filter($request->only(['search', 'event_type', 'user_id', 'date_from', 'date_to', 'per_page']), function($value) {
+            return !empty(trim($value));
         });
 
-    // Only send back filters that have actual values
-    $activeFilters = array_filter($request->only(['search', 'event_type', 'user_id', 'date_from', 'date_to', 'per_page']), function($value) {
-        return !empty(trim($value));
-    });
-
-    return Inertia::render('admin/Reports/AuditLogs', [
-        'logs' => [
-            'data' => $logs->items(),
-            'current_page' => $logs->currentPage(),
-            'first_page_url' => $logs->url(1),
-            'from' => $logs->firstItem(),
-            'last_page' => $logs->lastPage(),
-            'last_page_url' => $logs->url($logs->lastPage()),
-            'links' => $logs->linkCollection()->toArray(),
-            'next_page_url' => $logs->nextPageUrl(),
-            'path' => $logs->path(),
-            'per_page' => $logs->perPage(),
-            'prev_page_url' => $logs->previousPageUrl(),
-            'to' => $logs->lastItem(),
-            'total' => $logs->total(),
-        ],
-        'filters' => $activeFilters,
-        'event_types' => $eventTypes,
-        'log_names' => $logNames,
-        'users' => $users,
-        'stats' => $stats,
-        'recent_activities' => $recentActivities,
-        'activity_summary' => $activitySummary,
-        'top_users' => $topUsers,
-    ]);
-}
-
-/**
- * Display audit log details - ONLY for Payment logs
- */
-public function auditLogShow($id)
-{
-    $log = Activity::with(['causer', 'subject'])
-        ->where(function ($q) {
-            $q->where('subject_type', 'App\Models\Payment')
-              ->orWhere('log_name', 'payments');
-        })
-        ->findOrFail($id);
-
-    // Add computed name for causer if exists
-    if ($log->causer) {
-        $log->causer->name = $log->causer->first_name . ' ' . $log->causer->last_name;
+        return Inertia::render('admin/Reports/AuditLogs', [
+            'logs' => [
+                'data' => $logs->items(),
+                'current_page' => $logs->currentPage(),
+                'first_page_url' => $logs->url(1),
+                'from' => $logs->firstItem(),
+                'last_page' => $logs->lastPage(),
+                'last_page_url' => $logs->url($logs->lastPage()),
+                'links' => $logs->linkCollection()->toArray(),
+                'next_page_url' => $logs->nextPageUrl(),
+                'path' => $logs->path(),
+                'per_page' => $logs->perPage(),
+                'prev_page_url' => $logs->previousPageUrl(),
+                'to' => $logs->lastItem(),
+                'total' => $logs->total(),
+            ],
+            'filters' => $activeFilters,
+            'event_types' => $eventTypes,
+            'log_names' => $logNames,
+            'users' => $users,
+            'stats' => $stats,
+            'recent_activities' => $recentActivities,
+            'activity_summary' => $activitySummary,
+            'top_users' => $topUsers,
+        ]);
     }
 
-    // Get similar logs - ONLY payment-related
-    $similarLogs = Activity::where(function ($q) {
-            $q->where('subject_type', 'App\Models\Payment')
-              ->orWhere('log_name', 'payments');
-        })
-        ->where('causer_id', $log->causer_id)
-        ->where('id', '!=', $log->id)
-        ->where('event', $log->event)
-        ->latest()
-        ->limit(5)
-        ->get();
+    /**
+     * Display audit log details - ONLY for Payment logs
+     */
+    public function auditLogShow($id)
+    {
+        $log = Activity::with(['causer', 'subject'])
+            ->where(function ($q) {
+                $q->where('subject_type', 'App\Models\Payment')
+                  ->orWhere('log_name', 'payments');
+            })
+            ->findOrFail($id);
 
-    // Add computed names for similar logs
-    $similarLogs->each(function ($similarLog) {
-        if ($similarLog->causer) {
-            $similarLog->causer->name = $similarLog->causer->first_name . ' ' . $similarLog->causer->last_name;
+        // FIXED: Use username instead of first_name + last_name
+        if ($log->causer) {
+            $log->causer->name = $log->causer->username;
         }
-    });
 
-    // Get timeline of user's recent activities - ONLY payment-related
-    $userTimeline = Activity::where(function ($q) {
-            $q->where('subject_type', 'App\Models\Payment')
-              ->orWhere('log_name', 'payments');
-        })
-        ->where('causer_id', $log->causer_id)
-        ->where('id', '!=', $log->id)
-        ->latest()
-        ->limit(10)
-        ->get();
+        // Get similar logs - ONLY payment-related
+        $similarLogs = Activity::where(function ($q) {
+                $q->where('subject_type', 'App\Models\Payment')
+                  ->orWhere('log_name', 'payments');
+            })
+            ->where('causer_id', $log->causer_id)
+            ->where('id', '!=', $log->id)
+            ->where('event', $log->event)
+            ->latest()
+            ->limit(5)
+            ->get();
 
-    // Add computed names for timeline logs
-    $userTimeline->each(function ($timelineLog) {
-        if ($timelineLog->causer) {
-            $timelineLog->causer->name = $timelineLog->causer->first_name . ' ' . $timelineLog->causer->last_name;
-        }
-    });
+        // FIXED: Use username instead of first_name + last_name
+        $similarLogs->each(function ($similarLog) {
+            if ($similarLog->causer) {
+                $similarLog->causer->name = $similarLog->causer->username;
+            }
+        });
 
-    return Inertia::render('admin/Reports/AuditLogShow', [
-        'log' => $log,
-        'similar_logs' => $similarLogs,
-        'user_timeline' => $userTimeline,
-    ]);
-}
+        // Get timeline of user's recent activities - ONLY payment-related
+        $userTimeline = Activity::where(function ($q) {
+                $q->where('subject_type', 'App\Models\Payment')
+                  ->orWhere('log_name', 'payments');
+            })
+            ->where('causer_id', $log->causer_id)
+            ->where('id', '!=', $log->id)
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        // FIXED: Use username instead of first_name + last_name
+        $userTimeline->each(function ($timelineLog) {
+            if ($timelineLog->causer) {
+                $timelineLog->causer->name = $timelineLog->causer->username;
+            }
+        });
+
+        return Inertia::render('admin/Reports/AuditLogShow', [
+            'log' => $log,
+            'similar_logs' => $similarLogs,
+            'user_timeline' => $userTimeline,
+        ]);
+    }
 
     /**
-     * NEW: Payment Audit Trail Report
+     * Display ALL Activity Logs (not just payment-related)
      */
-    public function paymentAudit(Request $request)
+    public function activityLogs(Request $request)
     {
-        // Get payment activities only
-        $query = Activity::with(['causer', 'subject'])
-            ->where('subject_type', 'App\Models\Payment')
-            ->orWhere('log_name', 'payments')
-            ->latest();
-
-        // Filter by OR number
-        if ($request->filled('or_number')) {
-            $query->whereHas('subject', function($q) use ($request) {
-                $q->where('or_number', 'like', "%{$request->or_number}%");
+        $query = Activity::with(['causer' => function ($query) {
+            $query->select('id', 'username', 'email');
+        }])
+        ->with(['subject' => function ($query) {
+            // Load subject data based on type
+            if ($query->getModel() instanceof User) {
+                $query->select('id', 'username', 'email');
+            }
+            // Add more model-specific eager loading as needed
+        }])
+        ->latest();
+        
+        // Apply search filter
+        if ($request->filled('search') && !empty(trim($request->input('search')))) {
+            $search = trim($request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                  ->orWhere('event', 'like', "%{$search}%")
+                  ->orWhere('properties', 'like', "%{$search}%")
+                  ->orWhere('log_name', 'like', "%{$search}%")
+                  ->orWhere('batch_uuid', 'like', "%{$search}%")
+                  ->orWhereHas('causer', function ($q) use ($search) {
+                      $q->where('username', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                  })
+                  ->orWhereHasMorph('subject', ['App\Models\User'], function ($q) use ($search) {
+                      $q->where('username', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                  })
+                  ->orWhereHasMorph('subject', ['App\Models\Resident'], function ($q) use ($search) {
+                      $q->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('resident_id', 'like', "%{$search}%");
+                  });
             });
         }
-
-        // Filter by date
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
-
-        $perPage = $request->input('per_page', 50);
-        $activities = $query->paginate($perPage);
-
-        // Add computed names for causers
-        $activities->each(function ($activity) {
-            if ($activity->causer) {
-                $activity->causer->name = $activity->causer->first_name . ' ' . $activity->causer->last_name;
+        
+        // Apply log_name filter - SPECIAL HANDLING FOR RESIDENTS
+        if ($request->filled('log_name') && !empty(trim($request->input('log_name')))) {
+            $logName = $request->input('log_name');
+            
+            // Handle "residents" (plural) by also checking for "resident" (singular) and subject type
+            if ($logName === 'residents') {
+                $query->where(function ($q) {
+                    $q->where('log_name', 'residents')
+                      ->orWhere('log_name', 'resident')
+                      ->orWhere('subject_type', 'App\Models\Resident');
+                });
+            } else {
+                $query->where('log_name', $logName);
             }
+        }
+        
+        // Apply event_type filter
+        if ($request->filled('event_type') && !empty(trim($request->input('event_type')))) {
+            $query->where('event', $request->input('event_type'));
+        }
+        
+        // Apply user filter
+        if ($request->filled('user_id') && !empty(trim($request->input('user_id')))) {
+            $query->where('causer_id', $request->input('user_id'))
+                  ->where('causer_type', 'App\Models\User');
+        }
+        
+        // Apply date range filter
+        if ($request->filled('date_from') && !empty(trim($request->input('date_from')))) {
+            $query->whereDate('created_at', '>=', $request->input('date_from'));
+        }
+        
+        if ($request->filled('date_to') && !empty(trim($request->input('date_to')))) {
+            $query->whereDate('created_at', '<=', $request->input('date_to'));
+        }
+        
+        $perPage = $request->input('per_page', 25);
+        $logs = $query->paginate($perPage);
+        
+        // Process logs for display
+        $logs->getCollection()->transform(function ($log) {
+            return $this->formatActivityForDisplay($log);
         });
-
-        // Get payment summary stats
-        $paymentIds = $activities->pluck('subject_id')->filter()->unique();
-        $payments = Payment::whereIn('id', $paymentIds)->get();
         
-        $stats = [
-            'total_payments' => $payments->count(),
-            'total_amount' => $payments->sum('total_amount'),
-            'unique_collectors' => $payments->pluck('recorded_by')->unique()->count(),
+        // Get filter options - SPECIAL HANDLING FOR LOG NAMES
+        $eventTypes = Activity::select('event')
+            ->whereNotNull('event')
+            ->where('event', '!=', '')
+            ->distinct()
+            ->orderBy('event')
+            ->pluck('event')
+            ->values()
+            ->map(function ($event) {
+                return [
+                    'value' => $event,
+                    'label' => ucwords(str_replace(['_', '-'], ' ', $event))
+                ];
+            });
+        
+        // Get unique log names from database
+        $dbLogNames = Activity::select('log_name')
+            ->whereNotNull('log_name')
+            ->where('log_name', '!=', '')
+            ->distinct()
+            ->orderBy('log_name')
+            ->pluck('log_name')
+            ->values();
+        
+        // Create a unified list of log names for frontend
+        $logNames = collect();
+        
+        // Always include these standard categories
+        $standardLogs = [
+            'payments' => 'Payments',
+            'clearance-requests' => 'Clearance Requests',
+            'users' => 'Users',
+            'residents' => 'Residents', // We'll use 'residents' as the display name
+            'households' => 'Households',
+            'authentication' => 'Authentication',
+            'system' => 'System',
+            'default' => 'Default',
         ];
-
-        return Inertia::render('admin/Reports/PaymentAudit', [
-            'activities' => $activities,
-            'stats' => $stats,
-            'filters' => $request->only(['or_number', 'date_from', 'date_to', 'per_page']),
-        ]);
-    }
-
-    /**
-     * NEW: OR Number Accountability Report
-     */
-    public function orAccountability(Request $request)
-    {
-        $date = $request->input('date', today()->format('Y-m-d'));
         
-        // Get all payments for the date with recorder info
-        $payments = Payment::with('recorder')
-            ->whereDate('payment_date', $date)
-            ->orderBy('or_number')
-            ->get();
-        
-        // Group by recorder
-        $byRecorder = $payments->groupBy('recorded_by')
-            ->map(function ($userPayments, $userId) {
-                $recorder = $userPayments->first()->recorder;
-                $collectorName = 'Unknown';
-                if ($recorder) {
-                    $collectorName = $recorder->first_name . ' ' . $recorder->last_name;
-                }
-                
-                return [
-                    'collector_id' => $userId,
-                    'collector_name' => $collectorName,
-                    'collector_position' => $recorder ? $recorder->position : 'N/A',
-                    'or_numbers' => $userPayments->pluck('or_number')->sort()->values(),
-                    'total_collected' => $userPayments->sum('total_amount'),
-                    'payment_count' => $userPayments->count(),
-                ];
-            })->values();
-        
-        // Find missing OR numbers in sequence
-        $allORs = $payments->pluck('or_number')->sort()->values();
-        $missingORs = $this->findMissingORNumbers($allORs);
-        
-        return Inertia::render('admin/Reports/OrAccountability', [
-            'date' => $date,
-            'payments' => $payments,
-            'by_recorder' => $byRecorder,
-            'missing_or_numbers' => $missingORs,
-            'summary' => [
-                'total_collected' => $payments->sum('total_amount'),
-                'total_or_numbers' => $payments->count(),
-                'unique_collectors' => $byRecorder->count(),
-            ]
-        ]);
-    }
-
-    /**
-     * NEW: Collector Accountability Report
-     */
-    public function collectorReport(Request $request)
-    {
-        $userId = $request->input('user_id');
-        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->toDateString());
-        $endDate = $request->input('end_date', Carbon::now()->endOfMonth()->toDateString());
-        
-        $user = User::findOrFail($userId);
-        $user->name = $user->first_name . ' ' . $user->last_name;
-        
-        // Get all payments recorded by this user
-        $payments = Payment::where('recorded_by', $userId)
-            ->whereBetween('payment_date', [$startDate, $endDate])
-            ->orderBy('payment_date', 'desc')
-            ->get();
-        
-        // Group by date
-        $dailyCollections = $payments->groupBy(function($payment) {
-            return $payment->payment_date->format('Y-m-d');
-        })->map(function($dayPayments, $date) {
-            return [
-                'date' => $date,
-                'total_amount' => $dayPayments->sum('total_amount'),
-                'payment_count' => $dayPayments->count(),
-                'or_numbers' => $dayPayments->pluck('or_number')->sort()->values(),
-            ];
-        })->sortKeysDesc();
-        
-        // Group by clearance type
-        $byClearanceType = $payments->whereNotNull('clearance_type')
-            ->groupBy('clearance_type')
-            ->map(function($typePayments, $type) {
-                return [
-                    'type' => $type,
-                    'type_display' => $typePayments->first()->clearance_type_display,
-                    'total_amount' => $typePayments->sum('total_amount'),
-                    'payment_count' => $typePayments->count(),
-                ];
-            })->values();
-        
-        // Group by payment method
-        $byPaymentMethod = $payments->groupBy('payment_method')
-            ->map(function($methodPayments, $method) {
-                return [
-                    'method' => $method,
-                    'method_display' => $methodPayments->first()->payment_method_display,
-                    'total_amount' => $methodPayments->sum('total_amount'),
-                    'payment_count' => $methodPayments->count(),
-                ];
-            })->values();
-        
-        return Inertia::render('admin/Reports/CollectorReport', [
-            'user' => $user,
-            'payments' => $payments,
-            'daily_collections' => $dailyCollections,
-            'by_clearance_type' => $byClearanceType,
-            'by_payment_method' => $byPaymentMethod,
-            'summary' => [
-                'total_collected' => $payments->sum('total_amount'),
-                'total_payments' => $payments->count(),
-                'date_range' => $startDate . ' to ' . $endDate,
-            ],
-            'filters' => [
-                'user_id' => $userId,
-                'start_date' => $startDate,
-                'end_date' => $endDate,
-            ]
-        ]);
-    }
-
-    /**
-     * Helper: Find missing OR numbers
-     */
-    private function findMissingORNumbers($orNumbers)
-    {
-        if ($orNumbers->isEmpty()) {
-            return collect();
+        // Add standard logs first
+        foreach ($standardLogs as $key => $label) {
+            $logNames->push([
+                'value' => $key,
+                'label' => $label
+            ]);
         }
         
-        $missing = collect();
-        $currentSeries = null;
-        
-        foreach ($orNumbers as $or) {
-            // Extract number part (e.g., BAR-20250111-001 -> 001)
-            if (preg_match('/-(\d+)$/', $or, $matches)) {
-                $num = (int) $matches[1];
-                $series = substr($or, 0, strrpos($or, '-'));
-                
-                if ($currentSeries !== $series) {
-                    $currentSeries = $series;
-                    continue;
+        // Add any other log names from database not in standard list
+        foreach ($dbLogNames as $dbLogName) {
+            if (!collect($standardLogs)->has($dbLogName)) {
+                // Handle 'resident' singular -> map to 'residents' plural
+                if ($dbLogName === 'resident') {
+                    continue; // Skip since we already have 'residents' in standard
                 }
                 
-                // Check for gaps
-                // This is simplified - you might need more complex logic
+                $logNames->push([
+                    'value' => $dbLogName,
+                    'label' => $this->getLogTypeDisplay($dbLogName)
+                ]);
             }
         }
         
-        return $missing;
+        // Remove duplicates and reorder
+        $logNames = $logNames->unique('value')->values();
+        
+        // Get all users for filter dropdown (only those with activities)
+        // FIXED: Use username instead of first_name and last_name
+        $users = User::whereHas('activities')
+            ->select('id', 'username', 'email')
+            ->orderBy('username')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->username,
+                    'username' => $user->username,
+                    'email' => $user->email,
+                ];
+            });
+        
+        // Get stats - COUNT RESIDENT ACTIVITIES PROPERLY
+        $totalLogs = Activity::count();
+        $todayLogs = Activity::whereDate('created_at', today())->count();
+        
+        // Count resident activities (both 'resident' and 'residents' log names and subject_type)
+        $residentLogs = Activity::where(function ($q) {
+            $q->where('log_name', 'resident')
+              ->orWhere('log_name', 'residents')
+              ->orWhere('subject_type', 'App\Models\Resident');
+        })->count();
+        
+        $userLogs = Activity::where('causer_type', 'App\Models\User')->distinct('causer_id')->count();
+        $systemLogs = Activity::whereNull('causer_type')->count();
+        $userActivities = Activity::whereNotNull('causer_type')->count();
+        $last7Days = Activity::where('created_at', '>=', now()->subDays(7))->count();
+        
+        // Get payment logs separately
+        $paymentLogs = Activity::where('log_name', 'payments')->count();
+        
+        // Get recent activities
+        $recentActivities = Activity::with(['causer' => function ($query) {
+            $query->select('id', 'username', 'email');
+        }])
+        ->latest()
+        ->limit(10)
+        ->get()
+        ->map(function ($activity) {
+            return $this->formatActivityForDisplay($activity);
+        });
+        
+        // Get activity summary for last 30 days - GROUP RESIDENT ACTIVITIES
+        $rawActivitySummary = Activity::select('log_name', DB::raw('count(*) as count'))
+            ->whereNotNull('log_name')
+            ->where('log_name', '!=', '')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->groupBy('log_name')
+            ->orderBy('count', 'desc')
+            ->get();
+        
+        // Process activity summary - combine 'resident' and 'residents' into 'residents'
+        $activitySummary = collect();
+        $residentCount = 0;
+        
+        foreach ($rawActivitySummary as $item) {
+            if ($item->log_name === 'resident' || $item->log_name === 'residents') {
+                $residentCount += $item->count;
+            } else {
+                $activitySummary->push([
+                    'log_name' => $item->log_name,
+                    'count' => $item->count,
+                ]);
+            }
+        }
+        
+        // Add combined resident count
+        if ($residentCount > 0) {
+            $activitySummary->prepend([
+                'log_name' => 'residents',
+                'count' => $residentCount,
+            ]);
+        }
+        
+        // Get event summary for last 30 days
+        $eventSummary = Activity::select('event', DB::raw('count(*) as count'))
+            ->whereNotNull('event')
+            ->where('event', '!=', '')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->groupBy('event')
+            ->orderBy('count', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'event' => $item->event,
+                    'count' => $item->count,
+                ];
+            });
+        
+        // Get top users for last 30 days
+        $topUsers = Activity::select('causer_id', DB::raw('count(*) as activity_count'))
+            ->whereNotNull('causer_id')
+            ->where('causer_type', 'App\Models\User')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->with(['causer' => function ($query) {
+                $query->select('id', 'username', 'email');
+            }])
+            ->groupBy('causer_id')
+            ->orderBy('activity_count', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'user' => $item->causer ? [
+                        'id' => $item->causer->id,
+                        'name' => $item->causer->username,
+                        'username' => $item->causer->username,
+                        'email' => $item->causer->email,
+                    ] : null,
+                    'activity_count' => $item->activity_count,
+                ];
+            });
+        
+        // Get hourly activity (last 24 hours)
+        $hourlyActivity = Activity::select(
+                DB::raw('HOUR(created_at) as hour'),
+                DB::raw('count(*) as count')
+            )
+            ->where('created_at', '>=', now()->subDay())
+            ->groupBy(DB::raw('HOUR(created_at)'))
+            ->orderBy('hour')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'hour' => str_pad($item->hour, 2, '0', STR_PAD_LEFT) . ':00',
+                    'count' => $item->count,
+                ];
+            });
+        
+        // Get daily activity trend (last 7 days)
+        $dailyActivity = Activity::select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('count(*) as count')
+            )
+            ->where('created_at', '>=', now()->subDays(7))
+            ->groupBy(DB::raw('DATE(created_at)'))
+            ->orderBy('date')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'date' => Carbon::parse($item->date)->format('M j'),
+                    'count' => $item->count,
+                ];
+            });
+        
+        return Inertia::render('admin/Reports/ActivityLogs', [
+            'logs' => $logs,
+            'filters' => $request->only(['search', 'event_type', 'user_id', 'date_from', 'date_to', 'log_name', 'per_page']),
+            'event_types' => $eventTypes,
+            'log_names' => $logNames,
+            'users' => $users,
+            'stats' => [
+                'total_logs' => $totalLogs,
+                'today_logs' => $todayLogs,
+                'payment_logs' => $paymentLogs,
+                'resident_logs' => $residentLogs, // Add this
+                'user_logs' => $userLogs,
+                'system_logs' => $systemLogs,
+                'user_activities' => $userActivities,
+                'last_7_days' => $last7Days,
+            ],
+            'recent_activities' => $recentActivities,
+            'activity_summary' => $activitySummary,
+            'event_summary' => $eventSummary,
+            'top_users' => $topUsers,
+            'hourly_activity' => $hourlyActivity,
+            'daily_activity' => $dailyActivity,
+        ]);
     }
 
     /**
-     * Export collections report - UPDATED with recorder info
+     * Display single activity log details
      */
-    public function collectionsExport(Request $request)
+    public function activityLogShow($id)
     {
-        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->toDateString());
-        $endDate = $request->input('end_date', Carbon::now()->endOfMonth()->toDateString());
+        $log = Activity::with(['causer', 'subject'])
+            ->findOrFail($id);
         
-        $payments = Payment::with('recorder')
-            ->whereBetween('payment_date', [$startDate, $endDate])
-            ->orderBy('payment_date')
-            ->get();
+        // Format the log for display
+        $formattedLog = $this->formatActivityForDisplay($log, true);
         
-        $fileName = 'collections-report-' . now()->format('Y-m-d-H-i-s') . '.csv';
+        // Get similar logs
+        $similarLogs = Activity::where('causer_id', $log->causer_id)
+            ->where('id', '!=', $log->id)
+            ->where('event', $log->event)
+            ->where('log_name', $log->log_name)
+            ->latest()
+            ->limit(5)
+            ->get()
+            ->map(function ($similarLog) {
+                return $this->formatActivityForDisplay($similarLog);
+            });
+        
+        // Get user's recent activity timeline
+        $userTimeline = Activity::where('causer_id', $log->causer_id)
+            ->where('id', '!=', $log->id)
+            ->latest()
+            ->limit(10)
+            ->get()
+            ->map(function ($timelineLog) {
+                return $this->formatActivityForDisplay($timelineLog);
+            });
+        
+        return Inertia::render('admin/Reports/ActivityLogShow', [
+            'log' => $formattedLog,
+            'similar_logs' => $similarLogs,
+            'user_timeline' => $userTimeline,
+        ]);
+    }
+
+    /**
+     * Export activity logs
+     */
+    public function activityLogsExport(Request $request)
+    {
+        $query = Activity::with(['causer'])
+            ->latest();
+        
+        // Apply filters
+        if ($request->filled('search')) {
+            $search = trim($request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                  ->orWhere('event', 'like', "%{$search}%")
+                  ->orWhere('properties', 'like', "%{$search}%")
+                  ->orWhereHas('causer', function ($q) use ($search) {
+                      $q->where('username', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                  });
+            });
+        }
+        
+        if ($request->filled('log_name')) {
+            $query->where('log_name', $request->input('log_name'));
+        }
+        
+        if ($request->filled('event_type')) {
+            $query->where('event', $request->input('event_type'));
+        }
+        
+        if ($request->filled('user_id')) {
+            $query->where('causer_id', $request->input('user_id'));
+        }
+        
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->input('date_from'));
+        }
+        
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->input('date_to'));
+        }
+        
+        $logs = $query->get();
+        
+        $fileName = 'activity-logs-export-' . now()->format('Y-m-d-H-i-s') . '.csv';
         
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
         ];
         
-        $callback = function () use ($payments) {
+        $callback = function () use ($logs) {
             $file = fopen('php://output', 'w');
             
             // Add BOM for UTF-8
             fwrite($file, "\xEF\xBB\xBF");
             
-            // Headers - INCLUDING recorder info
+            // Headers
             fputcsv($file, [
-                'OR Number',
-                'Date',
-                'Payer Name',
-                'Amount',
-                'Payment Method',
-                'Clearance Type',
-                'Recorded By',
-                'Position',
-                'Status',
-                'Remarks',
+                'ID',
+                'Timestamp',
+                'Log Type',
+                'Event',
+                'Description',
+                'User',
+                'User Email',
+                'Subject Type',
+                'Subject ID',
+                'IP Address',
+                'Properties',
+                'Batch UUID',
             ]);
             
             // Data
-            foreach ($payments as $payment) {
-                $recorderName = 'Unknown';
-                if ($payment->recorder) {
-                    $recorderName = $payment->recorder->first_name . ' ' . $payment->recorder->last_name;
-                }
+            foreach ($logs as $log) {
+                // FIXED: Use username instead of first_name + last_name
+                $causerName = $log->causer ? $log->causer->username : 'System';
+                $causerEmail = $log->causer ? $log->causer->email : '';
+                $properties = json_encode($log->properties ?? [], JSON_PRETTY_PRINT);
                 
                 fputcsv($file, [
-                    $payment->or_number,
-                    $payment->payment_date->format('Y-m-d H:i:s'),
-                    $payment->payer_name,
-                    $payment->total_amount,
-                    $payment->payment_method_display,
-                    $payment->clearance_type_display ?? 'N/A',
-                    $recorderName,
-                    $payment->recorder ? $payment->recorder->position : 'N/A',
-                    $payment->status_display,
-                    $payment->remarks ?? '',
+                    $log->id,
+                    $log->created_at->format('Y-m-d H:i:s'),
+                    $this->getLogTypeDisplay($log->log_name),
+                    $log->event,
+                    $log->description ?? '',
+                    $causerName,
+                    $causerEmail,
+                    $log->subject_type ?? '',
+                    $log->subject_id ?? '',
+                    $log->properties['ip_address'] ?? '',
+                    $properties,
+                    $log->batch_uuid ?? '',
                 ]);
             }
             
@@ -744,273 +831,178 @@ public function auditLogShow($id)
     }
 
     /**
-     * Display all reports dashboard - UPDATED
+     * Helper: Format activity for display
      */
-    public function index()
+    private function formatActivityForDisplay(Activity $activity, $detailed = false): array
     {
-        $today = Carbon::today();
-        $yesterday = Carbon::yesterday();
-        $thisMonth = Carbon::now()->startOfMonth();
+        $properties = $activity->properties ?? [];
         
-        // Collections stats
-        $todayCollections = Payment::whereDate('payment_date', $today)->sum('total_amount');
-        $yesterdayCollections = Payment::whereDate('payment_date', $yesterday)->sum('total_amount');
-        $monthCollections = Payment::whereDate('payment_date', '>=', $thisMonth)->sum('total_amount');
-        
-        // Activity logs stats (using Spatie)
-        $todayLogs = Activity::whereDate('created_at', $today)->count();
-        $paymentLogs = Activity::where('log_name', 'payments')->whereDate('created_at', $today)->count();
-        
-        // Recent activities
-        $recentActivities = Activity::with('causer')
-            ->latest()
-            ->limit(10)
-            ->get();
-            
-        // Add computed names for recent activities
-        $recentActivities->each(function ($activity) {
-            if ($activity->causer) {
-                $activity->causer->name = $activity->causer->first_name . ' ' . $activity->causer->last_name;
-            }
-        });
-        
-        // Recent payments with recorder info
-        $recentPayments = Payment::with('recorder')
-            ->latest()
-            ->limit(10)
-            ->get();
-        
-        // Top collectors today
-        $topCollectors = Payment::with('recorder')
-            ->whereDate('payment_date', $today)
-            ->select('recorded_by', DB::raw('SUM(total_amount) as total_collected'), DB::raw('COUNT(*) as payment_count'))
-            ->groupBy('recorded_by')
-            ->orderBy('total_collected', 'desc')
-            ->limit(5)
-            ->get()
-            ->map(function($item) {
-                $collectorName = 'Unknown';
-                if ($item->recorder) {
-                    $collectorName = $item->recorder->first_name . ' ' . $item->recorder->last_name;
-                }
-                
-                return [
-                    'collector' => [
-                        'id' => $item->recorder ? $item->recorder->id : null,
-                        'name' => $collectorName,
-                        'position' => $item->recorder ? $item->recorder->position : null,
-                    ],
-                    'total_collected' => $item->total_collected,
-                    'payment_count' => $item->payment_count,
-                ];
-            });
-
-        return Inertia::render('admin/Reports/Index', [
-            'stats' => [
-                'todayCollections' => $todayCollections,
-                'yesterdayCollections' => $yesterdayCollections,
-                'monthCollections' => $monthCollections,
-                'todayLogs' => $todayLogs,
-                'paymentLogs' => $paymentLogs,
-            ],
-            'recentActivities' => $recentActivities,
-            'recentPayments' => $recentPayments,
-            'topCollectors' => $topCollectors,
-        ]);
-    }
-
-
-public function activityLogs(Request $request)
-{
-    $query = Activity::with(['causer' => function ($query) {
-        $query->select('id', 'first_name', 'last_name', 'email');
-    }])
-    ->latest();
-    
-    // Apply search filter
-    if ($request->filled('search') && !empty(trim($request->input('search')))) {
-        $search = trim($request->input('search'));
-        $query->where(function ($q) use ($search) {
-            $q->where('description', 'like', "%{$search}%")
-              ->orWhere('event', 'like', "%{$search}%")
-              ->orWhere('properties', 'like', "%{$search}%")
-              ->orWhereHas('causer', function ($q) use ($search) {
-                  $q->where('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-              });
-        });
-    }
-    
-    // Apply log_name filter
-    if ($request->filled('log_name') && !empty(trim($request->input('log_name')))) {
-        $query->where('log_name', $request->input('log_name'));
-    }
-    
-    // Apply event_type filter
-    if ($request->filled('event_type') && !empty(trim($request->input('event_type')))) {
-        $query->where('event', $request->input('event_type'));
-    }
-    
-    // Apply user filter
-    if ($request->filled('user_id') && !empty(trim($request->input('user_id')))) {
-        $query->where('causer_id', $request->input('user_id'))
-              ->where('causer_type', 'App\Models\User');
-    }
-    
-    // Apply date range filter
-    if ($request->filled('date_from') && !empty(trim($request->input('date_from')))) {
-        $query->whereDate('created_at', '>=', $request->input('date_from'));
-    }
-    
-    if ($request->filled('date_to') && !empty(trim($request->input('date_to')))) {
-        $query->whereDate('created_at', '<=', $request->input('date_to'));
-    }
-    
-    $perPage = $request->input('per_page', 25);
-    $logs = $query->paginate($perPage);
-    
-    // Get filter options
-    $eventTypes = Activity::select('event')
-        ->whereNotNull('event')
-        ->where('event', '!=', '')
-        ->distinct()
-        ->pluck('event')
-        ->values();
-    
-    $logNames = Activity::select('log_name')
-        ->whereNotNull('log_name')
-        ->where('log_name', '!=', '')
-        ->distinct()
-        ->pluck('log_name')
-        ->values();
-    
-    // Get all users for filter dropdown
-    $users = User::select('id', 'first_name', 'last_name', 'email')
-        ->get()
-        ->map(function ($user) {
-            $user->name = $user->first_name . ' ' . $user->last_name;
-            return $user;
-        });
-    
-    // Get stats
-    $totalLogs = Activity::count();
-    $todayLogs = Activity::whereDate('created_at', today())->count();
-    $paymentLogs = Activity::where('log_name', 'payments')->count();
-    $userLogs = Activity::where('causer_type', 'App\Models\User')->distinct('causer_id')->count();
-    $systemLogs = Activity::whereNull('causer_type')->count();
-    $userActivities = Activity::whereNotNull('causer_type')->count();
-    
-    // Get recent activities
-    $recentActivities = Activity::with(['causer' => function ($query) {
-        $query->select('id', 'first_name', 'last_name', 'email');
-    }])
-    ->latest()
-    ->limit(10)
-    ->get();
-    
-    // Get activity summary
-    $activitySummary = Activity::select('log_name', DB::raw('count(*) as count'))
-        ->whereNotNull('log_name')
-        ->where('log_name', '!=', '')
-        ->groupBy('log_name')
-        ->orderBy('count', 'desc')
-        ->get();
-    
-    // Get event summary
-    $eventSummary = Activity::select('event', DB::raw('count(*) as count'))
-        ->whereNotNull('event')
-        ->where('event', '!=', '')
-        ->groupBy('event')
-        ->orderBy('count', 'desc')
-        ->limit(10)
-        ->get();
-    
-    // Get top users
-    $topUsers = Activity::select('causer_id', DB::raw('count(*) as activity_count'))
-        ->whereNotNull('causer_id')
-        ->where('causer_type', 'App\Models\User')
-        ->with(['causer' => function ($query) {
-            $query->select('id', 'first_name', 'last_name', 'email');
-        }])
-        ->groupBy('causer_id')
-        ->orderBy('activity_count', 'desc')
-        ->limit(5)
-        ->get()
-        ->map(function ($item) {
-            return [
-                'user' => $item->causer ? [
-                    'id' => $item->causer->id,
-                    'name' => $item->causer->first_name . ' ' . $item->causer->last_name,
-                    'email' => $item->causer->email,
-                ] : null,
-                'activity_count' => $item->activity_count,
-            ];
-        });
-    
-    // Get hourly activity (last 24 hours)
-    $hourlyActivity = Activity::select(
-            DB::raw('HOUR(created_at) as hour'),
-            DB::raw('count(*) as count')
-        )
-        ->where('created_at', '>=', now()->subDay())
-        ->groupBy(DB::raw('HOUR(created_at)'))
-        ->orderBy('hour')
-        ->get();
-    
-    return Inertia::render('admin/Reports/ActivityLogs', [
-        'logs' => $logs,
-        'filters' => $request->only(['search', 'event_type', 'user_id', 'date_from', 'date_to', 'log_name', 'per_page']),
-        'event_types' => $eventTypes,
-        'log_names' => $logNames,
-        'users' => $users,
-        'stats' => [
-            'total_logs' => $totalLogs,
-            'today_logs' => $todayLogs,
-            'payment_logs' => $paymentLogs,
-            'user_logs' => $userLogs,
-            'system_logs' => $systemLogs,
-            'user_activities' => $userActivities,
-        ],
-        'recent_activities' => $recentActivities,
-        'activity_summary' => $activitySummary,
-        'event_summary' => $eventSummary,
-        'top_users' => $topUsers,
-        'hourly_activity' => $hourlyActivity,
-    ]);
-}
-public function activityLogShow($id)
-    {
-        $log = Activity::with(['causer'])
-            ->with(['subject' => function ($query) {
-                // Eager load subject relationships if needed
-            }])
-            ->findOrFail($id);
-        
-        // Format log for display
-        $formattedLog = [
-            'id' => $log->id,
-            'log_name' => $log->log_name,
-            'description' => $log->description,
-            'subject_type' => $log->subject_type,
-            'subject_id' => $log->subject_id,
-            'event' => $log->event,
-            'properties' => $log->properties,
-            'batch_uuid' => $log->batch_uuid,
-            'ip_address' => $log->ip_address,
-            'user_agent' => $log->user_agent,
-            'created_at' => $log->created_at->toISOString(),
-            'updated_at' => $log->updated_at->toISOString(),
-            'causer' => $log->causer ? [
-                'id' => $log->causer->id,
-                'name' => $log->causer->name,
-                'email' => $log->causer->email,
+        $formatted = [
+            'id' => $activity->id,
+            'log_name' => $activity->log_name,
+            'log_name_display' => $this->getLogTypeDisplay($activity->log_name),
+            'description' => $activity->description,
+            'event' => $activity->event,
+            'event_display' => ucwords(str_replace(['_', '-'], ' ', $activity->event)),
+            'subject_type' => $activity->subject_type,
+            'subject_type_display' => $activity->subject_type ? class_basename($activity->subject_type) : null,
+            'subject_id' => $activity->subject_id,
+            'causer_type' => $activity->causer_type,
+            'causer_id' => $activity->causer_id,
+            'batch_uuid' => $activity->batch_uuid,
+            'properties' => $properties,
+            'created_at' => $activity->created_at->toISOString(),
+            'updated_at' => $activity->updated_at->toISOString(),
+            'created_at_formatted' => $activity->created_at->format('Y-m-d H:i:s'),
+            'created_at_relative' => $activity->created_at->diffForHumans(),
+            // FIXED: Use username instead of first_name + last_name
+            'causer' => $activity->causer ? [
+                'id' => $activity->causer->id,
+                'name' => $activity->causer->username,
+                'username' => $activity->causer->username,
+                'email' => $activity->causer->email,
             ] : null,
+            'subject' => $activity->subject ? $this->formatSubjectForDisplay($activity->subject) : null,
         ];
         
-        return Inertia::render('admin/Reports/ActivityLogShow', [
-            'log' => $formattedLog,
-        ]);
+        // Add IP and User Agent if available in properties
+        if (isset($properties['ip_address'])) {
+            $formatted['ip_address'] = $properties['ip_address'];
+        }
+        
+        if (isset($properties['user_agent'])) {
+            $formatted['user_agent'] = $properties['user_agent'];
+        }
+        
+        // Add formatted changes if available
+        if (isset($properties['changes'])) {
+            $formatted['formatted_changes'] = $this->formatChanges($properties['changes']);
+        }
+        
+        if (isset($properties['old'])) {
+            $formatted['formatted_old_values'] = $this->formatOldValues($properties['old']);
+        }
+        
+        if (isset($properties['attributes'])) {
+            $formatted['extracted_attributes'] = $properties['attributes'];
+        }
+        
+        return $formatted;
     }
-    
+
+    /**
+     * Helper: Format subject for display
+     */
+    private function formatSubjectForDisplay($subject): array
+    {
+        // FIXED: Use username instead of first_name + last_name for User model
+        if ($subject instanceof User) {
+            return [
+                'id' => $subject->id,
+                'name' => $subject->username,
+                'email' => $subject->email,
+                'type' => 'user',
+            ];
+        }
+        
+        // Handle other model types
+        return [
+            'id' => $subject->id ?? null,
+            'type' => class_basename($subject),
+            'data' => $subject->toArray(),
+        ];
+    }
+
+    /**
+     * Helper: Get log type display name
+     */
+    private function getLogTypeDisplay(string $logName): string
+    {
+        $types = [
+            'default' => 'System',
+            'payments' => 'Payments',
+            'clearance-requests' => 'Clearance Requests',
+            'users' => 'Users',
+            'residents' => 'Residents',
+            'households' => 'Households',
+            'authentication' => 'Authentication',
+            'system' => 'System',
+        ];
+        
+        return $types[$logName] ?? ucwords(str_replace(['_', '-'], ' ', $logName));
+    }
+
+    /**
+     * Helper: Format changes for display
+     */
+    private function formatChanges(array $changes): array
+    {
+        $formatted = [];
+        
+        foreach ($changes as $key => $value) {
+            // Format date fields
+            if (in_array($key, ['created_at', 'updated_at', 'deleted_at', 'date', 'birth_date', 'date_of_birth'])) {
+                $value = Carbon::parse($value)->format('Y-m-d H:i:s');
+            }
+            
+            // Format boolean fields
+            if (is_bool($value)) {
+                $value = $value ? 'Yes' : 'No';
+            }
+            
+            // Format array/object fields
+            if (is_array($value) || is_object($value)) {
+                $value = json_encode($value, JSON_PRETTY_PRINT);
+            }
+            
+            // Format key for display
+            $displayKey = ucwords(str_replace(['_', '-'], ' ', $key));
+            
+            $formatted[] = [
+                'key' => $key,
+                'display_key' => $displayKey,
+                'value' => $value,
+                'type' => gettype($value),
+            ];
+        }
+        
+        return $formatted;
+    }
+
+    /**
+     * Helper: Format old values for display
+     */
+    private function formatOldValues(array $oldValues): array
+    {
+        $formatted = [];
+        
+        foreach ($oldValues as $key => $value) {
+            // Format date fields
+            if (in_array($key, ['created_at', 'updated_at', 'deleted_at', 'date', 'birth_date', 'date_of_birth'])) {
+                $value = $value ? Carbon::parse($value)->format('Y-m-d H:i:s') : null;
+            }
+            
+            // Format boolean fields
+            if (is_bool($value)) {
+                $value = $value ? 'Yes' : 'No';
+            }
+            
+            // Format array/object fields
+            if (is_array($value) || is_object($value)) {
+                $value = json_encode($value, JSON_PRETTY_PRINT);
+            }
+            
+            // Format key for display
+            $displayKey = ucwords(str_replace(['_', '-'], ' ', $key));
+            
+            $formatted[] = [
+                'key' => $key,
+                'display_key' => $displayKey,
+                'value' => $value,
+                'type' => gettype($value),
+            ];
+        }
+        
+        return $formatted;
+    }
 }

@@ -34,7 +34,7 @@ class RecordController extends Controller
         $user = auth()->user();
         
         // Get the household associated with the authenticated user
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             Log::warning('User not associated with any household', ['user_id' => $user->id]);
@@ -166,7 +166,7 @@ class RecordController extends Controller
         $storageStats = $this->getStorageStats($allHouseholdDocuments);
         
         // Get the head resident
-        $headResident = $residents->firstWhere('id', $household->head_resident_id);
+        $headResident = $this->getHeadResident($household);
         
         Log::info('=== FINAL DATA ===', [
             'household_id' => $household->id,
@@ -200,7 +200,7 @@ class RecordController extends Controller
     ]);
     
     $user = auth()->user();
-    $household = Household::where('user_id', $user->id)->first();
+    $household = $user->household_id ? Household::find($user->household_id) : null;
     
     if (!$household) {
         Log::error('User not associated with any household', ['user_id' => $user->id]);
@@ -559,7 +559,7 @@ private function formatBytes($bytes, $decimals = 2)
     public function extendSession($id)
     {
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             abort(403, 'You are not associated with any household.');
@@ -618,7 +618,7 @@ private function formatBytes($bytes, $decimals = 2)
             ]);
             
             $user = auth()->user();
-            $household = Household::where('user_id', $user->id)->first();
+            $household = $user->household_id ? Household::find($user->household_id) : null;
             
             if (!$household) {
                 return response()->json([
@@ -678,7 +678,7 @@ private function formatBytes($bytes, $decimals = 2)
         ]);
         
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             abort(403, 'You are not associated with any household.');
@@ -723,7 +723,7 @@ private function formatBytes($bytes, $decimals = 2)
         Log::info('Viewing document via view method', ['document_id' => $id, 'user_id' => auth()->id()]);
         
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             Log::error('User not associated with any household', ['user_id' => $user->id]);
@@ -771,7 +771,7 @@ private function formatBytes($bytes, $decimals = 2)
         Log::info('Accessing document create form', ['user_id' => auth()->id()]);
         
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             Log::warning('User not associated with any household', ['user_id' => $user->id]);
@@ -860,7 +860,7 @@ public function store(Request $request)
         ]);
 
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
 
         if (!$household) {
             Log::error('User not associated with any household', ['user_id' => $user->id]);
@@ -1181,7 +1181,7 @@ public function store(Request $request)
     public function download($id)
     {
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             abort(403, 'You are not associated with any household.');
@@ -1270,7 +1270,7 @@ public function store(Request $request)
         Log::info('Deleting document', ['document_id' => $id, 'user_id' => auth()->id()]);
         
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             Log::error('User not associated with any household', ['user_id' => $user->id]);
@@ -1317,7 +1317,7 @@ public function store(Request $request)
         Log::info('Exporting documents', ['user_id' => auth()->id()]);
         
         $user = auth()->user();
-        $household = Household::where('user_id', $user->id)->first();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
             Log::error('User not associated with any household', ['user_id' => $user->id]);
@@ -1392,6 +1392,23 @@ public function store(Request $request)
      */
     private function getStorageStats($documents)
     {
+        // Check if $documents is a collection or array
+        if (is_array($documents)) {
+            // Convert array to collection
+            $documents = collect($documents);
+        }
+        
+        // If empty collection or array, return default stats
+        if ($documents->isEmpty()) {
+            return [
+                'used' => '0 MB',
+                'limit' => '100 MB',
+                'available' => '100 MB',
+                'percentage' => 0,
+                'document_count' => 0,
+            ];
+        }
+        
         $totalSize = $documents->sum('file_size');
         $documentCount = $documents->count();
         
@@ -1416,7 +1433,7 @@ public function store(Request $request)
    public function preview($id)
 {
     $user = auth()->user();
-    $household = Household::where('user_id', $user->id)->first();
+    $household = $user->household_id ? Household::find($user->household_id) : null;
     
     if (!$household) {
         abort(403, 'You are not associated with any household.');
@@ -1469,5 +1486,23 @@ public function store(Request $request)
         'Content-Disposition' => 'inline; filename="' . $document->file_name . '"'
     ]);
 }
-
+    
+    /**
+     * Get the head resident of a household
+     */
+    private function getHeadResident(Household $household)
+    {
+        // First try to find through household members with is_head = true
+        $headMember = \App\Models\HouseholdMember::where('household_id', $household->id)
+            ->where('is_head', true)
+            ->first();
+            
+        if ($headMember && $headMember->resident) {
+            return $headMember->resident;
+        }
+        
+        // If no head found in household members, check residents table
+        return Resident::where('household_id', $household->id)
+            ->first();
+    }
 }

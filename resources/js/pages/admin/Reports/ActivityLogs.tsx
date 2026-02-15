@@ -42,7 +42,8 @@ import {
     HardDrive,
     Layers,
     FolderTree,
-    Tag
+    Tag,
+    ArrowRight
 } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -61,18 +62,26 @@ interface User {
 interface ActivityLog {
     id: number;
     log_name: string;
+    log_name_display: string;
     description: string | null;
     subject_type: string | null;
+    subject_type_display: string | null;
     subject_id: number | null;
     event: string;
+    event_display: string;
     causer_type: string | null;
     causer_id: number | null;
     properties: any;
+    formatted_changes?: any[];
+    formatted_old_values?: any[];
+    extracted_attributes?: any;
     batch_uuid: string | null;
     ip_address: string | null;
     user_agent: string | null;
     created_at: string;
     updated_at: string;
+    created_at_formatted: string;
+    created_at_relative: string;
     causer?: User;
     subject?: any;
 }
@@ -117,6 +126,11 @@ interface HourlyActivity {
     count: number;
 }
 
+interface DailyActivity {
+    date: string;
+    count: number;
+}
+
 interface LogTypeTab {
     id: string;
     name: string;
@@ -137,8 +151,8 @@ interface ActivityLogsPageProps extends PageProps {
         log_name?: string;
         per_page?: number;
     };
-    event_types: string[];
-    log_names: string[];
+    event_types: Array<{ value: string; label: string }>;
+    log_names: Array<{ value: string; label: string }>;
     users: User[];
     stats: {
         total_logs: number;
@@ -147,12 +161,14 @@ interface ActivityLogsPageProps extends PageProps {
         user_logs: number;
         system_logs: number;
         user_activities: number;
+        last_7_days: number;
     };
     recent_activities: ActivityLog[];
     activity_summary: ActivitySummary[];
     event_summary: EventSummary[];
     top_users: TopUser[];
     hourly_activity: HourlyActivity[];
+    daily_activity: DailyActivity[];
 }
 
 // Helper function to format date
@@ -220,7 +236,7 @@ const getEventClass = (event: string): string => {
     return classes[event] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300';
 };
 
-// Get log type display name
+// Get log type display name - Updated to use backend formatted names
 const getLogTypeDisplay = (logName: string): string => {
     const types: Record<string, string> = {
         'default': 'System',
@@ -275,8 +291,10 @@ const getEventIcon = (event: string, logName: string) => {
     return icons[event] || <Activity className="h-4 w-4" />;
 };
 
-// Get event display name
-const getEventDisplay = (event: string, subjectType: string | null): string => {
+// Get event display name - Updated to use backend formatted names
+const getEventDisplay = (event: string, eventDisplay?: string, subjectType: string | null = null): string => {
+    if (eventDisplay) return eventDisplay;
+    
     if (!event) return 'Unknown Event';
     
     const baseEvent = event.replace(/_/g, ' ');
@@ -331,11 +349,9 @@ const formatEventType = (event: string): string => {
     return event.replace(/_/g, ' ').toUpperCase();
 };
 
-// Get payment details
-const getPaymentDetails = (properties: any): { label: string; value: string; icon: JSX.Element }[] => {
-    if (!properties?.attributes) return [];
-    
-    const attrs = properties.attributes;
+// Get payment details - Updated to use extracted_attributes
+const getPaymentDetails = (log: ActivityLog): { label: string; value: string; icon: JSX.Element }[] => {
+    const attrs = log.extracted_attributes || log.properties?.attributes || {};
     const details = [];
     
     if (attrs.or_number) {
@@ -419,11 +435,9 @@ const getPaymentDetails = (properties: any): { label: string; value: string; ico
     return details;
 };
 
-// Get clearance request details
-const getClearanceDetails = (properties: any): { label: string; value: string; icon: JSX.Element }[] => {
-    if (!properties?.attributes) return [];
-    
-    const attrs = properties.attributes;
+// Get clearance request details - Updated to use extracted_attributes
+const getClearanceDetails = (log: ActivityLog): { label: string; value: string; icon: JSX.Element }[] => {
+    const attrs = log.extracted_attributes || log.properties?.attributes || {};
     const details = [];
     
     if (attrs.purpose) {
@@ -514,15 +528,16 @@ export default function ActivityLogs() {
     const { 
         logs, 
         filters, 
-        event_types, 
-        log_names,
-        users, 
+        event_types = [], 
+        log_names = [],
+        users = [], 
         stats, 
-        recent_activities, 
-        activity_summary, 
-        event_summary,
-        top_users,
-        hourly_activity
+        recent_activities = [], 
+        activity_summary = [], 
+        event_summary = [],
+        top_users = [],
+        hourly_activity = [],
+        daily_activity = []
     } = props;
     
     // State management
@@ -562,7 +577,7 @@ export default function ActivityLogs() {
             displayName: 'Payments',
             icon: <CreditCard className="h-4 w-4" />,
             color: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300',
-            count: getLogTypeCount('payments')
+            count: stats?.payment_logs || getLogTypeCount('payments')
         },
         {
             id: 'clearance-requests',
@@ -975,17 +990,17 @@ export default function ActivityLogs() {
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Users</p>
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Last 7 Days</p>
                                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                                    {stats?.user_logs?.toLocaleString() || 0}
+                                    {stats?.last_7_days?.toLocaleString() || 0}
                                 </p>
                                 <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
-                                    <UserIcon className="h-3 w-3" />
-                                    <span>Unique users</span>
+                                    <Calendar className="h-3 w-3" />
+                                    <span>Weekly activity</span>
                                 </div>
                             </div>
                             <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                                <UserIcon className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                <Calendar className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                             </div>
                         </div>
                     </div>
@@ -1063,8 +1078,8 @@ export default function ActivityLogs() {
                                             >
                                                 <option value="">All Log Types</option>
                                                 {log_names?.map((log) => (
-                                                    <option key={log} value={log}>
-                                                        {getLogTypeDisplay(log)}
+                                                    <option key={log.value} value={log.value}>
+                                                        {log.label}
                                                     </option>
                                                 ))}
                                             </select>
@@ -1083,8 +1098,8 @@ export default function ActivityLogs() {
                                         >
                                             <option value="">All Events</option>
                                             {event_types?.map((event) => (
-                                                <option key={event} value={event}>
-                                                    {formatEventType(event)}
+                                                <option key={event.value} value={event.value}>
+                                                    {event.label}
                                                 </option>
                                             ))}
                                         </select>
@@ -1183,12 +1198,12 @@ export default function ActivityLogs() {
                                             )}
                                             {logName && activeTab === 'all' && (
                                                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 rounded text-sm">
-                                                    Type: {getLogTypeDisplay(logName)}
+                                                    Type: {log_names.find(l => l.value === logName)?.label || logName}
                                                 </span>
                                             )}
                                             {eventType && (
                                                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-sm">
-                                                    Event: {formatEventType(eventType)}
+                                                    Event: {event_types.find(e => e.value === eventType)?.label || eventType}
                                                 </span>
                                             )}
                                             {userId && (
@@ -1258,19 +1273,19 @@ export default function ActivityLogs() {
                                                         <div className="flex items-center justify-between gap-2">
                                                             <div className="flex items-center gap-2">
                                                                 <h3 className="font-medium text-gray-900 dark:text-white truncate">
-                                                                    {log.description || getEventDisplay(log.event, log.subject_type)}
+                                                                    {log.description || getEventDisplay(log.event, log.event_display, log.subject_type)}
                                                                 </h3>
                                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${getLogTypeClass(log.log_name)}`}>
                                                                     {getLogTypeIcon(log.log_name)}
-                                                                    {getLogTypeDisplay(log.log_name)}
+                                                                    {log.log_name_display || getLogTypeDisplay(log.log_name)}
                                                                 </span>
                                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getEventClass(log.event)}`}>
-                                                                    {formatEventType(log.event)}
+                                                                    {log.event_display || formatEventType(log.event)}
                                                                 </span>
                                                             </div>
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                                    {getRelativeTime(log.created_at)}
+                                                                    {log.created_at_relative || getRelativeTime(log.created_at)}
                                                                 </span>
                                                                 <button
                                                                     onClick={() => toggleLogExpansion(log.id)}
@@ -1313,7 +1328,7 @@ export default function ActivityLogs() {
                                                             
                                                             <div className="flex items-center gap-1">
                                                                 <Clock className="h-3 w-3" />
-                                                                <span>{formatDate(log.created_at)}</span>
+                                                                <span>{log.created_at_formatted || formatDate(log.created_at)}</span>
                                                             </div>
                                                         </div>
                                                         
@@ -1327,13 +1342,13 @@ export default function ActivityLogs() {
                                                                             <div className="flex justify-between">
                                                                                 <span className="text-gray-500">Log Type:</span>
                                                                                 <span className="font-medium text-gray-900 dark:text-white">
-                                                                                    {getLogTypeDisplay(log.log_name)}
+                                                                                    {log.log_name_display || getLogTypeDisplay(log.log_name)}
                                                                                 </span>
                                                                             </div>
                                                                             <div className="flex justify-between">
                                                                                 <span className="text-gray-500">Event:</span>
                                                                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getEventClass(log.event)}`}>
-                                                                                    {getEventDisplay(log.event, log.subject_type)}
+                                                                                    {log.event_display || getEventDisplay(log.event, log.subject_type)}
                                                                                 </span>
                                                                             </div>
                                                                             {log.subject_type && (
@@ -1348,7 +1363,15 @@ export default function ActivityLogs() {
                                                                                 <div className="flex justify-between">
                                                                                     <span className="text-gray-500">Date & Time:</span>
                                                                                     <span className="font-medium text-gray-900 dark:text-white">
-                                                                                        {formatDate(log.created_at, true)}
+                                                                                        {log.created_at_formatted || formatDate(log.created_at, true)}
+                                                                                    </span>
+                                                                                </div>
+                                                                            )}
+                                                                            {log.batch_uuid && (
+                                                                                <div className="flex justify-between">
+                                                                                    <span className="text-gray-500">Batch UUID:</span>
+                                                                                    <span className="font-mono text-xs text-gray-900 dark:text-white">
+                                                                                        {log.batch_uuid}
                                                                                     </span>
                                                                                 </div>
                                                                             )}
@@ -1399,15 +1422,48 @@ export default function ActivityLogs() {
                                                                     </div>
                                                                 </div>
                                                                 
+                                                                {/* Show formatted changes if available */}
+                                                                {log.formatted_changes && log.formatted_changes.length > 0 && (
+                                                                    <div>
+                                                                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                                            Changes Made
+                                                                        </h4>
+                                                                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                                                                            <div className="space-y-3">
+                                                                                {log.formatted_changes.map((change, index) => (
+                                                                                    <div key={index} className="flex items-start justify-between p-2 bg-gray-50 dark:bg-gray-900 rounded">
+                                                                                        <div className="flex-1">
+                                                                                            <div className="text-xs text-gray-500">{change.display_key}</div>
+                                                                                            <div className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+                                                                                                {log.formatted_old_values && log.formatted_old_values[index] && (
+                                                                                                    <div className="flex items-center gap-2">
+                                                                                                        <span className="text-red-500 line-through text-xs">
+                                                                                                            {log.formatted_old_values[index].value || 'Empty'}
+                                                                                                        </span>
+                                                                                                        <ArrowRight className="h-3 w-3 text-gray-400" />
+                                                                                                    </div>
+                                                                                                )}
+                                                                                                <div className="text-green-600 mt-1">
+                                                                                                    {change.value || 'Empty'}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                
                                                                 {/* Payment-specific details */}
-                                                                {log.log_name === 'payments' && log.properties && (
+                                                                {log.log_name === 'payments' && (
                                                                     <div>
                                                                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                                                             Payment Details
                                                                         </h4>
                                                                         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                                                {getPaymentDetails(log.properties).map((detail, index) => (
+                                                                                {getPaymentDetails(log).map((detail, index) => (
                                                                                     <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900 rounded">
                                                                                         <div className="text-gray-500">
                                                                                             {detail.icon}
@@ -1438,14 +1494,14 @@ export default function ActivityLogs() {
                                                                 )}
                                                                 
                                                                 {/* Clearance request details */}
-                                                                {log.log_name === 'clearance-requests' && log.properties && (
+                                                                {log.log_name === 'clearance-requests' && (
                                                                     <div>
                                                                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                                                             Clearance Request Details
                                                                         </h4>
                                                                         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                                                {getClearanceDetails(log.properties).map((detail, index) => (
+                                                                                {getClearanceDetails(log).map((detail, index) => (
                                                                                     <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900 rounded">
                                                                                         <div className="text-gray-500">
                                                                                             {detail.icon}
@@ -1600,15 +1656,15 @@ export default function ActivityLogs() {
                                                 <div className="flex items-start justify-between gap-2">
                                                     <div>
                                                         <h3 className="font-medium text-gray-900 dark:text-white text-sm line-clamp-2">
-                                                            {log.description || getEventDisplay(log.event, log.subject_type)}
+                                                            {log.description || getEventDisplay(log.event, log.event_display, log.subject_type)}
                                                         </h3>
                                                         <div className="flex flex-wrap gap-1 mt-1">
                                                             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${getLogTypeClass(log.log_name)}`}>
                                                                 {getLogTypeIcon(log.log_name)}
-                                                                {getLogTypeDisplay(log.log_name)}
+                                                                {log.log_name_display || getLogTypeDisplay(log.log_name)}
                                                             </span>
                                                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${getEventClass(log.event)}`}>
-                                                                {formatEventType(log.event)}
+                                                                {log.event_display || formatEventType(log.event)}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -1630,7 +1686,7 @@ export default function ActivityLogs() {
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         <Clock className="h-3 w-3" />
-                                                        <span>{getRelativeTime(log.created_at)}</span>
+                                                        <span>{log.created_at_relative || getRelativeTime(log.created_at)}</span>
                                                     </div>
                                                     {log.ip_address && (
                                                         <div className="flex items-center gap-1">
@@ -1670,19 +1726,19 @@ export default function ActivityLogs() {
                                                         </div>
                                                         
                                                         {/* Quick payment details */}
-                                                        {log.log_name === 'payments' && log.properties?.attributes?.or_number && (
+                                                        {log.log_name === 'payments' && (log.extracted_attributes?.or_number || log.properties?.attributes?.or_number) && (
                                                             <div className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded">
                                                                 <div className="font-medium text-gray-900 dark:text-white">
-                                                                    OR#: {log.properties.attributes.or_number}
+                                                                    OR#: {log.extracted_attributes?.or_number || log.properties?.attributes?.or_number}
                                                                 </div>
-                                                                {log.properties.attributes.payer_name && (
+                                                                {(log.extracted_attributes?.payer_name || log.properties?.attributes?.payer_name) && (
                                                                     <div className="text-gray-600 dark:text-gray-400">
-                                                                        Payer: {log.properties.attributes.payer_name}
+                                                                        Payer: {log.extracted_attributes?.payer_name || log.properties?.attributes?.payer_name}
                                                                     </div>
                                                                 )}
-                                                                {log.properties.attributes.total_amount && (
+                                                                {(log.extracted_attributes?.total_amount || log.properties?.attributes?.total_amount) && (
                                                                     <div className="text-gray-600 dark:text-gray-400">
-                                                                        Amount: ₱{parseFloat(log.properties.attributes.total_amount).toFixed(2)}
+                                                                        Amount: ₱{parseFloat(log.extracted_attributes?.total_amount || log.properties?.attributes?.total_amount).toFixed(2)}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1719,14 +1775,14 @@ export default function ActivityLogs() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                                {activity.description || getEventDisplay(activity.event, activity.subject_type)}
+                                                {activity.description || getEventDisplay(activity.event, activity.event_display, activity.subject_type)}
                                             </p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <span className={`text-xs px-1.5 py-0.5 rounded ${getLogTypeClass(activity.log_name)}`}>
-                                                    {getLogTypeDisplay(activity.log_name)}
+                                                    {activity.log_name_display || getLogTypeDisplay(activity.log_name)}
                                                 </span>
                                                 <span className="text-xs text-gray-500">
-                                                    {getRelativeTime(activity.created_at)}
+                                                    {activity.created_at_relative || getRelativeTime(activity.created_at)}
                                                 </span>
                                             </div>
                                         </div>
@@ -1811,7 +1867,7 @@ export default function ActivityLogs() {
                                 {event_summary?.map((item) => (
                                     <div key={item.event} className="flex items-center justify-between p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-900/30">
                                         <span className={`text-xs px-2 py-0.5 rounded ${getEventClass(item.event)}`}>
-                                            {formatEventType(item.event)}
+                                            {item.event.replace(/_/g, ' ').toUpperCase()}
                                         </span>
                                         <span className="text-sm font-medium text-gray-900 dark:text-white">
                                             {item.count}

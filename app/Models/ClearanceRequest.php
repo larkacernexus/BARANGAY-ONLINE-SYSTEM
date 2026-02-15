@@ -504,6 +504,11 @@ class ClearanceRequest extends Model
 
         return $prefix . $newNumber;
     }
+
+        public function processor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'processor_id');
+    }
     
     // ========== BOOT METHOD ==========
     

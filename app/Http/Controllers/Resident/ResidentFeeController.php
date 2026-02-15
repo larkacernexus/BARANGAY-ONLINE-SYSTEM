@@ -102,93 +102,111 @@ class ResidentFeeController extends Controller
             });
     }
 
-    private function formatFeeForFrontend($fee)
-    {
-        // Format the fee for frontend display
-        $formatted = [
-            'id' => $fee->id,
-            'fee_code' => $fee->fee_code,
-            'or_number' => $fee->or_number,
-            'certificate_number' => $fee->certificate_number,
-            'purpose' => $fee->purpose,
-            'payer_name' => $fee->payer_name,
-            'address' => $fee->address,
-            'purok' => $fee->purok,
-            'zone' => $fee->zone,
-            'billing_period' => $fee->billing_period,
-            'issue_date' => $fee->issue_date?->toDateString(),
-            'due_date' => $fee->due_date?->toDateString(),
-            'period_start' => $fee->period_start?->toDateString(),
-            'period_end' => $fee->period_end?->toDateString(),
-            'base_amount' => (float) $fee->base_amount,
-            'surcharge_amount' => (float) $fee->surcharge_amount,
-            'penalty_amount' => (float) $fee->penalty_amount,
-            'discount_amount' => (float) $fee->discount_amount,
-            'total_amount' => (float) $fee->total_amount,
-            'amount_paid' => (float) $fee->amount_paid,
-            'balance' => (float) $fee->balance,
-            'status' => $fee->status,
-            'remarks' => $fee->remarks,
-            'formatted_issue_date' => $fee->issue_date?->format('M d, Y') ?? 'N/A',
-            'formatted_due_date' => $fee->due_date?->format('M d, Y') ?? 'N/A',
-            'formatted_total' => '₱' . number_format($fee->total_amount, 2),
-            'formatted_balance' => '₱' . number_format($fee->balance, 2),
-            'formatted_amount_paid' => '₱' . number_format($fee->amount_paid, 2),
-            'is_overdue' => $fee->isOverdue(),
-            'days_overdue' => $fee->days_overdue,
-        ];
-        
-        // Add fee type with document category
-        if ($fee->feeType) {
-            $categoryName = $fee->feeType->documentCategory ? $fee->feeType->documentCategory->name : 'Uncategorized';
-            $categoryCode = $fee->feeType->documentCategory ? $fee->feeType->documentCategory->slug : 'uncategorized';
-            
-            $formatted['fee_type'] = [
-                'id' => $fee->feeType->id,
-                'code' => $fee->feeType->code,
-                'name' => $fee->feeType->name,
-                'category' => $categoryName,
-                'category_display' => $categoryName,
-                'document_category' => $fee->feeType->documentCategory ? [
-                    'id' => $fee->feeType->documentCategory->id,
-                    'name' => $fee->feeType->documentCategory->name,
-                    'code' => $categoryCode,
-                    'slug' => $fee->feeType->documentCategory->slug,
-                ] : null,
+   private function formatFeeForFrontend($fee)
+{
+    // Format the fee for frontend display
+    $formatted = [
+        'id' => $fee->id,
+        'fee_code' => $fee->fee_code,
+        'or_number' => $fee->or_number,
+        'certificate_number' => $fee->certificate_number,
+        'purpose' => $fee->purpose,
+        'payer_name' => $fee->payer_name,
+        'address' => $fee->address,
+        'purok' => $fee->purok,
+        'zone' => $fee->zone,
+        'billing_period' => $fee->billing_period,
+        'issue_date' => $fee->issue_date?->toDateString(),
+        'due_date' => $fee->due_date?->toDateString(),
+        'period_start' => $fee->period_start?->toDateString(),
+        'period_end' => $fee->period_end?->toDateString(),
+        'base_amount' => (float) $fee->base_amount,
+        'surcharge_amount' => (float) $fee->surcharge_amount,
+        'penalty_amount' => (float) $fee->penalty_amount,
+        'discount_amount' => (float) $fee->discount_amount,
+        'total_amount' => (float) $fee->total_amount,
+        'amount_paid' => (float) $fee->amount_paid,
+        'balance' => (float) $fee->balance,
+        'status' => $fee->status,
+        'remarks' => $fee->remarks,
+        'formatted_issue_date' => $fee->issue_date?->format('M d, Y') ?? 'N/A',
+        'formatted_due_date' => $fee->due_date?->format('M d, Y') ?? 'N/A',
+        'formatted_total' => '₱' . number_format($fee->total_amount, 2),
+        'formatted_balance' => '₱' . number_format($fee->balance, 2),
+        'formatted_amount_paid' => '₱' . number_format($fee->amount_paid, 2),
+        'is_overdue' => $fee->isOverdue(),
+        'days_overdue' => $fee->days_overdue,
+    ];
+    
+    // Add payer data
+    if ($fee->payer) {
+        if ($fee->payer_type === 'resident') {
+            $formatted['resident'] = [
+                'id' => $fee->payer->id,
+                'first_name' => $fee->payer->first_name,
+                'last_name' => $fee->payer->last_name,
+                'middle_name' => $fee->payer->middle_name,
+                'full_name' => $fee->payer->full_name,
+            ];
+        } elseif ($fee->payer_type === 'household') {
+            $formatted['household'] = [
+                'id' => $fee->payer->id,
+                'household_number' => $fee->payer->household_number,
+                'head_name' => $fee->payer->head_name,
             ];
         }
-        
-        return $formatted;
     }
     
-    public function show(Fee $fee)
-    {
-        $user = auth()->user();
-        $resident = $this->getAuthenticatedResident($user);
+    // Add fee type with document category
+    if ($fee->feeType) {
+        $categoryName = $fee->feeType->documentCategory ? $fee->feeType->documentCategory->name : 'Uncategorized';
+        $categoryCode = $fee->feeType->documentCategory ? $fee->feeType->documentCategory->slug : 'uncategorized';
         
-        if (!$resident || !$this->authorizeFeeAccess($fee, $resident)) {
-            abort(403, 'You are not authorized to view this fee.');
+        $formatted['fee_type'] = [
+            'id' => $fee->feeType->id,
+            'code' => $fee->feeType->code,
+            'name' => $fee->feeType->name,
+            'category' => $categoryName,
+            'category_display' => $categoryName,
+            'document_category' => $fee->feeType->documentCategory ? [
+                'id' => $fee->feeType->documentCategory->id,
+                'name' => $fee->feeType->documentCategory->name,
+                'code' => $categoryCode,
+                'slug' => $fee->feeType->documentCategory->slug,
+            ] : null,
+        ];
+    }
+    
+    return $formatted;
+}
+    
+ public function show(Fee $fee)
+{
+    $user = auth()->user();
+    $resident = $this->getAuthenticatedResident($user);
+    
+    if (!$resident || !$this->authorizeFeeAccess($fee, $resident)) {
+        abort(403, 'You are not authorized to view this fee.');
+    }
+    
+    // Update eager loading to use payer
+    $fee->load([
+        'feeType.documentCategory:id,name,slug',
+        'payer', // Load polymorphic payer
+        'paymentItems.payment' => function ($query) {
+            $query->select('id', 'payment_date', 'or_number', 'payment_method', 'status');
         }
-        
-        $fee->load([
-            'feeType.documentCategory:id,name,slug',
-            'resident:id,first_name,last_name,middle_name,contact_number',
-            'household:id,household_number',
-            'paymentItems.payment' => function ($query) {
-                $query->select('id', 'payment_date', 'or_number', 'payment_method', 'status');
-            }
-        ]);
-        
-        $formattedFee = $this->formatFeeForFrontend($fee);
-        $paymentHistory = $this->getPaymentHistory($fee);
-        
-        return Inertia::render('resident/Fees/Show', [
-            'fee' => $formattedFee,
-            'paymentHistory' => $paymentHistory,
-            'canPayOnline' => $this->canPayOnline($fee),
-        ]);
-    }
+    ]);
     
+    $formattedFee = $this->formatFeeForFrontend($fee);
+    $paymentHistory = $this->getPaymentHistory($fee);
+    
+    return Inertia::render('resident/Fees/Show', [
+        'fee' => $formattedFee,
+        'paymentHistory' => $paymentHistory,
+        'canPayOnline' => $this->canPayOnline($fee),
+    ]);
+}
     /**
      * Helper Methods
      */
@@ -197,20 +215,35 @@ class ResidentFeeController extends Controller
         $cacheKey = "auth_resident_{$user->id}";
         
         return Cache::remember($cacheKey, 300, function () use ($user) {
-            // Try direct resident record
-            $resident = Resident::where('user_id', $user->id)->first();
-            
-            if ($resident) {
-                return $resident;
+            // Get resident from user's current_resident_id
+            if ($user->current_resident_id) {
+                $resident = Resident::find($user->current_resident_id);
+                if ($resident) {
+                    return $resident;
+                }
             }
             
-            // Try household head
-            $householdMember = HouseholdMember::with('resident')
-                ->where('user_id', $user->id)
-                ->where('is_head', true)
-                ->first();
+            // If user has household_id, try to find the head resident
+            if ($user->household_id) {
+                // Find household head through household members
+                $householdMember = HouseholdMember::where('household_id', $user->household_id)
+                    ->where('is_head', true)
+                    ->first();
+                    
+                if ($householdMember && $householdMember->resident) {
+                    return $householdMember->resident;
+                }
+                
+                // If no head found, get the first resident in the household
+                $firstResident = Resident::where('household_id', $user->household_id)
+                    ->first();
+                    
+                if ($firstResident) {
+                    return $firstResident;
+                }
+            }
             
-            return $householdMember?->resident;
+            return null;
         });
     }
     
@@ -221,15 +254,15 @@ class ResidentFeeController extends Controller
         return Cache::remember($cacheKey, 300, function () use ($resident) {
             $residentIds = [$resident->id];
             
+            // Get all residents in the same household
             if ($resident->household_id) {
-                // Get residents from household
                 $householdResidents = Resident::where('household_id', $resident->household_id)
                     ->pluck('id')
                     ->toArray();
                 
                 $residentIds = array_unique(array_merge($residentIds, $householdResidents));
                 
-                // Get additional household members
+                // Also get residents through household members
                 $householdMembers = HouseholdMember::where('household_id', $resident->household_id)
                     ->pluck('resident_id')
                     ->toArray();
@@ -241,92 +274,98 @@ class ResidentFeeController extends Controller
         });
     }
     
-    private function buildFeeQuery(array $residentIds, Resident $resident, Request $request)
-    {
-        $query = Fee::query()
-            ->where(function ($query) use ($residentIds, $resident) {
-                $query->where('payer_type', 'resident')
-                    ->whereIn('resident_id', $residentIds);
-                
-                if ($resident->household_id) {
-                    $query->orWhere(function ($q) use ($resident) {
-                        $q->where('payer_type', 'household')
-                            ->where('household_id', $resident->household_id);
-                    });
-                }
-            })
-            ->with([
-                'feeType.documentCategory:id,name,slug',
-                'resident', 
-                'household'
-            ])
-            ->latest('issue_date');
-        
-        // Apply filters
-        $this->applyFilters($query, $request, $residentIds);
-        
-        return $query;
-    }
-    
-    private function applyFilters($query, Request $request, array $residentIds): void
-    {
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('fee_code', 'like', "%{$search}%")
-                    ->orWhere('or_number', 'like', "%{$search}%")
-                    ->orWhere('certificate_number', 'like', "%{$search}%")
-                    ->orWhere('purpose', 'like', "%{$search}%")
-                    ->orWhere('payer_name', 'like', "%{$search}%")
-                    ->orWhereHas('feeType', function ($q) use ($search) {
-                        $q->where('name', 'like', "%{$search}%");
-                    });
+   private function buildFeeQuery(array $residentIds, Resident $resident, Request $request)
+{
+    $query = Fee::query()
+        ->where(function ($query) use ($residentIds, $resident) {
+            // Use polymorphic relationship
+            $query->where(function ($q) use ($residentIds) {
+                $q->where('payer_type', 'resident')
+                  ->whereIn('payer_id', $residentIds);
             });
-        }
-        
-        if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
-        }
-        
-        // FIXED: Filter by fee type ID (not code)
-        if ($request->filled('fee_type') && $request->fee_type !== 'all') {
-            $query->where('fee_type_id', $request->fee_type);
-        }
-        
-        // FIXED: Handle year filter properly
-        if ($request->filled('year') && $request->year !== 'all') {
-            $query->whereYear('issue_date', $request->year);
-        }
-        
-        // FIXED: Add resident filter
-        if ($request->filled('resident') && $request->resident !== 'all') {
-            $query->where('resident_id', $request->resident);
-        }
+            
+            if ($resident->household_id) {
+                $query->orWhere(function ($q) use ($resident) {
+                    $q->where('payer_type', 'household')
+                      ->where('payer_id', $resident->household_id);
+                });
+            }
+        })
+        ->with([
+            'feeType.documentCategory:id,name,slug',
+            'payer', // Use polymorphic payer instead of resident/household
+        ])
+        ->latest('issue_date');
+    
+    // Apply filters
+    $this->applyFilters($query, $request, $residentIds);
+    
+    return $query;
+}
+    
+   private function applyFilters($query, Request $request, array $residentIds): void
+{
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('fee_code', 'like', "%{$search}%")
+                ->orWhere('or_number', 'like', "%{$search}%")
+                ->orWhere('certificate_number', 'like', "%{$search}%")
+                ->orWhere('purpose', 'like', "%{$search}%")
+                ->orWhere('payer_name', 'like', "%{$search}%")
+                ->orWhereHas('feeType', function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%");
+                });
+        });
     }
     
-    private function getAvailableYears(array $residentIds, Resident $resident): array
-    {
-        return Fee::query()
-            ->where(function ($query) use ($residentIds, $resident) {
-                $query->where('payer_type', 'resident')
-                    ->whereIn('resident_id', $residentIds);
-                
-                if ($resident->household_id) {
-                    $query->orWhere(function ($q) use ($resident) {
-                        $q->where('payer_type', 'household')
-                            ->where('household_id', $resident->household_id);
-                    });
-                }
-            })
-            ->whereNotNull('issue_date') // Add this to exclude null dates
-            ->selectRaw('YEAR(issue_date) as year')
-            ->distinct()
-            ->orderBy('year', 'desc')
-            ->pluck('year')
-            ->filter()
-            ->values()
-            ->toArray();
+    if ($request->filled('status') && $request->status !== 'all') {
+        $query->where('status', $request->status);
     }
+    
+    // FIXED: Filter by fee type ID (not code)
+    if ($request->filled('fee_type') && $request->fee_type !== 'all') {
+        $query->where('fee_type_id', $request->fee_type);
+    }
+    
+    // FIXED: Handle year filter properly
+    if ($request->filled('year') && $request->year !== 'all') {
+        $query->whereYear('issue_date', $request->year);
+    }
+    
+    // FIXED: Add resident filter - now using payer_id and payer_type
+    if ($request->filled('resident') && $request->resident !== 'all') {
+        $query->where('payer_type', 'resident')
+              ->where('payer_id', $request->resident);
+    }
+}
+    
+  private function getAvailableYears(array $residentIds, Resident $resident): array
+{
+    return Fee::query()
+        ->where(function ($query) use ($residentIds, $resident) {
+            // Use polymorphic relationship
+            $query->where(function ($q) use ($residentIds) {
+                $q->where('payer_type', 'resident')
+                  ->whereIn('payer_id', $residentIds);
+            });
+            
+            if ($resident->household_id) {
+                $query->orWhere(function ($q) use ($resident) {
+                    $q->where('payer_type', 'household')
+                      ->where('payer_id', $resident->household_id);
+                });
+            }
+        })
+        ->whereNotNull('issue_date') // Add this to exclude null dates
+        ->selectRaw('YEAR(issue_date) as year')
+        ->distinct()
+        ->orderBy('year', 'desc')
+        ->pluck('year')
+        ->filter()
+        ->values()
+        ->toArray();
+}
     
     private function getHouseholdResidents(array $residentIds)
     {
@@ -349,8 +388,9 @@ class ResidentFeeController extends Controller
     {
         $residentIds = $this->getHouseholdResidentIds($resident);
         
-        return ($fee->payer_type === 'resident' && in_array($fee->resident_id, $residentIds)) ||
-               ($fee->payer_type === 'household' && $fee->household_id === $resident->household_id);
+        // Use polymorphic relationship
+        return ($fee->payer_type === 'resident' && in_array($fee->payer_id, $residentIds)) ||
+            ($fee->payer_type === 'household' && $fee->payer_id === $resident->household_id);
     }
     
     private function checkIfOverdue(Fee $fee): bool
@@ -379,17 +419,18 @@ class ResidentFeeController extends Controller
     private function isOwnFee(Fee $fee): bool
     {
         $user = auth()->user();
-        $loggedInResident = Resident::where('user_id', $user->id)->first();
         
-        if ($loggedInResident && $fee->payer_type === 'resident' && $fee->resident_id == $loggedInResident->id) {
+        // Check if fee belongs to user's current resident
+        if ($user->current_resident_id && $fee->payer_type === 'resident' && $fee->payer_id == $user->current_resident_id) {
             return true;
         }
         
-        $householdMember = HouseholdMember::where('user_id', $user->id)
-            ->where('is_head', true)
-            ->first();
+        // Check if user is household head and fee belongs to household
+        if ($user->household_id && $fee->payer_type === 'household' && $fee->payer_id == $user->household_id) {
+            return true;
+        }
         
-        return $householdMember && $fee->payer_type === 'resident' && $fee->resident_id == $householdMember->resident_id;
+        return false;
     }
     
     private function parseRequirements($requirements): array
@@ -432,23 +473,26 @@ class ResidentFeeController extends Controller
         return $fee->balance > 0 && $fee->status !== 'cancelled' && $fee->status !== 'paid';
     }
     
-    private function calculateFeeStats(array $residentIds, Resident $resident): array
-    {
-        $now = now();
-        $currentYear = $now->year;
-        
-        $baseQuery = Fee::query()
-            ->where(function ($query) use ($residentIds, $resident) {
-                $query->where('payer_type', 'resident')
-                    ->whereIn('resident_id', $residentIds);
-                
-                if ($resident->household_id) {
-                    $query->orWhere(function ($q) use ($resident) {
-                        $q->where('payer_type', 'household')
-                            ->where('household_id', $resident->household_id);
-                    });
-                }
+private function calculateFeeStats(array $residentIds, Resident $resident): array
+{
+    $now = now();
+    $currentYear = $now->year;
+    
+    $baseQuery = Fee::query()
+        ->where(function ($query) use ($residentIds, $resident) {
+            // Use polymorphic relationship
+            $query->where(function ($q) use ($residentIds) {
+                $q->where('payer_type', 'resident')
+                  ->whereIn('payer_id', $residentIds);
             });
+            
+            if ($resident->household_id) {
+                $query->orWhere(function ($q) use ($resident) {
+                    $q->where('payer_type', 'household')
+                      ->where('payer_id', $resident->household_id);
+                });
+            }
+        });
         
         $totalStats = (clone $baseQuery)
             ->selectRaw('COUNT(*) as total_count')
@@ -488,7 +532,7 @@ class ResidentFeeController extends Controller
     
     private function renderEmptyFeePage(Request $request)
     {
-        return Inertia::render('Resident/Fees/Index', [
+        return Inertia::render('resident/Fees/Index', [
             'fees' => [
                 'data' => [],
                 'current_page' => 1,

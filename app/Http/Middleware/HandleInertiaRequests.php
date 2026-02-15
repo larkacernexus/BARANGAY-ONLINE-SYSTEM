@@ -2,50 +2,101 @@
 
 namespace App\Http\Middleware;
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Household;
+use App\Models\HouseholdMember;
+use App\Models\Resident;
 
 class HandleInertiaRequests extends Middleware
 {
-    /**
-     * The root template that's loaded on the first page visit.
-     *
-     * @see https://inertiajs.com/server-side-setup#root-template
-     *
-     * @var string
-     */
     protected $rootView = 'app';
 
-    /**
-     * Determines the current asset version.
-     *
-     * @see https://inertiajs.com/asset-versioning
-     */
     public function version(Request $request): ?string
     {
         return parent::version($request);
     }
 
-    /**
-     * Define the props that are shared by default.
-     *
-     * @see https://inertiajs.com/shared-data
-     *
-     * @return array<string, mixed>
-     */
     public function share(Request $request): array
     {
-        [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
-
-        return [
-            ...parent::share($request),
-            'name' => config('app.name'),
-            'quote' => ['message' => trim($message), 'author' => trim($author)],
+        $user = $request->user();
+        $isHouseholdHead = false;
+        $residentData = null;
+        $unitNumber = null;
+        $purok = null;
+        $residentId = null;
+        
+        if ($user) {
+            // Get resident directly using resident_id from users table
+            $resident = Resident::with(['household', 'purok'])
+                ->where('id', $user->resident_id)
+                ->first();
+            
+            if ($resident) {
+                $residentId = $resident->id;
+                
+                $residentData = [
+                    'id' => $resident->id,
+                    'first_name' => $resident->first_name,
+                    'middle_name' => $resident->middle_name,
+                    'last_name' => $resident->last_name,
+                    'suffix' => $resident->suffix,
+                    'avatar' => $resident->avatar,
+                    'birth_date' => $resident->birth_date?->format('Y-m-d'),
+                    'gender' => $resident->gender,
+                    'marital_status' => $resident->marital_status,
+                    'phone_number' => $resident->phone_number,
+                    'email' => $resident->email,
+                ];
+                
+                // Check if resident is household head
+                // Since user has household_id, we can check directly
+                if ($user->household_id) {
+                    $isHouseholdHead = HouseholdMember::where('resident_id', $resident->id)
+                        ->where('household_id', $user->household_id)
+                        ->where('is_head', true)
+                        ->exists();
+                    
+                    // Get unit number from household
+                    $household = Household::find($user->household_id);
+                    if ($household) {
+                        $unitNumber = $household->unit_number;
+                    }
+                }
+                
+                // Get purok
+                if ($resident->purok) {
+                    $purok = $resident->purok->name;
+                }
+            }
+        }
+        
+        return array_merge(parent::share($request), [
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'name' => $user->full_name,
+                    'email' => $user->email,
+                    'role' => $user->role?->name,
+                    'role_id' => $user->role_id,
+                    'is_admin' => $user->isAdministrator(),
+                    'permissions' => $user->getPermissionNames(),
+                    // Resident information
+                    'resident' => $residentData,
+                    'is_household_head' => $isHouseholdHead,
+                    'resident_id' => $user->resident_id, // Now this comes directly from user table
+                    'household_id' => $user->household_id, // Add household_id to auth data
+                    'unit_number' => $unitNumber,
+                    'purok' => $purok,
+                ] : null,
             ],
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-        ];
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
+                'warning' => fn () => $request->session()->get('warning'),
+                'info' => fn () => $request->session()->get('info'),
+            ],
+        ]);
     }
 }

@@ -7,12 +7,12 @@ use Inertia\Inertia;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\Permission;
-use App\Models\Department;
+use App\Models\Resident;
+use App\Models\Household;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class UserController extends Controller
@@ -23,16 +23,13 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $query = User::query()
-            ->with(['role', 'department'])
+            ->with(['role', 'currentResident'])
             ->select([
                 'id',
-                'first_name',
-                'last_name',
-                'email',
                 'username',
+                'email',
                 'contact_number',
                 'position',
-                'department_id',
                 'role_id',
                 'status',
                 'email_verified_at',
@@ -42,17 +39,27 @@ class UserController extends Controller
                 'created_at',
                 'updated_at',
                 'two_factor_confirmed_at',
-                'require_password_change'
+                'require_password_change',
+                'resident_id',
+                'household_id',
+                'current_resident_id'
             ]);
         
         // Search filter
         if ($request->has('search') && !empty($search = $request->input('search'))) {
             $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
+                $q->where('username', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('username', 'like', "%{$search}%")
-                  ->orWhere('contact_number', 'like', "%{$search}%");
+                  ->orWhere('contact_number', 'like', "%{$search}%")
+                  ->orWhere('position', 'like', "%{$search}%")
+                  ->orWhereHas('currentResident', function ($residentQuery) use ($search) {
+                      $residentQuery->where('first_name', 'like', "%{$search}%")
+                                   ->orWhere('last_name', 'like', "%{$search}%")
+                                   ->orWhere('middle_name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('role', function ($roleQuery) use ($search) {
+                      $roleQuery->where('name', 'like', "%{$search}%");
+                  });
             });
         }
         
@@ -66,9 +73,17 @@ class UserController extends Controller
             $query->where('status', $request->input('status'));
         }
         
-        // Department filter
-        if ($request->has('department_id') && $request->input('department_id') !== 'all') {
-            $query->where('department_id', $request->input('department_id'));
+        // Account type filter
+        if ($request->has('account_type') && $request->input('account_type') !== 'all') {
+            if ($request->input('account_type') === 'household') {
+                $query->whereNotNull('household_id');
+            } elseif ($request->input('account_type') === 'official') {
+                $query->whereNull('household_id')
+                      ->whereNotNull('position');
+            } elseif ($request->input('account_type') === 'administrative') {
+                $query->whereNull('household_id')
+                      ->where('position', 'Administrator');
+            }
         }
         
         // 2FA filter
@@ -121,7 +136,7 @@ class UserController extends Controller
         $sortOrder = $request->input('sort_order', 'desc');
         
         // Validate sort column to prevent SQL injection
-        $allowedSortColumns = ['first_name', 'last_name', 'email', 'created_at', 'last_login_at', 'login_count', 'status', 'role_id'];
+        $allowedSortColumns = ['username', 'email', 'created_at', 'last_login_at', 'login_count', 'status', 'role_id', 'position'];
         $sortBy = in_array($sortBy, $allowedSortColumns) ? $sortBy : 'created_at';
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? $sortOrder : 'desc';
         
@@ -133,6 +148,29 @@ class UserController extends Controller
         
         // Format users for frontend
         $formattedUsers = $users->through(function ($user) {
+            // Get the resident name from current resident relationship
+            $residentName = null;
+            $householdInfo = null;
+            
+            if ($user->currentResident) {
+                $residentName = $user->currentResident->full_name;
+                
+                // Get household info if available
+                if ($user->currentResident->household) {
+                    $householdInfo = [
+                        'id' => $user->currentResident->household->id,
+                        'number' => $user->currentResident->household->household_number,
+                    ];
+                }
+            } elseif ($user->household && $user->household->currentHeadResident) {
+                // For household accounts, get head resident name
+                $residentName = $user->household->currentHeadResident->full_name;
+                $householdInfo = [
+                    'id' => $user->household->id,
+                    'number' => $user->household->household_number,
+                ];
+            }
+            
             // Get role permissions count safely
             $rolePermissions = 0;
             if ($user->role && method_exists($user->role, 'permissions')) {
@@ -147,20 +185,14 @@ class UserController extends Controller
             
             return [
                 'id' => $user->id,
-                'name' => $user->first_name || $user->last_name 
-                    ? trim($user->first_name . ' ' . $user->last_name) 
-                    : $user->email,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'email' => $user->email,
                 'username' => $user->username,
+                'email' => $user->email,
                 'contact_number' => $user->contact_number,
                 'position' => $user->position,
-                'department_id' => $user->department_id,
-                'department' => $user->department ? [
-                    'id' => $user->department->id,
-                    'name' => $user->department->name,
-                ] : null,
+                'resident_name' => $residentName,
+                'household_info' => $householdInfo,
+                'is_household_account' => !is_null($user->household_id),
+                'is_official_account' => !is_null($user->position) && !in_array(strtolower($user->position), ['administrator', 'admin']),
                 'role_id' => $user->role_id,
                 'role' => $user->role ? [
                     'id' => $user->role->id,
@@ -172,13 +204,13 @@ class UserController extends Controller
                 'last_login_at' => $user->last_login_at,
                 'last_login_ip' => $user->last_login_ip,
                 'login_count' => $user->login_count,
-                'recent_logins_count' => 0, // Temporary - fix when loginLogs relationship exists
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
                 'two_factor_enabled' => !is_null($user->two_factor_confirmed_at),
                 'require_password_change' => $user->require_password_change,
                 'is_online' => $user->last_login_at && $user->last_login_at->gt(now()->subMinutes(15)),
                 'total_permissions' => $rolePermissions + $userPermissions,
+                'account_type' => $this->getAccountType($user),
             ];
         });
         
@@ -186,11 +218,9 @@ class UserController extends Controller
         $stats = [
             ['label' => 'Total Users', 'value' => User::count()],
             ['label' => 'Active Users', 'value' => User::where('status', 'active')->count()],
-            ['label' => 'Online Now', 'value' => User::where('status', 'active')
-                ->where('last_login_at', '>=', now()->subMinutes(15))
-                ->count()],
-            ['label' => 'New This Month', 'value' => User::whereMonth('created_at', now()->month)
-                ->whereYear('created_at', now()->year)
+            ['label' => 'Household Accounts', 'value' => User::whereNotNull('household_id')->count()],
+            ['label' => 'Official Accounts', 'value' => User::whereNotNull('position')
+                ->whereNull('household_id')
                 ->count()],
             ['label' => 'With 2FA', 'value' => User::whereNotNull('two_factor_confirmed_at')->count()],
             ['label' => 'Inactive Users', 'value' => User::where('status', 'inactive')->count()],
@@ -212,24 +242,20 @@ class UserController extends Controller
                 ];
             });
         
-        // Get departments for filtering
-        $departments = Department::select(['id', 'name'])
-            ->withCount('users')
-            ->get()
-            ->map(function ($dept) {
-                return [
-                    'id' => $dept->id,
-                    'name' => $dept->name,
-                    'count' => $dept->users_count,
-                ];
-            });
+        // Get account type options
+        $accountTypeOptions = [
+            ['value' => 'all', 'label' => 'All Types'],
+            ['value' => 'household', 'label' => 'Household Accounts'],
+            ['value' => 'official', 'label' => 'Official Accounts'],
+            ['value' => 'administrative', 'label' => 'Administrative'],
+        ];
         
         return Inertia::render('admin/Users/Index', [
             'users' => $formattedUsers,
             'stats' => $stats,
             'roles' => $roles,
-            'departments' => $departments,
-            'filters' => $request->only(['search', 'role_id', 'status', 'department_id', 'two_factor', 'email_verified', 'date_from', 'date_to', 'last_login', 'sort_by', 'sort_order', 'per_page']),
+            'accountTypeOptions' => $accountTypeOptions,
+            'filters' => $request->only(['search', 'role_id', 'status', 'account_type', 'two_factor', 'email_verified', 'date_from', 'date_to', 'last_login', 'sort_by', 'sort_order', 'per_page']),
             'sort_by' => $sortBy,
             'sort_order' => $sortOrder,
             'per_page' => $perPage,
@@ -237,10 +263,68 @@ class UserController extends Controller
     }
     
     /**
+     * Helper: Get account type
+     */
+    private function getAccountType(User $user): string
+    {
+        if ($user->household_id) {
+            return 'household';
+        } elseif ($user->position && !in_array(strtolower($user->position), ['administrator', 'admin'])) {
+            return 'official';
+        } else {
+            return 'administrative';
+        }
+    }
+    
+    /**
      * Show the form for creating a new user.
      */
-    public function create()
+    public function create(Request $request)
     {
+        // Determine what type of user to create
+        $type = $request->input('type', 'administrative');
+        
+        // Get available residents for household or official accounts
+        $availableResidents = [];
+        $availableHouseholds = [];
+        
+        if ($type === 'household') {
+            // Get households without user accounts
+            $availableHouseholds = Household::whereNull('user_id')
+                ->where('status', 'active')
+                ->with(['currentHeadResident'])
+                ->get()
+                ->map(function ($household) {
+                    return [
+                        'id' => $household->id,
+                        'household_number' => $household->household_number,
+                        'head_resident' => $household->currentHeadResident ? [
+                            'id' => $household->currentHeadResident->id,
+                            'name' => $household->currentHeadResident->full_name,
+                        ] : null,
+                        'address' => $household->full_address,
+                    ];
+                });
+        } elseif ($type === 'official') {
+            // Get residents who don't have official positions yet
+            $availableResidents = Resident::whereDoesntHave('officials')
+                ->where('status', 'active')
+                ->with(['household'])
+                ->get()
+                ->map(function ($resident) {
+                    return [
+                        'id' => $resident->id,
+                        'name' => $resident->full_name,
+                        'household' => $resident->household ? [
+                            'id' => $resident->household->id,
+                            'number' => $resident->household->household_number,
+                        ] : null,
+                        'age' => $resident->age,
+                        'gender' => $resident->gender,
+                    ];
+                });
+        }
+        
         // Get permissions grouped by module
         $permissions = Permission::where('is_active', true)
             ->orderBy('module')
@@ -260,7 +344,7 @@ class UserController extends Controller
             })
             ->toArray();
         
-        // Get roles with permissions (without pivot column issues)
+        // Get roles with permissions
         $roles = Role::with(['permissions' => function ($query) {
             $query->select([
                 'permissions.id',
@@ -283,43 +367,25 @@ class UserController extends Controller
             ];
         });
         
-        // Get departments
-        $departments = Department::where('is_active', true)
-            ->get()
-            ->map(function ($department) {
-                return [
-                    'id' => $department->id,
-                    'name' => $department->name,
-                    'description' => $department->description,
-                ];
-            });
-        
-        // If tables are empty, provide fallback data
-        if ($roles->isEmpty()) {
-            $roles = collect([
-                ['id' => 1, 'name' => 'Administrator', 'description' => 'Full system access', 'permissions' => []],
-                ['id' => 2, 'name' => 'Treasury Officer', 'description' => 'Payment management', 'permissions' => []],
-                ['id' => 3, 'name' => 'Records Clerk', 'description' => 'Resident management', 'permissions' => []],
-                ['id' => 4, 'name' => 'Clearance Officer', 'description' => 'Clearance issuance', 'permissions' => []],
-                ['id' => 5, 'name' => 'Viewer', 'description' => 'Read-only access', 'permissions' => []],
-            ]);
-        }
-        
-        if ($departments->isEmpty()) {
-            $departments = collect([
-                ['id' => 1, 'name' => 'Barangay Office', 'description' => 'Main administration'],
-                ['id' => 2, 'name' => 'Finance Department', 'description' => 'Financial management'],
-                ['id' => 3, 'name' => 'Registry Department', 'description' => 'Records management'],
-                ['id' => 4, 'name' => 'Services Department', 'description' => 'Public services'],
-                ['id' => 5, 'name' => 'Health Department', 'description' => 'Health services'],
-                ['id' => 6, 'name' => 'Security Department', 'description' => 'Security services'],
-            ]);
+        // Get position options for official accounts
+        $positionOptions = [];
+        if ($type === 'official') {
+            $positionOptions = [
+                ['value' => 'Barangay Captain', 'label' => 'Barangay Captain'],
+                ['value' => 'Barangay Secretary', 'label' => 'Barangay Secretary'],
+                ['value' => 'Barangay Treasurer', 'label' => 'Barangay Treasurer'],
+                ['value' => 'SK Chairman', 'label' => 'SK Chairman'],
+                ['value' => 'Kagawad', 'label' => 'Kagawad'],
+            ];
         }
         
         return Inertia::render('admin/Users/Create', [
+            'type' => $type,
             'permissions' => $permissions,
             'roles' => $roles,
-            'departments' => $departments,
+            'availableResidents' => $availableResidents,
+            'availableHouseholds' => $availableHouseholds,
+            'positionOptions' => $positionOptions,
         ]);
     }
     
@@ -328,15 +394,14 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+        $type = $request->input('type', 'administrative');
+        
+        // Base validation rules
+        $rules = [
             'username' => 'required|string|max:50|unique:users',
+            'email' => 'required|string|email|max:255|unique:users',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'contact_number' => 'nullable|string|max:20',
-            'position' => 'nullable|string|max:100',
-            'department_id' => 'nullable|exists:departments,id',
             'role_id' => 'required|exists:roles,id',
             'selected_permissions' => 'nullable|array',
             'selected_permissions.*' => 'exists:permissions,id',
@@ -344,7 +409,20 @@ class UserController extends Controller
             'require_password_change' => 'boolean',
             'is_email_verified' => 'boolean',
             'send_setup_email' => 'boolean',
-        ]);
+        ];
+        
+        // Add type-specific validation
+        if ($type === 'household') {
+            $rules['household_id'] = 'required|exists:households,id';
+        } elseif ($type === 'official') {
+            $rules['resident_id'] = 'required|exists:residents,id';
+            $rules['position'] = 'required|string|max:100';
+        } else {
+            // Administrative account
+            $rules['position'] = 'nullable|string|max:100';
+        }
+        
+        $validator = Validator::make($request->all(), $rules);
         
         if ($validator->fails()) {
             return redirect()->back()
@@ -352,23 +430,55 @@ class UserController extends Controller
                 ->withInput();
         }
         
-        // Create user
-        $user = User::create([
-            'first_name' => $request->first_name,
-            'last_name' => $request->last_name,
-            'email' => $request->email,
+        // Prepare user data
+        $userData = [
             'username' => $request->username,
+            'email' => $request->email,
             'password' => Hash::make($request->password),
             'contact_number' => $request->contact_number,
-            'position' => $request->position,
-            'department_id' => $request->department_id,
             'role_id' => $request->role_id,
             'status' => $request->status,
             'require_password_change' => $request->boolean('require_password_change', false),
             'email_verified_at' => $request->boolean('is_email_verified') ? now() : null,
-        ]);
+        ];
         
-        // Attach permissions if provided - Only if relationship exists
+        // Set type-specific data
+        if ($type === 'household') {
+            $household = Household::findOrFail($request->household_id);
+            $userData['household_id'] = $household->id;
+            
+            // Set current resident to household head
+            if ($household->currentHeadResident) {
+                $userData['current_resident_id'] = $household->currentHeadResident->id;
+            }
+            
+            // Default position for household accounts
+            $userData['position'] = 'Household Head';
+            
+        } elseif ($type === 'official') {
+            $resident = Resident::findOrFail($request->resident_id);
+            $userData['position'] = $request->position;
+            
+            // Link to resident's household if exists
+            if ($resident->household) {
+                $userData['household_id'] = $resident->household->id;
+                $userData['current_resident_id'] = $resident->id;
+            }
+            
+        } else {
+            // Administrative account
+            $userData['position'] = $request->position ?? 'Administrator';
+        }
+        
+        // Create user
+        $user = User::create($userData);
+        
+        // Update household with user_id if this is a household account
+        if ($type === 'household' && isset($household)) {
+            $household->update(['user_id' => $user->id]);
+        }
+        
+        // Attach permissions if provided
         if ($request->filled('selected_permissions') && is_array($request->selected_permissions) && method_exists($user, 'permissions')) {
             // Get existing user permissions to avoid duplicates
             $existingPermissions = $user->permissions()->pluck('permissions.id')->toArray();
@@ -397,21 +507,47 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
-        // Load basic relationships
-        $user->load(['department']);
+        // Load relationships
+        $user->load([
+            'role.permissions',
+            'currentResident.household',
+            'household.currentHeadResident'
+        ]);
         
-        // Load role with its permissions (without pivot column issues)
-        $role = $user->role ? Role::with(['permissions' => function ($query) {
-            $query->select([
-                'permissions.id',
-                'permissions.name', 
-                'permissions.display_name', 
-                'permissions.description', 
-                'permissions.module'
-            ]);
-        }])->find($user->role_id) : null;
+        // Get the resident name based on account type
+        $residentInfo = null;
+        if ($user->currentResident) {
+            $residentInfo = [
+                'id' => $user->currentResident->id,
+                'name' => $user->currentResident->full_name,
+                'first_name' => $user->currentResident->first_name,
+                'last_name' => $user->currentResident->last_name,
+                'age' => $user->currentResident->age,
+                'gender' => $user->currentResident->gender,
+                'household' => $user->currentResident->household ? [
+                    'id' => $user->currentResident->household->id,
+                    'number' => $user->currentResident->household->household_number,
+                    'address' => $user->currentResident->household->full_address,
+                ] : null,
+            ];
+        } elseif ($user->household && $user->household->currentHeadResident) {
+            // For household accounts without specific current resident
+            $residentInfo = [
+                'id' => $user->household->currentHeadResident->id,
+                'name' => $user->household->currentHeadResident->full_name,
+                'first_name' => $user->household->currentHeadResident->first_name,
+                'last_name' => $user->household->currentHeadResident->last_name,
+                'age' => $user->household->currentHeadResident->age,
+                'gender' => $user->household->currentHeadResident->gender,
+                'household' => [
+                    'id' => $user->household->id,
+                    'number' => $user->household->household_number,
+                    'address' => $user->household->full_address,
+                ],
+            ];
+        }
         
-        // Load user's direct permissions (without pivot column issues)
+        // Get user's direct permissions
         $directPermissions = collect();
         if (method_exists($user, 'permissions')) {
             $directPermissions = $user->permissions()
@@ -425,32 +561,8 @@ class UserController extends Controller
                 ->get();
         }
         
-        // Get recent login activity (last 10 logins) - if loginLogs relationship exists
-        $recentLogins = [];
-        if (method_exists($user, 'loginLogs')) {
-            $recentLogins = $user->loginLogs()
-                ->select(['id', 'ip_address', 'user_agent', 'login_at', 'logout_at', 'created_at'])
-                ->latest('login_at')
-                ->take(10)
-                ->get()
-                ->map(function ($log) {
-                    return [
-                        'id' => $log->id,
-                        'ip_address' => $log->ip_address,
-                        'user_agent' => $log->user_agent,
-                        'login_at' => $log->login_at,
-                        'logout_at' => $log->logout_at,
-                        'duration' => $log->logout_at 
-                            ? Carbon::parse($log->login_at)->diffInMinutes(Carbon::parse($log->logout_at)) . ' minutes'
-                            : 'Still active',
-                        'device' => $this->parseUserAgent($log->user_agent),
-                        'created_at' => $log->created_at,
-                    ];
-                })->toArray();
-        }
-        
         // Get all permissions for this user (including role permissions)
-        $rolePermissions = $role ? $role->permissions : collect();
+        $rolePermissions = $user->role ? $user->role->permissions : collect();
         
         // Combine and group permissions
         $allPermissions = $directPermissions->concat($rolePermissions)->unique('id');
@@ -475,122 +587,408 @@ class UserController extends Controller
             ['label' => 'Direct Permissions', 'value' => $directPermissions->count()],
             ['label' => 'Role Permissions', 'value' => $rolePermissions->count()],
             ['label' => 'Total Permissions', 'value' => $allPermissions->count()],
+            ['label' => 'Account Type', 'value' => ucfirst($this->getAccountType($user))],
         ];
         
-        // Add recent login count if available
-        if (method_exists($user, 'loginLogs')) {
-            $stats[] = ['label' => 'Recent Logins (30 days)', 'value' => $user->loginLogs()
-                ->where('login_at', '>=', now()->subDays(30))
-                ->count()];
-            $stats[] = ['label' => 'Active Sessions', 'value' => $user->loginLogs()
-                ->whereNull('logout_at')
-                ->where('login_at', '>=', now()->subHours(24))
-                ->count()];
+        // Add household info if applicable
+        if ($user->household_id) {
+            $stats[] = ['label' => 'Household Members', 'value' => $user->household->member_count ?? 0];
         }
-        
-        // Get user activity timeline
-        $activityTimeline = collect();
-        
-        // Add login activities
-        foreach ($recentLogins as $login) {
-            $activityTimeline->push([
-                'id' => 'login_' . $login['id'],
-                'type' => 'login',
-                'title' => 'User Login',
-                'description' => 'Logged in from ' . $login['device']['browser'] . ' on ' . $login['device']['os'],
-                'icon' => 'login',
-                'timestamp' => $login['login_at'],
-                'details' => [
-                    'ip_address' => $login['ip_address'],
-                    'device' => $login['device']['full'],
-                    'duration' => $login['duration'],
-                ],
-                'color' => 'blue',
-            ]);
-            
-            if ($login['logout_at']) {
-                $activityTimeline->push([
-                    'id' => 'logout_' . $login['id'],
-                    'type' => 'logout',
-                    'title' => 'User Logout',
-                    'description' => 'Logged out after ' . $login['duration'],
-                    'icon' => 'logout',
-                    'timestamp' => $login['logout_at'],
-                    'details' => [
-                        'session_duration' => $login['duration'],
-                    ],
-                    'color' => 'gray',
-                ]);
-            }
-        }
-        
-        // Sort timeline by timestamp
-        $activityTimeline = $activityTimeline->sortByDesc('timestamp')->values();
         
         return Inertia::render('admin/Users/Show', [
             'user' => [
                 'id' => $user->id,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'full_name' => $user->first_name || $user->last_name 
-                    ? trim($user->first_name . ' ' . $user->last_name) 
-                    : $user->email,
-                'email' => $user->email,
                 'username' => $user->username,
+                'email' => $user->email,
                 'contact_number' => $user->contact_number,
                 'position' => $user->position,
-                'department_id' => $user->department_id,
-                'department' => $user->department ? [
-                    'id' => $user->department->id,
-                    'name' => $user->department->name,
-                    'description' => $user->department->description,
-                ] : null,
                 'role_id' => $user->role_id,
-                'role' => $role ? [
-                    'id' => $role->id,
-                    'name' => $role->name,
-                    'description' => $role->description,
-                    'color' => $this->getRoleColor($role->name),
+                'role' => $user->role ? [
+                    'id' => $user->role->id,
+                    'name' => $user->role->name,
+                    'description' => $user->role->description,
+                    'color' => $this->getRoleColor($user->role->name),
                 ] : null,
                 'status' => $user->status,
                 'email_verified_at' => $user->email_verified_at,
                 'require_password_change' => $user->require_password_change,
                 'password_changed_at' => $user->password_changed_at,
-                'two_factor_secret' => $user->two_factor_secret,
-                'two_factor_recovery_codes' => $user->two_factor_recovery_codes,
-                'two_factor_confirmed_at' => $user->two_factor_confirmed_at,
+                'two_factor_enabled' => !is_null($user->two_factor_confirmed_at),
                 'last_login_at' => $user->last_login_at,
                 'last_login_ip' => $user->last_login_ip,
                 'login_count' => $user->login_count,
-                'current_login_ip' => $user->current_login_ip,
-                'last_logout_at' => $user->last_logout_at,
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
                 'is_online' => $user->last_login_at && Carbon::parse($user->last_login_at)->gt(now()->subMinutes(15)),
+                'account_type' => $this->getAccountType($user),
+                'is_household_account' => !is_null($user->household_id),
+                'resident_info' => $residentInfo,
+                'household_id' => $user->household_id,
+                'current_resident_id' => $user->current_resident_id,
             ],
             'permissions' => $groupedPermissions,
-            'directPermissions' => $directPermissions->map(function ($permission) {
-                return [
-                    'id' => $permission->id,
-                    'name' => $permission->name,
-                    'display_name' => $permission->display_name,
-                    'description' => $permission->description,
-                    'module' => $permission->module,
-                ];
-            }),
-            'rolePermissions' => $rolePermissions->map(function ($permission) {
-                return [
-                    'id' => $permission->id,
-                    'name' => $permission->name,
-                    'display_name' => $permission->display_name,
-                    'description' => $permission->description,
-                    'module' => $permission->module,
-                ];
-            }),
             'stats' => $stats,
-            'recentLogins' => $recentLogins,
-            'activityTimeline' => $activityTimeline,
         ]);
+    }
+    
+    /**
+     * Show the form for editing the specified user.
+     */
+    public function edit(User $user)
+    {
+        // Load user with permissions
+        $user->load([
+            'permissions',
+            'currentResident',
+            'household.currentHeadResident'
+        ]);
+        
+        // Determine account type
+        $accountType = $this->getAccountType($user);
+        
+        // Get available residents for switching if this is an official account
+        $availableResidents = [];
+        $availableHouseholds = [];
+        
+        if ($accountType === 'official' || $accountType === 'household') {
+            $availableResidents = Resident::where('status', 'active')
+                ->with(['household'])
+                ->get()
+                ->map(function ($resident) {
+                    return [
+                        'id' => $resident->id,
+                        'name' => $resident->full_name,
+                        'household' => $resident->household ? [
+                            'id' => $resident->household->id,
+                            'number' => $resident->household->household_number,
+                        ] : null,
+                        'age' => $resident->age,
+                        'gender' => $resident->gender,
+                    ];
+                });
+            
+            $availableHouseholds = Household::where('status', 'active')
+                ->with(['currentHeadResident'])
+                ->get()
+                ->map(function ($household) {
+                    return [
+                        'id' => $household->id,
+                        'household_number' => $household->household_number,
+                        'head_resident' => $household->currentHeadResident ? [
+                            'id' => $household->currentHeadResident->id,
+                            'name' => $household->currentHeadResident->full_name,
+                        ] : null,
+                        'address' => $household->full_address,
+                    ];
+                });
+        }
+        
+        // Get permissions grouped by module
+        $permissions = Permission::where('is_active', true)
+            ->orderBy('module')
+            ->orderBy('display_name')
+            ->get()
+            ->groupBy('module')
+            ->map(function ($permissions) {
+                return $permissions->map(function ($permission) {
+                    return [
+                        'id' => $permission->id,
+                        'name' => $permission->name,
+                        'display_name' => $permission->display_name,
+                        'description' => $permission->description,
+                        'module' => $permission->module,
+                    ];
+                });
+            })
+            ->toArray();
+        
+        // Get roles with permissions
+        $roles = Role::with(['permissions' => function ($query) {
+            $query->select([
+                'permissions.id',
+                'permissions.name', 
+                'permissions.display_name', 
+                'permissions.description'
+            ]);
+        }])->get()->map(function ($role) {
+            return [
+                'id' => $role->id,
+                'name' => $role->name,
+                'description' => $role->description,
+                'permissions' => $role->permissions->map(function ($permission) {
+                    return [
+                        'id' => $permission->id,
+                        'name' => $permission->name,
+                        'display_name' => $permission->display_name,
+                    ];
+                }),
+            ];
+        });
+        
+        // Get user's permission IDs
+        $userPermissionIds = $user->permissions->pluck('id')->toArray();
+        
+        return Inertia::render('admin/Users/Edit', [
+            'user' => $user,
+            'account_type' => $accountType,
+            'permissions' => $permissions,
+            'roles' => $roles,
+            'userPermissionIds' => $userPermissionIds,
+            'availableResidents' => $availableResidents,
+            'availableHouseholds' => $availableHouseholds,
+        ]);
+    }
+    
+    /**
+     * Update the specified user in storage.
+     */
+    public function update(Request $request, User $user)
+    {
+        // Determine account type
+        $accountType = $this->getAccountType($user);
+        
+        // Base validation rules
+        $rules = [
+            'username' => 'required|string|max:50|unique:users,username,' . $user->id,
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'contact_number' => 'nullable|string|max:20',
+            'role_id' => 'required|exists:roles,id',
+            'selected_permissions' => 'nullable|array',
+            'selected_permissions.*' => 'exists:permissions,id',
+            'status' => 'required|in:active,inactive',
+            'require_password_change' => 'boolean',
+            'is_email_verified' => 'boolean',
+        ];
+        
+        // Add type-specific validation for changing account type
+        if ($request->has('change_account_type')) {
+            $newType = $request->input('new_account_type');
+            
+            if ($newType === 'household') {
+                $rules['new_household_id'] = 'required|exists:households,id';
+            } elseif ($newType === 'official') {
+                $rules['new_resident_id'] = 'required|exists:residents,id';
+                $rules['new_position'] = 'required|string|max:100';
+            } elseif ($newType === 'administrative') {
+                $rules['new_position'] = 'nullable|string|max:100';
+            }
+        } else {
+            // Keep current account type, update position if applicable
+            if ($accountType === 'official') {
+                $rules['position'] = 'required|string|max:100';
+            } else {
+                $rules['position'] = 'nullable|string|max:100';
+            }
+        }
+        
+        // Password update validation
+        if ($request->filled('password')) {
+            $rules['password'] = ['confirmed', Rules\Password::defaults()];
+        }
+        
+        $validator = Validator::make($request->all(), $rules);
+        
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+        
+        // Prepare update data
+        $updateData = [
+            'username' => $request->username,
+            'email' => $request->email,
+            'contact_number' => $request->contact_number,
+            'role_id' => $request->role_id,
+            'status' => $request->status,
+            'require_password_change' => $request->boolean('require_password_change', false),
+        ];
+        
+        // Handle email verification
+        if ($request->boolean('is_email_verified')) {
+            $updateData['email_verified_at'] = now();
+        } elseif ($request->has('is_email_verified')) {
+            $updateData['email_verified_at'] = null;
+        }
+        
+        // Handle password update
+        if ($request->filled('password')) {
+            $updateData['password'] = Hash::make($request->password);
+            $updateData['password_changed_at'] = $request->boolean('require_password_change') ? null : now();
+        }
+        
+        // Handle account type change
+        if ($request->boolean('change_account_type')) {
+            $newType = $request->input('new_account_type');
+            
+            // Clear old account type data
+            $updateData['household_id'] = null;
+            $updateData['current_resident_id'] = null;
+            $updateData['position'] = null;
+            
+            // Set new account type data
+            if ($newType === 'household') {
+                $household = Household::findOrFail($request->new_household_id);
+                $updateData['household_id'] = $household->id;
+                $updateData['position'] = 'Household Head';
+                
+                if ($household->currentHeadResident) {
+                    $updateData['current_resident_id'] = $household->currentHeadResident->id;
+                }
+                
+                // Update household user_id
+                $household->update(['user_id' => $user->id]);
+                
+            } elseif ($newType === 'official') {
+                $resident = Resident::findOrFail($request->new_resident_id);
+                $updateData['position'] = $request->new_position;
+                
+                if ($resident->household) {
+                    $updateData['household_id'] = $resident->household->id;
+                    $updateData['current_resident_id'] = $resident->id;
+                }
+                
+            } else {
+                // Administrative account
+                $updateData['position'] = $request->new_position ?? 'Administrator';
+            }
+            
+        } else {
+            // Keep same account type, update position if applicable
+            if ($accountType === 'official') {
+                $updateData['position'] = $request->position;
+            } elseif ($accountType === 'administrative') {
+                $updateData['position'] = $request->position ?? $user->position;
+            }
+        }
+        
+        // Update user
+        $user->update($updateData);
+        
+        // Update permissions if provided
+        if ($request->has('selected_permissions') && method_exists($user, 'permissions')) {
+            // Get current permissions
+            $currentPermissions = $user->permissions()->pluck('permissions.id')->toArray();
+            $newPermissions = $request->selected_permissions ?? [];
+            
+            // Find permissions to add and remove
+            $permissionsToAdd = array_diff($newPermissions, $currentPermissions);
+            $permissionsToRemove = array_diff($currentPermissions, $newPermissions);
+            
+            // Remove permissions
+            if (!empty($permissionsToRemove)) {
+                $user->permissions()->detach($permissionsToRemove);
+            }
+            
+            // Add new permissions
+            if (!empty($permissionsToAdd)) {
+                foreach ($permissionsToAdd as $permissionId) {
+                    $user->permissions()->attach($permissionId);
+                }
+            }
+        } elseif (method_exists($user, 'permissions')) {
+            // If no permissions are provided, remove all custom permissions
+            $user->permissions()->detach();
+        }
+        
+        return redirect()->route('users.show', $user)
+            ->with('success', 'User updated successfully!');
+    }
+    
+    /**
+     * Remove the specified user from storage.
+     */
+    public function destroy(User $user)
+    {
+        // Prevent deleting yourself
+        if ($user->id === auth()->id()) {
+            return redirect()->back()
+                ->with('error', 'You cannot delete your own account.');
+        }
+        
+        // If this is a household account, clear the user_id from household
+        if ($user->household) {
+            $user->household->update(['user_id' => null]);
+        }
+        
+        $user->delete();
+        
+        return redirect()->route('users.index')
+            ->with('success', 'User deleted successfully!');
+    }
+    
+    /**
+     * Reset user password
+     */
+    public function resetPassword(Request $request, User $user)
+    {
+        $request->validate([
+            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'require_password_change' => 'boolean',
+        ]);
+        
+        $user->update([
+            'password' => Hash::make($request->password),
+            'password_changed_at' => $request->boolean('require_password_change') ? null : now(),
+            'require_password_change' => $request->boolean('require_password_change', false),
+        ]);
+        
+        return redirect()->back()
+            ->with('success', 'Password reset successfully!');
+    }
+    
+    /**
+     * Toggle user status
+     */
+    public function toggleStatus(User $user)
+    {
+        $user->update([
+            'status' => $user->status === 'active' ? 'inactive' : 'active',
+        ]);
+        
+        $status = $user->status === 'active' ? 'activated' : 'deactivated';
+        
+        return redirect()->back()
+            ->with('success', "User {$status} successfully!");
+    }
+    
+    /**
+     * Update user permissions
+     */
+    public function updatePermissions(Request $request, User $user)
+    {
+        $request->validate([
+            'permissions' => 'nullable|array',
+            'permissions.*' => 'exists:permissions,id',
+        ]);
+        
+        if (!method_exists($user, 'permissions')) {
+            return redirect()->back()
+                ->with('error', 'Permissions relationship not found.');
+        }
+        
+        // Get current permissions
+        $currentPermissions = $user->permissions()->pluck('permissions.id')->toArray();
+        $newPermissions = $request->permissions ?? [];
+        
+        // Find permissions to add and remove
+        $permissionsToAdd = array_diff($newPermissions, $currentPermissions);
+        $permissionsToRemove = array_diff($currentPermissions, $newPermissions);
+        
+        // Remove permissions
+        if (!empty($permissionsToRemove)) {
+            $user->permissions()->detach($permissionsToRemove);
+        }
+        
+        // Add new permissions
+        if (!empty($permissionsToAdd)) {
+            foreach ($permissionsToAdd as $permissionId) {
+                $user->permissions()->attach($permissionId);
+            }
+        }
+        
+        return redirect()->back()
+            ->with('success', 'Permissions updated successfully!');
     }
     
     /**
@@ -603,7 +1001,10 @@ class UserController extends Controller
             'super admin', 'superadmin' => 'bg-purple-100 text-purple-800 border-purple-200',
             'manager', 'supervisor' => 'bg-blue-100 text-blue-800 border-blue-200',
             'editor', 'moderator' => 'bg-green-100 text-green-800 border-green-200',
-            'user', 'member' => 'bg-gray-100 text-gray-800 border-gray-200',
+            'household head' => 'bg-orange-100 text-orange-800 border-orange-200',
+            'barangay captain', 'captain' => 'bg-indigo-100 text-indigo-800 border-indigo-200',
+            'kagawad' => 'bg-cyan-100 text-cyan-800 border-cyan-200',
+            'secretary', 'treasurer' => 'bg-teal-100 text-teal-800 border-teal-200',
             default => 'bg-gray-100 text-gray-800 border-gray-200',
         };
     }
@@ -669,263 +1070,6 @@ class UserController extends Controller
     }
     
     /**
-     * Show the form for editing the specified user.
-     */
-    public function edit(User $user)
-    {
-        // Load user with permissions
-        $user->load(['permissions' => function ($query) {
-            $query->select([
-                'permissions.id',
-                'permissions.name', 
-                'permissions.display_name', 
-                'permissions.description', 
-                'permissions.module'
-            ]);
-        }]);
-        
-        // Get permissions grouped by module
-        $permissions = Permission::where('is_active', true)
-            ->orderBy('module')
-            ->orderBy('display_name')
-            ->get()
-            ->groupBy('module')
-            ->map(function ($permissions) {
-                return $permissions->map(function ($permission) {
-                    return [
-                        'id' => $permission->id,
-                        'name' => $permission->name,
-                        'display_name' => $permission->display_name,
-                        'description' => $permission->description,
-                        'module' => $permission->module,
-                    ];
-                });
-            })
-            ->toArray();
-        
-        // Get roles with permissions (without pivot column issues)
-        $roles = Role::with(['permissions' => function ($query) {
-            $query->select([
-                'permissions.id',
-                'permissions.name', 
-                'permissions.display_name', 
-                'permissions.description'
-            ]);
-        }])->get()->map(function ($role) {
-            return [
-                'id' => $role->id,
-                'name' => $role->name,
-                'description' => $role->description,
-                'permissions' => $role->permissions->map(function ($permission) {
-                    return [
-                        'id' => $permission->id,
-                        'name' => $permission->name,
-                        'display_name' => $permission->display_name,
-                    ];
-                }),
-            ];
-        });
-        
-        // Get departments
-        $departments = Department::where('is_active', true)
-            ->get()
-            ->map(function ($department) {
-                return [
-                    'id' => $department->id,
-                    'name' => $department->name,
-                    'description' => $department->description,
-                ];
-            });
-        
-        // Get user's permission IDs
-        $userPermissionIds = $user->permissions->pluck('id')->toArray();
-        
-        return Inertia::render('admin/Users/Edit', [
-            'user' => $user,
-            'permissions' => $permissions,
-            'roles' => $roles,
-            'departments' => $departments,
-            'userPermissionIds' => $userPermissionIds,
-        ]);
-    }
-    
-    /**
-     * Update the specified user in storage.
-     */
-    public function update(Request $request, User $user)
-    {
-        $validator = Validator::make($request->all(), [
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'username' => 'required|string|max:50|unique:users,username,' . $user->id,
-            'contact_number' => 'nullable|string|max:20',
-            'position' => 'nullable|string|max:100',
-            'department_id' => 'nullable|exists:departments,id',
-            'role_id' => 'required|exists:roles,id',
-            'selected_permissions' => 'nullable|array',
-            'selected_permissions.*' => 'exists:permissions,id',
-            'status' => 'required|in:active,inactive',
-            'require_password_change' => 'boolean',
-            'is_email_verified' => 'boolean',
-        ]);
-        
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-        
-        // Update user
-        $user->update([
-            'first_name' => $request->first_name,
-            'last_name' => $request->last_name,
-            'email' => $request->email,
-            'username' => $request->username,
-            'contact_number' => $request->contact_number,
-            'position' => $request->position,
-            'department_id' => $request->department_id,
-            'role_id' => $request->role_id,
-            'status' => $request->status,
-            'require_password_change' => $request->boolean('require_password_change', false),
-            'email_verified_at' => $request->boolean('is_email_verified') ? now() : $user->email_verified_at,
-        ]);
-        
-        // Update password if provided
-        if ($request->filled('password')) {
-            $request->validate([
-                'password' => ['confirmed', Rules\Password::defaults()],
-            ]);
-            
-            $user->update([
-                'password' => Hash::make($request->password),
-                'password_changed_at' => $request->boolean('require_password_change') ? null : now(),
-            ]);
-        }
-        
-        // Update permissions if provided - Only if relationship exists
-        if ($request->has('selected_permissions') && method_exists($user, 'permissions')) {
-            // Get current permissions
-            $currentPermissions = $user->permissions()->pluck('permissions.id')->toArray();
-            $newPermissions = $request->selected_permissions ?? [];
-            
-            // Find permissions to add and remove
-            $permissionsToAdd = array_diff($newPermissions, $currentPermissions);
-            $permissionsToRemove = array_diff($currentPermissions, $newPermissions);
-            
-            // Remove permissions
-            if (!empty($permissionsToRemove)) {
-                $user->permissions()->detach($permissionsToRemove);
-            }
-            
-            // Add new permissions
-            if (!empty($permissionsToAdd)) {
-                foreach ($permissionsToAdd as $permissionId) {
-                    $user->permissions()->attach($permissionId);
-                }
-            }
-        } elseif (method_exists($user, 'permissions')) {
-            // If no permissions are provided, remove all custom permissions
-            $user->permissions()->detach();
-        }
-        
-        return redirect()->route('users.show', $user)
-            ->with('success', 'User updated successfully!');
-    }
-    
-    /**
-     * Remove the specified user from storage.
-     */
-    public function destroy(User $user)
-    {
-        // Prevent deleting yourself
-        if ($user->id === auth()->id()) {
-            return redirect()->back()
-                ->with('error', 'You cannot delete your own account.');
-        }
-        
-        $user->delete();
-        
-        return redirect()->route('users.index')
-            ->with('success', 'User deleted successfully!');
-    }
-    
-    /**
-     * Reset user password
-     */
-    public function resetPassword(Request $request, User $user)
-    {
-        $request->validate([
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'require_password_change' => 'boolean',
-        ]);
-        
-        $user->update([
-            'password' => Hash::make($request->password),
-            'password_changed_at' => $request->boolean('require_password_change') ? null : now(),
-            'require_password_change' => $request->boolean('require_password_change', false),
-        ]);
-        
-        return redirect()->back()
-            ->with('success', 'Password reset successfully!');
-    }
-    
-    /**
-     * Toggle user status
-     */
-    public function toggleStatus(User $user)
-    {
-        $user->update([
-            'status' => $user->status === 'active' ? 'inactive' : 'active',
-        ]);
-        
-        $status = $user->status === 'active' ? 'activated' : 'deactivated';
-        
-        return redirect()->back()
-            ->with('success', "User {$status} successfully!");
-    }
-    
-    /**
-     * Update user permissions (separate endpoint if needed)
-     */
-    public function updatePermissions(Request $request, User $user)
-    {
-        $request->validate([
-            'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,id',
-        ]);
-        
-        // Only proceed if relationship exists
-        if (!method_exists($user, 'permissions')) {
-            return redirect()->back()
-                ->with('error', 'Permissions relationship not found.');
-        }
-        
-        // Get current permissions
-        $currentPermissions = $user->permissions()->pluck('permissions.id')->toArray();
-        $newPermissions = $request->permissions ?? [];
-        
-        // Find permissions to add and remove
-        $permissionsToAdd = array_diff($newPermissions, $currentPermissions);
-        $permissionsToRemove = array_diff($currentPermissions, $newPermissions);
-        
-        // Remove permissions
-        if (!empty($permissionsToRemove)) {
-            $user->permissions()->detach($permissionsToRemove);
-        }
-        
-        // Add new permissions
-        if (!empty($permissionsToAdd)) {
-            foreach ($permissionsToAdd as $permissionId) {
-                $user->permissions()->attach($permissionId);
-            }
-        }
-        
-        return redirect()->back()
-            ->with('success', 'Permissions updated successfully!');
-    }
-    
-    /**
      * Resend verification email
      */
     public function resendVerification(User $user)
@@ -984,13 +1128,25 @@ class UserController extends Controller
                 // Prevent deleting yourself
                 $userIds = array_diff($userIds, [auth()->id()]);
                 
+                // Clear household user_id references before deleting
+                $householdUsers = User::whereIn('id', $userIds)
+                    ->whereNotNull('household_id')
+                    ->with('household')
+                    ->get();
+                
+                foreach ($householdUsers as $user) {
+                    if ($user->household) {
+                        $user->household->update(['user_id' => null]);
+                    }
+                }
+                
                 // Delete users
                 User::whereIn('id', $userIds)->delete();
                 $message = count($userIds) . ' users deleted successfully!';
                 break;
                 
             case 'reset_password':
-                $tempPassword = 'Temporary@123'; // In production, generate secure password
+                $tempPassword = 'Temporary@123';
                 foreach ($userIds as $userId) {
                     $user = User::find($userId);
                     $user->update([
@@ -1016,7 +1172,7 @@ class UserController extends Controller
      */
     public function export(Request $request)
     {
-        $users = User::with(['role', 'department'])->get();
+        $users = User::with(['role', 'currentResident', 'household.currentHeadResident'])->get();
         
         $headers = [
             'Content-Type' => 'text/csv',
@@ -1028,23 +1184,42 @@ class UserController extends Controller
             
             // Headers
             fputcsv($file, [
-                'ID', 'First Name', 'Last Name', 'Email', 'Username', 'Contact Number',
-                'Position', 'Department', 'Role', 'Status', 'Email Verified',
-                'Last Login', 'Login Count', 'Created At'
+                'ID', 'Username', 'Email', 'Contact Number', 'Position', 'Role', 
+                'Resident Name', 'Household Number', 'Account Type', 'Status', 
+                'Email Verified', 'Last Login', 'Login Count', 'Created At'
             ]);
             
             // Data
             foreach ($users as $user) {
+                // Get resident name
+                $residentName = '';
+                if ($user->currentResident) {
+                    $residentName = $user->currentResident->full_name;
+                } elseif ($user->household && $user->household->currentHeadResident) {
+                    $residentName = $user->household->currentHeadResident->full_name;
+                }
+                
+                // Get household number
+                $householdNumber = '';
+                if ($user->household) {
+                    $householdNumber = $user->household->household_number;
+                } elseif ($user->currentResident && $user->currentResident->household) {
+                    $householdNumber = $user->currentResident->household->household_number;
+                }
+                
+                // Determine account type
+                $accountType = $this->getAccountType($user);
+                
                 fputcsv($file, [
                     $user->id,
-                    $user->first_name,
-                    $user->last_name,
-                    $user->email,
                     $user->username,
+                    $user->email,
                     $user->contact_number,
                     $user->position,
-                    $user->department ? $user->department->name : '',
                     $user->role ? $user->role->name : '',
+                    $residentName,
+                    $householdNumber,
+                    ucfirst($accountType),
                     $user->status,
                     $user->email_verified_at ? 'Yes' : 'No',
                     $user->last_login_at ? $user->last_login_at->format('Y-m-d H:i:s') : 'Never',

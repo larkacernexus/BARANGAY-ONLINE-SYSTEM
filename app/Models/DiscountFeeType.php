@@ -1,5 +1,4 @@
 <?php
-// app/Models/DiscountFeeType.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +15,11 @@ class DiscountFeeType extends Model
         'discount_type_id',
         'percentage',
         'is_active',
+        'is_mandatory',
+        'min_amount',
+        'max_amount',
+        'validity_start',
+        'validity_end',
         'sort_order',
         'notes'
     ];
@@ -23,6 +27,11 @@ class DiscountFeeType extends Model
     protected $casts = [
         'percentage' => 'decimal:2',
         'is_active' => 'boolean',
+        'is_mandatory' => 'boolean',
+        'min_amount' => 'decimal:2',
+        'max_amount' => 'decimal:2',
+        'validity_start' => 'date',
+        'validity_end' => 'date',
     ];
 
     // Relationships
@@ -52,9 +61,42 @@ class DiscountFeeType extends Model
         return $query->where('discount_type_id', $discountTypeId);
     }
 
-    // Helper methods
-    public function getDisplayPercentageAttribute()
+    public function scopeValid($query)
     {
-        return "{$this->percentage}%";
+        $now = now()->format('Y-m-d');
+        return $query->where(function ($q) use ($now) {
+            $q->whereNull('validity_start')
+                ->orWhere('validity_start', '<=', $now);
+        })->where(function ($q) use ($now) {
+            $q->whereNull('validity_end')
+                ->orWhere('validity_end', '>=', $now);
+        });
+    }
+
+    // Validation
+    public function amountQualifies($amount)
+    {
+        if ($this->min_amount && $amount < $this->min_amount) {
+            return false;
+        }
+
+        if ($this->max_amount && $amount > $this->max_amount) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function isCurrentlyValid()
+    {
+        if ($this->validity_start && now()->lt($this->validity_start)) {
+            return false;
+        }
+
+        if ($this->validity_end && now()->gt($this->validity_end)) {
+            return false;
+        }
+
+        return true;
     }
 }

@@ -33,9 +33,9 @@ class DiscountType extends Model
     public function feeTypes()
     {
         return $this->belongsToMany(FeeType::class, 'discount_fee_types')
-                    ->using(DiscountFeeType::class)
-                    ->withPivot('percentage', 'is_active', 'notes')
-                    ->withTimestamps();
+            ->using(DiscountFeeType::class)
+            ->withPivot('percentage', 'is_active', 'notes')
+            ->withTimestamps();
     }
 
     // Direct relationship to DiscountFeeType

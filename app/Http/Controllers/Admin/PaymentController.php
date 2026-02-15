@@ -8,7 +8,9 @@ use App\Models\Resident;
 use App\Models\Household;
 use App\Models\Fee;
 use App\Models\FeeType;
+use App\Models\DiscountRule;
 use App\Models\PaymentItem;
+use App\Models\PaymentDiscount;
 use App\Models\ClearanceRequest;
 use App\Models\ClearanceType;
 use Illuminate\Http\Request;
@@ -23,7 +25,7 @@ class PaymentController extends Controller
     /**
      * Display a listing of payments.
      */
-    public function index(Request $request)
+   public function index(Request $request)
     {
         $query = Payment::with([
                 'items', 
@@ -96,20 +98,20 @@ class PaymentController extends Controller
                 ];
             });
 
-        // Calculate statistics
+        // Calculate statistics - update to use amount_paid
         $stats = [
             'total' => Payment::count(),
             'today' => Payment::whereDate('payment_date', today())->count(),
             'monthly' => Payment::whereMonth('payment_date', now()->month)->count(),
-            'total_amount' => Payment::sum('total_amount'),
-            'today_amount' => Payment::whereDate('payment_date', today())->sum('total_amount'),
-            'monthly_amount' => Payment::whereMonth('payment_date', now()->month)->sum('total_amount'),
+            'total_amount' => Payment::sum('amount_paid'), // Changed from total_amount
+            'today_amount' => Payment::whereDate('payment_date', today())->sum('amount_paid'), // Changed from total_amount
+            'monthly_amount' => Payment::whereMonth('payment_date', now()->month)->sum('amount_paid'), // Changed from total_amount
             'clearance_payments' => Payment::whereHas('items', function ($q) {
                 $q->whereNotNull('clearance_request_id');
             })->count(),
             'clearance_amount' => Payment::whereHas('items', function ($q) {
                 $q->whereNotNull('clearance_request_id');
-            })->sum('total_amount'),
+            })->sum('amount_paid'), // Changed from total_amount
         ];
 
         return Inertia::render('admin/Payments/Index', [
@@ -120,153 +122,297 @@ class PaymentController extends Controller
             'hasClearanceTypes' => $clearanceTypes->count() > 0,
         ]);
     }
+   /**
+ * Show the form for creating a new payment.
+ */
+// app/Http/Controllers/Admin/PaymentController.php
 
-    /**
-     * Show the form for creating a new payment.
-     */
-    public function create(Request $request)
+/**
+ * Show the form for creating a new payment.
+ */
+  public function create(Request $request)
     {
         Log::info('PAYMENT_CREATE: Starting payment creation', [
             'user_id' => Auth::id(),
             'user_name' => Auth::user()->name ?? 'Unknown',
             'request_params' => $request->all(),
+            'query_string' => $request->getQueryString(),
+            'full_url' => $request->fullUrl(),
         ]);
 
-        // Get pre-filled data from query parameters
-        $preFilledData = $request->only([
-            'fee_id', 'fee_type_id', 'payer_type', 'payer_id', 'payer_name', 
-            'contact_number', 'address', 'purok', 'household_number',
-            'clearance_request_id', 'clearance_type_id', 'purpose'
+        // Helper function to safely get household member (handles both collection and single model)
+        $getHouseholdMember = function($resident) {
+            if (!$resident) return null;
+            
+            if ($resident->householdMember instanceof \Illuminate\Database\Eloquent\Collection) {
+                return $resident->householdMember->first();
+            }
+            
+            return $resident->householdMember;
+        };
+
+        // Get ALL query parameters directly from request
+        $preFilledData = [
+            'fee_id' => $request->query('fee_id'),
+            'fee_type_id' => $request->query('fee_type_id'),
+            'payer_type' => $request->query('payer_type'),
+            'payer_id' => $request->query('payer_id'),
+            'payer_name' => $request->query('payer_name'),
+            'contact_number' => $request->query('contact_number'),
+            'address' => $request->query('address'),
+            'purok' => $request->query('purok'),
+            'household_number' => $request->query('household_number'),
+            'clearance_request_id' => $request->query('clearance_request_id'),
+            'clearance_type_id' => $request->query('clearance_type_id'),
+            'purpose' => $request->query('purpose'),
+        ];
+
+        // Also check if fee_id is in the request input (for POST/Inertia)
+        if (empty($preFilledData['fee_id']) && $request->has('fee_id')) {
+            $preFilledData['fee_id'] = $request->input('fee_id');
+        }
+
+        Log::debug('PAYMENT_CREATE: Pre-filled data', [
+            'preFilledData' => $preFilledData,
+            'fee_id_exists' => !empty($preFilledData['fee_id']),
+            'fee_id_value' => $preFilledData['fee_id'] ?? null,
+            'clearance_request_id_exists' => !empty($preFilledData['clearance_request_id']),
         ]);
 
-        Log::debug('PAYMENT_CREATE: Pre-filled data', $preFilledData);
-
-        // Fetch residents only if they have fees or clearance requests
-        Log::debug('PAYMENT_CREATE: Fetching residents with fees or clearance requests');
+        // ========== RESIDENTS WITH COMPLETE HOUSEHOLD INFORMATION ==========
+        Log::debug('PAYMENT_CREATE: Fetching ALL residents with household details');
         
-        $residentsWithFees = Fee::where('balance', '>', 0)
-            ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
-            ->whereNotNull('resident_id')
-            ->where('payer_type', 'resident')
-            ->pluck('resident_id')
-            ->toArray();
+        $residents = Resident::with([
+                'household.purok',
+                'household.householdMembers' => function ($query) {
+                    $query->with('resident');
+                },
+                'householdMember'
+            ])
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get()
+            ->map(function ($resident) use ($getHouseholdMember) {
+                // Get outstanding fees for this resident
+                $outstandingFees = Fee::where('payer_id', $resident->id)
+                    ->where('payer_type', 'App\Models\Resident')
+                    ->where('balance', '>', 0)
+                    ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
+                    ->get();
 
-        $residentsWithClearance = DB::table('clearance_requests')
-            ->whereIn('status', ['pending_payment', 'pending', 'processing', 'approved'])
-            ->whereNotNull('resident_id')
-            ->whereNotExists(function ($query) {
-                $query->select(DB::raw(1))
-                      ->from('payment_items')
-                      ->whereColumn('payment_items.clearance_request_id', 'clearance_requests.id');
-            })
-            ->pluck('resident_id')
-            ->toArray();
+                $outstandingFeeCount = $outstandingFees->count();
+                $totalOutstandingBalance = $outstandingFees->sum('balance');
 
-        $relevantResidentIds = array_unique(array_merge($residentsWithFees, $residentsWithClearance));
+                // Get ALL pending clearance requests
+                $pendingClearanceRequests = DB::table('clearance_requests')
+                    ->where('resident_id', $resident->id)
+                    ->whereIn('status', ['pending_payment', 'pending', 'processing', 'approved'])
+                    ->count();
 
-        $residents = [];
-        if (!empty($relevantResidentIds)) {
-            $residents = Resident::with(['household.purok'])
-                ->whereIn('id', $relevantResidentIds)
-                ->orderBy('last_name')
-                ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name', 'middle_name', 'contact_number', 'address', 'household_id'])
-                ->map(function ($resident) {
-                    $outstandingFees = Fee::where('resident_id', $resident->id)
-                        ->where('balance', '>', 0)
-                        ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
-                        ->where('payer_type', 'resident')
-                        ->get();
-
-                    $outstandingFeeCount = $outstandingFees->count();
-                    $totalOutstandingBalance = $outstandingFees->sum('balance');
-
-                    $pendingClearanceRequests = DB::table('clearance_requests')
-                        ->where('resident_id', $resident->id)
-                        ->whereIn('status', ['pending_payment', 'pending', 'processing', 'approved'])
-                        ->whereNotExists(function ($query) {
-                            $query->select(DB::raw(1))
-                                  ->from('payment_items')
-                                  ->whereColumn('payment_items.clearance_request_id', 'clearance_requests.id');
-                        })
-                        ->count();
-
-                    return [
-                        'id' => $resident->id,
-                        'name' => $resident->full_name,
-                        'contact_number' => $resident->contact_number,
-                        'address' => $resident->address,
-                        'household_number' => $resident->household ? $resident->household->household_number : null,
-                        'purok' => $resident->household && $resident->household->purok 
-                            ? $resident->household->purok->name 
-                            : null,
-                        'household_id' => $resident->household_id,
-                        'has_outstanding_fees' => $outstandingFeeCount > 0,
-                        'outstanding_fee_count' => $outstandingFeeCount,
-                        'total_outstanding_balance' => $totalOutstandingBalance > 0 
-                            ? '₱' . number_format($totalOutstandingBalance, 2)
-                            : null,
-                        'has_pending_clearance' => $pendingClearanceRequests > 0,
-                        'pending_clearance_count' => $pendingClearanceRequests,
+                // Get household membership details
+                $householdInfo = null;
+                $isHouseholdHead = false;
+                $householdMember = $getHouseholdMember($resident);
+                
+                if ($resident->household) {
+                    // Check if this resident is the head of household
+                    $isHouseholdHead = $householdMember && $householdMember->is_head === true;
+                    
+                    // Get household head details
+                    $headMember = $resident->household->householdMembers()
+                        ->where('is_head', true)
+                        ->with('resident')
+                        ->first();
+                    
+                    $householdInfo = [
+                        'id' => $resident->household->id,
+                        'household_number' => $resident->household->household_number,
+                        'contact_number' => $resident->household->contact_number,
+                        'email' => $resident->household->email,
+                        'address' => $resident->household->address,
+                        'full_address' => $resident->household->full_address,
+                        'purok' => $resident->household->purok ? $resident->household->purok->name : null,
+                        'purok_id' => $resident->household->purok_id,
+                        'member_count' => $resident->household->member_count,
+                        'head_of_household' => $headMember && $headMember->resident ? [
+                            'id' => $headMember->resident->id,
+                            'name' => $headMember->resident->full_name,
+                            'contact_number' => $headMember->resident->contact_number,
+                            'is_current_resident' => $headMember->resident_id === $resident->id,
+                        ] : null,
+                        'current_head_name' => $resident->household->current_head_name,
+                        'has_user_account' => $resident->household->has_user_account,
+                        'user_account' => $resident->household->user_account_details,
+                        'is_head' => $isHouseholdHead,
+                        'relationship_to_head' => $householdMember ? $householdMember->relationship_to_head : null,
                     ];
-                });
-        }
+                }
 
-        // Fetch households only if they have fees
-        Log::debug('PAYMENT_CREATE: Fetching households with fees');
+                return [
+                    'id' => $resident->id,
+                    'name' => $resident->full_name,
+                    'first_name' => $resident->first_name,
+                    'last_name' => $resident->last_name,
+                    'middle_name' => $resident->middle_name,
+                    'suffix' => $resident->suffix,
+                    'contact_number' => $resident->contact_number,
+                    'email' => $resident->email,
+                    'address' => $resident->address,
+                    'birthdate' => $resident->birthdate?->format('Y-m-d'),
+                    'age' => $resident->age,
+                    'gender' => $resident->gender,
+                    'civil_status' => $resident->civil_status,
+                    'occupation' => $resident->occupation,
+                    'household_number' => $resident->household ? $resident->household->household_number : null,
+                    'purok' => $resident->household && $resident->household->purok 
+                        ? $resident->household->purok->name 
+                        : null,
+                    'purok_id' => $resident->household && $resident->household->purok 
+                        ? $resident->household->purok->id 
+                        : null,
+                    'household_id' => $resident->household_id,
+                    'household_info' => $householdInfo,
+                    'is_household_head' => $isHouseholdHead,
+                    'has_outstanding_fees' => $outstandingFeeCount > 0,
+                    'outstanding_fee_count' => $outstandingFeeCount,
+                    'total_outstanding_balance' => $totalOutstandingBalance > 0 
+                        ? '₱' . number_format($totalOutstandingBalance, 2)
+                        : null,
+                    'has_pending_clearance' => $pendingClearanceRequests > 0,
+                    'pending_clearance_count' => $pendingClearanceRequests,
+                    'is_senior' => $resident->is_senior,
+                    'is_pwd' => $resident->is_pwd,
+                    'is_solo_parent' => $resident->is_solo_parent,
+                    'is_indigent' => $resident->is_indigent,
+                    'has_special_classification' => $resident->has_special_classification,
+                    'discount_eligibility_list' => $resident->discount_eligibility_list,
+                ];
+            });
+
+        // ========== HOUSEHOLDS WITH COMPLETE MEMBER INFORMATION ==========
+        Log::debug('PAYMENT_CREATE: Fetching ALL households with member details');
         
-        $householdsWithFees = Fee::where('balance', '>', 0)
-            ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
-            ->whereNotNull('household_id')
-            ->where('payer_type', 'household')
-            ->pluck('household_id')
-            ->toArray();
+        $households = Household::with([
+                'purok',
+                'householdMembers' => function ($query) {
+                    $query->with('resident');
+                },
+                'user'
+            ])
+            ->orderBy('household_number', 'asc')
+            ->get()
+            ->map(function ($household) {
+                // Get outstanding fees for this household
+                $outstandingFees = Fee::where('payer_id', $household->id)
+                    ->where('payer_type', 'App\Models\Household')
+                    ->where('balance', '>', 0)
+                    ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
+                    ->get();
 
-        $households = [];
-        if (!empty($householdsWithFees)) {
-            $households = Household::with(['purok'])
-                ->withCount(['householdMembers as members_count'])
-                ->whereIn('id', $householdsWithFees)
-                ->orderBy('head_of_family', 'asc')
-                ->get(['id', 'head_of_family', 'contact_number', 'address', 'household_number', 'purok_id'])
-                ->map(function ($household) {
-                    $outstandingFees = Fee::where('household_id', $household->id)
-                        ->where('balance', '>', 0)
-                        ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
-                        ->where('payer_type', 'household')
-                        ->get();
+                $outstandingFeeCount = $outstandingFees->count();
+                $totalOutstandingBalance = $outstandingFees->sum('balance');
 
-                    $outstandingFeeCount = $outstandingFees->count();
-                    $totalOutstandingBalance = $outstandingFees->sum('balance');
+                // Get head of household
+                $headMember = $household->householdMembers()
+                    ->where('is_head', true)
+                    ->with('resident')
+                    ->first();
+                
+                // Get all members with their roles
+                $members = $household->householdMembers
+                    ->map(function ($member) {
+                        return [
+                            'id' => $member->id,
+                            'resident_id' => $member->resident_id,
+                            'name' => $member->resident->full_name ?? 'Unknown',
+                            'contact_number' => $member->resident->contact_number ?? null,
+                            'relationship_to_head' => $member->relationship_to_head,
+                            'is_head' => $member->is_head,
+                            'is_senior' => $member->resident->is_senior ?? false,
+                            'is_pwd' => $member->resident->is_pwd ?? false,
+                            'is_solo_parent' => $member->resident->is_solo_parent ?? false,
+                            'is_indigent' => $member->resident->is_indigent ?? false,
+                            'age' => $member->resident->age ?? null,
+                            'gender' => $member->resident->gender ?? null,
+                        ];
+                    })
+                    ->sortByDesc('is_head')
+                    ->values();
 
-                    return [
-                        'id' => $household->id,
-                        'head_name' => $household->head_of_family,
-                        'contact_number' => $household->contact_number,
-                        'address' => $household->address,
-                        'household_number' => $household->household_number,
-                        'purok' => $household->purok ? $household->purok->name : null,
-                        'purok_id' => $household->purok_id,
-                        'family_members' => $household->members_count,
-                        'has_outstanding_fees' => $outstandingFeeCount > 0,
-                        'outstanding_fee_count' => $outstandingFeeCount,
-                        'total_outstanding_balance' => $totalOutstandingBalance > 0 
-                            ? '₱' . number_format($totalOutstandingBalance, 2)
-                            : null,
-                    ];
-                });
-        }
+                // Get family composition
+                $familyComposition = [
+                    'total_members' => $household->member_count,
+                    'adults' => $members->filter(fn($m) => ($m['age'] ?? 0) >= 18)->count(),
+                    'minors' => $members->filter(fn($m) => ($m['age'] ?? 0) < 18)->count(),
+                    'seniors' => $members->filter(fn($m) => $m['is_senior'])->count(),
+                    'pwd' => $members->filter(fn($m) => $m['is_pwd'])->count(),
+                    'solo_parents' => $members->filter(fn($m) => $m['is_solo_parent'])->count(),
+                ];
 
-        // GET ALL FEES WITH BALANCE > 0 FOR THE FEES TAB
-        Log::debug('PAYMENT_CREATE: Fetching all fees with balance for fees tab');
+                return [
+                    'id' => $household->id,
+                    'household_number' => $household->household_number,
+                    'contact_number' => $household->contact_number,
+                    'email' => $household->email,
+                    'address' => $household->address,
+                    'full_address' => $household->full_address,
+                    'purok' => $household->purok ? $household->purok->name : null,
+                    'purok_id' => $household->purok_id,
+                    'member_count' => $household->member_count,
+                    'income_range' => $household->income_range,
+                    'housing_type' => $household->housing_type,
+                    'ownership_status' => $household->ownership_status,
+                    'water_source' => $household->water_source,
+                    'has_electricity' => $household->has_electricity,
+                    'has_internet' => $household->has_internet,
+                    'has_vehicle' => $household->has_vehicle,
+                    'remarks' => $household->remarks,
+                    'status' => $household->status,
+                    // Head of household information
+                    'head' => $headMember && $headMember->resident ? [
+                        'id' => $headMember->resident->id,
+                        'name' => $headMember->resident->full_name,
+                        'first_name' => $headMember->resident->first_name,
+                        'last_name' => $headMember->resident->last_name,
+                        'contact_number' => $headMember->resident->contact_number,
+                        'is_senior' => $headMember->resident->is_senior,
+                        'is_pwd' => $headMember->resident->is_pwd,
+                        'is_solo_parent' => $headMember->resident->is_solo_parent,
+                        'is_indigent' => $headMember->resident->is_indigent,
+                        'age' => $headMember->resident->age,
+                        'gender' => $headMember->resident->gender,
+                        'relationship' => $headMember->relationship_to_head,
+                    ] : null,
+                    'head_name' => $household->current_head_name,
+                    'head_id' => $headMember->resident_id ?? null,
+                    // Household members
+                    'members' => $members,
+                    'family_composition' => $familyComposition,
+                    // User account
+                    'has_user_account' => $household->has_user_account,
+                    'user_account' => $household->user_account_details,
+                    // Outstanding fees
+                    'has_outstanding_fees' => $outstandingFeeCount > 0,
+                    'outstanding_fee_count' => $outstandingFeeCount,
+                    'total_outstanding_balance' => $totalOutstandingBalance > 0 
+                        ? '₱' . number_format($totalOutstandingBalance, 2)
+                        : null,
+                ];
+            });
+
+        // ========== ALL FEES WITH COMPLETE PAYER INFORMATION ==========
+        Log::debug('PAYMENT_CREATE: Fetching ALL fees with balance for fees tab');
         
-        $allFees = Fee::with(['feeType'])
+        $allFees = Fee::with([
+                'feeType',
+                'payer' // Use polymorphic relationship instead of specific resident/household
+            ])
             ->where('balance', '>', 0)
             ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
             ->orderBy('due_date', 'asc')
             ->orderBy('payer_name', 'asc')
             ->get()
-            ->map(function ($fee) {
+            ->map(function ($fee) use ($getHouseholdMember) {
                 $baseAmount = is_numeric($fee->base_amount) ? $fee->base_amount : 0;
                 $surchargeAmount = is_numeric($fee->surcharge_amount) ? $fee->surcharge_amount : 0;
                 $penaltyAmount = is_numeric($fee->penalty_amount) ? $fee->penalty_amount : 0;
@@ -275,13 +421,152 @@ class PaymentController extends Controller
                 $balance = is_numeric($fee->balance) ? $fee->balance : 0;
                 $amountPaid = is_numeric($fee->amount_paid) ? $fee->amount_paid : 0;
 
+                // Get discount eligibility for resident fees
+                $applicableDiscounts = [];
+                $canApplyDiscount = false;
+                $residentDetails = null;
+                $householdDetails = null;
+                $isHouseholdHead = false;
+                
+                // For resident payers - access through polymorphic relationship
+                if ($fee->payer_type === 'App\Models\Resident' && $fee->payer_id) {
+                    $resident = $fee->payer; // This will load the Resident model
+                    
+                    if ($resident && $fee->feeType) {
+                        $residentDiscounts = $resident->discount_eligibility_list;
+                        
+                        foreach ($residentDiscounts as $discount) {
+                            $isDiscountApplicable = false;
+                            $applicablePercentage = $discount['percentage'];
+                            
+                            switch ($discount['type']) {
+                                case 'senior':
+                                    if ($fee->feeType->has_senior_discount) {
+                                        $isDiscountApplicable = true;
+                                        $applicablePercentage = $fee->feeType->senior_discount_percentage ?? $discount['percentage'];
+                                    }
+                                    break;
+                                case 'pwd':
+                                    if ($fee->feeType->has_pwd_discount) {
+                                        $isDiscountApplicable = true;
+                                        $applicablePercentage = $fee->feeType->pwd_discount_percentage ?? $discount['percentage'];
+                                    }
+                                    break;
+                                case 'solo_parent':
+                                    if ($fee->feeType->has_solo_parent_discount) {
+                                        $isDiscountApplicable = true;
+                                        $applicablePercentage = $fee->feeType->solo_parent_discount_percentage ?? $discount['percentage'];
+                                    }
+                                    break;
+                                case 'indigent':
+                                    if ($fee->feeType->has_indigent_discount) {
+                                        $isDiscountApplicable = true;
+                                        $applicablePercentage = $fee->feeType->indigent_discount_percentage ?? $discount['percentage'];
+                                    }
+                                    break;
+                            }
+                            
+                            if ($isDiscountApplicable) {
+                                $applicableDiscounts[] = [
+                                    'type' => $discount['type'],
+                                    'label' => $discount['label'],
+                                    'percentage' => $applicablePercentage,
+                                    'id_number' => $discount['id_number'] ?? null,
+                                    'has_id' => $discount['has_id'] ?? false,
+                                ];
+                            }
+                        }
+                        
+                        $canApplyDiscount = count($applicableDiscounts) > 0;
+                        
+                        // Check if resident is household head
+                        $householdMember = $getHouseholdMember($resident);
+                        $isHouseholdHead = $householdMember && $householdMember->is_head === true;
+                        
+                        $residentDetails = [
+                            'id' => $resident->id,
+                            'name' => $resident->full_name,
+                            'contact_number' => $resident->contact_number,
+                            'is_senior' => $resident->is_senior,
+                            'is_pwd' => $resident->is_pwd,
+                            'is_solo_parent' => $resident->is_solo_parent,
+                            'is_indigent' => $resident->is_indigent,
+                            'age' => $resident->age,
+                            'gender' => $resident->gender,
+                            'is_household_head' => $isHouseholdHead,
+                        ];
+                        
+                        // Get household details if resident belongs to a household
+                        if ($resident->household) {
+                            $headMember = $resident->household->householdMembers()
+                                ->where('is_head', true)
+                                ->with('resident')
+                                ->first();
+                            
+                            $householdDetails = [
+                                'id' => $resident->household->id,
+                                'household_number' => $resident->household->household_number,
+                                'contact_number' => $resident->household->contact_number,
+                                'address' => $resident->household->address,
+                                'purok' => $resident->household->purok->name ?? null,
+                                'member_count' => $resident->household->member_count,
+                                'head_of_household' => $headMember && $headMember->resident ? [
+                                    'id' => $headMember->resident_id,
+                                    'name' => $headMember->resident->full_name ?? 'Unknown',
+                                    'is_current_resident' => $headMember->resident_id === $resident->id,
+                                ] : null,
+                                'resident_role' => $householdMember ? $householdMember->relationship_to_head : null,
+                                'is_head' => $isHouseholdHead,
+                            ];
+                        }
+                    }
+                }
+                
+                // For household payers
+                if ($fee->payer_type === 'App\Models\Household' && $fee->payer_id) {
+                    $household = $fee->payer; // This will load the Household model
+                    
+                    if ($household) {
+                        // Get head of household
+                        $headMember = $household->householdMembers()
+                            ->where('is_head', true)
+                            ->with('resident')
+                            ->first();
+                        
+                        // Get all members count
+                        $membersCount = $household->householdMembers()->count();
+                        
+                        $householdDetails = [
+                            'id' => $household->id,
+                            'household_number' => $household->household_number,
+                            'contact_number' => $household->contact_number,
+                            'email' => $household->email,
+                            'address' => $household->address,
+                            'full_address' => $household->full_address,
+                            'purok' => $household->purok->name ?? null,
+                            'purok_id' => $household->purok_id,
+                            'member_count' => $household->member_count,
+                            'head_of_household' => $headMember && $headMember->resident ? [
+                                'id' => $headMember->resident_id,
+                                'name' => $headMember->resident->full_name ?? 'Unknown',
+                                'contact_number' => $headMember->resident->contact_number ?? null,
+                                'is_senior' => $headMember->resident->is_senior ?? false,
+                                'is_pwd' => $headMember->resident->is_pwd ?? false,
+                            ] : null,
+                            'head_name' => $household->current_head_name,
+                            'head_id' => $headMember->resident_id ?? null,
+                            'has_user_account' => $household->has_user_account,
+                            'members_count' => $membersCount,
+                        ];
+                    }
+                }
+
                 return [
                     'id' => $fee->id,
                     'fee_type_id' => $fee->fee_type_id,
                     'fee_code' => $fee->fee_code,
                     'payer_type' => $fee->payer_type,
-                    'resident_id' => $fee->resident_id,
-                    'household_id' => $fee->household_id,
+                    'payer_id' => $fee->payer_id,
                     'business_name' => $fee->business_name,
                     'payer_name' => $fee->payer_name,
                     'contact_number' => $fee->contact_number,
@@ -330,27 +615,130 @@ class PaymentController extends Controller
                     'deleted_at' => $fee->deleted_at ? $fee->deleted_at->format('Y-m-d H:i:s') : null,
                     'fee_type_name' => $fee->feeType->name ?? 'Unknown',
                     'fee_type_category' => $fee->feeType->category ?? 'other',
+                    'fee_type_has_senior_discount' => $fee->feeType->has_senior_discount ?? false,
+                    'fee_type_senior_discount_percentage' => $fee->feeType->senior_discount_percentage ?? 0,
+                    'fee_type_has_pwd_discount' => $fee->feeType->has_pwd_discount ?? false,
+                    'fee_type_pwd_discount_percentage' => $fee->feeType->pwd_discount_percentage ?? 0,
+                    'fee_type_has_solo_parent_discount' => $fee->feeType->has_solo_parent_discount ?? false,
+                    'fee_type_solo_parent_discount_percentage' => $fee->feeType->solo_parent_discount_percentage ?? 0,
+                    'fee_type_has_indigent_discount' => $fee->feeType->has_indigent_discount ?? false,
+                    'fee_type_indigent_discount_percentage' => $fee->feeType->indigent_discount_percentage ?? 0,
+                    'applicableDiscounts' => $applicableDiscounts,
+                    'canApplyDiscount' => $canApplyDiscount,
+                    'category' => $fee->feeType->category ?? 'other',
+                    'resident_details' => $residentDetails,
+                    'household_details' => $householdDetails,
+                    'fee_type' => $fee->feeType ? [
+                        'id' => $fee->feeType->id,
+                        'name' => $fee->feeType->name,
+                        'code' => $fee->feeType->code,
+                        'base_amount' => $fee->feeType->base_amount,
+                        'category' => $fee->feeType->category,
+                    ] : null,
                 ];
             });
 
-        // Get pending clearance requests (not yet paid)
-        Log::debug('PAYMENT_CREATE: Fetching pending clearance requests');
+        // ========== CLEARANCE REQUESTS WITH HOUSEHOLD INFORMATION ==========
+        Log::debug('PAYMENT_CREATE: Fetching ALL pending clearance requests');
+        
         $clearanceRequests = ClearanceRequest::with([
-                'resident.household.purok',
+                'resident' => function ($query) {
+                    $query->with(['household.purok', 'household.householdMembers.resident', 'householdMember']);
+                },
                 'clearanceType'
             ])
             ->whereIn('status', ['pending_payment', 'pending', 'processing', 'approved'])
-            ->whereNotExists(function ($query) {
-                $query->select(DB::raw(1))
-                      ->from('payment_items')
-                      ->whereColumn('payment_items.clearance_request_id', 'clearance_requests.id');
-            })
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function ($request) {
+            ->map(function ($request) use ($getHouseholdMember) {
                 $hasPaymentItem = DB::table('payment_items')
                     ->where('clearance_request_id', $request->id)
                     ->exists();
+                
+                $applicableDiscounts = [];
+                $canApplyDiscount = false;
+                $householdInfo = null;
+                $isHouseholdHead = false;
+                
+                if ($request->resident && $request->clearanceType) {
+                    $residentDiscounts = $request->resident->discount_eligibility_list;
+                    
+                    foreach ($residentDiscounts as $discount) {
+                        $isDiscountApplicable = false;
+                        $applicablePercentage = $discount['percentage'];
+                        
+                        switch ($discount['type']) {
+                            case 'senior':
+                                if ($request->clearanceType->has_senior_discount) {
+                                    $isDiscountApplicable = true;
+                                    $applicablePercentage = $request->clearanceType->senior_discount_percentage ?? $discount['percentage'];
+                                }
+                                break;
+                            case 'pwd':
+                                if ($request->clearanceType->has_pwd_discount) {
+                                    $isDiscountApplicable = true;
+                                    $applicablePercentage = $request->clearanceType->pwd_discount_percentage ?? $discount['percentage'];
+                                }
+                                break;
+                            case 'solo_parent':
+                                if ($request->clearanceType->has_solo_parent_discount) {
+                                    $isDiscountApplicable = true;
+                                    $applicablePercentage = $request->clearanceType->solo_parent_discount_percentage ?? $discount['percentage'];
+                                }
+                                break;
+                            case 'indigent':
+                                if ($request->clearanceType->has_indigent_discount) {
+                                    $isDiscountApplicable = true;
+                                    $applicablePercentage = $request->clearanceType->indigent_discount_percentage ?? $discount['percentage'];
+                                }
+                                break;
+                        }
+                        
+                        if ($isDiscountApplicable) {
+                            $applicableDiscounts[] = [
+                                'type' => $discount['type'],
+                                'label' => $discount['label'],
+                                'percentage' => $applicablePercentage,
+                                'id_number' => $discount['id_number'] ?? null,
+                                'has_id' => $discount['has_id'] ?? false,
+                            ];
+                        }
+                    }
+                    
+                    $canApplyDiscount = count($applicableDiscounts) > 0;
+                    
+                    // Check if resident is household head
+                    $householdMember = $getHouseholdMember($request->resident);
+                    $isHouseholdHead = $householdMember && $householdMember->is_head === true;
+                    
+                    // Get household information
+                    if ($request->resident->household) {
+                        $headMember = $request->resident->household->householdMembers()
+                            ->where('is_head', true)
+                            ->with('resident')
+                            ->first();
+                        
+                        $householdInfo = [
+                            'id' => $request->resident->household->id,
+                            'household_number' => $request->resident->household->household_number,
+                            'contact_number' => $request->resident->household->contact_number,
+                            'address' => $request->resident->household->address,
+                            'full_address' => $request->resident->household->full_address,
+                            'purok' => $request->resident->household->purok->name ?? null,
+                            'purok_id' => $request->resident->household->purok_id ?? null,
+                            'member_count' => $request->resident->household->member_count,
+                            'head_of_household' => $headMember && $headMember->resident ? [
+                                'id' => $headMember->resident_id,
+                                'name' => $headMember->resident->full_name ?? 'Unknown',
+                                'is_current_resident' => $headMember->resident_id === $request->resident_id,
+                            ] : null,
+                            'head_name' => $request->resident->household->current_head_name,
+                            'head_id' => $headMember->resident_id ?? null,
+                            'resident_role' => $householdMember ? $householdMember->relationship_to_head : null,
+                            'is_head' => $isHouseholdHead,
+                        ];
+                    }
+                }
                 
                 return [
                     'id' => $request->id,
@@ -367,24 +755,52 @@ class PaymentController extends Controller
                         'name' => $request->clearanceType->name,
                         'code' => $request->clearanceType->code ?? strtoupper(str_replace(' ', '_', $request->clearanceType->name)),
                         'description' => $request->clearanceType->description,
+                        'fee' => floatval($request->clearanceType->fee),
+                        'formatted_fee' => '₱' . number_format($request->clearanceType->fee, 2),
+                        'validity_days' => $request->clearanceType->validity_days,
+                        'has_senior_discount' => $request->clearanceType->has_senior_discount ?? false,
+                        'senior_discount_percentage' => $request->clearanceType->senior_discount_percentage ?? 0,
+                        'has_pwd_discount' => $request->clearanceType->has_pwd_discount ?? false,
+                        'pwd_discount_percentage' => $request->clearanceType->pwd_discount_percentage ?? 0,
+                        'has_solo_parent_discount' => $request->clearanceType->has_solo_parent_discount ?? false,
+                        'solo_parent_discount_percentage' => $request->clearanceType->solo_parent_discount_percentage ?? 0,
+                        'has_indigent_discount' => $request->clearanceType->has_indigent_discount ?? false,
+                        'indigent_discount_percentage' => $request->clearanceType->indigent_discount_percentage ?? 0,
                     ] : null,
                     'resident' => $request->resident ? [
                         'id' => $request->resident->id,
                         'name' => $request->resident->full_name,
+                        'first_name' => $request->resident->first_name,
+                        'last_name' => $request->resident->last_name,
                         'contact_number' => $request->resident->contact_number,
+                        'email' => $request->resident->email,
                         'address' => $request->resident->address,
-                        'household_number' => $request->resident->household->household_number ?? null,
-                        'purok' => $request->resident->household->purok->name ?? null,
-                        'household_id' => $request->resident->household_id ?? null,
+                        'birthdate' => $request->resident->birthdate?->format('Y-m-d'),
+                        'age' => $request->resident->age,
+                        'gender' => $request->resident->gender,
+                        'civil_status' => $request->resident->civil_status,
+                        'occupation' => $request->resident->occupation,
+                        'is_senior' => $request->resident->is_senior,
+                        'is_pwd' => $request->resident->is_pwd,
+                        'is_solo_parent' => $request->resident->is_solo_parent,
+                        'is_indigent' => $request->resident->is_indigent,
+                        'discount_eligibility_list' => $request->resident->discount_eligibility_list,
+                        'household_id' => $request->resident->household_id,
+                        'household_info' => $householdInfo,
+                        'is_household_head' => $isHouseholdHead,
                     ] : null,
+                    'household_info' => $householdInfo,
+                    'applicableDiscounts' => $applicableDiscounts,
+                    'canApplyDiscount' => $canApplyDiscount,
                     'can_be_paid' => in_array($request->status, ['pending_payment', 'processing', 'approved']) && !$hasPaymentItem,
                     'already_paid' => $hasPaymentItem,
                 ];
             })
             ->values();
 
-        // Get fee types for dropdown
+        // ========== FEE TYPES ==========
         Log::debug('PAYMENT_CREATE: Fetching fee types');
+        
         $feeTypes = FeeType::where('is_active', true)
             ->orderBy('sort_order', 'asc')
             ->orderBy('name', 'asc')
@@ -398,6 +814,14 @@ class PaymentController extends Controller
                     'base_amount' => floatval($feeType->base_amount),
                     'category' => $feeType->category,
                     'frequency' => $feeType->frequency,
+                    'has_senior_discount' => (bool) $feeType->has_senior_discount,
+                    'senior_discount_percentage' => floatval($feeType->senior_discount_percentage ?? 0),
+                    'has_pwd_discount' => (bool) $feeType->has_pwd_discount,
+                    'pwd_discount_percentage' => floatval($feeType->pwd_discount_percentage ?? 0),
+                    'has_solo_parent_discount' => (bool) $feeType->has_solo_parent_discount,
+                    'solo_parent_discount_percentage' => floatval($feeType->solo_parent_discount_percentage ?? 0),
+                    'has_indigent_discount' => (bool) $feeType->has_indigent_discount,
+                    'indigent_discount_percentage' => floatval($feeType->indigent_discount_percentage ?? 0),
                     'has_surcharge' => (bool) $feeType->has_surcharge,
                     'surcharge_rate' => floatval($feeType->surcharge_percentage ?? 0),
                     'surcharge_fixed' => floatval($feeType->surcharge_fixed ?? 0),
@@ -409,36 +833,244 @@ class PaymentController extends Controller
                 ];
             });
 
-        // Define discount types
-        $discountTypes = [
-            'senior_citizen' => 'Senior Citizen (20%)',
-            'pwd' => 'Person with Disability (20%)',
-            'solo_parent' => 'Solo Parent (15%)',
-            'indigent' => 'Indigent (50%)',
-            'veteran' => 'Veteran (100%)',
-            'government_employee' => 'Government Employee (10%)',
-            'promo' => 'Promotional Discount',
-        ];
+        // ========== DISCOUNT RULES ==========
+        Log::debug('PAYMENT_CREATE: Fetching active discount rules');
 
-        // Generate OR number in frontend format
-        function generateORNumber(): string {
+        $discountRules = DiscountRule::active()
+            ->priorityOrder()
+            ->get()
+            ->map(function ($rule) {
+                return [
+                    'id' => $rule->id,
+                    'code' => $rule->code,
+                    'name' => $rule->name,
+                    'description' => $rule->description,
+                    'discount_type' => $rule->discount_type,
+                    'value_type' => $rule->value_type,
+                    'discount_value' => $rule->discount_value,
+                    'maximum_discount_amount' => $rule->maximum_discount_amount,
+                    'minimum_purchase_amount' => $rule->minimum_purchase_amount,
+                    'priority' => $rule->priority,
+                    'requires_verification' => $rule->requires_verification,
+                    'verification_document' => $rule->verification_document,
+                    'applicable_to' => $rule->applicable_to,
+                    'stackable' => $rule->stackable,
+                    'exclusive_with' => $rule->exclusive_with,
+                    'effective_date' => $rule->effective_date?->format('Y-m-d'),
+                    'expiry_date' => $rule->expiry_date?->format('Y-m-d'),
+                    'formatted_value' => $rule->formatted_value,
+                    'status' => $rule->status,
+                    'type_label' => $rule->type_label,
+                    'is_expired' => $rule->is_expired,
+                ];
+            });
+
+        // Create a formatted array for the discount dropdown
+        $discountTypes = $discountRules->mapWithKeys(function ($rule) {
+            // Create a descriptive label
+            $label = $rule['name'];
+            if ($rule['formatted_value']) {
+                $label .= ' (' . $rule['formatted_value'] . ')';
+            }
+            if ($rule['minimum_purchase_amount'] > 0) {
+                $label .= ' - Min: ₱' . number_format($rule['minimum_purchase_amount'], 2);
+            }
+            if ($rule['requires_verification']) {
+                $label .= ' ✓';
+            }
+            return [$rule['code'] => $label];
+        })->toArray();
+
+        // Also keep a mapping of code -> id for reference
+        $discountCodeToIdMap = $discountRules->mapWithKeys(function ($rule) {
+            return [$rule['code'] => $rule['id']];
+        })->toArray();
+
+        // Generate OR number function
+        $generateORNumber = function(): string {
             $date = new \DateTime();
             $year = $date->format('Y');
             $month = $date->format('m');
             $day = $date->format('d');
             $random = str_pad(mt_rand(1, 999), 3, '0', STR_PAD_LEFT);
             return "BAR-{$year}{$month}{$day}-{$random}";
-        }
+        };
 
-        $defaultOrNumber = generateORNumber();
-
-        // If fee_id is provided in pre-filled data, get the fee details
+        // ========== SELECTED FEE DETAILS WITH HOUSEHOLD INFORMATION ==========
         $selectedFeeDetails = null;
         if (!empty($preFilledData['fee_id'])) {
-            $fee = Fee::with(['feeType', 'resident', 'household'])
-                ->find($preFilledData['fee_id']);
+            $feeId = $preFilledData['fee_id'];
+            Log::debug('PAYMENT_CREATE: Fetching selected fee details', ['fee_id' => $feeId]);
+            
+            $fee = Fee::with([
+                    'feeType',
+                    'payer' // Use polymorphic relationship
+                ])
+                ->find($feeId);
             
             if ($fee) {
+                Log::debug('PAYMENT_CREATE: Found fee', ['fee_id' => $fee->id, 'fee_code' => $fee->fee_code]);
+                
+                $applicableDiscounts = [];
+                $discountEligibilityText = '';
+                $residentDiscountInfo = null;
+                $householdInfo = null;
+                $isHouseholdHead = false;
+                
+                // For resident payers
+                if ($fee->payer_type === 'App\Models\Resident' && $fee->payer_id && $fee->feeType) {
+                    $resident = $fee->payer; // This will load the Resident model
+                    
+                    if ($resident) {
+                        $residentDiscounts = $resident->discount_eligibility_list;
+                        
+                        foreach ($residentDiscounts as $discount) {
+                            $isDiscountApplicable = false;
+                            $applicablePercentage = $discount['percentage'];
+                            
+                            switch ($discount['type']) {
+                                case 'senior':
+                                    if ($fee->feeType->has_senior_discount) {
+                                        $isDiscountApplicable = true;
+                                        $applicablePercentage = $fee->feeType->senior_discount_percentage ?? $discount['percentage'];
+                                    }
+                                    break;
+                                case 'pwd':
+                                    if ($fee->feeType->has_pwd_discount) {
+                                        $isDiscountApplicable = true;
+                                        $applicablePercentage = $fee->feeType->pwd_discount_percentage ?? $discount['percentage'];
+                                    }
+                                    break;
+                                case 'solo_parent':
+                                    if ($fee->feeType->has_solo_parent_discount) {
+                                        $isDiscountApplicable = true;
+                                        $applicablePercentage = $fee->feeType->solo_parent_discount_percentage ?? $discount['percentage'];
+                                    }
+                                    break;
+                                case 'indigent':
+                                    if ($fee->feeType->has_indigent_discount) {
+                                        $isDiscountApplicable = true;
+                                        $applicablePercentage = $fee->feeType->indigent_discount_percentage ?? $discount['percentage'];
+                                    }
+                                    break;
+                            }
+                            
+                            if ($isDiscountApplicable) {
+                                $applicableDiscounts[] = [
+                                    'type' => $discount['type'],
+                                    'label' => $discount['label'],
+                                    'percentage' => $applicablePercentage,
+                                    'id_number' => $discount['id_number'] ?? null,
+                                    'has_id' => $discount['has_id'] ?? false,
+                                ];
+                            }
+                        }
+                        
+                        if (!empty($applicableDiscounts)) {
+                            $highestDiscount = collect($applicableDiscounts)->sortByDesc('percentage')->first();
+                            $discountEligibilityText = "Eligible for {$highestDiscount['label']} discount ({$highestDiscount['percentage']}%)";
+                        }
+                        
+                        // Check if resident is household head
+                        $householdMember = $getHouseholdMember($resident);
+                        $isHouseholdHead = $householdMember && $householdMember->is_head === true;
+                        
+                        // Get household details
+                        if ($resident->household) {
+                            $headMember = $resident->household->householdMembers()
+                                ->where('is_head', true)
+                                ->with('resident')
+                                ->first();
+                            
+                            $householdInfo = [
+                                'id' => $resident->household->id,
+                                'household_number' => $resident->household->household_number,
+                                'contact_number' => $resident->household->contact_number,
+                                'email' => $resident->household->email,
+                                'address' => $resident->household->address,
+                                'full_address' => $resident->household->full_address,
+                                'purok' => $resident->household->purok->name ?? null,
+                                'purok_id' => $resident->household->purok_id,
+                                'member_count' => $resident->household->member_count,
+                                'head_of_household' => $headMember && $headMember->resident ? [
+                                    'id' => $headMember->resident_id,
+                                    'name' => $headMember->resident->full_name ?? 'Unknown',
+                                    'contact_number' => $headMember->resident->contact_number ?? null,
+                                    'is_current_resident' => $headMember->resident_id === $resident->id,
+                                ] : null,
+                                'head_name' => $resident->household->current_head_name,
+                                'head_id' => $headMember->resident_id ?? null,
+                                'resident_role' => $householdMember ? $householdMember->relationship_to_head : null,
+                                'is_head' => $isHouseholdHead,
+                                'has_user_account' => $resident->household->has_user_account,
+                            ];
+                        }
+                        
+                        $residentDiscountInfo = [
+                            'id' => $resident->id,
+                            'name' => $resident->full_name,
+                            'first_name' => $resident->first_name,
+                            'last_name' => $resident->last_name,
+                            'contact_number' => $resident->contact_number,
+                            'email' => $resident->email,
+                            'address' => $resident->address,
+                            'birthdate' => $resident->birthdate?->format('Y-m-d'),
+                            'age' => $resident->age,
+                            'gender' => $resident->gender,
+                            'is_senior' => $resident->is_senior,
+                            'is_pwd' => $resident->is_pwd,
+                            'is_solo_parent' => $resident->is_solo_parent,
+                            'is_indigent' => $resident->is_indigent,
+                            'has_special_classification' => $resident->has_special_classification,
+                            'discount_eligibility_list' => $residentDiscounts,
+                            'household_id' => $resident->household_id,
+                            'household_info' => $householdInfo,
+                            'is_household_head' => $isHouseholdHead,
+                        ];
+                    }
+                }
+                
+                // For household payers
+                if ($fee->payer_type === 'App\Models\Household' && $fee->payer_id) {
+                    $household = $fee->payer; // This will load the Household model
+                    
+                    if ($household) {
+                        $headMember = $household->householdMembers()
+                            ->where('is_head', true)
+                            ->with('resident')
+                            ->first();
+                        
+                        $householdInfo = [
+                            'id' => $household->id,
+                            'household_number' => $household->household_number,
+                            'contact_number' => $household->contact_number,
+                            'email' => $household->email,
+                            'address' => $household->address,
+                            'full_address' => $household->full_address,
+                            'purok' => $household->purok->name ?? null,
+                            'purok_id' => $household->purok_id,
+                            'member_count' => $household->member_count,
+                            'head_of_household' => $headMember && $headMember->resident ? [
+                                'id' => $headMember->resident_id,
+                                'name' => $headMember->resident->full_name ?? 'Unknown',
+                                'contact_number' => $headMember->resident->contact_number ?? null,
+                                'is_senior' => $headMember->resident->is_senior ?? false,
+                                'is_pwd' => $headMember->resident->is_pwd ?? false,
+                            ] : null,
+                            'head_name' => $household->current_head_name,
+                            'head_id' => $headMember->resident_id ?? null,
+                            'has_user_account' => $household->has_user_account,
+                            'user_account' => $household->user_account_details,
+                            'income_range' => $household->income_range,
+                            'housing_type' => $household->housing_type,
+                            'ownership_status' => $household->ownership_status,
+                            'has_electricity' => $household->has_electricity,
+                            'has_internet' => $household->has_internet,
+                            'has_vehicle' => $household->has_vehicle,
+                        ];
+                    }
+                }
+                
                 $selectedFeeDetails = [
                     'id' => $fee->id,
                     'fee_code' => $fee->fee_code,
@@ -447,14 +1079,14 @@ class PaymentController extends Controller
                     'fee_type_category' => $fee->feeType->category ?? 'other',
                     'payer_name' => $fee->payer_name,
                     'payer_type' => $fee->payer_type,
-                    'payer_id' => $fee->payer_type === 'resident' ? $fee->resident_id : $fee->household_id,
+                    'payer_id' => $fee->payer_id,
                     'contact_number' => $fee->contact_number,
                     'address' => $fee->address,
                     'purok' => $fee->purok,
                     'base_amount' => floatval($fee->base_amount),
                     'surcharge_amount' => floatval($fee->surcharge_amount),
                     'penalty_amount' => floatval($fee->penalty_amount),
-                    'discount_amount' => floatval($fee->discount_amount),
+                    'total_discounts' => floatval($fee->total_discounts),
                     'total_amount' => floatval($fee->total_amount),
                     'balance' => floatval($fee->balance),
                     'status' => $fee->status,
@@ -462,13 +1094,33 @@ class PaymentController extends Controller
                     'due_date' => $fee->due_date->format('Y-m-d'),
                     'purpose' => $fee->purpose,
                     'remarks' => $fee->remarks,
+                    'applicable_discounts' => $applicableDiscounts,
+                    'discount_eligibility_text' => $discountEligibilityText,
+                    'resident_discount_info' => $residentDiscountInfo,
+                    'household_info' => $householdInfo,
+                    'is_household_head' => $isHouseholdHead,
+                    'fee_type_has_senior_discount' => $fee->feeType->has_senior_discount ?? false,
+                    'fee_type_senior_discount_percentage' => $fee->feeType->senior_discount_percentage ?? 0,
+                    'fee_type_has_pwd_discount' => $fee->feeType->has_pwd_discount ?? false,
+                    'fee_type_pwd_discount_percentage' => $fee->feeType->pwd_discount_percentage ?? 0,
+                    'fee_type_has_solo_parent_discount' => $fee->feeType->has_solo_parent_discount ?? false,
+                    'fee_type_solo_parent_discount_percentage' => $fee->feeType->solo_parent_discount_percentage ?? 0,
+                    'fee_type_has_indigent_discount' => $fee->feeType->has_indigent_discount ?? false,
+                    'fee_type_indigent_discount_percentage' => $fee->feeType->indigent_discount_percentage ?? 0,
                 ];
+                
+                Log::debug('PAYMENT_CREATE: Selected fee details prepared', [
+                    'fee_id' => $selectedFeeDetails['id'],
+                    'has_discounts' => !empty($selectedFeeDetails['applicable_discounts']),
+                    'has_household_info' => !is_null($selectedFeeDetails['household_info']),
+                    'is_household_head' => $selectedFeeDetails['is_household_head'] ?? false,
+                ]);
             }
         }
 
-        // Get clearance types
-        Log::debug('PAYMENT_CREATE: Fetching clearance types from database');
-        
+        // ========== CLEARANCE TYPES ==========
+        Log::debug('PAYMENT_CREATE: Fetching clearance types');
+
         $clearanceTypesForSelect = ClearanceType::where('is_active', true)
             ->orderBy('name')
             ->get()
@@ -482,6 +1134,11 @@ class PaymentController extends Controller
             ->orderBy('name')
             ->get()
             ->map(function ($type) {
+                // Handle fields that are cast to arrays by the model
+                $eligibilityCriteria = $type->eligibility_criteria ?? [];
+                $purposeOptions = $type->purpose_options ?? [];
+                $requirements = $type->requirements ?? [];
+
                 return [
                     'id' => $type->id,
                     'name' => $type->name,
@@ -494,12 +1151,22 @@ class PaymentController extends Controller
                     'requires_payment' => (bool) $type->requires_payment,
                     'requires_approval' => (bool) $type->requires_approval,
                     'is_online_only' => (bool) $type->is_online_only,
-                    'eligibility_criteria' => $type->eligibility_criteria ? json_decode($type->eligibility_criteria, true) : [],
-                    'purpose_options' => $type->purpose_options ? explode(', ', $type->purpose_options) : [],
+                    'is_discountable' => (bool) $type->is_discountable,
+                    'eligibility_criteria' => $eligibilityCriteria,
+                    'purpose_options' => $purposeOptions,
+                    'requirements' => $requirements,
+                    'has_senior_discount' => (bool) ($type->has_senior_discount ?? false),
+                    'senior_discount_percentage' => floatval($type->senior_discount_percentage ?? 0),
+                    'has_pwd_discount' => (bool) ($type->has_pwd_discount ?? false),
+                    'pwd_discount_percentage' => floatval($type->pwd_discount_percentage ?? 0),
+                    'has_solo_parent_discount' => (bool) ($type->has_solo_parent_discount ?? false),
+                    'solo_parent_discount_percentage' => floatval($type->solo_parent_discount_percentage ?? 0),
+                    'has_indigent_discount' => (bool) ($type->has_indigent_discount ?? false),
+                    'indigent_discount_percentage' => floatval($type->indigent_discount_percentage ?? 0),
                 ];
             });
 
-        // Handle clearance request pre-fill
+        // ========== CLEARANCE REQUEST PRE-FILL ==========
         $clearanceRequest = null;
         $selectedClearanceTypeId = $preFilledData['clearance_type_id'] ?? null;
         
@@ -509,7 +1176,9 @@ class PaymentController extends Controller
             ]);
             
             $clearanceRequest = ClearanceRequest::with([
-                    'resident.household.purok',
+                    'resident' => function ($query) {
+                        $query->with(['household.purok', 'household.householdMembers.resident', 'householdMember']);
+                    },
                     'clearanceType'
                 ])
                 ->find($preFilledData['clearance_request_id']);
@@ -518,12 +1187,6 @@ class PaymentController extends Controller
                 $hasPaymentItem = DB::table('payment_items')
                     ->where('clearance_request_id', $clearanceRequest->id)
                     ->exists();
-                    
-                if ($hasPaymentItem) {
-                    return redirect()->back()->withErrors([
-                        'error' => 'This clearance request already has a payment.'
-                    ]);
-                }
                 
                 $payableStatuses = ['approved', 'pending_payment', 'processing'];
                 
@@ -534,7 +1197,7 @@ class PaymentController extends Controller
                     ]);
                 }
                 
-                $preFilledData['payer_type'] = 'resident';
+                $preFilledData['payer_type'] = 'App\Models\Resident';
                 $preFilledData['payer_id'] = $clearanceRequest->resident_id;
                 $preFilledData['payer_name'] = $clearanceRequest->resident->full_name ?? 'Unknown';
                 $preFilledData['contact_number'] = $clearanceRequest->resident->contact_number ?? null;
@@ -567,15 +1230,22 @@ class PaymentController extends Controller
             $selectedClearanceType = $clearanceTypesDetails->firstWhere('id', $selectedClearanceTypeId);
         }
 
+        // Determine if this is a combined payment (both fee and clearance)
+        $isCombinedPayment = !empty($preFilledData['fee_id']) && !empty($preFilledData['clearance_request_id']);
+
         Log::info('PAYMENT_CREATE: Rendering payment creation view', [
             'data_summary' => [
                 'residents_count' => count($residents),
                 'households_count' => count($households),
                 'clearance_requests_count' => $clearanceRequests->count(),
                 'all_fees_count' => $allFees->count(),
+                'discount_rules_count' => $discountRules->count(),
                 'has_clearance_request' => !is_null($clearanceRequest),
                 'clearance_types_count' => $clearanceTypesDetails->count(),
                 'selected_clearance_type_id' => $selectedClearanceTypeId,
+                'has_selected_fee_details' => !is_null($selectedFeeDetails),
+                'selected_fee_id' => $selectedFeeDetails['id'] ?? null,
+                'is_combined_payment' => $isCombinedPayment,
             ],
         ]);
 
@@ -585,7 +1255,9 @@ class PaymentController extends Controller
             'clearance_requests' => $clearanceRequests,
             'fees' => $allFees,
             'feeTypes' => $feeTypes,
-            'discountTypes' => $discountTypes,
+            'discountRules' => $discountRules, // Full discount rule data
+            'discountTypes' => $discountTypes, // For dropdown display
+            'discountCodeToIdMap' => $discountCodeToIdMap, // For mapping back to IDs
             'pre_filled_data' => array_merge($preFilledData, [
                 'fee_type_id' => $preFilledData['fee_type_id'] ?? null,
                 'clearance_type_id' => $selectedClearanceTypeId,
@@ -606,7 +1278,6 @@ class PaymentController extends Controller
                 'requirements_met' => $clearanceRequest->requirements_met,
                 'remarks' => $clearanceRequest->remarks,
                 'created_at' => $clearanceRequest->created_at->format('Y-m-d H:i:s'),
-                
                 'clearance_type' => $clearanceRequest->clearanceType ? [
                     'id' => $clearanceRequest->clearanceType->id,
                     'name' => $clearanceRequest->clearanceType->name,
@@ -616,22 +1287,45 @@ class PaymentController extends Controller
                     'formatted_fee' => '₱' . number_format($clearanceRequest->clearanceType->fee, 2),
                     'processing_days' => $clearanceRequest->clearanceType->processing_days,
                     'validity_days' => $clearanceRequest->clearanceType->validity_days,
-                    'requirements' => $clearanceRequest->clearanceType->requirements,
+                    'requirements' => $clearanceRequest->clearanceType->requirements ?? [],
+                    'has_senior_discount' => $clearanceRequest->clearanceType->has_senior_discount ?? false,
+                    'senior_discount_percentage' => $clearanceRequest->clearanceType->senior_discount_percentage ?? 0,
+                    'has_pwd_discount' => $clearanceRequest->clearanceType->has_pwd_discount ?? false,
+                    'pwd_discount_percentage' => $clearanceRequest->clearanceType->pwd_discount_percentage ?? 0,
+                    'has_solo_parent_discount' => $clearanceRequest->clearanceType->has_solo_parent_discount ?? false,
+                    'solo_parent_discount_percentage' => $clearanceRequest->clearanceType->solo_parent_discount_percentage ?? 0,
+                    'has_indigent_discount' => $clearanceRequest->clearanceType->has_indigent_discount ?? false,
+                    'indigent_discount_percentage' => $clearanceRequest->clearanceType->indigent_discount_percentage ?? 0,
                 ] : null,
-                
                 'resident' => $clearanceRequest->resident ? [
                     'id' => $clearanceRequest->resident->id,
                     'name' => $clearanceRequest->resident->full_name,
+                    'first_name' => $clearanceRequest->resident->first_name,
+                    'last_name' => $clearanceRequest->resident->last_name,
                     'contact_number' => $clearanceRequest->resident->contact_number,
+                    'email' => $clearanceRequest->resident->email,
                     'address' => $clearanceRequest->resident->address,
                     'household_number' => $clearanceRequest->resident->household->household_number ?? null,
                     'purok' => $clearanceRequest->resident->household->purok->name ?? null,
+                    'purok_id' => $clearanceRequest->resident->household->purok_id ?? null,
+                    'household_id' => $clearanceRequest->resident->household_id ?? null,
+                    'household_head' => $clearanceRequest->resident->household && $clearanceRequest->resident->household->head_of_household 
+                        ? $clearanceRequest->resident->household->head_of_household->full_name 
+                        : null,
+                    'household_head_id' => $clearanceRequest->resident->household && $clearanceRequest->resident->household->head_of_household
+                        ? $clearanceRequest->resident->household->head_of_household->id
+                        : null,
+                    'is_household_head' => $clearanceRequest->resident->householdMember && 
+                        $getHouseholdMember($clearanceRequest->resident)?->is_head === true,
                     'birthdate' => $clearanceRequest->resident->birthdate?->format('Y-m-d'),
                     'age' => $clearanceRequest->resident->age ?? null,
                     'gender' => $clearanceRequest->resident->gender,
-                    'household_id' => $clearanceRequest->resident->household_id ?? null,
+                    'is_senior' => $clearanceRequest->resident->is_senior,
+                    'is_pwd' => $clearanceRequest->resident->is_pwd,
+                    'is_solo_parent' => $clearanceRequest->resident->is_solo_parent,
+                    'is_indigent' => $clearanceRequest->resident->is_indigent,
+                    'discount_eligibility_list' => $clearanceRequest->resident->discount_eligibility_list,
                 ] : null,
-                
                 'can_be_paid' => in_array($clearanceRequest->status, ['approved', 'pending_payment', 'processing']) && !$hasPaymentItem,
                 'already_paid' => $hasPaymentItem ?? false,
             ] : null,
@@ -653,30 +1347,9 @@ class PaymentController extends Controller
             'clearanceTypesDetails' => $clearanceTypesDetails,
             'selectedClearanceType' => $selectedClearanceType,
             'hasClearanceTypes' => $clearanceTypesDetails->count() > 0,
+            'isCombinedPayment' => $isCombinedPayment,
         ]);
     }
-
-    /**
-     * Generate OR number in frontend format.
-     */
-    private function generateOrNumber()
-    {
-        $date = now()->format('Ymd');
-        
-        $latestPayment = Payment::where('or_number', 'like', "BAR-{$date}-%")
-            ->orderByRaw('CAST(SUBSTRING(or_number, -3) AS UNSIGNED) DESC')
-            ->first();
-
-        if ($latestPayment) {
-            $lastNumber = (int) substr($latestPayment->or_number, -3);
-            $nextNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT);
-        } else {
-            $nextNumber = '001';
-        }
-
-        return "BAR-{$date}-{$nextNumber}";
-    }
-
     /**
      * Get outstanding fees for a specific payer.
      */
@@ -758,27 +1431,42 @@ class PaymentController extends Controller
    /**
  * Store a newly created payment in storage.
  */
+  private function getPayerModelClass(string $payerType): string
+    {
+        return match($payerType) {
+            'resident' => 'App\\Models\\Resident',
+            'household' => 'App\\Models\\Household',
+            'business' => 'App\\Models\\Business',
+            default => 'App\\Models\\Resident',
+        };
+    }
+
+    /**
+     * Generate a unique OR number
+     */
+    private function generateOrNumber(): string
+    {
+        $date = now()->format('Ymd');
+        $lastPayment = Payment::where('or_number', 'like', "BAR-{$date}-%")
+            ->orderBy('or_number', 'desc')
+            ->first();
+
+        if ($lastPayment) {
+            $lastNumber = (int) substr($lastPayment->or_number, -3);
+            $newNumber = str_pad($lastNumber + 1, 3, '0', STR_PAD_LEFT);
+        } else {
+            $newNumber = '001';
+        }
+
+        return "BAR-{$date}-{$newNumber}";
+    }
+
 public function store(Request $request)
 {
     Log::info('PAYMENT_STORE_REQUEST: Payment creation started', [
         'user_id' => Auth::id(),
         'user_name' => Auth::user()->name ?? 'Unknown',
         'items_count' => count($request->input('items', [])),
-    ]);
-
-    // Debug: Check authentication
-    Log::debug('Auth debug:', [
-        'auth_id' => Auth::id(),
-        'auth_check' => Auth::check(),
-        'user_exists' => Auth::user() ? 'YES' : 'NO',
-        'user_details' => Auth::user() ? [
-            'id' => Auth::user()->id,
-            'first_name' => Auth::user()->first_name,
-            'last_name' => Auth::user()->last_name,
-            'username' => Auth::user()->username,
-            'email' => Auth::user()->email,
-            'status' => Auth::user()->status,
-        ] : 'NO_USER',
     ]);
 
     // Validate main request
@@ -799,8 +1487,8 @@ public function store(Request $request)
         'surcharge' => 'required|numeric|min:0',
         'penalty' => 'required|numeric|min:0',
         'discount' => 'required|numeric|min:0',
-        'discount_type' => 'nullable|string|max:100',
-        'total_amount' => 'required|numeric|min:0',
+        'amount_paid' => 'required|numeric|min:0',
+        'total_amount' => 'required|numeric|min:0', // This should be subtotal + surcharge + penalty
         'purpose' => 'required|string|max:500',
         'remarks' => 'nullable|string|max:1000',
         'is_cleared' => 'boolean',
@@ -808,23 +1496,56 @@ public function store(Request $request)
         'collection_type' => 'required|in:manual,system',
         'method_details' => 'nullable|array',
         'items' => 'required|array|min:1',
+        'verification_id_number' => 'nullable|string',
+        'verification_remarks' => 'nullable|string',
+        'discount_code' => 'nullable|string',
+        'discount_type' => 'nullable|string',
     ]);
 
-    // Generate OR number if not provided or invalid
+    // IMPORTANT: Recalculate total_amount to ensure it's correct (subtotal + surcharge + penalty)
+    $calculatedTotal = $validated['subtotal'] + $validated['surcharge'] + $validated['penalty'];
+    
+    // If there's a mismatch, use the calculated total
+    if (abs($calculatedTotal - $validated['total_amount']) > 0.01) {
+        Log::warning('PAYMENT_STORE: Total amount mismatch, using calculated value', [
+            'provided_total' => $validated['total_amount'],
+            'calculated_total' => $calculatedTotal,
+        ]);
+        $validated['total_amount'] = $calculatedTotal;
+    }
+
+    // Calculate amount due after discount (what they should pay)
+    $amountDue = $validated['total_amount'] - $validated['discount'];
+
+    // Log the correct values
+    Log::info('PAYMENT_STORE: Payment calculation', [
+        'subtotal' => $validated['subtotal'],
+        'surcharge' => $validated['surcharge'],
+        'penalty' => $validated['penalty'],
+        'total_amount' => $validated['total_amount'], // Original amount before discount (51.00)
+        'discount' => $validated['discount'], // Discount amount (5.10)
+        'amount_due' => $amountDue, // What they should pay (45.90)
+        'amount_paid' => $validated['amount_paid'], // What they actually paid (should be 45.90)
+    ]);
+
+    // Validate that amount_paid makes sense
+    if ($validated['amount_paid'] < 0) {
+        return back()->withErrors(['amount_paid' => 'Amount paid cannot be negative'])->withInput();
+    }
+
+    // Generate OR number
     $orNumber = $validated['or_number'] ?? $this->generateOrNumber();
     
     if (Payment::where('or_number', $orNumber)->exists()) {
         $orNumber = $this->generateOrNumber();
-        Log::warning('PAYMENT_STORE: OR number conflict, generated new one', [
-            'new_or_number' => $orNumber,
-        ]);
     }
     
     $validated['or_number'] = $orNumber;
 
-    // Validate each item
+    // Validate items
     $validatedItems = [];
-    $clearanceTypeCode = null;
+    $feeIdsToUpdate = [];
+    $itemDiscountAmounts = [];
     
     foreach ($validated['items'] as $index => $item) {
         try {
@@ -839,45 +1560,15 @@ public function store(Request $request)
                 'base_amount' => 'required|numeric|min:0',
                 'surcharge' => 'required|numeric|min:0',
                 'penalty' => 'required|numeric|min:0',
-                'total_amount' => 'required|numeric|min:0',
+                'total_amount' => 'required|numeric|min:0', // This is base + surcharge + penalty (without discount)
                 'category' => 'required|string|max:50',
                 'period_covered' => 'nullable|string|max:100',
                 'months_late' => 'nullable|integer|min:0',
                 'metadata' => 'nullable|array',
             ])->validate();
 
-            // Validate clearance request if provided in metadata
-            if (!empty($itemData['metadata']['clearance_request_id'])) {
-                $clearanceRequest = ClearanceRequest::with(['resident', 'clearanceType'])
-                    ->find($itemData['metadata']['clearance_request_id']);
-                
-                if (!$clearanceRequest) {
-                    throw new \Exception('Clearance request not found');
-                }
-                
-                $payableStatuses = ['pending_payment', 'processing', 'approved'];
-                if (!in_array($clearanceRequest->status, $payableStatuses)) {
-                    throw new \Exception('Clearance request is not payable. Current status: ' . 
-                               ($clearanceRequest->status_display ?? $clearanceRequest->status));
-                }
-                
-                $alreadyPaid = DB::table('payment_items')
-                    ->where('clearance_request_id', $clearanceRequest->id)
-                    ->exists();
-                
-                if ($alreadyPaid) {
-                    throw new \Exception('Clearance request already has a payment.');
-                }
-                
-                if ($validated['payer_type'] === 'resident' && 
-                    $validated['payer_id'] != $clearanceRequest->resident_id) {
-                    throw new \Exception('Payer does not match clearance request resident');
-                }
-                
-                if ($clearanceRequest->clearanceType) {
-                    $clearanceTypeCode = $clearanceRequest->clearanceType->code ?? 
-                        strtoupper(str_replace(' ', '_', $clearanceRequest->clearanceType->name));
-                }
+            if (!empty($itemData['outstanding_fee_id'])) {
+                $feeIdsToUpdate[] = $itemData['outstanding_fee_id'];
             }
 
             $validatedItems[] = [
@@ -891,26 +1582,14 @@ public function store(Request $request)
                 'base_amount' => floatval($itemData['base_amount']),
                 'surcharge' => floatval($itemData['surcharge']),
                 'penalty' => floatval($itemData['penalty']),
-                'total_amount' => floatval($itemData['total_amount']),
+                'total_amount' => floatval($itemData['total_amount']), // Original amount without discount
                 'category' => $itemData['category'],
                 'period_covered' => $itemData['period_covered'] ?? null,
                 'months_late' => $itemData['months_late'] ?? 0,
-                'metadata' => $itemData['metadata'] ?? null,
+                'metadata' => $itemData['metadata'] ?? [],
             ];
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('PAYMENT_STORE_ITEM_VALIDATION_ERROR', [
-                'item_index' => $index,
-                'errors' => $e->errors(),
-            ]);
-            throw $e;
         } catch (\Exception $e) {
-            Log::error('PAYMENT_STORE_ITEM_ERROR', [
-                'item_index' => $index,
-                'error' => $e->getMessage(),
-            ]);
-            return back()->withErrors([
-                'error' => 'Item ' . ($index + 1) . ': ' . $e->getMessage()
-            ])->withInput();
+            return back()->withErrors(['error' => 'Item ' . ($index + 1) . ': ' . $e->getMessage()])->withInput();
         }
     }
 
@@ -919,75 +1598,21 @@ public function store(Request $request)
     DB::beginTransaction();
 
     try {
-        Log::info('PAYMENT_STORE: Creating payment record', [
-            'or_number' => $validated['or_number'],
-            'payer_name' => $validated['payer_name'],
-            'payer_type' => $validated['payer_type'],
-            'total_amount' => $validated['total_amount'],
-            'items_count' => count($validated['items']),
-            'clearance_type_code' => $clearanceTypeCode,
-        ]);
-
-        // === DEBUG: Check user exists before insert ===
-        $recordedByUser = Auth::user();
-        if (!$recordedByUser) {
-            throw new \Exception('No authenticated user found. Cannot record payment.');
-        }
-        
-        // Check if user exists in database
-        $userExists = DB::table('users')->where('id', $recordedByUser->id)->exists();
-        if (!$userExists) {
-            Log::warning('PAYMENT_STORE: Auth user not found in database, using fallback user', [
-                'auth_id' => $recordedByUser->id,
-                'fallback_to_user_id' => 1,
-            ]);
-            $recordedBy = 1; // Fallback to user ID 1
-        } else {
-            $recordedBy = $recordedByUser->id;
+        // Determine status based on amount paid vs amount due
+        $status = 'completed';
+        if ($validated['amount_paid'] <= 0) {
+            $status = 'pending';
+        } elseif ($validated['amount_paid'] < $amountDue - 0.01) {
+            $status = 'partially_paid';
         }
 
-        // === DEBUG: Test insert before main insert ===
-        Log::debug('PAYMENT_STORE: Testing insert with recorded_by = ' . $recordedBy);
-        
-        $testData = [
-            'status' => 'completed',
-            'collection_type' => 'manual',
-            'or_number' => 'TEST-' . time(),
-            'payer_type' => 'resident',
-            'payer_id' => 1,
-            'payer_name' => 'Test Payment',
-            'payment_date' => now(),
-            'payment_method' => 'cash',
-            'subtotal' => 100,
-            'surcharge' => 0,
-            'penalty' => 0,
-            'discount' => 0,
-            'total_amount' => 100,
-            'purpose' => 'Test',
-            'is_cleared' => false,
-            'recorded_by' => $recordedBy,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ];
-        
-        try {
-            DB::table('payments')->insert($testData);
-            Log::info('PAYMENT_STORE: Test insert successful with recorded_by = ' . $recordedBy);
-            // Delete test record
-            DB::table('payments')->where('or_number', $testData['or_number'])->delete();
-        } catch (\Exception $e) {
-            Log::error('PAYMENT_STORE: Test insert failed', [
-                'error' => $e->getMessage(),
-                'recorded_by' => $recordedBy,
-                'test_data' => $testData,
-            ]);
-            throw new \Exception('Test insert failed: ' . $e->getMessage());
-        }
+        // Get recorded by user
+        $recordedBy = Auth::id() ?? 1;
 
-        // === MAIN PAYMENT DATA ===
+        // Create payment record
         $paymentData = [
-            'status' => 'completed',
-            'collection_type' => 'manual',
+            'status' => $status,
+            'collection_type' => $validated['collection_type'] ?? 'manual',
             'or_number' => $validated['or_number'],
             'payer_type' => $validated['payer_type'],
             'payer_id' => $validated['payer_id'],
@@ -1004,69 +1629,65 @@ public function store(Request $request)
             'surcharge' => floatval($validated['surcharge']),
             'penalty' => floatval($validated['penalty']),
             'discount' => floatval($validated['discount']),
-            'discount_type' => $validated['discount_type'] ?? null,
-            'total_amount' => floatval($validated['total_amount']),
+            'amount_paid' => floatval($validated['amount_paid']),
+            'total_amount' => floatval($validated['total_amount']), // Original amount before discount
             'purpose' => $validated['purpose'],
             'remarks' => $validated['remarks'] ?? null,
             'is_cleared' => $validated['is_cleared'] ?? false,
             'validity_date' => $validated['validity_date'] ?? null,
-            'method_details' => !empty($validated['method_details']) 
-                ? json_encode($validated['method_details']) 
-                : null,
-            'recorded_by' => $recordedBy, // Use validated user ID
+            'method_details' => !empty($validated['method_details']) ? json_encode($validated['method_details']) : null,
+            'recorded_by' => $recordedBy,
+            'discount_code' => $validated['discount_code'] ?? null,
+            'discount_type' => $validated['discount_type'] ?? null,
             'created_at' => now(),
             'updated_at' => now(),
         ];
 
-        // Log data for debugging
-        Log::debug('Payment data being inserted:', $paymentData);
-
-        // === CRITICAL FIX: Temporarily disable foreign key checks ===
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        
-        try {
-            $paymentId = DB::table('payments')->insertGetId($paymentData);
-        } finally {
-            // Always re-enable foreign key checks
-            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-        }
-        
-        $payment = Payment::find($paymentId);
-
-        if (!$payment) {
-            throw new \Exception('Failed to retrieve created payment');
-        }
-
-        Log::info('PAYMENT_STORE: Payment record created', [
-            'payment_id' => $payment->id,
-            'or_number' => $payment->or_number,
+        Log::info('PAYMENT_STORE: Creating payment record', [
+            'or_number' => $paymentData['or_number'],
+            'payer_name' => $paymentData['payer_name'],
+            'total_amount' => $paymentData['total_amount'],
+            'discount' => $paymentData['discount'],
+            'amount_due' => $paymentData['total_amount'] - $paymentData['discount'],
+            'amount_paid' => $paymentData['amount_paid'],
+            'status' => $status,
         ]);
 
-        $outstandingFees = Fee::where('payer_type', $validated['payer_type'])
-            ->where($validated['payer_type'] . '_id', $validated['payer_id'])
-            ->where('balance', '>', 0)
-            ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
+        $payment = Payment::create($paymentData);
+
+        // Get outstanding fees
+        $payerModelClass = $this->getPayerModelClass($validated['payer_type']);
+        $outstandingFees = Fee::where('payer_type', $payerModelClass)
+            ->where('payer_id', $validated['payer_id'])
+            ->whereIn('id', $feeIdsToUpdate)
             ->get()
             ->keyBy('id');
 
-        // Create payment items
-        $itemDetails = [];
+        // Calculate proportional discount per item
+        $totalBaseAmount = array_sum(array_column($validated['items'], 'base_amount'));
+        $totalDiscount = floatval($validated['discount']);
+        
+        if ($totalDiscount > 0 && $totalBaseAmount > 0) {
+            foreach ($validated['items'] as $index => $item) {
+                $itemBaseAmount = floatval($item['base_amount']);
+                $itemProportion = $itemBaseAmount / $totalBaseAmount;
+                $itemDiscountAmounts[$index] = $totalDiscount * $itemProportion;
+            }
+        }
+
+        // Create payment items and update fees
         $feeIdsPaid = [];
-        $clearanceRequestsPaid = [];
         
         foreach ($validated['items'] as $index => $item) {
             $paymentItemData = [
                 'payment_id' => $payment->id,
-                'fee_id' => null,
-                'clearance_request_id' => null,
-                'original_fee_id' => null,
                 'fee_name' => $item['fee_name'],
                 'fee_code' => $item['fee_code'],
                 'description' => $item['description'] ?? null,
                 'base_amount' => $item['base_amount'],
                 'surcharge' => $item['surcharge'],
                 'penalty' => $item['penalty'],
-                'total_amount' => $item['total_amount'],
+                'total_amount' => $item['total_amount'], // Original amount without discount
                 'category' => $item['category'],
                 'period_covered' => $item['period_covered'] ?? null,
                 'months_late' => $item['months_late'] ?? 0,
@@ -1075,143 +1696,53 @@ public function store(Request $request)
                 'updated_at' => now(),
             ];
 
-            // Check if it's a clearance fee
-            if (($item['metadata']['is_clearance_fee'] ?? false) || $item['item_type'] === 'clearance') {
-                $clearanceRequestId = $item['metadata']['clearance_request_id'] ?? null;
+            // Handle outstanding fee
+            if (!empty($item['outstanding_fee_id']) && isset($outstandingFees[$item['outstanding_fee_id']])) {
+                $fee = $outstandingFees[$item['outstanding_fee_id']];
+                $itemDiscountAmount = $itemDiscountAmounts[$index] ?? 0;
                 
-                if ($clearanceRequestId) {
-                    $clearanceRequest = ClearanceRequest::find($clearanceRequestId);
-                    
-                    if ($clearanceRequest) {
-                        $clearanceRequest->update([
-                            'status' => 'paid',
-                            'payment_id' => $payment->id,
-                            'fee_amount' => $item['total_amount'],
-                            'payment_date' => $validated['payment_date'],
-                            'payment_method' => $validated['payment_method'],
-                            'or_number' => $payment->or_number,
-                        ]);
-                        
-                        $clearanceRequestsPaid[] = $clearanceRequestId;
-                        
-                        $paymentItemData['clearance_request_id'] = $clearanceRequestId;
-                        
-                        $metadata = $item['metadata'] ?? [];
-                        $metadata['is_clearance_fee'] = true;
-                        $metadata['clearance_request_id'] = $clearanceRequestId;
-                        $metadata['clearance_type_id'] = $clearanceRequest->clearance_type_id ?? null;
-                        $metadata['clearance_type_code'] = $clearanceTypeCode;
-                        
-                        $paymentItemData['fee_metadata'] = json_encode($metadata);
-                    }
-                }
-            } 
-            // Check if it's an outstanding fee payment
-            elseif (!empty($item['outstanding_fee_id']) || ($item['metadata']['is_outstanding_fee'] ?? false)) {
-                $outstandingFeeId = $item['outstanding_fee_id'] ?? $item['fee_id'];
+                // Calculate the actual amount paid for this fee (total_amount - discount portion)
+                $actualAmountPaid = $item['total_amount'] - $itemDiscountAmount;
                 
-                if (isset($outstandingFees[$outstandingFeeId])) {
-                    $fee = $outstandingFees[$outstandingFeeId];
-                    
-                    $newBalance = max(0, $fee->balance - $item['total_amount']);
-                    $newStatus = $newBalance <= 0 ? 'paid' : 'partially_paid';
-                    
-                    $fee->update([
-                        'balance' => $newBalance,
-                        'amount_paid' => $fee->amount_paid + $item['total_amount'],
-                        'status' => $newStatus,
-                        'last_payment_date' => now(),
-                        'last_payment_or' => $payment->or_number,
-                    ]);
-                    
-                    $paymentItemData['original_fee_id'] = $fee->id;
-                    $paymentItemData['fee_id'] = $fee->id;
-                    $feeIdsPaid[] = $fee->id;
-                    
-                    $metadata = $item['metadata'] ?? [];
-                    if ($fee->feeType) {
-                        $metadata['original_amount'] = $fee->feeType->base_amount;
-                        $metadata['surcharge_rate'] = $fee->feeType->surcharge_percentage;
-                        $metadata['penalty_rate'] = $fee->feeType->penalty_percentage;
-                        $metadata['validity_days'] = $fee->feeType->validity_days;
-                        $metadata['frequency'] = $fee->feeType->frequency;
-                    }
-                    $metadata['is_outstanding_fee'] = true;
-                    $metadata['original_fee_id'] = $fee->id;
-                    
-                    $paymentItemData['fee_metadata'] = json_encode($metadata);
-                }
-            }
-            // Regular fee type payment (new fee)
-            elseif (!empty($item['fee_id']) && is_numeric($item['fee_id'])) {
-                if (!isset($outstandingFees[$item['fee_id']])) {
-                    $feeType = FeeType::find($item['fee_id']);
-                    if ($feeType) {
-                        $newFee = Fee::create([
-                            'fee_code' => $item['fee_code'] ?? $feeType->code,
-                            'fee_type_id' => $feeType->id,
-                            'payer_type' => $validated['payer_type'],
-                            'resident_id' => $validated['payer_type'] === 'resident' ? $validated['payer_id'] : null,
-                            'household_id' => $validated['payer_type'] === 'household' ? $validated['payer_id'] : null,
-                            'payer_name' => $validated['payer_name'],
-                            'contact_number' => $validated['contact_number'] ?? null,
-                            'address' => $validated['address'] ?? null,
-                            'purok' => $validated['purok'] ?? null,
-                            'base_amount' => $item['base_amount'],
-                            'surcharge_amount' => $item['surcharge'],
-                            'penalty_amount' => $item['penalty'],
-                            'discount_amount' => 0,
-                            'total_amount' => $item['total_amount'],
-                            'amount_paid' => $item['total_amount'],
-                            'balance' => 0,
-                            'status' => 'paid',
-                            'issue_date' => now(),
-                            'due_date' => now(),
-                            'purpose' => $validated['purpose'] ?? $feeType->description,
-                            'remarks' => 'Paid upon creation: ' . $payment->or_number,
-                            'recorded_by' => $recordedBy,
-                        ]);
-                        
-                        $paymentItemData['fee_id'] = $newFee->id;
-                        
-                        $metadata = $item['metadata'] ?? [];
-                        $metadata['original_amount'] = $feeType->base_amount;
-                        $metadata['surcharge_rate'] = $feeType->surcharge_percentage;
-                        $metadata['penalty_rate'] = $feeType->penalty_percentage;
-                        $metadata['validity_days'] = $feeType->validity_days;
-                        $metadata['frequency'] = $feeType->frequency;
-                        $metadata['is_new_fee'] = true;
-                        
-                        $paymentItemData['fee_metadata'] = json_encode($metadata);
-                    }
-                }
+                // Update fee
+                $newBalance = max(0, $fee->balance - $actualAmountPaid);
+                $newAmountPaid = $fee->amount_paid + $actualAmountPaid;
+                $newTotalDiscounts = ($fee->total_discounts ?? 0) + $itemDiscountAmount;
+                
+                $fee->update([
+                    'total_discounts' => $newTotalDiscounts,
+                    'balance' => $newBalance,
+                    'amount_paid' => $newAmountPaid,
+                    'status' => $newBalance <= 0 ? 'paid' : 'partially_paid',
+                    'last_payment_date' => now(),
+                    'last_payment_or' => $payment->or_number,
+                ]);
+                
+                $paymentItemData['original_fee_id'] = $fee->id;
+                $paymentItemData['fee_id'] = $fee->id;
+                $feeIdsPaid[] = $fee->id;
             }
 
-            // Use DB facade for payment items too
             DB::table('payment_items')->insert($paymentItemData);
-
-            $itemDetails[] = [
-                'item_id' => DB::getPdo()->lastInsertId(),
-                'fee_name' => $item['fee_name'],
-                'total_amount' => $item['total_amount'],
-                'original_fee_id' => $paymentItemData['original_fee_id'] ?? null,
-                'fee_id' => $paymentItemData['fee_id'] ?? null,
-                'clearance_request_id' => $paymentItemData['clearance_request_id'] ?? null,
-                'is_clearance_fee' => $item['metadata']['is_clearance_fee'] ?? false,
-            ];
         }
 
-        Log::info('PAYMENT_STORE: Payment items created', [
-            'items_count' => count($itemDetails),
-            'items_linked_to_fees' => count(array_filter($itemDetails, function($item) {
-                return !empty($item['original_fee_id']);
-            })),
-            'clearance_items' => count(array_filter($itemDetails, function($item) {
-                return $item['is_clearance_fee'];
-            })),
-            'clearance_requests_paid' => $clearanceRequestsPaid,
-            'fees_paid' => $feeIdsPaid,
-        ]);
+        // Handle discount verification
+        if (!empty($validated['discount_code']) && !empty($validated['verification_id_number'])) {
+            $discountRule = DiscountRule::where('code', $validated['discount_code'])->first();
+            
+            if ($discountRule) {
+                PaymentDiscount::create([
+                    'payment_id' => $payment->id,
+                    'discount_rule_id' => $discountRule->id,
+                    'discount_amount' => $validated['discount'],
+                    'verified_by' => $recordedBy,
+                    'verified_at' => now(),
+                    'id_presented' => true,
+                    'id_number' => $validated['verification_id_number'],
+                    'remarks' => $validated['verification_remarks'] ?? null,
+                ]);
+            }
+        }
 
         DB::commit();
 
@@ -1219,8 +1750,10 @@ public function store(Request $request)
             'payment_id' => $payment->id,
             'or_number' => $payment->or_number,
             'total_amount' => $payment->total_amount,
-            'clearance_requests' => $clearanceRequestsPaid,
-            'fees_paid' => $feeIdsPaid,
+            'discount' => $payment->discount,
+            'amount_due' => $payment->total_amount - $payment->discount,
+            'amount_paid' => $payment->amount_paid,
+            'status' => $payment->status,
         ]);
 
         return redirect()->route('payments.show', $payment->id)
@@ -1230,64 +1763,18 @@ public function store(Request $request)
         DB::rollBack();
         
         Log::error('PAYMENT_STORE_ERROR: Payment creation failed', [
-            'error_message' => $e->getMessage(),
-            'error_trace' => $e->getTraceAsString(),
-            'or_number' => $validated['or_number'] ?? 'N/A',
-            'payer_name' => $validated['payer_name'] ?? 'N/A',
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
         ]);
         
-        return back()->withErrors([
-            'error' => 'Failed to record payment. Please try again. Error: ' . $e->getMessage()
-        ])->withInput();
+        return back()->withErrors(['error' => 'Failed to record payment: ' . $e->getMessage()])->withInput();
     }
 }
-    private function updateFeeStatusOnPaymentChange(Payment $payment, $newPaymentStatus)
-    {
-        foreach ($payment->items as $item) {
-            if ($item->fee_id) {
-                $fee = Fee::find($item->fee_id);
-                if ($fee) {
-                    if ($newPaymentStatus === 'cancelled' || $newPaymentStatus === 'refunded') {
-                        $newBalance = $fee->balance + $item->total_amount;
-                        $fee->update([
-                            'balance' => $newBalance,
-                            'amount_paid' => max(0, $fee->amount_paid - $item->total_amount),
-                            'status' => $newBalance > 0 ? 'pending' : 'pending',
-                            'last_payment_date' => null,
-                            'last_payment_or' => null,
-                        ]);
-                    }
-                }
-            }
-            
-            if ($item->clearance_request_id) {
-                $clearanceRequest = ClearanceRequest::find($item->clearance_request_id);
-                if ($clearanceRequest) {
-                    if ($newPaymentStatus === 'cancelled' || $newPaymentStatus === 'refunded') {
-                        $clearanceRequest->update([
-                            'status' => 'pending_payment',
-                            'payment_id' => null,
-                            'payment_date' => null,
-                            'payment_method' => null,
-                            'or_number' => null,
-                        ]);
-                    } elseif ($newPaymentStatus === 'completed') {
-                        $clearanceRequest->update([
-                            'status' => 'paid',
-                            'payment_id' => $payment->id,
-                            'payment_date' => $payment->payment_date,
-                            'payment_method' => $payment->payment_method,
-                            'or_number' => $payment->or_number,
-                        ]);
-                    }
-                }
-            }
-        }
-    }
 
-    /**
-     * Display the specified payment.
-     */
+
+  /**
+ * Display the specified payment.
+ */
 public function show(Payment $payment)
 {
     $payment->load([
@@ -1342,8 +1829,7 @@ public function show(Payment $payment)
         ->whereNotNull('fee_id')
         ->with([
             'fee.feeType',
-            'fee.resident.household',
-            'fee.household',
+            'fee.payer', // Load polymorphic payer relationship
             'fee.issuedBy',
             'fee.collectedBy',
             'fee.createdBy',
@@ -1352,6 +1838,11 @@ public function show(Payment $payment)
         ->pluck('fee')
         ->filter()
         ->map(function ($fee) {
+            // Load household for residents if needed
+            if ($fee->payer && $fee->payer_type === 'App\Models\Resident' && method_exists($fee->payer, 'household')) {
+                $fee->payer->load('household');
+            }
+            
             // Add formatted dates and calculations
             if ($fee->issue_date) {
                 $fee->formatted_issue_date = $fee->issue_date->format('F j, Y');
@@ -1381,7 +1872,7 @@ public function show(Payment $payment)
 
     // Load payer details based on payer_type
     if ($payment->payer_type === 'resident') {
-        $payment->load(['resident.household']); // Removed 'resident.user'
+        $payment->load(['resident.household']);
         $payerDetails = $payment->resident;
     } elseif ($payment->payer_type === 'household') {
         $payment->load(['household.members.resident']);
@@ -1399,7 +1890,7 @@ public function show(Payment $payment)
                 'name' => $payment->payer_name,
                 'type' => $payment->payer_type,
                 'contact_number' => $payerDetails->contact_number ?? $payment->contact_number,
-                'email' => $payerDetails->email ?? null, // Removed user email reference
+                'email' => $payerDetails->email ?? null,
                 'address' => $payerDetails->address ?? $payment->address,
                 'household_number' => $payerDetails->household?->household_number ?? null,
                 'purok' => $payerDetails->purok?->name ?? $payerDetails->household?->purok?->name ?? $payment->purok,
@@ -1517,7 +2008,6 @@ public function show(Payment $payment)
         'hasFees' => $fees->isNotEmpty(),
     ]);
 }
-
     /**
      * Show the form for editing the specified payment.
      */

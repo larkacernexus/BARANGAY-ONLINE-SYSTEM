@@ -1,0 +1,344 @@
+// components/admin/clearance-types/ClearanceTypesGridView.tsx
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+    CheckCircle,
+    Clock,
+    Calendar,
+    Users,
+    MoreVertical,
+    Copy,
+    FileText,
+    DollarSign,
+    Shield,
+    Globe,
+    XCircle,
+    Eye,
+    Edit,
+    Printer,
+    Trash2,
+    CreditCard,
+    Timer,
+    FileSpreadsheet
+} from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import { route } from 'ziggy-js';
+
+interface ClearanceType {
+    id: number;
+    name: string;
+    code: string;
+    description: string;
+    fee: number;
+    formatted_fee: string;
+    processing_days: number;
+    validity_days: number;
+    is_active: boolean;
+    requires_payment: boolean;
+    requires_approval: boolean;
+    is_online_only: boolean;
+    clearances_count?: number;
+    purpose_options?: string;
+    document_types_count?: number;
+    created_at: string;
+    updated_at: string;
+}
+
+interface ClearanceTypesGridViewProps {
+    clearanceTypes: ClearanceType[];
+    isBulkMode: boolean;
+    selectedTypes: number[];
+    onItemSelect: (id: number) => void;
+    hasActiveFilters: boolean;
+    onClearFilters: () => void;
+    onDelete: (type: ClearanceType) => void;
+    onToggleStatus?: (type: ClearanceType) => void;
+    onDuplicate?: (type: ClearanceType) => void;
+    onViewPhoto: (type: ClearanceType) => void;
+    onCopyToClipboard: (text: string, label: string) => void;
+    truncateText: (text: string, maxLength?: number) => string;
+    getStatusBadgeVariant: (isActive: boolean) => "default" | "secondary" | "destructive" | "outline";
+    getPurposeOptionsCount: (type: ClearanceType) => number;
+    getTruncationLength: (type: 'name' | 'description' | 'code') => number;
+}
+
+export default function ClearanceTypesGridView({
+    clearanceTypes,
+    isBulkMode,
+    selectedTypes,
+    onItemSelect,
+    hasActiveFilters,
+    onClearFilters,
+    onDelete,
+    onToggleStatus,
+    onDuplicate,
+    onViewPhoto,
+    onCopyToClipboard,
+    truncateText,
+    getStatusBadgeVariant,
+    getPurposeOptionsCount,
+    getTruncationLength
+}: ClearanceTypesGridViewProps) {
+    
+    const getStatusIcon = (isActive: boolean) => {
+        return isActive ? 
+            <CheckCircle className="h-4 w-4 text-green-500" /> : 
+            <XCircle className="h-4 w-4 text-gray-500" />;
+    };
+
+    const formatDate = (dateString: string) => {
+        try {
+            return new Date(dateString).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+            });
+        } catch {
+            return dateString;
+        }
+    };
+
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
+            {clearanceTypes.map((type) => {
+                const nameLength = getTruncationLength('name');
+                const descLength = getTruncationLength('description');
+                const codeLength = getTruncationLength('code');
+                const isSelected = selectedTypes.includes(type.id);
+                
+                return (
+                    <Card 
+                        key={type.id}
+                        className={`overflow-hidden hover:shadow-md transition-all duration-200 border ${
+                            isSelected ? 'border-blue-500 ring-2 ring-blue-200 bg-blue-50/50' : 'border-gray-200'
+                        }`}
+                        onClick={(e) => {
+                            if (isBulkMode && e.target instanceof HTMLElement && 
+                                !e.target.closest('a') && 
+                                !e.target.closest('button') &&
+                                !e.target.closest('.dropdown-menu-content') &&
+                                !e.target.closest('input[type="checkbox"]')) {
+                                onItemSelect(type.id);
+                            }
+                        }}
+                    >
+                        <div className="p-4">
+                            {/* Header with selection checkbox and actions */}
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    {isBulkMode && (
+                                        <Checkbox
+                                            checked={isSelected}
+                                            onCheckedChange={() => onItemSelect(type.id)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                        />
+                                    )}
+                                    <Badge 
+                                        variant={getStatusBadgeVariant(type.is_active)}
+                                        className="flex items-center gap-1"
+                                    >
+                                        {getStatusIcon(type.is_active)}
+                                        {type.is_active ? 'Active' : 'Inactive'}
+                                    </Badge>
+                                </div>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button 
+                                            variant="ghost" 
+                                            className="h-8 w-8 p-0 hover:bg-gray-100"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-48">
+                                        <DropdownMenuItem asChild>
+                                            <Link href={route('clearance-types.show', type.id)} className="flex items-center cursor-pointer">
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                <span>View Details</span>
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        
+                                        <DropdownMenuItem asChild>
+                                            <Link href={route('clearance-types.edit', type.id)} className="flex items-center cursor-pointer">
+                                                <Edit className="mr-2 h-4 w-4" />
+                                                <span>Edit Type</span>
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        
+                                        <DropdownMenuSeparator />
+                                        
+                                        <DropdownMenuItem 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCopyToClipboard(type.code, 'Code');
+                                            }}
+                                            className="flex items-center cursor-pointer"
+                                        >
+                                            <Copy className="mr-2 h-4 w-4" />
+                                            <span>Copy Code</span>
+                                        </DropdownMenuItem>
+                                        
+                                        {onToggleStatus && (
+                                            <DropdownMenuItem 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onToggleStatus(type);
+                                                }}
+                                                className="flex items-center cursor-pointer"
+                                            >
+                                                {type.is_active ? (
+                                                    <>
+                                                        <XCircle className="mr-2 h-4 w-4" />
+                                                        <span>Deactivate</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                                        <span>Activate</span>
+                                                    </>
+                                                )}
+                                            </DropdownMenuItem>
+                                        )}
+                                        
+                                        <DropdownMenuItem 
+                                            className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDelete(type);
+                                            }}
+                                        >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            <span>Delete Type</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+
+                            {/* Type Name and Code */}
+                            <div className="mb-3">
+                                <h3 
+                                    className="font-semibold text-gray-900 truncate mb-1"
+                                    title={type.name}
+                                >
+                                    {truncateText(type.name, nameLength)}
+                                </h3>
+                                <code 
+                                    className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600 truncate block"
+                                    title={type.code}
+                                >
+                                    {truncateText(type.code, codeLength)}
+                                </code>
+                            </div>
+
+                            {/* Description */}
+                            <p 
+                                className="text-sm text-gray-600 mb-4 line-clamp-2"
+                                title={type.description}
+                            >
+                                {truncateText(type.description, descLength)}
+                            </p>
+
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <CreditCard className="h-4 w-4 text-amber-500" />
+                                        <span className="text-sm font-medium">
+                                            {type.formatted_fee}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Timer className="h-4 w-4 text-blue-500" />
+                                        <span className="text-sm">
+                                            {type.processing_days} days
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-green-500" />
+                                        <span className="text-sm">
+                                            {type.validity_days} days
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Users className="h-4 w-4 text-purple-500" />
+                                        <span className="text-sm font-medium">
+                                            {type.clearances_count || 0} issued
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Badges */}
+                            <div className="flex flex-wrap gap-1 mb-4">
+                                {type.requires_payment && (
+                                    <Badge variant="outline" className="text-xs">
+                                        <DollarSign className="h-3 w-3 mr-1" />
+                                        Paid
+                                    </Badge>
+                                )}
+                                {type.requires_approval && (
+                                    <Badge variant="outline" className="text-xs">
+                                        <Shield className="h-3 w-3 mr-1" />
+                                        Approval
+                                    </Badge>
+                                )}
+                                {type.is_online_only && (
+                                    <Badge variant="outline" className="text-xs">
+                                        <Globe className="h-3 w-3 mr-1" />
+                                        Online
+                                    </Badge>
+                                )}
+                                <Badge variant="outline" className="text-xs">
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    {type.document_types_count || 0} docs
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                    <Copy className="h-3 w-3 mr-1" />
+                                    {getPurposeOptionsCount(type)} purposes
+                                </Badge>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="flex items-center justify-between pt-3 border-t">
+                                <span className="text-xs text-gray-500">
+                                    Updated: {formatDate(type.updated_at)}
+                                </span>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Link href={route('clearances.create', { type: type.id })}>
+                                            <Button size="sm" variant="outline">
+                                                <FileSpreadsheet className="h-3 w-3 mr-1" />
+                                                Issue
+                                            </Button>
+                                        </Link>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Issue new clearance</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </div>
+                        </div>
+                    </Card>
+                );
+            })}
+        </div>
+    );
+}

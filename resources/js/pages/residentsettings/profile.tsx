@@ -235,7 +235,7 @@ export default function Profile({
   mustVerifyEmail: boolean;
   status?: string;
 }) {
-  const { props } = usePage<SharedData & { user: ProfileUserData }>();
+  const { props, url } = usePage<SharedData & { user: ProfileUserData }>();
   const { user } = props;
   
   // Extract data from the user object
@@ -250,9 +250,45 @@ export default function Profile({
   // Calculate age if birth date exists
   const age = resident?.birth_date ? calculateAge(resident.birth_date) : null;
 
-  // Tab state
+  // Tab state - initialize from URL query parameter
   const [activeTab, setActiveTab] = useState<string>('personal');
   const [isMobile, setIsMobile] = useState(false);
+
+  // Check URL query parameter for tab selection
+  useEffect(() => {
+    console.log('Current URL:', url);
+    
+    try {
+      // Parse the URL to get query parameters
+      const urlObj = new URL(url, window.location.origin);
+      const tabParam = urlObj.searchParams.get('tab');
+      
+      console.log('Tab parameter from URL:', tabParam);
+      
+      // Valid tab IDs from your configuration
+      const validTabs = ['personal', 'additional', 'household', 'members'];
+      
+      if (tabParam && validTabs.includes(tabParam)) {
+        console.log('Setting active tab to:', tabParam);
+        setActiveTab(tabParam);
+      }
+    } catch (error) {
+      console.error('Error parsing URL:', error);
+      // Fallback to checking window.location
+      try {
+        const searchParams = new URLSearchParams(window.location.search);
+        const tabParam = searchParams.get('tab');
+        const validTabs = ['personal', 'additional', 'household', 'members'];
+        
+        if (tabParam && validTabs.includes(tabParam)) {
+          console.log('Setting active tab from window.location:', tabParam);
+          setActiveTab(tabParam);
+        }
+      } catch (err) {
+        console.error('Error checking window.location:', err);
+      }
+    }
+  }, [url]); // Run when URL changes
 
   // Check if mobile on mount and resize
   useEffect(() => {

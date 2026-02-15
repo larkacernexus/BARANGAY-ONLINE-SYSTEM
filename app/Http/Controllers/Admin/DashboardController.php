@@ -18,6 +18,12 @@ class DashboardController extends Controller
 {
     public function index()
     {
+
+
+      if (!auth()->user()->hasPermission('view-dashboard')) {
+            abort(403, 'You do not have permission to view the dashboard.');
+        }
+        
         $today = Carbon::today();
         $startOfWeek = Carbon::now()->startOfWeek();
         $endOfWeek = Carbon::now()->endOfWeek();

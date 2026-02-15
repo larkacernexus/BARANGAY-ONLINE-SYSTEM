@@ -15,60 +15,60 @@ class PurokController extends Controller
     /**
      * Display a listing of puroks.
      */
-public function index(Request $request)
-{
-    $query = Purok::query()
-        ->withCount(['households', 'residents'])
-        ->orderBy('name');
+    public function index(Request $request)
+    {
+        $query = Purok::query()
+            ->withCount(['households', 'residents'])
+            ->orderBy('name');
 
-    // Apply search filter
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $query->where(function ($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('description', 'like', "%{$search}%")
-              ->orWhere('leader_name', 'like', "%{$search}%")
-              ->orWhere('leader_contact', 'like', "%{$search}%")
-              ->orWhere('google_maps_url', 'like', "%{$search}%"); // Added search for Google Maps URL
-        });
+        // Apply search filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('leader_name', 'like', "%{$search}%")
+                  ->orWhere('leader_contact', 'like', "%{$search}%")
+                  ->orWhere('google_maps_url', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply status filter
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $puroks = $query->paginate(20)
+            ->through(function ($purok) {
+                return [
+                    'id' => $purok->id,
+                    'name' => $purok->name,
+                    'slug' => $purok->slug ?? str($purok->name)->slug(),
+                    'description' => $purok->description,
+                    'leader_name' => $purok->leader_name,
+                    'leader_contact' => $purok->leader_contact,
+                    'google_maps_url' => $purok->google_maps_url,
+                    'total_households' => $purok->households_count ?? 0,
+                    'total_residents' => $purok->residents_count ?? 0,
+                    'status' => $purok->status,
+                    'created_at' => $purok->created_at,
+                ];
+            });
+
+        // Calculate stats
+        $stats = [
+            ['label' => 'Total Puroks', 'value' => Purok::count()],
+            ['label' => 'Active Puroks', 'value' => Purok::where('status', 'active')->count()],
+            ['label' => 'Total Households', 'value' => Household::count()],
+            ['label' => 'Total Residents', 'value' => Resident::count()],
+        ];
+
+        return Inertia::render('admin/Puroks/Index', [
+            'puroks' => $puroks,
+            'stats' => $stats,
+            'filters' => $request->only(['search', 'status']),
+        ]);
     }
-
-    // Apply status filter
-    if ($request->filled('status')) {
-        $query->where('status', $request->status);
-    }
-
-    $puroks = $query->paginate(20)
-        ->through(function ($purok) {
-            return [
-                'id' => $purok->id,
-                'name' => $purok->name,
-                'slug' => $purok->slug ?? str($purok->name)->slug(),
-                'description' => $purok->description,
-                'leader_name' => $purok->leader_name,
-                'leader_contact' => $purok->leader_contact,
-                'google_maps_url' => $purok->google_maps_url, // Added this
-                'total_households' => $purok->households_count ?? 0,
-                'total_residents' => $purok->residents_count ?? 0,
-                'status' => $purok->status,
-                'created_at' => $purok->created_at,
-            ];
-        });
-
-    // Calculate stats
-    $stats = [
-        ['label' => 'Total Puroks', 'value' => Purok::count()],
-        ['label' => 'Active Puroks', 'value' => Purok::where('status', 'active')->count()],
-        ['label' => 'Total Households', 'value' => Household::count()],
-        ['label' => 'Total Residents', 'value' => Resident::count()],
-    ];
-
-    return Inertia::render('admin/Puroks/Index', [
-        'puroks' => $puroks,
-        'stats' => $stats,
-        'filters' => $request->only(['search', 'status']),
-    ]);
-}
 
     /**
      * Show the form for creating a new purok.
@@ -81,157 +81,135 @@ public function index(Request $request)
     /**
      * Store a newly created purok.
      */
-  public function store(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'name' => 'required|string|max:100|unique:puroks',
-        'description' => 'nullable|string',
-        'leader_name' => 'nullable|string|max:200',
-        'leader_contact' => 'nullable|string|max:20',
-        'status' => 'required|in:active,inactive',
-        'google_maps_url' => 'nullable|url|max:500', // Added validation for Google Maps URL
-    ]);
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:100|unique:puroks',
+            'description' => 'nullable|string',
+            'leader_name' => 'nullable|string|max:200',
+            'leader_contact' => 'nullable|string|max:20',
+            'status' => 'required|in:active,inactive',
+            'google_maps_url' => 'nullable|url|max:500',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ]);
 
-    if ($validator->fails()) {
-        return redirect()->back()
-            ->withErrors($validator)
-            ->withInput();
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        Purok::create([
+            'name' => $request->name,
+            'description' => $request->description,
+            'leader_name' => $request->leader_name,
+            'leader_contact' => $request->leader_contact,
+            'status' => $request->status,
+            'google_maps_url' => $request->google_maps_url,
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
+        ]);
+
+        return redirect()->route('puroks.index')
+            ->with('success', 'Purok created successfully!');
     }
 
-    Purok::create([
-        'name' => $request->name,
-        'description' => $request->description,
-        'leader_name' => $request->leader_name,
-        'leader_contact' => $request->leader_contact,
-        'status' => $request->status,
-        'google_maps_url' => $request->google_maps_url, // Store the Google Maps URL
-    ]);
-
-    return redirect()->route('puroks.index')
-        ->with('success', 'Purok created successfully!');
-}
     /**
      * Display the specified purok.
      */
-public function show(Purok $purok, Request $request)
-{
-    // Load counts for the purok
-    $purok->loadCount(['households', 'residents']);
-    
-    // Get accurate counts
-    $householdsCount = $purok->households_count;
-    $residentsCount = $purok->residents_count;
+    public function show(Purok $purok, Request $request)
+    {
+        // Load counts for the purok
+        $purok->loadCount(['households', 'residents']);
+        
+        // Get accurate counts
+        $householdsCount = $purok->households_count;
+        $residentsCount = $purok->residents_count;
 
-    // Load households with pagination
-    $householdsQuery = $purok->households()
-        ->withCount(['members', 'householdMembers'])
-        ->orderBy('household_number');
-    
-    $households = $householdsQuery->paginate(10, ['*'], 'household_page')
-        ->withQueryString();
+        // Load households with pagination - FIXED: Properly load head of family
+        $householdsQuery = $purok->households()
+            ->withCount(['householdMembers'])
+            ->with(['householdMembers' => function ($query) {
+                $query->where('is_head', true)
+                    ->with('resident');
+            }])
+            ->orderBy('household_number');
+        
+        $households = $householdsQuery->paginate(10, ['*'], 'household_page')
+            ->withQueryString();
 
-    // Load residents with pagination
-    $residentsQuery = $purok->residents()
-        ->orderBy('last_name')
-        ->orderBy('first_name');
-    
-    $residents = $residentsQuery->paginate(15, ['*'], 'resident_page')
-        ->withQueryString();
+        // Load residents with pagination
+        $residentsQuery = $purok->residents()
+            ->orderBy('last_name')
+            ->orderBy('first_name');
+        
+        $residents = $residentsQuery->paginate(15, ['*'], 'resident_page')
+            ->withQueryString();
 
-    // Get statistics for this purok - FIXED: Use accurate counts
-    $stats = [
-        ['label' => 'Total Households', 'value' => $householdsCount, 'icon' => 'home', 'color' => 'blue'],
-        ['label' => 'Total Residents', 'value' => $residentsCount, 'icon' => 'users', 'color' => 'green'],
-        ['label' => 'Avg. Household Size', 'value' => $householdsCount > 0 
-            ? round($residentsCount / $householdsCount, 1) 
-            : 0, 'icon' => 'bar-chart-3', 'color' => 'purple'],
-        ['label' => 'Status', 'value' => ucfirst($purok->status), 'icon' => 'activity', 'color' => $purok->status === 'active' ? 'green' : 'gray'],
-        ['label' => 'Map Location', 'value' => $purok->google_maps_url ? 'Available' : 'Not Set', 'icon' => 'globe', 'color' => $purok->google_maps_url ? 'orange' : 'gray'],
-    ];
-
-    // Get recent activities
-    $recentHouseholds = $purok->households()
-        ->latest()
-        ->take(5)
-        ->get();
-    
-    $recentResidents = $purok->residents()
-        ->latest()
-        ->take(5)
-        ->get();
-
-    // Get demographic data
-    $demographics = [
-        'gender' => [
-            'male' => $purok->residents()->where('gender', 'male')->count(),
-            'female' => $purok->residents()->where('gender', 'female')->count(),
-            'other' => $purok->residents()->where('gender', 'other')->count(),
-        ],
-        'age_groups' => [
-            'children' => $purok->residents()->where('age', '<', 18)->count(),
-            'adults' => $purok->residents()->whereBetween('age', [18, 59])->count(),
-            'seniors' => $purok->residents()->where('age', '>=', 60)->count(),
-        ]
-    ];
-
-    // Transform households for the view
-    $householdsData = $households->through(function ($household) {
-        return [
-            'id' => $household->id,
-            'household_number' => $household->household_number,
-            'head_of_family' => $household->head_of_family,
-            'member_count' => $household->members_count ?? $household->householdMembers()->count(),
-            'address' => $household->address,
-            'contact_number' => $household->contact_number,
-            'created_at' => $household->created_at,
+        // Get statistics for this purok
+        $stats = [
+            ['label' => 'Total Households', 'value' => $householdsCount, 'icon' => 'home', 'color' => 'blue'],
+            ['label' => 'Total Residents', 'value' => $residentsCount, 'icon' => 'users', 'color' => 'green'],
+            ['label' => 'Avg. Household Size', 'value' => $householdsCount > 0 
+                ? round($residentsCount / $householdsCount, 1) 
+                : 0, 'icon' => 'bar-chart-3', 'color' => 'purple'],
+            ['label' => 'Status', 'value' => ucfirst($purok->status), 'icon' => 'activity', 'color' => $purok->status === 'active' ? 'green' : 'gray'],
+            ['label' => 'Map Location', 'value' => $purok->google_maps_url ? 'Available' : 'Not Set', 'icon' => 'globe', 'color' => $purok->google_maps_url ? 'orange' : 'gray'],
         ];
-    });
 
-    // Transform residents for the view
-    $residentsData = $residents->through(function ($resident) {
-        return [
-            'id' => $resident->id,
-            'first_name' => $resident->first_name,
-            'last_name' => $resident->last_name,
-            'middle_name' => $resident->middle_name,
-            'age' => $resident->age,
-            'gender' => $resident->gender,
-            'contact_number' => $resident->contact_number,
-            'address' => $resident->address,
-            'created_at' => $resident->created_at,
+        // Get recent activities
+        $recentHouseholds = $purok->households()
+            ->with(['householdMembers' => function ($query) {
+                $query->where('is_head', true)
+                    ->with('resident');
+            }])
+            ->latest()
+            ->take(5)
+            ->get();
+        
+        $recentResidents = $purok->residents()
+            ->latest()
+            ->take(5)
+            ->get();
+
+        // Get demographic data
+        $demographics = [
+            'gender' => [
+                'male' => $purok->residents()->where('gender', 'male')->count(),
+                'female' => $purok->residents()->where('gender', 'female')->count(),
+                'other' => $purok->residents()->where('gender', 'other')->count(),
+            ],
+            'age_groups' => [
+                'children' => $purok->residents()->where('age', '<', 18)->count(),
+                'adults' => $purok->residents()->whereBetween('age', [18, 59])->count(),
+                'seniors' => $purok->residents()->where('age', '>=', 60)->count(),
+            ]
         ];
-    });
 
-    return Inertia::render('admin/Puroks/Show', [
-        'purok' => [
-            'id' => $purok->id,
-            'name' => $purok->name,
-            'slug' => $purok->slug,
-            'description' => $purok->description,
-            'leader_name' => $purok->leader_name,
-            'leader_contact' => $purok->leader_contact,
-            'google_maps_url' => $purok->google_maps_url,
-            'latitude' => $purok->latitude,
-            'longitude' => $purok->longitude,
-            'total_households' => $householdsCount, // Use the accurate count
-            'total_residents' => $residentsCount,   // Use the accurate count
-            'status' => $purok->status,
-            'created_at' => $purok->created_at,
-            'updated_at' => $purok->updated_at,
-        ],
-        'stats' => $stats,
-        'recentHouseholds' => $recentHouseholds->map(function ($household) {
+        // Transform households for the view - FIXED: Get head_of_family from relationship
+        $householdsData = $households->through(function ($household) {
+            // Get head of family from householdMembers relationship
+            $headMember = $household->householdMembers->firstWhere('is_head', true);
+            $headOfFamily = 'No head assigned';
+            
+            if ($headMember && $headMember->resident) {
+                $headOfFamily = $headMember->resident->first_name . ' ' . $headMember->resident->last_name;
+            }
+            
             return [
                 'id' => $household->id,
                 'household_number' => $household->household_number,
-                'head_of_family' => $household->head_of_family,
-                'member_count' => $household->householdMembers()->count(),
+                'head_of_family' => $headOfFamily,
+                'member_count' => $household->household_members_count ?? $household->householdMembers()->count(),
                 'address' => $household->address,
                 'contact_number' => $household->contact_number,
                 'created_at' => $household->created_at,
             ];
-        }),
-        'recentResidents' => $recentResidents->map(function ($resident) {
+        });
+
+        // Transform residents for the view
+        $residentsData = $residents->through(function ($resident) {
             return [
                 'id' => $resident->id,
                 'first_name' => $resident->first_name,
@@ -243,90 +221,146 @@ public function show(Purok $purok, Request $request)
                 'address' => $resident->address,
                 'created_at' => $resident->created_at,
             ];
-        }),
-        'demographics' => $demographics,
-        'households' => [
-            'data' => $householdsData->items(),
-            'current_page' => $households->currentPage(),
-            'last_page' => $households->lastPage(),
-            'total' => $householdsCount, // Use the accurate total count
-        ],
-        'residents' => [
-            'data' => $residentsData->items(),
-            'current_page' => $residents->currentPage(),
-            'last_page' => $residents->lastPage(),
-            'total' => $residentsCount, // Use the accurate total count
-        ],
-    ]);
-}
+        });
+
+        return Inertia::render('admin/Puroks/Show', [
+            'purok' => [
+                'id' => $purok->id,
+                'name' => $purok->name,
+                'slug' => $purok->slug,
+                'description' => $purok->description,
+                'leader_name' => $purok->leader_name,
+                'leader_contact' => $purok->leader_contact,
+                'google_maps_url' => $purok->google_maps_url,
+                'latitude' => $purok->latitude,
+                'longitude' => $purok->longitude,
+                'total_households' => $householdsCount,
+                'total_residents' => $residentsCount,
+                'status' => $purok->status,
+                'created_at' => $purok->created_at,
+                'updated_at' => $purok->updated_at,
+            ],
+            'stats' => $stats,
+            'recentHouseholds' => $recentHouseholds->map(function ($household) {
+                // Get head of family from householdMembers relationship
+                $headMember = $household->householdMembers->firstWhere('is_head', true);
+                $headOfFamily = 'No head assigned';
+                
+                if ($headMember && $headMember->resident) {
+                    $headOfFamily = $headMember->resident->first_name . ' ' . $headMember->resident->last_name;
+                }
+                
+                return [
+                    'id' => $household->id,
+                    'household_number' => $household->household_number,
+                    'head_of_family' => $headOfFamily,
+                    'member_count' => $household->householdMembers()->count(),
+                    'address' => $household->address,
+                    'contact_number' => $household->contact_number,
+                    'created_at' => $household->created_at,
+                ];
+            }),
+            'recentResidents' => $recentResidents->map(function ($resident) {
+                return [
+                    'id' => $resident->id,
+                    'first_name' => $resident->first_name,
+                    'last_name' => $resident->last_name,
+                    'middle_name' => $resident->middle_name,
+                    'age' => $resident->age,
+                    'gender' => $resident->gender,
+                    'contact_number' => $resident->contact_number,
+                    'address' => $resident->address,
+                    'created_at' => $resident->created_at,
+                ];
+            }),
+            'demographics' => $demographics,
+            'households' => [
+                'data' => $householdsData->items(),
+                'current_page' => $households->currentPage(),
+                'last_page' => $households->lastPage(),
+                'total' => $householdsCount,
+            ],
+            'residents' => [
+                'data' => $residentsData->items(),
+                'current_page' => $residents->currentPage(),
+                'last_page' => $residents->lastPage(),
+                'total' => $residentsCount,
+            ],
+        ]);
+    }
+
     /**
      * Show the form for editing the specified purok.
      */
-   public function edit(Purok $purok)
-{
-    // Load statistics for the purok
-    $purok->loadCount(['households', 'residents']);
-    
-    return Inertia::render('admin/Puroks/Edit', [
-        'purok' => [
-            'id' => $purok->id,
-            'name' => $purok->name,
-            'description' => $purok->description,
-            'leader_name' => $purok->leader_name,
-            'leader_contact' => $purok->leader_contact,
-            'status' => $purok->status,
-            'google_maps_url' => $purok->google_maps_url, // Changed from boundaries
-            'created_at' => $purok->created_at,
-            'updated_at' => $purok->updated_at,
-            'households_count' => $purok->households_count,
-            'residents_count' => $purok->residents_count,
-        ],
-    ]);
-}
-
-/**
- * Update the specified purok in storage.
- */
-public function update(Request $request, Purok $purok)
-{
-    $validator = Validator::make($request->all(), [
-        'name' => 'required|string|max:100|unique:puroks,name,' . $purok->id,
-        'description' => 'nullable|string',
-        'leader_name' => 'nullable|string|max:200',
-        'leader_contact' => 'nullable|string|max:20',
-        'status' => 'required|in:active,inactive',
-        'google_maps_url' => 'nullable|url|max:500', // Added validation for Google Maps URL
-    ]);
-
-    if ($validator->fails()) {
-        return redirect()->back()
-            ->withErrors($validator)
-            ->withInput();
+    public function edit(Purok $purok)
+    {
+        $purok->loadCount(['households', 'residents']);
+        
+        return Inertia::render('admin/Puroks/Edit', [
+            'purok' => [
+                'id' => $purok->id,
+                'name' => $purok->name,
+                'description' => $purok->description,
+                'leader_name' => $purok->leader_name,
+                'leader_contact' => $purok->leader_contact,
+                'status' => $purok->status,
+                'google_maps_url' => $purok->google_maps_url,
+                'latitude' => $purok->latitude,
+                'longitude' => $purok->longitude,
+                'created_at' => $purok->created_at,
+                'updated_at' => $purok->updated_at,
+                'households_count' => $purok->households_count,
+                'residents_count' => $purok->residents_count,
+            ],
+        ]);
     }
 
-    // If changing status to inactive and purok has active records, show warning
-    if ($request->status === 'inactive' && $purok->status === 'active') {
-        $activeHouseholds = $purok->households()->where('status', 'active')->count();
-        $activeResidents = $purok->residents()->where('status', 'active')->count();
-        
-        if ($activeHouseholds > 0 || $activeResidents > 0) {
+    /**
+     * Update the specified purok in storage.
+     */
+    public function update(Request $request, Purok $purok)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:100|unique:puroks,name,' . $purok->id,
+            'description' => 'nullable|string',
+            'leader_name' => 'nullable|string|max:200',
+            'leader_contact' => 'nullable|string|max:20',
+            'status' => 'required|in:active,inactive',
+            'google_maps_url' => 'nullable|url|max:500',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ]);
+
+        if ($validator->fails()) {
             return redirect()->back()
-                ->with('warning', "This purok has $activeHouseholds active households and $activeResidents active residents. Changing status to inactive may affect these records.")
+                ->withErrors($validator)
                 ->withInput();
         }
+
+        // If changing status to inactive and purok has active records, show warning
+        if ($request->status === 'inactive' && $purok->status === 'active') {
+            $activeHouseholds = $purok->households()->where('status', 'active')->count();
+            $activeResidents = $purok->residents()->where('status', 'active')->count();
+            
+            if ($activeHouseholds > 0 || $activeResidents > 0) {
+                return redirect()->back()
+                    ->with('warning', "This purok has $activeHouseholds active households and $activeResidents active residents. Changing status to inactive may affect these records.")
+                    ->withInput();
+            }
+        }
+
+        // Handle google_maps_url data (allow empty string)
+        $data = $request->all();
+        if (empty($data['google_maps_url'])) {
+            $data['google_maps_url'] = null;
+        }
+
+        $purok->update($data);
+
+        return redirect()->route('puroks.show', $purok)
+            ->with('success', 'Purok updated successfully!');
     }
 
-    // Handle google_maps_url data (allow empty string)
-    $data = $request->all();
-    if (empty($data['google_maps_url'])) {
-        $data['google_maps_url'] = null;
-    }
-
-    $purok->update($data);
-
-    return redirect()->route('puroks.show', $purok)
-        ->with('success', 'Purok updated successfully!');
-}
     /**
      * Remove the specified purok.
      */

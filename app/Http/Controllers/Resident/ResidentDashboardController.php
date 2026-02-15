@@ -22,47 +22,27 @@ class ResidentDashboardController extends Controller
         $user = Auth::user();
         
         // Check if user has a resident profile
-        $resident = Resident::where('user_id', $user->id)->first();
+        $resident = $user->resident;
         
         if (!$resident) {
             return $this->handleNoResidentProfile($user);
         }
         
-        // Get household information - check both direct household_id and household memberships
+        // Get household information - user now has household_id
         $household = null;
         $householdMember = null;
         $isHouseholdHead = false;
         $householdResidentIds = [$resident->id]; // Start with current resident
         
-        // First check direct household relationship
-        if ($resident->household_id) {
-            $household = $resident->householdRelation;
-        }
-        
-        // Then check household memberships
-        if (!$household && $resident->householdMemberships->isNotEmpty()) {
-            $householdMember = $resident->householdMemberships->first();
-            $household = $householdMember->household;
-        }
-        
-        // Also check householdMember relationship
-        if (!$household && $resident->householdMember) {
-            $householdMember = $resident->householdMember;
-            $household = $householdMember->household;
+        // Get household from user's household_id
+        if ($user->household_id) {
+            $household = Household::with(['householdMembers.resident'])->find($user->household_id);
         }
         
         if ($household) {
-            // Load household with householdMembers and their residents
-            $household->load(['householdMembers.resident']);
-            
             // Check if current resident is household head
-            if ($householdMember) {
-                $isHouseholdHead = $householdMember->is_head;
-            } else {
-                // Check in household members
-                $member = $household->householdMembers->firstWhere('resident_id', $resident->id);
-                $isHouseholdHead = $member ? $member->is_head : false;
-            }
+            $member = $household->householdMembers->firstWhere('resident_id', $resident->id);
+            $isHouseholdHead = $member ? $member->is_head : false;
             
             // Get all resident IDs in this household
             $householdResidentIds = $household->householdMembers
@@ -163,12 +143,16 @@ class ResidentDashboardController extends Controller
                 ->count();
             
             // Get complaints for entire household
-            $totalComplaints = Complaint::whereHas('user.resident', function($query) use ($householdResidentIds) {
-                $query->whereIn('id', $householdResidentIds);
+            $totalComplaints = Complaint::whereHas('user', function($query) use ($householdResidentIds) {
+                $query->whereHas('resident', function($q) use ($householdResidentIds) {
+                    $q->whereIn('id', $householdResidentIds);
+                });
             })->count();
             
-            $activeComplaints = Complaint::whereHas('user.resident', function($query) use ($householdResidentIds) {
-                $query->whereIn('id', $householdResidentIds);
+            $activeComplaints = Complaint::whereHas('user', function($query) use ($householdResidentIds) {
+                $query->whereHas('resident', function($q) use ($householdResidentIds) {
+                    $q->whereIn('id', $householdResidentIds);
+                });
             })->whereIn('status', ['pending', 'processing', 'investigating'])
                 ->count();
             
@@ -253,8 +237,10 @@ class ResidentDashboardController extends Controller
             }
 
             // Get recent complaints for household
-            $recentComplaints = Complaint::whereHas('user.resident', function($query) use ($householdResidentIds) {
-                $query->whereIn('id', $householdResidentIds);
+            $recentComplaints = Complaint::whereHas('user', function($query) use ($householdResidentIds) {
+                $query->whereHas('resident', function($q) use ($householdResidentIds) {
+                    $q->whereIn('id', $householdResidentIds);
+                });
             })
             ->orderBy('created_at', 'desc')
             ->take(5)
@@ -315,7 +301,7 @@ class ResidentDashboardController extends Controller
                         'payment_method' => $payment->payment_method,
                         'payer_name' => $payerResident ? $payerResident->first_name . ' ' . $payerResident->last_name : 'Household Member',
                         'payer_id' => $payment->payer_id,
-                        'is_current_user' => $payerResident && $payerResident->user_id === Auth::id(),
+                        'is_current_user' => $payerResident && $payerResident->user && $payerResident->user->id === Auth::id(),
                     ];
                 })
                 ->toArray();
@@ -388,7 +374,7 @@ class ResidentDashboardController extends Controller
                         'urgency' => $clearance->urgency,
                         'applicant_name' => $applicantResident ? $applicantResident->first_name . ' ' . $applicantResident->last_name : 'Household Member',
                         'applicant_id' => $clearance->resident_id,
-                        'is_current_user' => $applicantResident && $applicantResident->user_id === Auth::id(),
+                        'is_current_user' => $applicantResident && $applicantResident->user && $applicantResident->user->id === Auth::id(),
                     ];
                 })
                 ->toArray();
@@ -404,8 +390,10 @@ class ResidentDashboardController extends Controller
     private function getActiveComplaints(Resident $resident, array $householdResidentIds): array
     {
         try {
-            return Complaint::whereHas('user.resident', function($query) use ($householdResidentIds) {
-                $query->whereIn('id', $householdResidentIds);
+            return Complaint::whereHas('user', function($query) use ($householdResidentIds) {
+                $query->whereHas('resident', function($q) use ($householdResidentIds) {
+                    $q->whereIn('id', $householdResidentIds);
+                });
             })
             ->with(['type', 'updates'])
             ->whereIn('status', ['pending', 'processing', 'investigating', 'action_taken'])
@@ -522,8 +510,10 @@ class ResidentDashboardController extends Controller
             $householdMemberCount = $household->householdMembers->count();
             
             // Get household members details
-            $householdMembers = $household->householdMembers->map(function ($member) use ($resident) {
+            $householdMembers = $household->householdMembers->map(function ($member) {
                 $memberResident = $member->resident;
+                $user = $memberResident ? $memberResident->user : null;
+                
                 return [
                     'id' => $member->resident_id,
                     'full_name' => $memberResident ? $memberResident->full_name : 'Unknown',
@@ -531,7 +521,7 @@ class ResidentDashboardController extends Controller
                     'last_name' => $memberResident ? $memberResident->last_name : '',
                     'relationship' => $member->relationship_to_head,
                     'is_head' => $member->is_head,
-                    'is_current_user' => $memberResident && $memberResident->user_id === Auth::id(),
+                    'is_current_user' => $user && $user->id === Auth::id(),
                     'age' => $memberResident ? $memberResident->age : null,
                     'gender' => $memberResident ? $memberResident->gender : null,
                 ];
@@ -553,9 +543,12 @@ class ResidentDashboardController extends Controller
             $purokName = $resident->purok ? $resident->purok->name : null;
         }
         
+        // Get user reference
+        $user = $resident->user;
+        
         return [
             'id' => $resident->id,
-            'user_id' => $resident->user_id,
+            'user_id' => $user ? $user->id : null,
             'full_name' => $resident->full_name,
             'first_name' => $resident->first_name ?? 'Resident',
             'last_name' => $resident->last_name ?? '',
@@ -655,7 +648,7 @@ class ResidentDashboardController extends Controller
         
         // Create resident record with required fields
         $resident = Resident::create([
-            'user_id' => $user->id,
+            // No user_id since it's now in users table
             'first_name' => $validated['first_name'],
             'last_name' => $validated['last_name'],
             'email' => $user->email,
@@ -669,6 +662,11 @@ class ResidentDashboardController extends Controller
             'is_voter' => false,
             'is_pwd' => false,
             'is_senior' => Carbon::parse($validated['birth_date'])->age >= 60,
+        ]);
+
+        // Update user with resident_id
+        $user->update([
+            'resident_id' => $resident->id,
         ]);
 
         return redirect()->route('resident.dashboard')
@@ -685,26 +683,10 @@ class ResidentDashboardController extends Controller
         
         $resident = $user->resident;
         
-        // Get household info - check multiple ways
+        // Get household info from user's household_id
         $household = null;
-        $householdMember = null;
-        
-        if ($resident->household_id) {
-            $household = $resident->householdRelation;
-        }
-        
-        if (!$household && $resident->householdMemberships->isNotEmpty()) {
-            $householdMember = $resident->householdMemberships->first();
-            $household = $householdMember->household;
-        }
-        
-        if (!$household && $resident->householdMember) {
-            $householdMember = $resident->householdMember;
-            $household = $householdMember->household;
-        }
-        
-        if ($household) {
-            $household->load(['householdMembers.resident']);
+        if ($user->household_id) {
+            $household = Household::with(['householdMembers.resident'])->find($user->household_id);
         }
         
         // Get purok info
@@ -740,7 +722,7 @@ class ResidentDashboardController extends Controller
                     'zone' => $household->zone,
                     'purok' => $household->purok,
                     'address' => $household->address,
-                    'members' => $household->householdMembers->map(function ($member) use ($resident) {
+                    'members' => $household->householdMembers->map(function ($member) use ($user) {
                         $memberResident = $member->resident;
                         return [
                             'id' => $member->resident_id,
@@ -748,7 +730,7 @@ class ResidentDashboardController extends Controller
                             'relationship' => $member->relationship_to_head,
                             'age' => $memberResident ? $memberResident->age : null,
                             'is_head' => $member->is_head,
-                            'is_current_user' => $memberResident && $memberResident->user_id === $resident->user_id,
+                            'is_current_user' => $memberResident && $memberResident->user && $memberResident->user->id === $user->id,
                         ];
                     }),
                 ] : null,
@@ -785,7 +767,6 @@ class ResidentDashboardController extends Controller
         
         // Create minimal resident record
         $resident = Resident::create([
-            'user_id' => $user->id,
             'first_name' => $user->name,
             'last_name' => '',
             'email' => $user->email,
@@ -797,6 +778,11 @@ class ResidentDashboardController extends Controller
             'is_voter' => false,
             'is_pwd' => false,
             'is_senior' => false,
+        ]);
+        
+        // Update user with resident_id
+        $user->update([
+            'resident_id' => $resident->id,
         ]);
         
         return redirect()->route('resident.dashboard')

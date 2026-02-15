@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
-import { Permission } from '@/types';
 import {
     ArrowLeft,
     Save,
@@ -34,13 +33,22 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 
+interface Permission {
+    id: number;
+    name: string;
+    display_name: string;
+    description?: string;
+    module: string;
+    is_active: boolean;
+}
+
 interface RoleCreateProps {
-    available_permissions?: Permission[];
+    permissions?: Record<string, Permission[]>;
     validation_errors?: Record<string, string>;
     modules?: string[];
 }
 
-export default function RoleCreate({ available_permissions = [], validation_errors, modules = [] }: RoleCreateProps) {
+export default function RoleCreate({ permissions = {}, validation_errors, modules = [] }: RoleCreateProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedModule, setSelectedModule] = useState('all');
     const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -49,12 +57,15 @@ export default function RoleCreate({ available_permissions = [], validation_erro
 
     const { data, setData, errors, processing, post, reset } = useForm({
         name: '',
-        display_name: '',
         description: '',
-        is_active: true,
         is_system_role: false,
-        permission_ids: [] as number[],
+        permissions: [] as number[], // Changed from permission_ids to match Laravel
     });
+
+    // Flatten permissions array for easier manipulation
+    const allPermissions = useMemo(() => {
+        return Object.values(permissions).flat();
+    }, [permissions]);
 
     // Check if role name suggests a system role
     useEffect(() => {
@@ -67,29 +78,15 @@ export default function RoleCreate({ available_permissions = [], validation_erro
         setShowSystemRoleWarning(isPotentialSystemRole && !data.is_system_role);
     }, [data.name, data.is_system_role]);
 
-    // Safely get modules from available_permissions or provided modules
+    // Get available modules
     const availableModules = useMemo(() => {
-        if (modules.length > 0) {
-            return ['all', ...modules];
-        }
-        
-        if (!Array.isArray(available_permissions)) {
-            return ['all'];
-        }
-        
-        const uniqueModules = [...new Set(available_permissions.map(p => p?.module).filter(Boolean))];
-        return ['all', ...uniqueModules];
-    }, [available_permissions, modules]);
+        const permissionModules = Object.keys(permissions);
+        return ['all', ...permissionModules.sort()];
+    }, [permissions]);
 
-    // Filter permissions with null checks
+    // Filter permissions based on search and module
     const filteredPermissions = useMemo(() => {
-        if (!Array.isArray(available_permissions)) {
-            return [];
-        }
-        
-        return available_permissions.filter(permission => {
-            if (!permission) return false;
-            
+        return allPermissions.filter(permission => {
             const permissionName = permission.name?.toLowerCase() || '';
             const displayName = permission.display_name?.toLowerCase() || '';
             const module = permission.module || '';
@@ -102,15 +99,13 @@ export default function RoleCreate({ available_permissions = [], validation_erro
             
             return matchesSearch && matchesModule;
         });
-    }, [available_permissions, searchTerm, selectedModule]);
+    }, [allPermissions, searchTerm, selectedModule]);
 
-    // Group permissions with null checks
+    // Group filtered permissions by module
     const groupedPermissions = useMemo(() => {
         const groups: Record<string, Permission[]> = {};
         
         filteredPermissions.forEach(permission => {
-            if (!permission) return;
-            
             const module = permission.module || 'Uncategorized';
             if (!groups[module]) {
                 groups[module] = [];
@@ -124,9 +119,16 @@ export default function RoleCreate({ available_permissions = [], validation_erro
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         
+        // Validate name format
+        const nameRegex = /^[a-z_]+$/;
+        if (!nameRegex.test(data.name)) {
+            alert('Role name must contain only lowercase letters and underscores.');
+            return;
+        }
+        
         // Show confirmation for system roles
         if (data.is_system_role) {
-            if (!confirm('Are you sure you want to create a system role? System roles have special privileges and cannot be deleted.')) {
+            if (!confirm('Are you sure you want to create a system role? System roles cannot be deleted.')) {
                 return;
             }
         }
@@ -145,11 +147,11 @@ export default function RoleCreate({ available_permissions = [], validation_erro
     };
 
     const handlePermissionToggle = (permissionId: number) => {
-        const newPermissionIds = data.permission_ids.includes(permissionId)
-            ? data.permission_ids.filter(id => id !== permissionId)
-            : [...data.permission_ids, permissionId];
+        const newPermissions = data.permissions.includes(permissionId)
+            ? data.permissions.filter(id => id !== permissionId)
+            : [...data.permissions, permissionId];
         
-        setData('permission_ids', newPermissionIds);
+        setData('permissions', newPermissions);
     };
 
     const handleSelectAll = (module?: string) => {
@@ -157,28 +159,28 @@ export default function RoleCreate({ available_permissions = [], validation_erro
         
         if (module && groupedPermissions[module]) {
             permissionIdsToAdd = groupedPermissions[module]
-                .filter(p => p && !data.permission_ids.includes(p.id))
+                .filter(p => !data.permissions.includes(p.id))
                 .map(p => p.id);
         } else {
             permissionIdsToAdd = filteredPermissions
-                .filter(p => p && !data.permission_ids.includes(p.id))
+                .filter(p => !data.permissions.includes(p.id))
                 .map(p => p.id);
         }
         
-        setData('permission_ids', [...data.permission_ids, ...permissionIdsToAdd]);
+        setData('permissions', [...data.permissions, ...permissionIdsToAdd]);
     };
 
     const handleDeselectAll = (module?: string) => {
-        let newPermissionIds = [...data.permission_ids];
+        let newPermissions = [...data.permissions];
         
         if (module && groupedPermissions[module]) {
             const modulePermissionIds = groupedPermissions[module].map(p => p.id);
-            newPermissionIds = newPermissionIds.filter(id => !modulePermissionIds.includes(id));
+            newPermissions = newPermissions.filter(id => !modulePermissionIds.includes(id));
         } else {
-            newPermissionIds = [];
+            newPermissions = [];
         }
         
-        setData('permission_ids', newPermissionIds);
+        setData('permissions', newPermissions);
     };
 
     const handleCopy = (text: string, field: string) => {
@@ -197,38 +199,18 @@ export default function RoleCreate({ available_permissions = [], validation_erro
     const isAllSelected = (module?: string) => {
         if (module && groupedPermissions[module]) {
             const modulePermissions = groupedPermissions[module];
-            return modulePermissions.every(p => data.permission_ids.includes(p.id));
+            return modulePermissions.length > 0 && modulePermissions.every(p => data.permissions.includes(p.id));
         }
-        return filteredPermissions.every(p => data.permission_ids.includes(p.id));
+        return filteredPermissions.length > 0 && filteredPermissions.every(p => data.permissions.includes(p.id));
     };
 
     const isAnySelected = (module?: string) => {
         if (module && groupedPermissions[module]) {
             const modulePermissions = groupedPermissions[module];
-            return modulePermissions.some(p => data.permission_ids.includes(p.id));
+            return modulePermissions.some(p => data.permissions.includes(p.id));
         }
-        return filteredPermissions.some(p => data.permission_ids.includes(p.id));
+        return filteredPermissions.some(p => data.permissions.includes(p.id));
     };
-
-    // Generate a suggested display name from the role name
-    const generateDisplayName = () => {
-        if (data.display_name.trim() !== '' || data.name.trim() === '') return;
-        
-        const name = data.name
-            .replace(/[_-]/g, ' ') // Replace underscores and hyphens with spaces
-            .replace(/\b\w/g, char => char.toUpperCase()) // Capitalize each word
-            .trim();
-        
-        setData('display_name', name);
-    };
-
-    // Auto-generate display name when role name changes
-    useEffect(() => {
-        if (!data.display_name && data.name) {
-            const timeoutId = setTimeout(generateDisplayName, 500);
-            return () => clearTimeout(timeoutId);
-        }
-    }, [data.name]);
 
     return (
         <AdminLayout
@@ -315,54 +297,16 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                         <Input
                                             id="name"
                                             value={data.name}
-                                            onChange={(e) => setData('name', e.target.value)}
-                                            placeholder="e.g., admin, editor, moderator"
+                                            onChange={(e) => setData('name', e.target.value.toLowerCase())}
+                                            placeholder="e.g., admin, content_editor, moderator"
                                             className={`font-mono ${errors.name ? 'border-red-500' : ''}`}
                                             disabled={processing}
-                                            onBlur={generateDisplayName}
                                         />
                                         {errors.name && (
                                             <p className="text-sm text-red-600">{errors.name}</p>
                                         )}
                                         <p className="text-xs text-gray-500">
-                                            Use lowercase letters, numbers, and underscores only. Example: content_editor
-                                        </p>
-                                    </div>
-
-                                    {/* Display Name Field */}
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <Label htmlFor="display_name">
-                                                Display Name
-                                                <span className="text-xs text-gray-500 font-normal ml-2">
-                                                    (User-friendly name)
-                                                </span>
-                                            </Label>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleCopy(data.display_name, 'display_name')}
-                                                className="h-6 text-xs"
-                                                disabled={!data.display_name}
-                                            >
-                                                <Copy className="h-3 w-3 mr-1" />
-                                                {copiedField === 'display_name' ? 'Copied!' : 'Copy'}
-                                            </Button>
-                                        </div>
-                                        <Input
-                                            id="display_name"
-                                            value={data.display_name}
-                                            onChange={(e) => setData('display_name', e.target.value)}
-                                            placeholder="e.g., Administrator, Content Editor"
-                                            className={errors.display_name ? 'border-red-500' : ''}
-                                            disabled={processing}
-                                        />
-                                        {errors.display_name && (
-                                            <p className="text-sm text-red-600">{errors.display_name}</p>
-                                        )}
-                                        <p className="text-xs text-gray-500">
-                                            This is how the role will appear to users in the system
+                                            Use lowercase letters and underscores only. Example: content_editor
                                         </p>
                                     </div>
 
@@ -390,43 +334,22 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                         </p>
                                     </div>
 
-                                    {/* Role Type and Status */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Status */}
-                                        <div className="flex items-center justify-between p-4 border rounded-lg">
-                                            <div className="space-y-0.5">
-                                                <Label htmlFor="is_active" className="text-base">
-                                                    Status
-                                                </Label>
-                                                <p className="text-sm text-gray-500">
-                                                    Enable or disable this role
-                                                </p>
-                                            </div>
-                                            <Switch
-                                                id="is_active"
-                                                checked={data.is_active}
-                                                onCheckedChange={(checked) => setData('is_active', checked)}
-                                                disabled={processing}
-                                            />
+                                    {/* System Role Toggle */}
+                                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                                        <div className="space-y-0.5">
+                                            <Label htmlFor="is_system_role" className="text-base">
+                                                System Role
+                                            </Label>
+                                            <p className="text-sm text-gray-500">
+                                                Special privileges, cannot be deleted
+                                            </p>
                                         </div>
-
-                                        {/* System Role */}
-                                        <div className="flex items-center justify-between p-4 border rounded-lg">
-                                            <div className="space-y-0.5">
-                                                <Label htmlFor="is_system_role" className="text-base">
-                                                    System Role
-                                                </Label>
-                                                <p className="text-sm text-gray-500">
-                                                    Special privileges, cannot be deleted
-                                                </p>
-                                            </div>
-                                            <Switch
-                                                id="is_system_role"
-                                                checked={data.is_system_role}
-                                                onCheckedChange={(checked) => setData('is_system_role', checked)}
-                                                disabled={processing}
-                                            />
-                                        </div>
+                                        <Switch
+                                            id="is_system_role"
+                                            checked={data.is_system_role}
+                                            onCheckedChange={(checked) => setData('is_system_role', checked)}
+                                            disabled={processing}
+                                        />
                                     </div>
 
                                     {/* System Role Warning */}
@@ -464,7 +387,7 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                         <Key className="h-5 w-5" />
                                         Permissions
                                         <Badge variant="outline" className="ml-2">
-                                            {data.permission_ids.length} selected
+                                            {data.permissions.length} selected
                                         </Badge>
                                     </CardTitle>
                                     <CardDescription>
@@ -515,7 +438,7 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                                     size="sm"
                                                     onClick={() => handleDeselectAll()}
                                                     className="h-8"
-                                                    disabled={data.permission_ids.length === 0}
+                                                    disabled={data.permissions.length === 0}
                                                 >
                                                     <Minus className="h-3 w-3 mr-1" />
                                                     Clear All
@@ -536,7 +459,7 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                                     ? 'Try changing your search or filter criteria.'
                                                     : 'No permissions are available to assign.'}
                                             </p>
-                                            {available_permissions.length === 0 && (
+                                            {allPermissions.length === 0 && (
                                                 <Button
                                                     variant="outline"
                                                     onClick={() => router.visit(route('permissions.index'))}
@@ -548,13 +471,13 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                         </div>
                                     ) : (
                                         <div className="space-y-6">
-                                            {Object.entries(groupedPermissions).map(([module, permissions]) => (
+                                            {Object.entries(groupedPermissions).map(([module, modulePermissions]) => (
                                                 <div key={module} className="space-y-3">
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
                                                             <h3 className="font-medium">{module}</h3>
                                                             <Badge variant="secondary">
-                                                                {permissions.length}
+                                                                {modulePermissions.length}
                                                             </Badge>
                                                         </div>
                                                         <div className="flex gap-2">
@@ -581,18 +504,18 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                        {permissions.map((permission) => (
+                                                        {modulePermissions.map((permission) => (
                                                             <div
                                                                 key={permission.id}
                                                                 className={`flex items-center space-x-2 p-3 rounded-lg border ${
-                                                                    data.permission_ids.includes(permission.id)
+                                                                    data.permissions.includes(permission.id)
                                                                         ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
                                                                         : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'
                                                                 }`}
                                                             >
                                                                 <Checkbox
                                                                     id={`permission-${permission.id}`}
-                                                                    checked={data.permission_ids.includes(permission.id)}
+                                                                    checked={data.permissions.includes(permission.id)}
                                                                     onCheckedChange={() => handlePermissionToggle(permission.id)}
                                                                     disabled={processing}
                                                                 />
@@ -600,7 +523,7 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                                                     htmlFor={`permission-${permission.id}`}
                                                                     className="flex-1 cursor-pointer"
                                                                 >
-                                                                    <div className="font-medium">{permission.display_name || permission.name}</div>
+                                                                    <div className="font-medium">{permission.display_name}</div>
                                                                     <div className="text-sm text-gray-500 font-mono truncate">
                                                                         {permission.name}
                                                                     </div>
@@ -659,39 +582,30 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                                 }`} />
                                             </div>
                                             <div>
-                                                <div className="font-medium">
-                                                    {data.display_name || 'New Role'}
-                                                </div>
-                                                <div className="text-sm text-gray-500 font-mono">
+                                                <div className="font-medium font-mono">
                                                     {data.name || 'role.name'}
                                                 </div>
+                                                {data.description && (
+                                                    <div className="text-sm text-gray-500 line-clamp-1">
+                                                        {data.description}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                        <Badge variant={data.is_active ? "default" : "secondary"}>
-                                            {data.is_active ? (
-                                                <Check className="mr-1 h-3 w-3" />
-                                            ) : (
-                                                <X className="mr-1 h-3 w-3" />
-                                            )}
-                                            {data.is_active ? 'Active' : 'Inactive'}
+                                        <Badge variant={data.is_system_role ? "outline" : "default"}>
+                                            {data.is_system_role ? 'System' : 'Custom'}
                                         </Badge>
                                     </div>
 
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-500">Type</span>
-                                            <Badge variant={data.is_system_role ? "outline" : "default"}>
-                                                {data.is_system_role ? 'System' : 'Custom'}
-                                            </Badge>
-                                        </div>
-                                        <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-500">Permissions</span>
-                                            <Badge variant="outline">{data.permission_ids.length}</Badge>
+                                            <Badge variant="outline">{data.permissions.length}</Badge>
                                         </div>
                                         {data.description && (
                                             <div>
                                                 <span className="text-sm text-gray-500">Description</span>
-                                                <p className="text-sm mt-1 text-gray-700 dark:text-gray-300 line-clamp-2">
+                                                <p className="text-sm mt-1 text-gray-700 dark:text-gray-300">
                                                     {data.description}
                                                 </p>
                                             </div>
@@ -712,9 +626,9 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                     <div className="space-y-2">
                                         <h4 className="font-medium text-sm">Role Naming</h4>
                                         <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
-                                            <li>Use lowercase with underscores for technical names</li>
+                                            <li>Use lowercase with underscores only (e.g., content_editor)</li>
                                             <li>Keep role names descriptive but concise</li>
-                                            <li>Consider naming conventions in your organization</li>
+                                            <li>System roles should have "admin" or "system" in name</li>
                                         </ul>
                                     </div>
                                     
@@ -725,7 +639,7 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                         <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
                                             <li>Follow the principle of least privilege</li>
                                             <li>Only assign permissions needed for the role's purpose</li>
-                                            <li>Group related permissions by module</li>
+                                            <li>Review inactive permissions carefully</li>
                                         </ul>
                                     </div>
                                     
@@ -736,7 +650,7 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                         <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
                                             <li>System roles cannot be deleted</li>
                                             <li>Use for core administrative functions</li>
-                                            <li>Assign system roles carefully</li>
+                                            <li>Assign system roles carefully to trusted users</li>
                                         </ul>
                                     </div>
                                 </CardContent>
@@ -761,18 +675,21 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                             size="sm"
                                             className="justify-start h-8"
                                             onClick={() => {
-                                                // Example: Admin template
+                                                // Admin template - select all active permissions
+                                                const allActivePermissionIds = allPermissions
+                                                    .filter(p => p.is_active)
+                                                    .map(p => p.id);
+                                                
                                                 setData({
-                                                    ...data,
                                                     name: 'admin',
-                                                    display_name: 'Administrator',
                                                     description: 'Full system administrator with all permissions',
                                                     is_system_role: true,
+                                                    permissions: allActivePermissionIds,
                                                 });
                                             }}
                                         >
                                             <Shield className="h-3 w-3 mr-2" />
-                                            Administrator
+                                            Administrator (All Permissions)
                                         </Button>
                                         
                                         <Button
@@ -781,13 +698,20 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                             size="sm"
                                             className="justify-start h-8"
                                             onClick={() => {
-                                                // Example: Editor template
+                                                // Editor template - focus on content permissions
+                                                const contentPermissions = allPermissions
+                                                    .filter(p => p.is_active && 
+                                                        (p.module.toLowerCase().includes('content') || 
+                                                         p.module.toLowerCase().includes('post') ||
+                                                         p.name.includes('create') ||
+                                                         p.name.includes('edit')))
+                                                    .map(p => p.id);
+                                                
                                                 setData({
-                                                    ...data,
-                                                    name: 'editor',
-                                                    display_name: 'Content Editor',
-                                                    description: 'Can create and edit content but not manage users',
+                                                    name: 'content_editor',
+                                                    description: 'Can create and edit content',
                                                     is_system_role: false,
+                                                    permissions: contentPermissions.slice(0, 10), // Limit to 10 permissions
                                                 });
                                             }}
                                         >
@@ -801,18 +725,24 @@ export default function RoleCreate({ available_permissions = [], validation_erro
                                             size="sm"
                                             className="justify-start h-8"
                                             onClick={() => {
-                                                // Example: Viewer template
+                                                // Viewer template - mostly view permissions
+                                                const viewPermissions = allPermissions
+                                                    .filter(p => p.is_active && 
+                                                        (p.name.includes('view') || 
+                                                         p.name.includes('read') ||
+                                                         p.name.includes('list')))
+                                                    .map(p => p.id);
+                                                
                                                 setData({
-                                                    ...data,
                                                     name: 'viewer',
-                                                    display_name: 'Viewer',
                                                     description: 'Can view content but not create or edit',
                                                     is_system_role: false,
+                                                    permissions: viewPermissions,
                                                 });
                                             }}
                                         >
                                             <Eye className="h-3 w-3 mr-2" />
-                                            Viewer
+                                            Viewer (Read-Only)
                                         </Button>
                                     </div>
                                 </CardContent>

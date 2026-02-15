@@ -64,8 +64,6 @@ interface Purok {
 
 interface HouseholdFormData {
     household_number: string;
-    head_of_family: string;
-    head_resident_id: number | null;
     contact_number: string;
     email?: string;
     address: string;
@@ -86,8 +84,6 @@ interface EditHouseholdProps extends PageProps {
     household: {
         id: number;
         household_number: string;
-        head_of_family: string;
-        head_resident_id: number | null;
         contact_number: string;
         email?: string;
         address: string;
@@ -102,7 +98,6 @@ interface EditHouseholdProps extends PageProps {
         internet: boolean;
         vehicle: boolean;
         remarks?: string;
-        members: HouseholdMember[];
     };
     heads: Resident[];
     puroks: Purok[];
@@ -148,8 +143,6 @@ export default function EditHousehold({
 
     const { data, setData, put, processing, errors } = useForm<HouseholdFormData>({
         household_number: household.household_number,
-        head_of_family: household.head_of_family,
-        head_resident_id: household.head_resident_id,
         contact_number: household.contact_number,
         email: household.email || '',
         address: household.address,
@@ -217,6 +210,14 @@ export default function EditHousehold({
         'Non-relative'
     ];
 
+    // Get the current head member
+    const headMember = members.find(m => m.relationship === 'Head' || m.is_head);
+    
+    // Get the current head resident from heads list
+    const currentHeadResident = headMember?.resident_id 
+        ? heads.find(h => h.id === headMember.resident_id)
+        : null;
+
     // Update form data when members change
     useEffect(() => {
         setData('total_members', members.length);
@@ -230,7 +231,7 @@ export default function EditHousehold({
             purok_id: member.purok_id,
             photo_path: member.photo_path,
             photo_url: member.photo_url,
-            is_head: member.is_head,
+            is_head: member.relationship === 'Head' || member.is_head,
         })));
     }, [members]);
 
@@ -302,25 +303,15 @@ export default function EditHousehold({
 
     const handleHeadChange = (value: string) => {
         if (!value) {
-            // Clear head selection
-            setData('head_of_family', '');
-            setData('head_resident_id', null);
-            
-            // Remove head from members if exists
-            const headMemberIndex = members.findIndex(m => m.relationship === 'Head' || m.is_head);
-            if (headMemberIndex !== -1) {
-                const newMembers = [...members];
-                newMembers.splice(headMemberIndex, 1);
-                setMembers(newMembers);
-            }
+            // Clear head selection by removing any head member
+            const newMembers = members.filter(m => m.relationship !== 'Head' && !m.is_head);
+            setMembers(newMembers);
             return;
         }
 
         const selectedHead = heads.find(head => head.id.toString() === value);
         if (selectedHead) {
             const fullName = `${selectedHead.first_name} ${selectedHead.last_name}`.trim();
-            setData('head_of_family', fullName);
-            setData('head_resident_id', parseInt(value));
             
             // Update purok_id based on selected head
             if (selectedHead.purok_id) {
@@ -370,6 +361,14 @@ export default function EditHousehold({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // Validate that we have exactly one head member
+        const headMembers = members.filter(m => m.relationship === 'Head' || m.is_head);
+        if (headMembers.length !== 1) {
+            alert('Household must have exactly one head member. Please select a head of family.');
+            return;
+        }
+        
         put(`/households/${household.id}`, {
             preserveScroll: true,
         });
@@ -470,12 +469,11 @@ export default function EditHousehold({
                                                 id="householdNumber" 
                                                 value={data.household_number}
                                                 onChange={(e) => setData('household_number', e.target.value)}
-                                                readOnly
-                                                className="bg-gray-50"
+                                                required
                                             />
-                                            <p className="text-xs text-gray-500">
-                                                Household number cannot be changed
-                                            </p>
+                                            {errors.household_number && (
+                                                <p className="text-sm text-red-600">{errors.household_number}</p>
+                                            )}
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="registrationDate">Registration Date</Label>
@@ -492,11 +490,35 @@ export default function EditHousehold({
                                     <div className="space-y-2">
                                         <Label htmlFor="head_resident_id">Head of Family *</Label>
                                         <Select 
-                                            value={data.head_resident_id?.toString() || ''}
+                                            value={currentHeadResident?.id?.toString() || ''}
                                             onValueChange={handleHeadChange}
                                         >
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Select or search for head of family" />
+                                                <SelectValue placeholder="Select or search for head of family">
+                                                    {currentHeadResident ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-6 w-6 rounded-full overflow-hidden">
+                                                                {hasPhoto(currentHeadResident) ? (
+                                                                    <img 
+                                                                        src={getResidentPhotoUrl(currentHeadResident)!}
+                                                                        alt={currentHeadResident.first_name + ' ' + currentHeadResident.last_name}
+                                                                        className="h-full w-full object-cover"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="h-full w-full bg-gray-100 flex items-center justify-center">
+                                                                        <User className="h-3 w-3 text-gray-500" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <span>{currentHeadResident.first_name} {currentHeadResident.last_name}</span>
+                                                            {currentHeadResident.age && (
+                                                                <span className="text-xs text-gray-500">
+                                                                    ({currentHeadResident.age} years)
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : 'Select head of family'}
+                                                </SelectValue>
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {heads.map((head) => {
@@ -529,18 +551,9 @@ export default function EditHousehold({
                                                 })}
                                             </SelectContent>
                                         </Select>
-                                        {errors.head_resident_id && (
-                                            <p className="text-sm text-red-600">{errors.head_resident_id}</p>
-                                        )}
-                                        <Input 
-                                            value={data.head_of_family}
-                                            onChange={(e) => setData('head_of_family', e.target.value)}
-                                            placeholder="Or enter name manually"
-                                            className="mt-2"
-                                        />
-                                        {errors.head_of_family && (
-                                            <p className="text-sm text-red-600">{errors.head_of_family}</p>
-                                        )}
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Select the head of family from available residents. The head will be added as the first household member.
+                                        </p>
                                     </div>
 
                                     <div className="grid gap-4 md:grid-cols-2">
@@ -745,7 +758,7 @@ export default function EditHousehold({
                                                                     Try a different search term or create a new resident.
                                                                 </p>
                                                                 <Link 
-                                                                    href={`/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(searchQuery)}&household_head_id=${data.head_resident_id || ''}&purok_id=${data.purok_id || ''}`}
+                                                                    href={`/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(searchQuery)}&household_id=${household.id}&purok_id=${data.purok_id || ''}`}
                                                                     className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                                                                     onClick={() => setShowMemberSearch(false)}
                                                                 >
@@ -769,7 +782,7 @@ export default function EditHousehold({
                                                                 {searchResults.map((resident) => {
                                                                     const fullName = `${resident.first_name} ${resident.last_name}`.trim();
                                                                     const isAlreadyAdded = members.some(m => m.resident_id === resident.id);
-                                                                    const isHead = resident.id === data.head_resident_id;
+                                                                    const isHead = currentHeadResident?.id === resident.id;
                                                                     const currentPurok = resident.purok_name || 'No purok';
                                                                     const photoUrl = getResidentPhotoUrl(resident);
                                                                     
@@ -954,12 +967,13 @@ export default function EditHousehold({
                                         ) : (
                                             members.map((member) => {
                                                 const photoUrl = getResidentPhotoUrl(member);
+                                                const isHead = member.relationship === 'Head' || member.is_head;
                                                 return (
                                                     <div key={member.id} className="border rounded-lg p-4 hover:border-gray-300 transition-colors">
                                                         <div className="flex items-center justify-between mb-4">
                                                             <div className="flex items-center gap-3">
                                                                 <div className={`h-10 w-10 rounded-full flex items-center justify-center overflow-hidden ${
-                                                                    member.relationship === 'Head' || member.is_head
+                                                                    isHead
                                                                         ? 'border-2 border-blue-500' 
                                                                         : 'border border-gray-300'
                                                                 }`}>
@@ -974,11 +988,11 @@ export default function EditHousehold({
                                                                                 if (parent) {
                                                                                     parent.innerHTML = `
                                                                                         <div class="h-full w-full flex items-center justify-center ${
-                                                                                            member.relationship === 'Head' || member.is_head
+                                                                                            isHead
                                                                                                 ? 'bg-blue-100 text-blue-600' 
                                                                                                 : 'bg-gray-100 text-gray-600'
                                                                                         }">
-                                                                                            ${member.relationship === 'Head' || member.is_head ? '<Home className="h-5 w-5" />' : '<User className="h-5 w-5" />'}
+                                                                                            ${isHead ? '<Home className="h-5 w-5" />' : '<User className="h-5 w-5" />'}
                                                                                         </div>
                                                                                     `;
                                                                                 }
@@ -986,11 +1000,11 @@ export default function EditHousehold({
                                                                         />
                                                                     ) : (
                                                                         <div className={`h-full w-full flex items-center justify-center ${
-                                                                            member.relationship === 'Head' || member.is_head
+                                                                            isHead
                                                                                 ? 'bg-blue-100 text-blue-600' 
                                                                                 : 'bg-gray-100 text-gray-600'
                                                                         }`}>
-                                                                            {member.relationship === 'Head' || member.is_head ? (
+                                                                            {isHead ? (
                                                                                 <Home className="h-5 w-5" />
                                                                             ) : (
                                                                                 <User className="h-5 w-5" />
@@ -1001,7 +1015,7 @@ export default function EditHousehold({
                                                                 <div>
                                                                     <div className="font-medium flex items-center gap-2">
                                                                         {member.name || `Member #${member.id}`}
-                                                                        {member.relationship === 'Head' || member.is_head ? (
+                                                                        {isHead ? (
                                                                             <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
                                                                                 Head of Family
                                                                             </span>
@@ -1016,7 +1030,7 @@ export default function EditHousehold({
                                                                     <div className="text-sm text-gray-500">
                                                                         {member.relationship}
                                                                         {member.age > 0 && ` • ${member.age} years old`}
-                                                                        {member.resident_id && member.relationship !== 'Head' && !member.is_head && (
+                                                                        {member.resident_id && !isHead && (
                                                                             <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
                                                                                 Existing Resident
                                                                             </span>
@@ -1029,7 +1043,7 @@ export default function EditHousehold({
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            {member.relationship !== 'Head' && !member.is_head && (
+                                                            {!isHead && (
                                                                 <Button
                                                                     type="button"
                                                                     variant="ghost"
@@ -1043,7 +1057,7 @@ export default function EditHousehold({
                                                         </div>
                                                         
                                                         {/* Relationship Selection for non-head members */}
-                                                        {member.relationship !== 'Head' && !member.is_head && (
+                                                        {!isHead && (
                                                             <div className="mt-4">
                                                                 <Label htmlFor={`relationship-${member.id}`}>Relationship to Head</Label>
                                                                 <Select 
@@ -1067,13 +1081,13 @@ export default function EditHousehold({
                                                             </div>
                                                         )}
                                                         
-                                                        {!member.resident_id && member.name && member.relationship !== 'Head' && !member.is_head && (
+                                                        {!member.resident_id && member.name && !isHead && (
                                                             <div className="mt-3 pt-3 border-t border-dashed">
                                                                 <div className="text-sm text-gray-600 mb-2">
                                                                     This member is not in the residents database yet.
                                                                 </div>
                                                                 <Link 
-                                                                    href={`/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(member.name)}&age=${member.age}&relationship=${encodeURIComponent(member.relationship)}&household_head_id=${data.head_resident_id || ''}&purok_id=${data.purok_id || ''}`}
+                                                                    href={`/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(member.name)}&age=${member.age}&relationship=${encodeURIComponent(member.relationship)}&household_id=${household.id}&purok_id=${data.purok_id || ''}`}
                                                                     target="_blank"
                                                                     className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:underline"
                                                                 >
@@ -1267,13 +1281,13 @@ export default function EditHousehold({
                                                     {members.filter(m => hasPhoto(m)).length} of {members.length} members
                                                 </span>
                                                 <span className="text-sm font-medium">
-                                                    {Math.round((members.filter(m => hasPhoto(m)).length / members.length) * 100)}%
+                                                    {Math.round((members.filter(m => hasPhoto(m)).length / Math.max(members.length, 1)) * 100)}%
                                                 </span>
                                             </div>
                                             <div className="w-full bg-gray-200 rounded-full h-2.5">
                                                 <div 
                                                     className="bg-blue-600 h-2.5 rounded-full" 
-                                                    style={{ width: `${(members.filter(m => hasPhoto(m)).length / members.length) * 100}%` }}
+                                                    style={{ width: `${(members.filter(m => hasPhoto(m)).length / Math.max(members.length, 1)) * 100}%` }}
                                                 ></div>
                                             </div>
                                         </div>
@@ -1288,9 +1302,9 @@ export default function EditHousehold({
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-3">
-                                        <div className={`flex items-center space-x-2 ${data.head_of_family ? 'text-green-600' : 'text-gray-400'}`}>
-                                            <div className={`h-5 w-5 rounded-full ${data.head_of_family ? 'bg-green-100' : 'bg-gray-100'} flex items-center justify-center`}>
-                                                <div className={`h-2 w-2 rounded-full ${data.head_of_family ? 'bg-green-600' : 'bg-gray-400'}`}></div>
+                                        <div className={`flex items-center space-x-2 ${headMember ? 'text-green-600' : 'text-gray-400'}`}>
+                                            <div className={`h-5 w-5 rounded-full ${headMember ? 'bg-green-100' : 'bg-gray-100'} flex items-center justify-center`}>
+                                                <div className={`h-2 w-2 rounded-full ${headMember ? 'bg-green-600' : 'bg-gray-400'}`}></div>
                                             </div>
                                             <span className="text-sm">Head of family information</span>
                                         </div>
@@ -1386,8 +1400,6 @@ export default function EditHousehold({
                                     // Reset form to original values
                                     setData({
                                         household_number: household.household_number,
-                                        head_of_family: household.head_of_family,
-                                        head_resident_id: household.head_resident_id,
                                         contact_number: household.contact_number,
                                         email: household.email || '',
                                         address: household.address,
@@ -1410,9 +1422,6 @@ export default function EditHousehold({
                             </Button>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" type="button">
-                                Save as Draft
-                            </Button>
                             <Button type="submit" disabled={processing}>
                                 <Save className="h-4 w-4 mr-2" />
                                 {processing ? 'Updating...' : 'Update Household'}

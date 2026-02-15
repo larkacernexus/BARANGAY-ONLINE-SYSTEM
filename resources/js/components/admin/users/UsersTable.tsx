@@ -1,0 +1,241 @@
+import { useState } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Link } from '@inertiajs/react';
+import {
+  Eye,
+  Edit,
+  Trash2,
+  MoreVertical,
+  Mail,
+  Copy,
+  CheckCircle,
+  XCircle,
+  Shield,
+  Clock,
+  AlertTriangle,
+  User as UserIcon,
+  ChevronUp,
+  ChevronDown,
+  CheckSquare,
+  Square,
+  Lock,
+  Unlock,
+  Key
+} from 'lucide-react';
+import UsersTableRow from './UsersTableRow';
+import { User } from '@/types';
+
+interface UsersTableProps {
+  users: User[];
+  isBulkMode: boolean;
+  selectedUsers: number[];
+  isSelectAll: boolean;
+  onItemSelect: (id: number) => void;
+  onSelectAll: () => void;
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+  onSort: (column: string) => void;
+}
+
+export default function UsersTable({
+  users,
+  isBulkMode,
+  selectedUsers,
+  isSelectAll,
+  onItemSelect,
+  onSelectAll,
+  sortBy,
+  sortOrder,
+  onSort
+}: UsersTableProps) {
+  const [expandedRow, setExpandedRow] = useState<number | null>(null);
+
+  const getSortIcon = (column: string) => {
+    if (sortBy !== column) return null;
+    return sortOrder === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      'active': 'default',
+      'inactive': 'secondary',
+      'suspended': 'destructive',
+      'pending': 'outline'
+    };
+    return variants[status] || 'outline';
+  };
+
+  const getStatusIcon = (status: string) => {
+    const icons: Record<string, JSX.Element> = {
+      'active': <CheckCircle className="h-4 w-4 text-green-500" />,
+      'inactive': <XCircle className="h-4 w-4 text-gray-500" />,
+      'suspended': <AlertTriangle className="h-4 w-4 text-red-500" />,
+      'pending': <Clock className="h-4 w-4 text-amber-500" />
+    };
+    return icons[status] || null;
+  };
+
+  const getRoleBadgeVariant = (roleName: string | undefined) => {
+    if (!roleName) return 'outline';
+    
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      'Administrator': 'destructive',
+      'Admin': 'destructive',
+      'Super Admin': 'destructive',
+      'Treasury': 'outline',
+      'Treasury Officer': 'outline',
+      'Records Clerk': 'outline',
+      'Clearance Officer': 'outline',
+      'Analyst': 'secondary',
+      'Auditor': 'outline',
+      'Viewer': 'outline',
+      'User': 'outline'
+    };
+    return variants[roleName] || 'outline';
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const truncateText = (text: string | null, maxLength: number = 30): string => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
+  const truncateEmail = (email: string, maxLength: number = 25): string => {
+    if (!email) return '';
+    if (email.length <= maxLength) return email;
+    const [local, domain] = email.split('@');
+    if (!domain) return truncateText(email, maxLength);
+    
+    const maxLocal = Math.floor(maxLength / 2);
+    const maxDomain = maxLength - maxLocal - 1;
+    
+    const truncatedLocal = truncateText(local, maxLocal);
+    const truncatedDomain = truncateText(domain, maxDomain);
+    
+    return `${truncatedLocal}@${truncatedDomain}`;
+  };
+
+  const getFullName = (user: User): string => {
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`.trim();
+    } else if (user.first_name) {
+      return user.first_name;
+    } else if (user.last_name) {
+      return user.last_name;
+    } else {
+      return user.email;
+    }
+  };
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-gray-50 dark:bg-gray-800">
+            {isBulkMode && (
+              <TableHead className="px-4 py-3 text-center w-12">
+                <div className="flex items-center justify-center">
+                  <Checkbox
+                    checked={isSelectAll && users.length > 0}
+                    onCheckedChange={onSelectAll}
+                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                  />
+                </div>
+              </TableHead>
+            )}
+            <TableHead 
+              className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100"
+              onClick={() => onSort('name')}
+            >
+              <div className="flex items-center gap-1">
+                User
+                {getSortIcon('name')}
+              </div>
+            </TableHead>
+            <TableHead 
+              className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
+              onClick={() => onSort('role')}
+            >
+              <div className="flex items-center gap-1">
+                Role
+                {getSortIcon('role')}
+              </div>
+            </TableHead>
+            <TableHead 
+              className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]"
+            >
+              Department
+            </TableHead>
+            <TableHead 
+              className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+              onClick={() => onSort('status')}
+            >
+              <div className="flex items-center gap-1">
+                Status
+                {getSortIcon('status')}
+              </div>
+            </TableHead>
+            <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px]">
+              Last Activity
+            </TableHead>
+            <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[80px]">
+              Actions
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {users.map((user) => (
+            <UsersTableRow
+              key={user.id}
+              user={user}
+              isBulkMode={isBulkMode}
+              isSelected={selectedUsers.includes(user.id)}
+              onSelect={() => onItemSelect(user.id)}
+              isExpanded={expandedRow === user.id}
+              onToggleExpand={() => setExpandedRow(expandedRow === user.id ? null : user.id)}
+              getFullName={getFullName}
+              truncateText={truncateText}
+              truncateEmail={truncateEmail}
+              getStatusBadgeVariant={getStatusBadgeVariant}
+              getStatusIcon={getStatusIcon}
+              getRoleBadgeVariant={getRoleBadgeVariant}
+              formatDate={formatDate}
+            />
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}

@@ -1,0 +1,444 @@
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { 
+    MoreVertical,
+    Eye,
+    Edit,
+    Trash2,
+    Copy,
+    Printer,
+    CreditCard,
+    CheckSquare,
+    Square,
+    User,
+    Home,
+    Building,
+    Calendar,
+    Clock,
+    FileText,
+    CheckCircle,
+    AlertCircle,
+    ChevronUp,
+    ChevronDown
+} from 'lucide-react';
+import { Link, router } from '@inertiajs/react';
+import { route } from 'ziggy-js';
+import { Fee, Filters } from '@/types/fees.types';
+import { format, isAfter } from 'date-fns';
+
+interface FeesTableViewProps {
+    fees: Fee[];
+    isBulkMode: boolean;
+    selectedFees: number[];
+    filtersState: Filters;
+    onItemSelect: (id: number) => void;
+    onSort: (column: string) => void;
+    onDelete: (fee: Fee) => void;
+    onEdit?: (fee: Fee) => void;
+    onViewDetails?: (fee: Fee) => void;
+    onCopyToClipboard?: (text: string, label: string) => void;
+    onSelectAllOnPage: () => void;
+    isSelectAll: boolean;
+    hasActiveFilters: boolean;
+    onClearFilters: () => void;
+    statuses: Record<string, string>;
+    categories: Record<string, string>;
+}
+
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+        style: 'currency',
+        currency: 'PHP',
+        minimumFractionDigits: 2
+    }).format(amount);
+};
+
+const formatDate = (dateString: string) => {
+    return format(new Date(dateString), 'MMM dd, yyyy');
+};
+
+const isOverdue = (dueDate: string) => {
+    const due = new Date(dueDate);
+    const today = new Date();
+    return isAfter(today, due);
+};
+
+const getDaysOverdue = (dueDate: string) => {
+    const due = new Date(dueDate);
+    const today = new Date();
+    const diffTime = today.getTime() - due.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+};
+
+const getStatusIcon = (status: string) => {
+    switch (status) {
+        case 'paid': return <CheckCircle className="h-4 w-4 text-green-500" />;
+        case 'issued': return <FileText className="h-4 w-4 text-blue-500" />;
+        case 'pending': return <Clock className="h-4 w-4 text-amber-500" />;
+        case 'partially_paid': return <CreditCard className="h-4 w-4 text-indigo-500" />;
+        case 'overdue': return <AlertCircle className="h-4 w-4 text-red-500" />;
+        default: return null;
+    }
+};
+
+const getPayerIcon = (payerType: string) => {
+    switch (payerType) {
+        case 'resident': return <User className="h-4 w-4" />;
+        case 'household': return <Home className="h-4 w-4" />;
+        case 'business': return <Building className="h-4 w-4" />;
+        default: return <User className="h-4 w-4" />;
+    }
+};
+
+const getSortIcon = (column: string, filtersState: Filters) => {
+    if (filtersState.sort_by !== column) return null;
+    return filtersState.sort_order === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+};
+
+export default function FeesTableView({
+    fees,
+    isBulkMode,
+    selectedFees,
+    filtersState,
+    onItemSelect,
+    onSort,
+    onDelete,
+    onEdit,
+    onViewDetails,
+    onCopyToClipboard,
+    onSelectAllOnPage,
+    isSelectAll,
+    hasActiveFilters,
+    onClearFilters,
+    statuses,
+    categories
+}: FeesTableViewProps) {
+
+    const handleViewClick = (fee: Fee) => {
+        if (onViewDetails) {
+            onViewDetails(fee);
+        } else {
+            router.get(route('fees.show', fee.id));
+        }
+    };
+
+    const handleEditClick = (fee: Fee) => {
+        if (onEdit) {
+            onEdit(fee);
+        } else {
+            router.get(route('fees.edit', fee.id));
+        }
+    };
+
+    const handleCopyFeeCode = (fee: Fee) => {
+        if (onCopyToClipboard) {
+            onCopyToClipboard(fee.fee_code, 'Fee Code');
+        } else {
+            navigator.clipboard.writeText(fee.fee_code);
+        }
+    };
+
+    return (
+        <div className="overflow-x-auto">
+            <div className="min-w-full inline-block align-middle">
+                <div className="overflow-hidden">
+                    <Table className="min-w-full">
+                        <TableHeader>
+                            <TableRow className="bg-gray-50 dark:bg-gray-800">
+                                {isBulkMode && (
+                                    <TableHead className="px-4 py-3 text-center w-12">
+                                        <div className="flex items-center justify-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelectAll && fees.length > 0}
+                                                onChange={onSelectAllOnPage}
+                                                className="rounded border-gray-300 dark:border-gray-600"
+                                            />
+                                        </div>
+                                    </TableHead>
+                                )}
+                                <TableHead 
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[160px] cursor-pointer hover:bg-gray-100"
+                                    onClick={() => onSort('fee_code')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Fee Details
+                                        {getSortIcon('fee_code', filtersState)}
+                                    </div>
+                                </TableHead>
+                                <TableHead 
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100"
+                                    onClick={() => onSort('payer_name')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Payer Information
+                                        {getSortIcon('payer_name', filtersState)}
+                                    </div>
+                                </TableHead>
+                                <TableHead 
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] cursor-pointer hover:bg-gray-100"
+                                    onClick={() => onSort('due_date')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Dates
+                                        {getSortIcon('due_date', filtersState)}
+                                    </div>
+                                </TableHead>
+                                <TableHead 
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] cursor-pointer hover:bg-gray-100"
+                                    onClick={() => onSort('total_amount')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Amount
+                                        {getSortIcon('total_amount', filtersState)}
+                                    </div>
+                                </TableHead>
+                                <TableHead 
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
+                                    onClick={() => onSort('status')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Status
+                                        {getSortIcon('status', filtersState)}
+                                    </div>
+                                </TableHead>
+                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[80px]">
+                                    Actions
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody className="divide-y divide-gray-200 dark:divide-gray-700">
+                            {fees.map((fee) => {
+                                const isSelected = selectedFees.includes(fee.id);
+                                const isFeeOverdue = isOverdue(fee.due_date) && fee.status !== 'paid';
+                                const daysOverdue = getDaysOverdue(fee.due_date);
+                                
+                                return (
+                                    <TableRow 
+                                        key={fee.id} 
+                                        className={`hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${
+                                            isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
+                                        } ${isFeeOverdue ? 'bg-red-50/30 dark:bg-red-900/10' : ''}`}
+                                        onClick={(e) => {
+                                            if (isBulkMode && e.target instanceof HTMLElement && 
+                                                !e.target.closest('a') && 
+                                                !e.target.closest('button') &&
+                                                !e.target.closest('.dropdown-menu-content') &&
+                                                !e.target.closest('input[type="checkbox"]')) {
+                                                onItemSelect(fee.id);
+                                            }
+                                        }}
+                                    >
+                                        {isBulkMode && (
+                                            <TableCell className="px-4 py-3 text-center">
+                                                <div className="flex items-center justify-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => onItemSelect(fee.id)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="rounded border-gray-300 dark:border-gray-600"
+                                                    />
+                                                </div>
+                                            </TableCell>
+                                        )}
+                                        <TableCell className="px-4 py-3 whitespace-nowrap">
+                                            <div className="space-y-1">
+                                                <div className="font-medium">
+                                                    {fee.fee_code}
+                                                </div>
+                                                <div className="text-sm text-gray-500">
+                                                    {fee.fee_type?.name || 'Unknown Fee Type'}
+                                                </div>
+                                                {fee.fee_type?.category && (
+                                                    <div className="mt-1">
+                                                        <Badge variant="outline">
+                                                            {categories[fee.fee_type.category] || fee.fee_type.category}
+                                                        </Badge>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="px-4 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                                                    {getPayerIcon(fee.payer_type)}
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium">
+                                                        {fee.payer_name}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500">
+                                                        {fee.contact_number || 'No contact'}
+                                                    </div>
+                                                    {fee.purok && (
+                                                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                                                            Purok {fee.purok}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="px-4 py-3">
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <Calendar className="h-4 w-4 text-gray-400" />
+                                                    <span className="text-sm">
+                                                        Issued: {formatDate(fee.issue_date)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Clock className="h-4 w-4 text-gray-400" />
+                                                    <span className={`text-sm ${isFeeOverdue ? 'text-red-600' : ''}`}>
+                                                        Due: {formatDate(fee.due_date)}
+                                                        {isFeeOverdue && (
+                                                            <span className="ml-1 text-xs">
+                                                                ({daysOverdue} days)
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </TableCell>
+                                       <TableCell className="px-4 py-3">
+    <div className="space-y-1">
+        <div className="font-bold text-lg">
+            {formatCurrency(fee.amount_paid)}
+        </div>
+        <div className="text-xs text-gray-500">
+            Total: {formatCurrency(fee.total_amount)}
+        </div>
+        {fee.balance > 0 && (
+            <div className="text-sm text-red-600">
+                Balance: {formatCurrency(fee.balance)}
+            </div>
+        )}
+    </div>
+</TableCell>
+                                        <TableCell className="px-4 py-3">
+                                            <Badge variant="outline" className="flex items-center gap-1">
+                                                {getStatusIcon(fee.status)}
+                                                {statuses[fee.status] || fee.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="px-4 py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        className="h-8 w-8 p-0"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <MoreVertical className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-48">
+                                                    <DropdownMenuItem onClick={() => handleViewClick(fee)}>
+                                                        <Eye className="mr-2 h-4 w-4" />
+                                                        View Details
+                                                    </DropdownMenuItem>
+                                                    
+                                                    {(fee.status === 'pending' || fee.status === 'issued') && (
+                                                        <DropdownMenuItem onClick={() => handleEditClick(fee)}>
+                                                            <Edit className="mr-2 h-4 w-4" />
+                                                            Edit Fee
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    
+                                                    <DropdownMenuSeparator />
+                                                    
+                                                    <DropdownMenuItem onClick={() => handleCopyFeeCode(fee)}>
+                                                        <Copy className="mr-2 h-4 w-4" />
+                                                        Copy Fee Code
+                                                    </DropdownMenuItem>
+                                                    
+                                                    <DropdownMenuItem asChild>
+                                                        <Link href={`/fees/${fee.id}/print`}>
+                                                            <Printer className="mr-2 h-4 w-4" />
+                                                            Print Invoice
+                                                        </Link>
+                                                    </DropdownMenuItem>
+                                                    
+                                                    {fee.status !== 'paid' && fee.balance > 0 && (
+                                                        <DropdownMenuItem asChild>
+                                                            <Link 
+                                                                href={route('payments.create', { 
+                                                                    fee_id: fee.id,
+                                                                    payer_type: fee.payer_type,
+                                                                    payer_id: fee.payer_type === 'resident' ? fee.resident_id : fee.household_id,
+                                                                    payer_name: fee.payer_name,
+                                                                    contact_number: fee.contact_number,
+                                                                    address: fee.address,
+                                                                    purok: fee.purok,
+                                                                    fee_code: fee.fee_code,
+                                                                    balance: fee.balance
+                                                                })}
+                                                                className="flex items-center"
+                                                            >
+                                                                <CreditCard className="mr-2 h-4 w-4" />
+                                                                Pay Fee
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    
+                                                    {isBulkMode && (
+                                                        <>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem onClick={() => onItemSelect(fee.id)}>
+                                                                {isSelected ? (
+                                                                    <>
+                                                                        <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
+                                                                        <span className="text-green-600">Deselect</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <Square className="mr-2 h-4 w-4" />
+                                                                        Select for Bulk
+                                                                    </>
+                                                                )}
+                                                            </DropdownMenuItem>
+                                                        </>
+                                                    )}
+                                                    
+                                                    {fee.status === 'pending' && (
+                                                        <>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem 
+                                                                onClick={() => onDelete(fee)}
+                                                                className="text-red-600"
+                                                            >
+                                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                                Delete Fee
+                                                            </DropdownMenuItem>
+                                                        </>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
+            </div>
+        </div>
+    );
+}

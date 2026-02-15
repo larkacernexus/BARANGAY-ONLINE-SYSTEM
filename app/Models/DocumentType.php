@@ -15,7 +15,7 @@ class DocumentType extends Model
         'name',
         'code',
         'description',
-        'document_category_id',  // Changed from 'category'
+        'document_category_id',
         'is_required',
         'is_active',
         'accepted_formats',

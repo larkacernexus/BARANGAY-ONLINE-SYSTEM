@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
-import { SystemModule, GuardType } from '@/types';
+import { SystemModule } from '@/types';
 import {
     ArrowLeft,
     Save,
     Key,
-    Shield,
     Eye,
     AlertCircle,
     RefreshCw,
@@ -40,13 +39,11 @@ import { route } from 'ziggy-js';
 
 interface PermissionCreateProps {
     modules?: SystemModule[];
-    guard_types?: GuardType[];
     validation_errors?: Record<string, string>;
 }
 
 export default function PermissionCreate({ 
     modules = [], 
-    guard_types = [], 
     validation_errors 
 }: PermissionCreateProps) {
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -59,15 +56,11 @@ export default function PermissionCreate({
         description: string;
     }>>([]);
 
-    // Default guard type if none provided
-    const defaultGuardName = guard_types.length > 0 ? guard_types[0].name : 'web';
-
     const { data, setData, errors, processing, post, reset } = useForm({
         name: '',
         display_name: '',
         description: '',
         module: '',
-        guard_name: defaultGuardName,
         is_active: true,
     });
 
@@ -162,7 +155,7 @@ export default function PermissionCreate({
         setSuggestedPermissions(suggestions);
     }, [selectedModule, modules]);
 
-    // Auto-generate name when display name changes (optional)
+    // Auto-generate name when display name changes
     useEffect(() => {
         if (data.display_name && !data.name && selectedModule) {
             const baseName = data.display_name
@@ -508,7 +501,7 @@ export default function PermissionCreate({
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <Shield className="h-4 w-4 text-gray-500" />
+                                                <HelpCircle className="h-4 w-4 text-gray-500" />
                                                 <span className="font-medium">Advanced Settings</span>
                                             </div>
                                             <Button
@@ -524,39 +517,6 @@ export default function PermissionCreate({
 
                                         {showAdvanced && (
                                             <div className="space-y-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800/30">
-                                                {/* Guard Name */}
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="guard_name">Guard Name</Label>
-                                                    {guard_types.length === 0 ? (
-                                                        <Alert variant="warning" className="py-2">
-                                                            <AlertCircle className="h-4 w-4" />
-                                                            <AlertDescription className="text-sm">
-                                                                No guard types configured
-                                                            </AlertDescription>
-                                                        </Alert>
-                                                    ) : (
-                                                        <Select
-                                                            value={data.guard_name}
-                                                            onValueChange={(value) => setData('guard_name', value)}
-                                                            disabled={processing}
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {guard_types.map((guard) => (
-                                                                    <SelectItem key={guard.name} value={guard.name}>
-                                                                        {guard.display_name}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    )}
-                                                    <p className="text-xs text-gray-500">
-                                                        The authentication guard this permission belongs to
-                                                    </p>
-                                                </div>
-
                                                 {/* Status */}
                                                 <div className="flex items-center justify-between">
                                                     <div className="space-y-0.5">
@@ -670,10 +630,6 @@ export default function PermissionCreate({
                                             <span className="text-sm text-gray-400">Not selected</span>
                                         )}
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm text-gray-500">Guard</span>
-                                        <span className="text-sm font-medium">{data.guard_name}</span>
-                                    </div>
                                     {data.description && (
                                         <div>
                                             <span className="text-sm text-gray-500">Description</span>
@@ -744,101 +700,8 @@ export default function PermissionCreate({
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <Separator />
-                                
-                                <div className="space-y-2">
-                                    <h4 className="font-medium text-sm">Examples from Your System</h4>
-                                    <div className="text-xs text-gray-600 dark:text-gray-400 space-y-2">
-                                        <div>
-                                            <div className="font-medium">Dashboard</div>
-                                            <div className="space-y-1 ml-2">
-                                                <code className="block bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">dashboard.access</code>
-                                                <code className="block bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">dashboard.view_stats</code>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div className="font-medium">Residents</div>
-                                            <div className="space-y-1 ml-2">
-                                                <code className="block bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">residents.view</code>
-                                                <code className="block bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">residents.create</code>
-                                                <code className="block bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">residents.edit</code>
-                                                <code className="block bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">residents.delete</code>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                             </CardContent>
                         </Card>
-
-                        {/* Module Information */}
-                        {selectedModule && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        {getModuleIcon(selectedModule)}
-                                        {selectedModule} Module
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                                        {getModuleDescription(selectedModule)}
-                                    </div>
-                                    <div className="pt-2">
-                                        <div className="text-xs text-gray-500 mb-2">Existing permissions in this module:</div>
-                                        <div className="space-y-1 max-h-40 overflow-y-auto">
-                                            {selectedModule === 'Dashboard' && (
-                                                <>
-                                                    <div className="flex items-center justify-between text-xs p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded">
-                                                        <code className="font-mono">dashboard.access</code>
-                                                        <Badge variant="outline" className="text-xs">Active</Badge>
-                                                    </div>
-                                                    <div className="flex items-center justify-between text-xs p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded">
-                                                        <code className="font-mono">dashboard.view_stats</code>
-                                                        <Badge variant="outline" className="text-xs">Active</Badge>
-                                                    </div>
-                                                </>
-                                            )}
-                                            {selectedModule === 'Residents' && (
-                                                <>
-                                                    <div className="flex items-center justify-between text-xs p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded">
-                                                        <code className="font-mono">residents.view</code>
-                                                        <Badge variant="outline" className="text-xs">Active</Badge>
-                                                    </div>
-                                                    <div className="flex items-center justify-between text-xs p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded">
-                                                        <code className="font-mono">residents.create</code>
-                                                        <Badge variant="outline" className="text-xs">Active</Badge>
-                                                    </div>
-                                                    <div className="flex items-center justify-between text-xs p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded">
-                                                        <code className="font-mono">residents.edit</code>
-                                                        <Badge variant="outline" className="text-xs">Active</Badge>
-                                                    </div>
-                                                    <div className="flex items-center justify-between text-xs p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded">
-                                                        <code className="font-mono">residents.delete</code>
-                                                        <Badge variant="outline" className="text-xs">Active</Badge>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                                <CardFooter className="border-t px-6 py-4">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full"
-                                        onClick={() => {
-                                            const url = new URL(route('permissions.index'), window.location.origin);
-                                            url.searchParams.append('module', selectedModule);
-                                            router.visit(url.toString());
-                                        }}
-                                    >
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        View All {selectedModule} Permissions
-                                    </Button>
-                                </CardFooter>
-                            </Card>
-                        )}
 
                         {/* Action Buttons */}
                         <Card>
@@ -852,7 +715,7 @@ export default function PermissionCreate({
                                     onClick={() => router.visit(route('roles.index'))}
                                     className="w-full"
                                 >
-                                    <Shield className="mr-2 h-4 w-4" />
+                                    <Users className="mr-2 h-4 w-4" />
                                     Manage Roles
                                 </Button>
                                 
@@ -864,19 +727,6 @@ export default function PermissionCreate({
                                 >
                                     <Key className="mr-2 h-4 w-4" />
                                     View All Permissions
-                                </Button>
-                                
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                        // Bulk create feature
-                                        alert('Bulk permission creation coming soon!');
-                                    }}
-                                    className="w-full"
-                                >
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    Bulk Create
                                 </Button>
                             </CardContent>
                         </Card>
