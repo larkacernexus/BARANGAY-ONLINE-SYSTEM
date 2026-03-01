@@ -365,6 +365,179 @@ public function index(Request $request)
     ]);
 }
     
+
+  /**
+ * Show the form for creating a new community report.
+ */
+public function create()
+{
+    // Get report types for dropdown
+    $reportTypes = ReportType::orderBy('name')->get(['id', 'name', 'category', 'description']);
+    
+    // Get categories for filtering
+    $categories = ReportType::select('category')
+        ->distinct()
+        ->whereNotNull('category')
+        ->orderBy('category')
+        ->pluck('category')
+        ->toArray();
+    
+    // Get puroks for location suggestions
+    $puroks = Purok::select('name as purok')
+        ->orderBy('name')
+        ->pluck('purok')
+        ->toArray();
+    
+    // Get users for selection - FIXED: Use currentResident instead of resident
+    $users = User::whereHas('currentResident') // Only users with resident records
+        ->with(['currentResident:id,first_name,middle_name,last_name,address']) // Load resident data
+        ->get()
+        ->map(function ($user) {
+            $resident = $user->currentResident;
+            
+            // Get full name from resident
+            $firstName = $resident->first_name ?? '';
+            $middleName = $resident->middle_name ?? '';
+            $lastName = $resident->last_name ?? '';
+            $fullName = trim("{$firstName} {$middleName} {$lastName}");
+            
+            return [
+                'id' => $user->id,
+                'name' => $fullName ?: $user->email,
+                'email' => $user->email,
+                'phone' => $user->contact_number,
+                'address' => $resident->address ?? null,
+                'purok' => null, // You might want to add purok to the resident relationship if needed
+            ];
+        })
+        ->sortBy('name') // Sort alphabetically
+        ->values(); // Reset keys after sorting
+    
+    return Inertia::render('admin/CommunityReports/Create', [
+        'report_types' => $reportTypes,
+        'categories' => $categories,
+        'puroks' => $puroks,
+        'users' => $users,
+        'statuses' => [
+            ['value' => 'pending', 'label' => 'Pending'],
+            ['value' => 'under_review', 'label' => 'Under Review'],
+            ['value' => 'assigned', 'label' => 'Assigned'],
+            ['value' => 'in_progress', 'label' => 'In Progress'],
+            ['value' => 'resolved', 'label' => 'Resolved'],
+            ['value' => 'rejected', 'label' => 'Rejected'],
+        ],
+        'urgencies' => [
+            ['value' => 'low', 'label' => 'Low'],
+            ['value' => 'medium', 'label' => 'Medium'],
+            ['value' => 'high', 'label' => 'High'],
+        ],
+        'priorities' => [
+            ['value' => 'low', 'label' => 'Low'],
+            ['value' => 'medium', 'label' => 'Medium'],
+            ['value' => 'high', 'label' => 'High'],
+            ['value' => 'critical', 'label' => 'Critical'],
+        ],
+        'impact_levels' => [
+            ['value' => 'minor', 'label' => 'Minor'],
+            ['value' => 'moderate', 'label' => 'Moderate'],
+            ['value' => 'major', 'label' => 'Major'],
+            ['value' => 'severe', 'label' => 'Severe'],
+        ],
+        'affected_people_options' => [
+            ['value' => 'individual', 'label' => 'Individual'],
+            ['value' => 'family', 'label' => 'Family'],
+            ['value' => 'group', 'label' => 'Group'],
+            ['value' => 'community', 'label' => 'Community'],
+            ['value' => 'multiple', 'label' => 'Multiple'],
+        ],
+        'noise_levels' => [
+            ['value' => 'low', 'label' => 'Low'],
+            ['value' => 'medium', 'label' => 'Medium'],
+            ['value' => 'high', 'label' => 'High'],
+        ],
+    ]);
+}
+
+/**
+ * Store a newly created community report.
+ */
+public function store(Request $request)
+{
+    $validated = $request->validate([
+        'user_id' => 'nullable|exists:users,id',
+        'report_type_id' => 'required|exists:report_types,id',
+        'title' => 'required|string|max:255',
+        'description' => 'required|string',
+        'detailed_description' => 'nullable|string',
+        'location' => 'required|string|max:255',
+        'incident_date' => 'required|date',
+        'incident_time' => 'nullable|date_format:H:i',
+        'urgency_level' => 'required|in:low,medium,high',
+        'recurring_issue' => 'boolean',
+        'affected_people' => 'required|in:individual,family,group,community,multiple',
+        'estimated_affected_count' => 'nullable|integer|min:0',
+        'is_anonymous' => 'boolean',
+        'reporter_name' => 'required_if:is_anonymous,true|nullable|string|max:255',
+        'reporter_contact' => 'required_if:is_anonymous,true|nullable|string|max:50',
+        'reporter_address' => 'required_if:is_anonymous,true|nullable|string|max:500',
+        'perpetrator_details' => 'nullable|string|max:1000',
+        'preferred_resolution' => 'nullable|string|max:1000',
+        'has_previous_report' => 'boolean',
+        'previous_report_id' => 'nullable|exists:community_reports,id',
+        'impact_level' => 'required|in:minor,moderate,major,severe',
+        'safety_concern' => 'boolean',
+        'environmental_impact' => 'boolean',
+        'noise_level' => 'nullable|in:low,medium,high',
+        'duration_hours' => 'nullable|numeric|min:0',
+        'status' => 'required|in:pending,under_review,assigned,in_progress,resolved,rejected',
+        'priority' => 'required|in:low,medium,high,critical',
+        'assigned_to' => 'nullable|exists:users,id',
+    ]);
+
+    // Handle file uploads separately
+    $files = $request->file('evidences', []);
+    
+    // Set default values
+    $validated['is_anonymous'] = $request->boolean('is_anonymous', false);
+    $validated['recurring_issue'] = $request->boolean('recurring_issue', false);
+    $validated['has_previous_report'] = $request->boolean('has_previous_report', false);
+    $validated['safety_concern'] = $request->boolean('safety_concern', false);
+    $validated['environmental_impact'] = $request->boolean('environmental_impact', false);
+    
+    // Create the report
+    $report = CommunityReport::create($validated);
+    
+    // Handle evidence uploads
+    if (!empty($files)) {
+        foreach ($files as $file) {
+            $path = $file->store('community-reports/evidence', 'public');
+            
+            $report->evidences()->create([
+                'file_path' => $path,
+                'file_name' => $file->getClientOriginalName(),
+                'file_type' => $file->getMimeType(),
+                'file_size' => $file->getSize(),
+                'uploaded_by' => Auth::id(),
+            ]);
+        }
+    }
+    
+    // Log the creation
+    $reportNumber = $report->report_number ?? 'N/A';
+    activity()
+        ->on($report)
+        ->by(Auth::user())
+        ->withProperties([
+            'ip' => request()->ip(),
+            'report_number' => $reportNumber,
+        ])
+        ->event('created')
+        ->log("Created new community report #{$reportNumber}");
+    
+    return redirect()->route('admin.community-reports.show', $report)
+        ->with('success', 'Community report created successfully.');
+}
+
     public function show(CommunityReport $report)
     {
         // Load report with related data

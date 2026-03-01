@@ -30,6 +30,8 @@ interface FeeHandlersProps {
     setIsLatePayment: (value: boolean) => void;
     setMonthsLate: (value: number) => void;
     setSelectedDiscount: (value: string) => void;
+    // NEW: Optional callback for when discount is applied with amount
+    onDiscountApplied?: (discountedAmount: number) => void;
 }
 
 /**
@@ -161,7 +163,8 @@ export function useFeeHandlers({
     setShowLateSettings,
     setIsLatePayment,
     setMonthsLate,
-    setSelectedDiscount
+    setSelectedDiscount,
+    onDiscountApplied // NEW
 }: FeeHandlersProps) {
     
     /**
@@ -283,6 +286,25 @@ export function useFeeHandlers({
                 setData('penalty', parseFloat(penalty.toFixed(2)));
                 setData('discount', parseFloat(discount.toFixed(2)));
                 setData('total_amount', parseFloat(total_amount.toFixed(2)));
+            } else {
+                // Object pattern
+                setData((prev: PaymentFormData) => {
+                    const subtotal = updatedItems.reduce((sum, item) => sum + (item.base_amount || 0), 0);
+                    const surcharge = updatedItems.reduce((sum, item) => sum + (item.surcharge || 0), 0);
+                    const penalty = updatedItems.reduce((sum, item) => sum + (item.penalty || 0), 0);
+                    const discount = updatedItems.reduce((sum, item) => sum + (item.discount || 0), 0);
+                    const total_amount = updatedItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+                    
+                    return {
+                        ...prev,
+                        items: updatedItems,
+                        subtotal: parseFloat(subtotal.toFixed(2)),
+                        surcharge: parseFloat(surcharge.toFixed(2)),
+                        penalty: parseFloat(penalty.toFixed(2)),
+                        discount: parseFloat(discount.toFixed(2)),
+                        total_amount: parseFloat(total_amount.toFixed(2))
+                    };
+                });
             }
         }
         
@@ -306,8 +328,9 @@ export function useFeeHandlers({
 
     /**
      * 🔴 FIXED: Add outstanding fee with discount - WITH DUAL UPDATE PATH
+     * AND NOW SUPPORTS DISCOUNTED AMOUNT CALLBACK
      */
-    const handleAddOutstandingFeeWithDiscount = useCallback((outstandingFee: OutstandingFee, discountType: string): void => {
+    const handleAddOutstandingFeeWithDiscount = useCallback((outstandingFee: OutstandingFee, discountType: string, discountedAmount?: number): void => {
         // 🔴 CRITICAL FIX: Strong duplicate prevention
         const isAlreadyAdded = isFeeAlreadyInPaymentItems(paymentItems, outstandingFee.id);
         
@@ -323,6 +346,7 @@ export function useFeeHandlers({
         console.log('💰 Adding fee with discount:', {
             feeId: outstandingFee.id,
             discountType,
+            discountedAmount,
             balance: outstandingFee.balance
         });
         
@@ -431,6 +455,49 @@ export function useFeeHandlers({
                 setData('penalty', parseFloat(penalty.toFixed(2)));
                 setData('discount', parseFloat(discount.toFixed(2)));
                 setData('total_amount', parseFloat(total_amount.toFixed(2)));
+                
+                // 🔥 NEW: Set the amount_paid to the discounted amount if provided
+                if (discountedAmount !== undefined && discountedAmount > 0) {
+                    console.log('💰 Setting amount_paid to discounted amount:', discountedAmount);
+                    setData('amount_paid', discountedAmount);
+                    
+                    // Call the callback if provided
+                    if (onDiscountApplied) {
+                        onDiscountApplied(discountedAmount);
+                    }
+                }
+            } else {
+                // Object pattern
+                setData((prev: PaymentFormData) => {
+                    const subtotal = updatedItems.reduce((sum, item) => sum + (item.base_amount || 0), 0);
+                    const surcharge = updatedItems.reduce((sum, item) => sum + (item.surcharge || 0), 0);
+                    const penalty = updatedItems.reduce((sum, item) => sum + (item.penalty || 0), 0);
+                    const discount = updatedItems.reduce((sum, item) => sum + (item.discount || 0), 0);
+                    const total_amount = updatedItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+                    
+                    const updated = {
+                        ...prev,
+                        items: updatedItems,
+                        subtotal: parseFloat(subtotal.toFixed(2)),
+                        surcharge: parseFloat(surcharge.toFixed(2)),
+                        penalty: parseFloat(penalty.toFixed(2)),
+                        discount: parseFloat(discount.toFixed(2)),
+                        discount_type: discountType,
+                        total_amount: parseFloat(total_amount.toFixed(2))
+                    };
+                    
+                    // 🔥 NEW: Set the amount_paid to the discounted amount if provided
+                    if (discountedAmount !== undefined && discountedAmount > 0) {
+                        updated.amount_paid = discountedAmount;
+                        
+                        // Call the callback if provided
+                        if (onDiscountApplied) {
+                            onDiscountApplied(discountedAmount);
+                        }
+                    }
+                    
+                    return updated;
+                });
             }
         }
         
@@ -450,7 +517,7 @@ export function useFeeHandlers({
             }
         }
         
-    }, [paymentItems, data.payer_id, data.payer_name, data.purpose, userModifiedPurpose, updateItems, setData, generatePurposeFromItems]);
+    }, [paymentItems, data.payer_id, data.payer_name, data.purpose, userModifiedPurpose, updateItems, setData, generatePurposeFromItems, onDiscountApplied]);
 
     /**
      * 🔴 FIXED: Handle clicking on an outstanding fee
@@ -521,21 +588,41 @@ export function useFeeHandlers({
         updateItems(updatedItems);
         
         // Direct backup update
-        if (typeof setData === 'function' && setData.length === 2) {
-            setData('items', updatedItems);
-            
-            // Recalculate totals
-            const subtotal = updatedItems.reduce((sum, item) => sum + (item.base_amount || 0), 0);
-            const surcharge = updatedItems.reduce((sum, item) => sum + (item.surcharge || 0), 0);
-            const penalty = updatedItems.reduce((sum, item) => sum + (item.penalty || 0), 0);
-            const discount = updatedItems.reduce((sum, item) => sum + (item.discount || 0), 0);
-            const total_amount = updatedItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
-            
-            setData('subtotal', parseFloat(subtotal.toFixed(2)));
-            setData('surcharge', parseFloat(surcharge.toFixed(2)));
-            setData('penalty', parseFloat(penalty.toFixed(2)));
-            setData('discount', parseFloat(discount.toFixed(2)));
-            setData('total_amount', parseFloat(total_amount.toFixed(2)));
+        if (typeof setData === 'function') {
+            if (setData.length === 2) {
+                setData('items', updatedItems);
+                
+                // Recalculate totals
+                const subtotal = updatedItems.reduce((sum, item) => sum + (item.base_amount || 0), 0);
+                const surcharge = updatedItems.reduce((sum, item) => sum + (item.surcharge || 0), 0);
+                const penalty = updatedItems.reduce((sum, item) => sum + (item.penalty || 0), 0);
+                const discount = updatedItems.reduce((sum, item) => sum + (item.discount || 0), 0);
+                const total_amount = updatedItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+                
+                setData('subtotal', parseFloat(subtotal.toFixed(2)));
+                setData('surcharge', parseFloat(surcharge.toFixed(2)));
+                setData('penalty', parseFloat(penalty.toFixed(2)));
+                setData('discount', parseFloat(discount.toFixed(2)));
+                setData('total_amount', parseFloat(total_amount.toFixed(2)));
+            } else {
+                setData((prev: PaymentFormData) => {
+                    const subtotal = updatedItems.reduce((sum, item) => sum + (item.base_amount || 0), 0);
+                    const surcharge = updatedItems.reduce((sum, item) => sum + (item.surcharge || 0), 0);
+                    const penalty = updatedItems.reduce((sum, item) => sum + (item.penalty || 0), 0);
+                    const discount = updatedItems.reduce((sum, item) => sum + (item.discount || 0), 0);
+                    const total_amount = updatedItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+                    
+                    return {
+                        ...prev,
+                        items: updatedItems,
+                        subtotal: parseFloat(subtotal.toFixed(2)),
+                        surcharge: parseFloat(surcharge.toFixed(2)),
+                        penalty: parseFloat(penalty.toFixed(2)),
+                        discount: parseFloat(discount.toFixed(2)),
+                        total_amount: parseFloat(total_amount.toFixed(2))
+                    };
+                });
+            }
         }
         
         // Update purpose if not modified
@@ -599,7 +686,7 @@ export function useFeeHandlers({
     /**
      * Handle fee selection with discount
      */
-    const handleFeeWithDiscount = useCallback((fee: OutstandingFee, discountType: string) => {
+    const handleFeeWithDiscount = useCallback((fee: OutstandingFee, discountType: string, discountedAmount?: number) => {
         // Check for duplicates before adding with discount
         if (isFeeAlreadyInPaymentItems(paymentItems, fee.id)) {
             console.warn('⚠️ DUPLICATE PREVENTED: Fee with discount already added:', {
@@ -613,7 +700,7 @@ export function useFeeHandlers({
             return;
         }
         
-        handleAddOutstandingFeeWithDiscount(fee, discountType);
+        handleAddOutstandingFeeWithDiscount(fee, discountType, discountedAmount);
         setSelectedOutstandingFee(null);
         setShowDiscountSelection(false);
         setSelectedDiscount('');

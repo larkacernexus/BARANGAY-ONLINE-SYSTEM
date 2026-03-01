@@ -439,7 +439,7 @@ class RecordController extends Controller
     $previewUrl = null;
     if (in_array(strtolower($document->file_extension), ['pdf']) || 
         str_contains($document->mime_type, 'pdf')) {
-        $previewUrl = route('my.records.preview', ['id' => $document->id]);
+        $previewUrl = route('portal.my.records.preview', ['id' => $document->id]);
     }
     
     // Prepare document data for frontend
@@ -637,7 +637,7 @@ private function formatBytes($bytes, $decimals = 2)
             if (!$document->requires_password || is_null($document->password)) {
                 return response()->json([
                     'success' => true,
-                    'redirect' => route('my.records.show', $id)
+                    'redirect' => route('portal.my.records.show', $id)
                 ]);
             }
             
@@ -649,7 +649,7 @@ private function formatBytes($bytes, $decimals = 2)
                 
                 return response()->json([
                     'success' => true,
-                    'redirect' => route('my.records.show', $id)
+                    'redirect' => route('portal.my.records.show', $id)
                 ]);
             }
             
@@ -690,7 +690,7 @@ private function formatBytes($bytes, $decimals = 2)
             ->findOrFail($id);
         
         if (!$document->requires_password || is_null($document->password)) {
-            return redirect()->route('my.records.show', $id);
+            return redirect()->route('portal.my.records.show', $id);
         }
         
         // Verify password (assuming passwords are hashed)
@@ -705,7 +705,7 @@ private function formatBytes($bytes, $decimals = 2)
                 'access_valid_until' => now()->addMinutes(30)->toDateTimeString(),
             ]);
             
-            return redirect()->route('my.records.show', $id);
+            return redirect()->route('portal.my.records.show', $id);
         }
         
         Log::warning('Failed password attempt', [
@@ -775,7 +775,7 @@ private function formatBytes($bytes, $decimals = 2)
         
         if (!$household) {
             Log::warning('User not associated with any household', ['user_id' => $user->id]);
-            return redirect()->route('my.records.index')
+            return redirect()->route('portal.my.records.index')
                 ->with('error', 'You are not associated with any household.');
         }
         
@@ -925,34 +925,73 @@ public function store(Request $request)
                 ->with('error', "File size exceeds maximum limit of {$maxSize}KB.");
         }
 
+        // ============== FIXED SECTION: Handle accepted_formats properly ==============
         // Validate file format
         $isValidFormat = false;
-        if ($documentType->accepted_formats && count($documentType->accepted_formats) > 0) {
-            $allowedFormats = $documentType->accepted_formats;
-            
-            $lowerExtension = strtolower($extension);
-            
-            foreach ($allowedFormats as $format) {
-                // Check if format is a MIME type (contains '/')
-                if (strpos($format, '/') !== false) {
-                    // It's a MIME type - check if it matches
-                    if ($mimeType === $format) {
-                        $isValidFormat = true;
-                        break;
+        
+        // Process accepted_formats - convert to array if it's a string
+        $acceptedFormats = $documentType->accepted_formats;
+        
+        // If it's empty, skip format validation (will use fallback)
+        if (!empty($acceptedFormats)) {
+            // Convert to array if it's a string
+            if (is_string($acceptedFormats)) {
+                // Check if it's JSON
+                $trimmed = trim($acceptedFormats);
+                if (str_starts_with($trimmed, '[') || str_starts_with($trimmed, '{')) {
+                    // Try to decode as JSON
+                    $decoded = json_decode($acceptedFormats, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $acceptedFormats = $decoded;
+                    } else {
+                        // If JSON decode fails, treat as comma-separated
+                        $acceptedFormats = array_map('trim', explode(',', $acceptedFormats));
                     }
                 } else {
-                    // It's already an extension - check directly
-                    if ($lowerExtension === strtolower($format)) {
-                        $isValidFormat = true;
-                        break;
+                    // Treat as comma-separated string
+                    $acceptedFormats = array_map('trim', explode(',', $acceptedFormats));
+                }
+            }
+            
+            // Ensure we have an array at this point
+            if (is_array($acceptedFormats) && count($acceptedFormats) > 0) {
+                $allowedFormats = $acceptedFormats;
+                $lowerExtension = strtolower($extension);
+                
+                foreach ($allowedFormats as $format) {
+                    // Skip empty formats
+                    if (empty($format)) continue;
+                    
+                    // Check if format is a MIME type (contains '/')
+                    if (strpos($format, '/') !== false) {
+                        // It's a MIME type - check if it matches
+                        if ($mimeType === $format) {
+                            $isValidFormat = true;
+                            break;
+                        }
+                    } else {
+                        // It's an extension - check directly
+                        if ($lowerExtension === strtolower(trim($format))) {
+                            $isValidFormat = true;
+                            break;
+                        }
                     }
                 }
             }
-        } else {
-            // Fallback to global allowed types
+        }
+        
+        // Fallback to global allowed types if no valid format found from document type
+        if (!$isValidFormat) {
             $allowedTypes = config('app.allowed_file_types', ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif']);
             $isValidFormat = in_array(strtolower($extension), $allowedTypes);
+            
+            Log::info('Using fallback format validation', [
+                'extension' => $extension,
+                'allowed_types' => $allowedTypes,
+                'is_valid' => $isValidFormat
+            ]);
         }
+        // ============== END FIXED SECTION ==============
         
         if (!$isValidFormat) {
             Log::warning('Invalid file format', [
@@ -1137,10 +1176,10 @@ public function store(Request $request)
             'tags_count' => $document->tags ? count($document->tags) : 0,
             'metadata_count' => $document->metadata ? count($document->metadata) : 0,
             'reference_number_final' => $document->reference_number,
-            'route' => route('my.records.show', $document->id)
+            'route' => route('portal.my.records.show', $document->id)
         ]);
         
-        return redirect()->route('my.records.show', $document->id)
+        return redirect()->route('portal.my.records.show', $document->id)
             ->with('success', 'Document uploaded successfully!');
             
     } catch (ValidationException $e) {
@@ -1305,7 +1344,7 @@ public function store(Request $request)
             'resident_id' => $document->resident_id
         ]);
         
-        return redirect()->route('my.records.index')
+        return redirect()->route('portal.my.records.index')
             ->with('success', 'Document deleted successfully!');
     }
     
@@ -1331,7 +1370,7 @@ public function store(Request $request)
         
         if ($documents->isEmpty()) {
             Log::warning('No documents to export', ['household_id' => $household->id]);
-            return redirect()->route('my.records.index')
+            return redirect()->route('portal.my.records.index')
                 ->with('error', 'No documents to export.');
         }
         
@@ -1382,7 +1421,7 @@ public function store(Request $request)
             return response()->download($zipPath)->deleteFileAfterSend(true);
         } else {
             Log::error('Failed to create export zip file', ['zip_path' => $zipPath]);
-            return redirect()->route('my.records.index')
+            return redirect()->route('portal.my.records.index')
                 ->with('error', 'Failed to create export file.');
         }
     }

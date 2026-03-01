@@ -4,130 +4,93 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { ClearanceTabs } from '@/components/residentui/ClearanceTabs';
-
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import {
-    AlertCircle,
-    Search,
-    Eye,
-    Plus,
-    Check,
-    X,
-    Square,
-    Grid,
-    List,
-    MoreVertical,
-    Copy,
-    FileText,
-    Printer,
-    Download,
-    Share2,
-    Filter,
-    ChevronLeft,
-    ChevronRight,
-    ChevronUp,
-    ChevronDown,
-    BarChart,
-    Loader2,
-    Calendar,
-    Clock,
-    DollarSign,
-    FileCheck,
-    User,
-    XCircle,
-    CheckCircle,
-    Zap,
-    Mail,
-} from 'lucide-react';
 import { Link, usePage, router, Head } from '@inertiajs/react';
 import { toast } from 'sonner';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertCircle,
+  Search,
+  Eye,
+  Plus,
+  Check,
+  X,
+  Square,
+  Grid,
+  List,
+  MoreVertical,
+  Copy,
+  FileText,
+  Printer,
+  Download,
+  Share2,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  BarChart,
+  Loader2,
+  Calendar,
+  Clock,
+  DollarSign,
+  FileCheck,
+  User,
+  XCircle,
+  CheckCircle,
+  Zap,
+  Mail,
+  ArrowUpDown,
+  Info,
+} from 'lucide-react';
 import { format } from 'date-fns';
-import ResidentMobileFooter from '@/layouts/resident-mobile-sticky-footer';
+import { cn } from '@/lib/utils';
 
-// Status configuration
-const STATUS_CONFIG = {
-    pending: { 
-        label: 'Pending', 
-        color: 'bg-yellow-100 dark:bg-yellow-900/30', 
-        textColor: 'text-yellow-800 dark:text-yellow-300',
-        icon: Clock
-    },
-    pending_payment: { 
-        label: 'Pending Payment', 
-        color: 'bg-orange-100 dark:bg-orange-900/30', 
-        textColor: 'text-orange-800 dark:text-orange-300',
-        icon: DollarSign
-    },
-    processing: { 
-        label: 'Processing', 
-        color: 'bg-blue-100 dark:bg-blue-900/30', 
-        textColor: 'text-blue-800 dark:text-blue-300',
-        icon: Loader2
-    },
-    approved: { 
-        label: 'Approved', 
-        color: 'bg-green-100 dark:bg-green-900/30', 
-        textColor: 'text-green-800 dark:text-green-300',
-        icon: CheckCircle
-    },
-    issued: { 
-        label: 'Issued', 
-        color: 'bg-purple-100 dark:bg-purple-900/30', 
-        textColor: 'text-purple-800 dark:text-purple-300',
-        icon: FileCheck
-    },
-    rejected: { 
-        label: 'Rejected', 
-        color: 'bg-red-100 dark:bg-red-900/30', 
-        textColor: 'text-red-800 dark:text-red-300',
-        icon: XCircle
-    },
-    cancelled: { 
-        label: 'Cancelled', 
-        color: 'bg-gray-100 dark:bg-gray-800', 
-        textColor: 'text-gray-800 dark:text-gray-300',
-        icon: XCircle
-    },
-};
+// Reusable Components
+import { CustomTabs } from '@/components/residentui/CustomTabs';
+import { ModernSelect } from '@/components/residentui/modern-select';
+import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
+import { ModernStatsCards } from '@/components/residentui/modern-stats-cards';
+import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
+import { ModernPagination } from '@/components/residentui/modern-pagination';
+import { ModernLoadingOverlay } from '@/components/residentui/modern-loading-overlay';
+import { ModernSelectionBanner } from '@/components/residentui/modern-selection-banner';
 
-// Urgency configuration
-const URGENCY_CONFIG = {
-    normal: { 
-        label: 'Normal', 
-        color: 'bg-blue-100 dark:bg-blue-900/30', 
-        textColor: 'text-blue-700 dark:text-blue-300',
-        dot: 'bg-blue-500'
-    },
-    rush: { 
-        label: 'Rush', 
-        color: 'bg-orange-100 dark:bg-orange-900/30', 
-        textColor: 'text-orange-700 dark:text-orange-300',
-        dot: 'bg-orange-500'
-    },
-    express: { 
-        label: 'Express', 
-        color: 'bg-red-100 dark:bg-red-900/30', 
-        textColor: 'text-red-700 dark:text-red-300',
-        dot: 'bg-red-500'
-    },
-};
+// Clearance-specific components
+import { 
+  STATUS_CONFIG, 
+  URGENCY_CONFIG, 
+  CLEARANCE_TABS,
+  getClearanceStatsCards 
+} from '@/components/residentui/clearances/constants';
+import {
+  formatDate,
+  formatCurrency,
+  getClearanceTypeDisplay,
+  getUrgencyBadge,
+  getStatusCount,
+  copyToClipboard,
+  printClearancesList,
+  exportClearancesToCSV,
+} from '@/components/residentui/clearances/clearance-utils';
+import { ModernClearanceCard } from '@/components/residentui/clearances/modern-clearance-card';
+import { ModernClearanceGridCard } from '@/components/residentui/clearances/modern-clearance-grid-card';
+import { ModernClearanceFilters } from '@/components/residentui/clearances/modern-clearance-filters';
+import { ModernClearanceTable } from '@/components/residentui/clearances/modern-clearance-table';
 
+// Types
 interface ClearanceType {
     id: number;
     name: string;
@@ -227,7 +190,7 @@ interface PageProps extends Record<string, any> {
     error?: string;
 }
 
-// Inline StatusBadge Component
+// StatusBadge Component
 const StatusBadge = ({ status }: { status: string }) => {
     const statusKey = status as keyof typeof STATUS_CONFIG;
     const config = STATUS_CONFIG[statusKey];
@@ -249,259 +212,38 @@ const StatusBadge = ({ status }: { status: string }) => {
     );
 };
 
-// Inline MobileClearanceCard Component
-const MobileClearanceCard = ({ 
-    clearance,
-    selectMode,
-    selectedClearances,
-    toggleSelectClearance,
-    getClearanceTypeDisplay,
-    getUrgencyBadge,
-    formatDate,
-    formatCurrency,
-    currentResident,
-    copyReferenceNumber
-}: any) => (
-    <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 hover:shadow-md transition-shadow">
-        <div className="p-4">
-            <div className="space-y-3">
-                {/* Header */}
-                <div className="flex items-start gap-3">
-                    {selectMode && (
-                        <button
-                            onClick={() => toggleSelectClearance(clearance.id)}
-                            className={`flex-shrink-0 w-5 h-5 mt-1 rounded border flex items-center justify-center transition-colors ${
-                                selectedClearances.includes(clearance.id)
-                                    ? 'bg-blue-600 border-blue-600'
-                                    : 'border-gray-300 hover:border-blue-500'
-                            }`}
-                        >
-                            {selectedClearances.includes(clearance.id) && (
-                                <Check className="h-3 w-3 text-white" />
-                            )}
-                        </button>
-                    )}
-                    
-                    <div className={`flex-1 min-w-0 ${selectMode ? '' : 'ml-0'}`}>
-                        <div className="flex items-center gap-2 mb-1">
-                            <button
-                                onClick={() => copyReferenceNumber(clearance.reference_number)}
-                                className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 transition-colors"
-                                title="Copy reference number"
-                            >
-                                #{clearance.reference_number}
-                            </button>
-                            {clearance.clearance_number && (
-                                <Badge variant="outline" size="sm" className="h-5 text-xs">
-                                    <FileCheck className="h-3 w-3 mr-1" />
-                                    #{clearance.clearance_number}
-                                </Badge>
-                            )}
-                        </div>
-                        <h4 className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                            {getClearanceTypeDisplay(clearance.clearance_type)}
-                        </h4>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
-                            {clearance.purpose}
-                        </p>
-                    </div>
-                    
-                    <div className="flex flex-col items-end gap-1">
-                        {getUrgencyBadge(clearance.urgency)}
-                        <StatusBadge status={clearance.status} />
-                    </div>
-                </div>
+// UrgencyBadge Component
+const UrgencyBadge = ({ urgency }: { urgency: string }) => {
+    const urgencyKey = urgency as keyof typeof URGENCY_CONFIG;
+    const config = URGENCY_CONFIG[urgencyKey];
+    
+    if (!config) {
+        return (
+            <Badge variant="outline" className="text-gray-700">
+                {urgency}
+            </Badge>
+        );
+    }
+    
+    return (
+        <Badge variant="outline" className={`${config.color} ${config.textColor} border-0`}>
+            <span className={`h-2 w-2 rounded-full ${config.dot} mr-2`}></span>
+            <span>{config.label}</span>
+        </Badge>
+    );
+};
 
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">Requested By</p>
-                        <p className="font-medium flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {clearance.resident?.first_name} {clearance.resident?.last_name}
-                            {clearance.resident_id === currentResident?.id && ' (You)'}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">Date Requested</p>
-                        <p className="font-medium flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {formatDate(clearance.created_at)}
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                    <Link 
-                        href={`/my-clearances/${clearance.id}`} 
-                        className="flex-1"
-                    >
-                        <Button variant="outline" size="sm" className="w-full">
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                        </Button>
-                    </Link>
-                    <div className="flex gap-1 ml-2">
-                        {clearance.status === 'issued' && clearance.clearance_number && (
-                            <Button 
-                                size="sm" 
-                                variant="ghost"
-                                onClick={() => toast.info('Download functionality would be implemented here')}
-                            >
-                                <Download className="h-4 w-4" />
-                            </Button>
-                        )}
-                        {clearance.status === 'pending_payment' && (
-                            <Button 
-                                size="sm" 
-                                variant="ghost"
-                                onClick={() => toast.info('Payment functionality would open here')}
-                            >
-                                <DollarSign className="h-4 w-4" />
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-);
-
-// Inline DesktopGridViewCard Component
-const DesktopGridViewCard = ({ 
-    clearance,
-    selectMode,
-    selectedClearances,
-    toggleSelectClearance,
-    getClearanceTypeDisplay,
-    getUrgencyBadge,
-    formatDate,
-    formatCurrency,
-    currentResident,
-    copyReferenceNumber
-}: any) => (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 hover:shadow-md transition-shadow">
-        <div className="p-4">
-            <div className="space-y-3">
-                {/* Header with selection checkbox */}
-                <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                        {selectMode && (
-                            <button
-                                onClick={() => toggleSelectClearance(clearance.id)}
-                                className={`flex-shrink-0 w-5 h-5 mt-1 rounded border flex items-center justify-center transition-colors ${
-                                    selectedClearances.includes(clearance.id)
-                                        ? 'bg-blue-600 border-blue-600'
-                                        : 'border-gray-300 hover:border-blue-500'
-                                }`}
-                            >
-                                {selectedClearances.includes(clearance.id) && (
-                                    <Check className="h-3 w-3 text-white" />
-                                )}
-                            </button>
-                        )}
-                        
-                        <div className={`flex-1 min-w-0 ${selectMode ? '' : 'ml-0'}`}>
-                            <div className="flex items-center gap-2 mb-1">
-                                <button
-                                    onClick={() => copyReferenceNumber(clearance.reference_number)}
-                                    className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 transition-colors"
-                                    title="Copy reference number"
-                                >
-                                    #{clearance.reference_number}
-                                </button>
-                                {clearance.clearance_number && (
-                                    <Badge variant="outline" size="sm" className="h-5 text-xs">
-                                        <FileCheck className="h-3 w-3 mr-1" />
-                                        #{clearance.clearance_number}
-                                    </Badge>
-                                )}
-                            </div>
-                            <h4 className="font-semibold text-gray-900 dark:text-gray-100">
-                                {getClearanceTypeDisplay(clearance.clearance_type)}
-                            </h4>
-                        </div>
-                    </div>
-                    
-                    <div className="flex flex-col items-end gap-1">
-                        {getUrgencyBadge(clearance.urgency)}
-                        <StatusBadge status={clearance.status} />
-                    </div>
-                </div>
-
-                {/* Purpose */}
-                <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Purpose</p>
-                    <p className="font-medium text-gray-900 dark:text-gray-100">
-                        {clearance.purpose}
-                    </p>
-                    {clearance.specific_purpose && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            {clearance.specific_purpose}
-                        </p>
-                    )}
-                </div>
-
-                {/* Details */}
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">Requested By</p>
-                        <p className="font-medium">
-                            {clearance.resident?.first_name} {clearance.resident?.last_name}
-                            {clearance.resident_id === currentResident?.id && (
-                                <Badge variant="outline" size="sm" className="ml-2 text-xs">You</Badge>
-                            )}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">Date Requested</p>
-                        <p className="font-medium">{formatDate(clearance.created_at)}</p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">Needed By</p>
-                        <p className="font-medium">{formatDate(clearance.needed_date)}</p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">Fee</p>
-                        <p className="font-bold">{formatCurrency(clearance.fee_amount)}</p>
-                    </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
-                    <Link href={`/my-clearances/${clearance.id}`} className="flex-1">
-                        <Button variant="outline" size="sm" className="w-full">
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                        </Button>
-                    </Link>
-                    {clearance.status === 'pending_payment' && (
-                        <Link href={`/resident/payments/create?clearance_id=${clearance.id}`} className="flex-1">
-                            <Button size="sm" variant="default" className="w-full">
-                                <DollarSign className="h-4 w-4 mr-2" />
-                                Pay Now
-                            </Button>
-                        </Link>
-                    )}
-                </div>
-            </div>
-        </div>
-    </div>
-);
-
-// Inline CollapsibleStats Component
+// CollapsibleStats Component (Mobile)
 const CollapsibleStats = ({ 
     showStats, 
     setShowStats, 
-    statusFilter, 
     stats, 
-    clearances, 
-    getStatusCount, 
     formatCurrency 
 }: any) => (
     <div className="md:hidden">
         <Button 
             variant="outline" 
-            className="w-full justify-between bg-white dark:bg-gray-800"
+            className="w-full justify-between bg-white dark:bg-gray-800 rounded-xl border-gray-200 dark:border-gray-700"
             onClick={() => setShowStats(!showStats)}
         >
             <div className="flex items-center gap-2">
@@ -516,317 +258,29 @@ const CollapsibleStats = ({
         </Button>
         
         {showStats && (
-            <div className="mt-2">
-                <div className="grid grid-cols-2 gap-3">
-                    <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                                        Total
-                                    </p>
-                                    <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                        {stats.total_clearances}
-                                    </p>
-                                </div>
-                                <div className="p-2 bg-blue-100 dark:bg-blue-800/30 rounded-lg">
-                                    <BarChart className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-purple-600 dark:text-purple-400">
-                                        Issued
-                                    </p>
-                                    <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                        {getStatusCount('issued')}
-                                    </p>
-                                </div>
-                                <div className="p-2 bg-purple-100 dark:bg-purple-800/30 rounded-lg">
-                                    <FileCheck className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-green-600 dark:text-green-400">
-                                        Processing
-                                    </p>
-                                    <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                        {getStatusCount('processing')}
-                                    </p>
-                                </div>
-                                <div className="p-2 bg-green-100 dark:bg-green-800/30 rounded-lg">
-                                    <Loader2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-900/10">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-orange-600 dark:text-orange-400">
-                                        Pending Payment
-                                    </p>
-                                    <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                        {getStatusCount('pending_payment')}
-                                    </p>
-                                </div>
-                                <div className="p-2 bg-orange-100 dark:orange-800/30 rounded-lg">
-                                    <DollarSign className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            <div className="mt-2 animate-slide-down">
+                <ModernStatsCards 
+                    cards={getClearanceStatsCards(stats, formatCurrency)} 
+                    loading={false}
+                    gridCols="grid-cols-2"
+                />
             </div>
         )}
     </div>
 );
 
-// Inline DesktopStats Component
+// DesktopStats Component
 const DesktopStats = ({ 
-    statusFilter, 
     stats, 
-    clearances, 
-    getStatusCount, 
     formatCurrency 
 }: any) => (
-    <div className="hidden md:grid md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10">
-            <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                            Total Clearances
-                        </p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                            {stats.total_clearances}
-                        </p>
-                    </div>
-                    <div className="p-2 bg-blue-100 dark:bg-blue-800/30 rounded-lg">
-                        <BarChart className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10">
-            <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                            Issued
-                        </p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                            {getStatusCount('issued')}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {Math.round((getStatusCount('issued') / (stats.total_clearances || 1)) * 100)}% of total
-                        </p>
-                    </div>
-                    <div className="p-2 bg-purple-100 dark:bg-purple-800/30 rounded-lg">
-                        <FileCheck className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10">
-            <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                            Processing
-                        </p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                            {getStatusCount('processing')}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {Math.round((getStatusCount('processing') / (stats.total_clearances || 1)) * 100)}% of total
-                        </p>
-                    </div>
-                    <div className="p-2 bg-green-100 dark:bg-green-800/30 rounded-lg">
-                        <Loader2 className="h-6 w-6 text-green-600 dark:text-green-400" />
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-900/10">
-            <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                            Pending Payment
-                        </p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                            {getStatusCount('pending_payment')}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Fees: {formatCurrency(stats.total_balance)}
-                        </p>
-                    </div>
-                    <div className="p-2 bg-orange-100 dark:bg-orange-800/30 rounded-lg">
-                        <DollarSign className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
+    <div className="hidden md:block">
+        <ModernStatsCards 
+            cards={getClearanceStatsCards(stats, formatCurrency)} 
+            loading={false}
+        />
     </div>
 );
-
-// Inline FiltersSection Component
-const FiltersSection = ({ 
-    search,
-    setSearch,
-    handleSearchSubmit,
-    handleSearchClear,
-    clearanceTypeFilter,
-    handleClearanceTypeChange,
-    residentFilter,
-    handleResidentChange,
-    urgencyFilter,
-    handleUrgencyChange,
-    yearFilter,
-    handleYearChange,
-    loading,
-    availableClearanceTypes,
-    householdResidents,
-    currentResident,
-    availableYears,
-    printClearances,
-    exportToCSV,
-    isExporting,
-    getCurrentTabClearances,
-    hasActiveFilters,
-    handleClearFilters,
-    isMobile,
-    setShowFilters
-}: any) => (
-    <Card>
-        <CardContent className="p-4">
-            <div className="space-y-4">
-                {/* Search Bar */}
-                <form onSubmit={handleSearchSubmit} className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                        placeholder="Search by reference number, purpose, clearance type..."
-                        className="pl-10 pr-10 bg-white dark:bg-gray-800"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                    {search && (
-                        <button
-                            type="button"
-                            onClick={handleSearchClear}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                    )}
-                </form>
-
-                {/* Filters Row */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex gap-2 flex-wrap">
-                        <Select value={clearanceTypeFilter} onValueChange={handleClearanceTypeChange}>
-                            <SelectTrigger className="w-[140px] h-9">
-                                <SelectValue placeholder="Clearance Type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Types</SelectItem>
-                                {availableClearanceTypes.map(type => (
-                                    <SelectItem key={type.id} value={type.id.toString()}>
-                                        {type.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select value={residentFilter} onValueChange={handleResidentChange}>
-                            <SelectTrigger className="w-[160px] h-9">
-                                <SelectValue placeholder="Resident" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Household Members</SelectItem>
-                                {Array.isArray(householdResidents) && householdResidents.map(resident => (
-                                    <SelectItem key={resident?.id || Math.random()} value={resident?.id?.toString() || ''}>
-                                        {resident?.first_name || ''} {resident?.last_name || ''}
-                                        {resident?.id === currentResident?.id && ' (You)'}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select value={urgencyFilter} onValueChange={handleUrgencyChange}>
-                            <SelectTrigger className="w-[140px] h-9">
-                                <SelectValue placeholder="Urgency" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Urgency</SelectItem>
-                                <SelectItem value="normal">Normal</SelectItem>
-                                <SelectItem value="rush">Rush</SelectItem>
-                                <SelectItem value="express">Express</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Select value={yearFilter} onValueChange={handleYearChange}>
-                            <SelectTrigger className="w-[120px] h-9">
-                                <SelectValue placeholder="Year" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Years</SelectItem>
-                                {availableYears.map(year => (
-                                    <SelectItem key={year} value={year.toString()}>
-                                        {year}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-end sm:self-auto">
-                        {hasActiveFilters && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleClearFilters}
-                                className="text-gray-500"
-                            >
-                                <X className="h-4 w-4 mr-1" />
-                                Clear Filters
-                            </Button>
-                        )}
-                        
-                        {isMobile && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShowFilters(false)}
-                            >
-                                <Check className="h-4 w-4 mr-2" />
-                                Done
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </CardContent>
-    </Card>
-);
-
 
 export default function MyClearances() {
     const page = usePage<PageProps>();
@@ -875,7 +329,7 @@ export default function MyClearances() {
     const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [showStats, setShowStats] = useState(true);
-    const [showFilters, setShowFilters] = useState(false);
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [selectedClearances, setSelectedClearances] = useState<number[]>([]);
     const [isExporting, setIsExporting] = useState(false);
     const [selectMode, setSelectMode] = useState(false);
@@ -953,7 +407,7 @@ export default function MyClearances() {
             }
         });
         
-        router.get('/my-clearances', cleanFilters, {
+        router.get('/portal/my-clearances', cleanFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -976,7 +430,7 @@ export default function MyClearances() {
             });
         }
         
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleClearanceTypeChange = (type: string) => {
@@ -985,7 +439,7 @@ export default function MyClearances() {
             clearance_type: type === 'all' ? '' : type,
             page: '1'
         });
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleResidentChange = (resident: string) => {
@@ -994,7 +448,7 @@ export default function MyClearances() {
             resident: resident === 'all' ? '' : resident,
             page: '1'
         });
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleUrgencyChange = (urgency: string) => {
@@ -1003,7 +457,7 @@ export default function MyClearances() {
             urgency: urgency === 'all' ? '' : urgency,
             page: '1'
         });
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleYearChange = (year: string) => {
@@ -1012,7 +466,7 @@ export default function MyClearances() {
             year: year === 'all' ? '' : year,
             page: '1'
         });
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleClearFilters = () => {
@@ -1023,13 +477,13 @@ export default function MyClearances() {
         setUrgencyFilter('all');
         setYearFilter('all');
         
-        router.get('/my-clearances', {}, {
+        router.get('/portal/my-clearances', {}, {
             preserveState: true,
             preserveScroll: true,
             onFinish: () => setLoading(false),
         });
         
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleSearchSubmit = (e: React.FormEvent) => {
@@ -1061,7 +515,7 @@ export default function MyClearances() {
     };
     
     const selectAllClearances = () => {
-        const currentClearances = getCurrentTabClearances();
+        const currentClearances = clearances.data;
         if (selectedClearances.length === currentClearances.length && currentClearances.length > 0) {
             setSelectedClearances([]);
         } else {
@@ -1078,76 +532,47 @@ export default function MyClearances() {
         }
     };
     
-    // Utility functions
-    const formatDate = (dateString: string) => {
-        if (!dateString) return 'N/A';
-        try {
-            const date = new Date(dateString);
-            if (isMobile) {
-                return format(date, 'MMM dd');
-            }
-            return format(date, 'MMM dd, yyyy');
-        } catch (error) {
-            return 'N/A';
+    const handleDeleteSelected = () => {
+        if (confirm(`Are you sure you want to delete ${selectedClearances.length} selected clearance requests?`)) {
+            toast.success(`Deleted ${selectedClearances.length} clearance requests`);
+            setSelectedClearances([]);
+            setSelectMode(false);
         }
     };
     
-    const formatCurrency = (amount: number | string) => {
-        const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-        if (isNaN(num)) return '₱0.00';
-        return `₱${num.toFixed(2)}`;
+    const handleViewDetails = (id: number) => {
+        router.visit(`/portal/my-clearances/${id}`);
     };
     
-    const getClearanceTypeDisplay = (clearanceType: ClearanceType | undefined) => {
-        if (!clearanceType) return 'Clearance';
-        return clearanceType.name;
+    const handleMakePayment = (id: number) => {
+        router.visit(`/portal/payments/create?clearance_id=${id}`);
     };
     
-    const getUrgencyBadge = (urgency: string) => {
-        const urgencyKey = urgency as keyof typeof URGENCY_CONFIG;
-        const config = URGENCY_CONFIG[urgencyKey];
-        
-        if (!config) {
-            return (
-                <Badge variant="outline" className="text-gray-700">
-                    {urgency}
-                </Badge>
-            );
-        }
-        
-        return (
-            <Badge variant="outline" className={`${config.color} ${config.textColor} border-0`}>
-                <span className={`h-2 w-2 rounded-full ${config.dot} mr-2`}></span>
-                <span>{config.label}</span>
-            </Badge>
-        );
+    const handleDownloadClearance = (clearance: any) => {
+        toast.info('Download functionality would be implemented here');
     };
     
-    // Get status count from global stats
-    const getStatusCount = (status: string) => {
-        switch(status) {
-            case 'all': 
-                return stats.total_clearances || 0;
-            case 'pending': 
-                return stats.pending_clearances || 0;
-            case 'pending_payment': 
-                return stats.pending_payment_clearances || 0;
-            case 'processing': 
-                return stats.processing_clearances || 0;
-            case 'approved': 
-                return stats.approved_clearances || 0;
-            case 'issued': 
-                return stats.issued_clearances || 0;
-            case 'rejected': 
-                return stats.rejected_clearances || 0;
-            case 'cancelled': 
-                return stats.cancelled_clearances || 0;
-            default: 
-                return 0;
+    const handleGenerateReport = (clearance: any) => {
+        const reportWindow = window.open('', '_blank');
+        if (reportWindow) {
+            reportWindow.document.write(`
+                <h1>Clearance Request Details: ${clearance.reference_number}</h1>
+                <p><strong>Type:</strong> ${getClearanceTypeDisplay(clearance.clearance_type)}</p>
+                <p><strong>Purpose:</strong> ${clearance.purpose}</p>
+                <p><strong>Fee:</strong> ${formatCurrency(clearance.fee_amount)}</p>
+                <p><strong>Status:</strong> ${clearance.status}</p>
+            `);
         }
     };
     
-    // Get current tab clearances
+    const handleReportIssue = (clearance: any) => {
+        toast.info('Report issue feature would open a form');
+    };
+    
+    const handleCopyReference = (ref: string) => {
+        copyToClipboard(ref, `Copied: ${ref}`);
+    };
+    
     const getCurrentTabClearances = () => {
         return clearances.data;
     };
@@ -1158,286 +583,122 @@ export default function MyClearances() {
         );
     }, [filters]);
     
-    // Print function
-    const printClearances = () => {
-        const currentClearances = getCurrentTabClearances();
-        if (currentClearances.length === 0) {
-            toast.error('No clearance requests to print');
-            return;
-        }
-        
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            toast.error('Please allow popups to print');
-            return;
-        }
-        
-        const printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>My Clearance Requests Report</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
-                    .print-header { margin-bottom: 30px; }
-                    .print-info { display: flex; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; }
-                    .clearance-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                    .clearance-table th { background-color: #f3f4f6; padding: 12px; text-align: left; border: 1px solid #ddd; }
-                    .clearance-table td { padding: 10px; border: 1px solid #ddd; }
-                    .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; display: inline-block; }
-                    .badge-pending { background-color: #fef3c7; color: #92400e; }
-                    .badge-pending_payment { background-color: #fed7aa; color: #9a3412; }
-                    .badge-processing { background-color: #dbeafe; color: #1e40af; }
-                    .badge-approved { background-color: #d1fae5; color: #065f46; }
-                    .badge-issued { background-color: #e9d5ff; color: #6b21a8; }
-                    .badge-rejected { background-color: #fee2e2; color: #991b1b; }
-                    .badge-cancelled { background-color: #f3f4f6; color: #374151; }
-                    .badge-normal { background-color: #dbeafe; color: #1e40af; }
-                    .badge-rush { background-color: #fed7aa; color: #9a3412; }
-                    .badge-express { background-color: #fee2e2; color: #991b1b; }
-                    .footer { margin-top: 40px; text-align: center; color: #6b7280; font-size: 12px; }
-                    @media print {
-                        body { margin: 0; }
-                        .no-print { display: none; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="print-header">
-                    <h1>My Clearance Requests Report</h1>
-                    <div class="print-info">
-                        <div>
-                            <p><strong>Generated:</strong> ${new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                            <p><strong>Total Requests:</strong> ${currentClearances.length}</p>
-                            <p><strong>Status:</strong> ${statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}</p>
-                        </div>
-                        <div>
-                            <p><strong>Household:</strong> ${household?.household_number || 'N/A'}</p>
-                            <p><strong>Head of Family:</strong> ${household?.head_of_family || 'N/A'}</p>
-                            <p><strong>Total Fees:</strong> ${formatCurrency(stats.total_fees)}</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <table class="clearance-table">
-                    <thead>
-                        <tr>
-                            <th>Reference No.</th>
-                            <th>Type</th>
-                            <th>Purpose</th>
-                            <th>Date Requested</th>
-                            <th>Urgency</th>
-                            <th>Status</th>
-                            <th>Fee</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${currentClearances.map(clearance => `
-                            <tr>
-                                <td>${clearance.reference_number}</td>
-                                <td>${getClearanceTypeDisplay(clearance.clearance_type)}</td>
-                                <td>${clearance.purpose}</td>
-                                <td>${formatDate(clearance.created_at)}</td>
-                                <td><span class="badge badge-${clearance.urgency}">${clearance.urgency.toUpperCase()}</span></td>
-                                <td><span class="badge badge-${clearance.status}">${clearance.status.replace('_', ' ').toUpperCase()}</span></td>
-                                <td>${formatCurrency(clearance.fee_amount)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-                
-                <div class="footer">
-                    <p>Generated from Barangay Management System</p>
-                    <p>Page 1 of 1</p>
-                </div>
-            </body>
-            </html>
-        `;
-        
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
+    const handlePrint = () => {
+        printClearancesList(
+            clearances.data,
+            statusFilter,
+            household,
+            stats,
+            (date: string) => formatDate(date, false),
+            formatCurrency,
+            getClearanceTypeDisplay
+        );
     };
     
-    // Export to CSV
-    const exportToCSV = () => {
-        const currentClearances = getCurrentTabClearances();
-        if (currentClearances.length === 0) {
-            toast.error('No clearance requests to export');
-            return;
-        }
-        
-        setIsExporting(true);
-        
-        const headers = ['Reference No.', 'Clearance Number', 'Type', 'Purpose', 'Specific Purpose', 'Status', 'Urgency', 'Fee', 'Date Requested', 'Needed Date', 'Issue Date', 'Valid Until'];
-        
-        const csvData = currentClearances.map(clearance => [
-            clearance.reference_number,
-            clearance.clearance_number || 'N/A',
-            getClearanceTypeDisplay(clearance.clearance_type),
-            `"${clearance.purpose.replace(/"/g, '""')}"`,
-            `"${(clearance.specific_purpose || '').replace(/"/g, '""')}"`,
-            clearance.status.replace('_', ' ').toUpperCase(),
-            clearance.urgency.toUpperCase(),
-            formatCurrency(clearance.fee_amount),
-            formatDate(clearance.created_at),
-            formatDate(clearance.needed_date),
-            clearance.issue_date ? formatDate(clearance.issue_date) : 'Not issued',
-            clearance.valid_until ? formatDate(clearance.valid_until) : 'N/A'
-        ]);
-        
-        const csvContent = [
-            headers.join(','),
-            ...csvData.map(row => row.join(','))
-        ].join('\n');
-        
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        
-        link.setAttribute('href', url);
-        link.setAttribute('download', `clearance_requests_${statusFilter}_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        setIsExporting(false);
-        toast.success('CSV file downloaded successfully');
+    const handleExport = () => {
+        exportClearancesToCSV(
+            clearances.data,
+            statusFilter,
+            (date: string) => formatDate(date, false),
+            formatCurrency,
+            getClearanceTypeDisplay,
+            setIsExporting,
+            toast
+        );
     };
     
-    const shareClearances = async () => {
-        const currentClearances = getCurrentTabClearances();
-        if (currentClearances.length === 0) {
-            toast.error('No clearance requests to share');
-            return;
-        }
-
+    const handleCopySummary = async () => {
         const summary = `My Clearance Requests Summary:\n\n` +
             `Household: ${household?.household_number || 'N/A'}\n` +
             `Head of Family: ${household?.head_of_family || 'N/A'}\n\n` +
-            `Total Requests: ${currentClearances.length}\n` +
-            `Pending: ${currentClearances.filter(c => c.status === 'pending').length}\n` +
-            `Pending Payment: ${currentClearances.filter(c => c.status === 'pending_payment').length}\n` +
-            `Processing: ${currentClearances.filter(c => c.status === 'processing').length}\n` +
-            `Approved: ${currentClearances.filter(c => c.status === 'approved').length}\n` +
-            `Issued: ${currentClearances.filter(c => c.status === 'issued').length}\n` +
-            `Rejected: ${currentClearances.filter(c => c.status === 'rejected').length}\n` +
-            `Cancelled: ${currentClearances.filter(c => c.status === 'cancelled').length}\n\n` +
+            `Total Requests: ${clearances.data.length}\n` +
+            `Pending: ${clearances.data.filter(c => c.status === 'pending').length}\n` +
+            `Pending Payment: ${clearances.data.filter(c => c.status === 'pending_payment').length}\n` +
+            `Processing: ${clearances.data.filter(c => c.status === 'processing').length}\n` +
+            `Approved: ${clearances.data.filter(c => c.status === 'approved').length}\n` +
+            `Issued: ${clearances.data.filter(c => c.status === 'issued').length}\n` +
+            `Rejected: ${clearances.data.filter(c => c.status === 'rejected').length}\n` +
+            `Cancelled: ${clearances.data.filter(c => c.status === 'cancelled').length}\n\n` +
             `Total Fees: ${formatCurrency(stats.total_fees)}\n` +
             `Total Paid: ${formatCurrency(stats.total_paid)}\n` +
             `Balance Due: ${formatCurrency(stats.total_balance)}\n\n` +
             `Generated on: ${new Date().toLocaleDateString()}\n` +
-            `View online: ${window.location.origin}/my-clearances`;
-
-        try {
-            if (navigator.share) {
-                await navigator.share({
-                    title: 'My Clearance Requests Report',
-                    text: summary,
-                });
-                toast.success('Shared successfully');
-            } else if (navigator.clipboard) {
-                await navigator.clipboard.writeText(summary);
-                toast.success('Summary copied to clipboard');
-            } else {
-                toast.error('Sharing not supported on this device');
-            }
-        } catch (error) {
-            if (error instanceof Error && error.name !== 'AbortError') {
-                console.error('Error sharing:', error);
-                toast.error('Failed to share');
-            }
-        }
+            `View online: ${window.location.origin}/portal/my-clearances`;
+        
+        await copyToClipboard(summary, 'Summary copied to clipboard');
     };
     
-    const copyReferenceNumber = (refNumber: string) => {
-        navigator.clipboard.writeText(refNumber).then(() => {
-            toast.success(`Copied: ${refNumber}`);
-        }).catch(() => {
-            toast.error('Failed to copy');
-        });
+    const handleEmailSummary = () => {
+        const body = `
+Hello,
+
+Here's a summary of my clearance requests:
+
+Total Requests: ${clearances.data.length}
+- Pending: ${clearances.data.filter(c => c.status === 'pending').length}
+- Pending Payment: ${clearances.data.filter(c => c.status === 'pending_payment').length}
+- Processing: ${clearances.data.filter(c => c.status === 'processing').length}
+- Approved: ${clearances.data.filter(c => c.status === 'approved').length}
+- Issued: ${clearances.data.filter(c => c.status === 'issued').length}
+- Rejected: ${clearances.data.filter(c => c.status === 'rejected').length}
+- Cancelled: ${clearances.data.filter(c => c.status === 'cancelled').length}
+
+Total Fees: ${formatCurrency(stats.total_fees)}
+Total Paid: ${formatCurrency(stats.total_paid)}
+Balance Due: ${formatCurrency(stats.total_balance)}
+
+This summary was generated from the Barangay Management System.
+
+Best regards,
+${currentResident?.first_name} ${currentResident?.last_name}
+        `.trim();
+        
+        const subject = `My Clearance Requests Summary - ${new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    };
+    
+    const handlePageChange = (page: number) => {
+        updateFilters({ page: page.toString() });
     };
     
     const renderTabContent = () => {
         const currentClearances = getCurrentTabClearances();
         const tabHasData = currentClearances.length > 0;
         
+        // FIXED: Safely handle statusFilter for display
+        const displayStatus = statusFilter && statusFilter !== 'all' 
+            ? statusFilter.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+            : 'All';
+        
+        // FIXED: Safely handle status for empty state message
+        const emptyStateStatus = statusFilter === 'all' ? 'clearance requests' : (statusFilter || '').replace(/_/g, ' ');
+        
         return (
-            <Card className="border border-gray-200 dark:border-gray-700">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50">
                 <CardContent className="p-4 md:p-6">
-                    {/* Selection Mode Banner */}
-                    {selectMode && tabHasData && (
-                        <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                <div className="flex items-center gap-3">
-                                    <Badge variant="secondary" className="gap-1">
-                                        <Square className="h-3 w-3" />
-                                        Selection Mode
-                                    </Badge>
-                                    <span className="text-sm text-blue-700 dark:text-blue-300">
-                                        {selectedClearances.length} request{selectedClearances.length !== 1 ? 's' : ''} selected
-                                    </span>
-                                </div>
-                                <div className="flex gap-2 w-full sm:w-auto">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={selectAllClearances}
-                                        className="flex-1 sm:flex-none"
-                                    >
-                                        {selectedClearances.length === currentClearances.length && currentClearances.length > 0
-                                            ? 'Deselect All'
-                                            : 'Select All'}
-                                    </Button>
-                                    {selectedClearances.length > 0 && (
-                                        <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => {
-                                                if (confirm(`Are you sure you want to delete ${selectedClearances.length} selected clearance requests?`)) {
-                                                    toast.success(`Deleted ${selectedClearances.length} clearance requests`);
-                                                    setSelectedClearances([]);
-                                                    setSelectMode(false);
-                                                }
-                                            }}
-                                            className="flex-1 sm:flex-none"
-                                        >
-                                            Delete Selected
-                                        </Button>
-                                    )}
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            setSelectMode(false);
-                                            setSelectedClearances([]);
-                                        }}
-                                        className="flex-1 sm:flex-none"
-                                    >
-                                        <X className="h-4 w-4 mr-1" />
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    <ModernSelectionBanner
+                        selectMode={selectMode}
+                        selectedCount={selectedClearances.length}
+                        totalCount={currentClearances.length}
+                        onSelectAll={selectAllClearances}
+                        onDeselectAll={() => setSelectedClearances([])}
+                        onCancel={() => {
+                            setSelectMode(false);
+                            setSelectedClearances([]);
+                        }}
+                        onDelete={handleDeleteSelected}
+                        deleteLabel="Delete Selected"
+                    />
                     
-                    {/* Clearances List Header */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                         <div>
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                                {statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Clearance Requests
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                {displayStatus} Clearance Requests
                             </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
                                 {tabHasData 
                                     ? `Showing ${currentClearances.length} request${currentClearances.length !== 1 ? 's' : ''}`
-                                    : `No ${statusFilter === 'all' ? 'clearance requests' : statusFilter.replace('_', ' ')} found`
+                                    : `No ${emptyStateStatus} found`
                                 }
                                 {selectMode && selectedClearances.length > 0 && ` • ${selectedClearances.length} selected`}
                                 {(clearanceTypeFilter !== 'all' || residentFilter !== 'all' || urgencyFilter !== 'all' || yearFilter !== 'all' || search) && ' (filtered)'}
@@ -1445,152 +706,135 @@ export default function MyClearances() {
                             </p>
                         </div>
                         
-                        <div className="flex items-center gap-3">
-                            <div className="flex gap-2">
-                                {!selectMode && tabHasData && (
-                                    <>
-                                        <div className="hidden md:flex gap-2">
-                                            <Button
-                                                variant={viewMode === 'grid' ? 'default' : 'outline'}
-                                                size="sm"
-                                                onClick={() => setViewMode('grid')}
-                                                className="gap-2"
-                                            >
-                                                <Grid className="h-4 w-4" />
-                                                Grid
-                                            </Button>
-                                            <Button
-                                                variant={viewMode === 'list' ? 'default' : 'outline'}
-                                                size="sm"
-                                                onClick={() => setViewMode('list')}
-                                                className="gap-2"
-                                            >
-                                                <List className="h-4 w-4" />
-                                                List
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={toggleSelectMode}
-                                                className="gap-2"
-                                            >
-                                                <Square className="h-4 w-4" />
-                                                Select
-                                            </Button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                        <div className="flex items-center gap-2">
+                            {/* Sort Dropdown */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+                                        <ArrowUpDown className="h-4 w-4" />
+                                        Sort
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem>
+                                        <Calendar className="h-4 w-4 mr-2" />
+                                        Date
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem>
+                                        <DollarSign className="h-4 w-4 mr-2" />
+                                        Amount
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem>
+                                        <Info className="h-4 w-4 mr-2" />
+                                        Status
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* View Toggle */}
+                            {!selectMode && tabHasData && (
+                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                                    <Button
+                                        variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setViewMode('grid')}
+                                        className={cn(
+                                            "h-8 w-8 p-0",
+                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm"
+                                        )}
+                                    >
+                                        <Grid className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant={viewMode === 'list' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setViewMode('list')}
+                                        className={cn(
+                                            "h-8 w-8 p-0",
+                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm"
+                                        )}
+                                    >
+                                        <List className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Select Mode Toggle */}
+                            {tabHasData && (
+                                <Button
+                                    variant={selectMode ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={toggleSelectMode}
+                                    className="gap-2 rounded-xl"
+                                >
+                                    <Square className="h-4 w-4" />
+                                    {selectMode ? 'Cancel' : 'Select'}
+                                </Button>
+                            )}
                         </div>
                     </div>
                     
                     {!tabHasData ? (
-                        <div className="text-center py-12">
-                            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                {(() => {
-                                    const Icon = statusFilter === 'all' ? FileText : 
-                                               statusFilter === 'pending' ? Clock :
-                                               statusFilter === 'pending_payment' ? DollarSign :
-                                               statusFilter === 'processing' ? Loader2 :
-                                               statusFilter === 'approved' ? CheckCircle :
-                                               statusFilter === 'issued' ? FileCheck :
-                                               statusFilter === 'rejected' || statusFilter === 'cancelled' ? XCircle : FileText;
-                                    return <Icon className="h-8 w-8 text-gray-400" />;
-                                })()}
-                            </div>
-                            <h3 className="text-lg font-semibold mb-2">
-                                No {statusFilter === 'all' ? 'clearance requests' : statusFilter.replace('_', ' ')} found
-                            </h3>
-                            <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                {hasActiveFilters 
-                                    ? 'Try adjusting your filters'
-                                    : statusFilter === 'all' 
-                                        ? 'You have no clearance requests'
-                                        : `You have no ${statusFilter.replace('_', ' ')} clearance requests`}
-                            </p>
-                            {hasActiveFilters && (
-                                <Button variant="outline" onClick={handleClearFilters} size="sm">
-                                    Clear Filters
-                                </Button>
-                            )}
-                        </div>
+                        <ModernEmptyState
+                            status={statusFilter || 'all'}
+                            hasFilters={hasActiveFilters}
+                            onClearFilters={handleClearFilters}
+                            icon={statusFilter === 'all' ? FileText : 
+                                  statusFilter === 'pending' ? Clock :
+                                  statusFilter === 'pending_payment' ? DollarSign :
+                                  statusFilter === 'processing' ? Loader2 :
+                                  statusFilter === 'approved' ? CheckCircle :
+                                  statusFilter === 'issued' ? FileCheck :
+                                  statusFilter === 'rejected' || statusFilter === 'cancelled' ? XCircle : FileText}
+                        />
                     ) : (
                         <>
-                            {/* Mobile View Mode Toggle */}
-                            {isMobile && tabHasData && !selectMode && (
-                                <div className="mb-4">
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant={viewMode === 'grid' ? 'default' : 'outline'}
-                                            size="sm"
-                                            onClick={() => setViewMode('grid')}
-                                            className="flex-1"
-                                        >
-                                            <Grid className="h-4 w-4 mr-2" />
-                                            Grid View
-                                        </Button>
-                                        <Button
-                                            variant={viewMode === 'list' ? 'default' : 'outline'}
-                                            size="sm"
-                                            onClick={() => setViewMode('list')}
-                                            className="flex-1"
-                                        >
-                                            <List className="h-4 w-4 mr-2" />
-                                            List View
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={toggleSelectMode}
-                                            className="flex-1"
-                                        >
-                                            <Square className="h-4 w-4 mr-2" />
-                                            Select
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                            
-                            {/* Grid View (Mobile & Desktop) */}
                             {viewMode === 'grid' && (
                                 <>
-                                    {/* Mobile Grid View */}
                                     {isMobile && (
                                         <div className="pb-4">
                                             {currentClearances.map((clearance) => (
-                                                <MobileClearanceCard 
-                                                    key={clearance.id} 
+                                                <ModernClearanceCard
+                                                    key={clearance.id}
                                                     clearance={clearance}
                                                     selectMode={selectMode}
                                                     selectedClearances={selectedClearances}
                                                     toggleSelectClearance={toggleSelectClearance}
                                                     getClearanceTypeDisplay={getClearanceTypeDisplay}
-                                                    getUrgencyBadge={getUrgencyBadge}
-                                                    formatDate={formatDate}
+                                                    formatDate={(date) => formatDate(date, isMobile)}
                                                     formatCurrency={formatCurrency}
                                                     currentResident={currentResident}
-                                                    copyReferenceNumber={copyReferenceNumber}
+                                                    onCopyReference={handleCopyReference}
+                                                    onViewDetails={handleViewDetails}
+                                                    onMakePayment={handleMakePayment}
+                                                    onDownloadClearance={handleDownloadClearance}
+                                                    onGenerateReport={handleGenerateReport}
+                                                    onReportIssue={handleReportIssue}
+                                                    isMobile={isMobile}
                                                 />
                                             ))}
                                         </div>
                                     )}
                                     
-                                    {/* Desktop Grid View */}
                                     {!isMobile && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {currentClearances.map((clearance) => (
-                                                <DesktopGridViewCard 
-                                                    key={clearance.id} 
+                                                <ModernClearanceGridCard
+                                                    key={clearance.id}
                                                     clearance={clearance}
                                                     selectMode={selectMode}
                                                     selectedClearances={selectedClearances}
                                                     toggleSelectClearance={toggleSelectClearance}
                                                     getClearanceTypeDisplay={getClearanceTypeDisplay}
-                                                    getUrgencyBadge={getUrgencyBadge}
-                                                    formatDate={formatDate}
+                                                    formatDate={(date) => formatDate(date, isMobile)}
                                                     formatCurrency={formatCurrency}
                                                     currentResident={currentResident}
-                                                    copyReferenceNumber={copyReferenceNumber}
+                                                    onCopyReference={handleCopyReference}
+                                                    onViewDetails={handleViewDetails}
+                                                    onMakePayment={handleMakePayment}
+                                                    onDownloadClearance={handleDownloadClearance}
+                                                    onGenerateReport={handleGenerateReport}
+                                                    onReportIssue={handleReportIssue}
                                                 />
                                             ))}
                                         </div>
@@ -1598,206 +842,34 @@ export default function MyClearances() {
                                 </>
                             )}
                             
-                            {/* List/Table View (Mobile & Desktop) */}
                             {viewMode === 'list' && (
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                {selectMode && (
-                                                    <TableHead className="w-12">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedClearances.length === currentClearances.length && currentClearances.length > 0}
-                                                            onChange={selectAllClearances}
-                                                            className="h-4 w-4 rounded border-gray-300"
-                                                        />
-                                                    </TableHead>
-                                                )}
-                                                <TableHead>Reference Details</TableHead>
-                                                <TableHead>Type & Purpose</TableHead>
-                                                <TableHead>Dates</TableHead>
-                                                <TableHead>Urgency</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Fee</TableHead>
-                                                <TableHead className="text-right">Actions</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {currentClearances.map((clearance) => (
-                                                <TableRow key={clearance.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                                                    {selectMode && (
-                                                        <TableCell>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedClearances.includes(clearance.id)}
-                                                                onChange={() => toggleSelectClearance(clearance.id)}
-                                                                className="h-4 w-4 rounded border-gray-300"
-                                                            />
-                                                        </TableCell>
-                                                    )}
-                                                    <TableCell>
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <button
-                                                                    onClick={() => copyReferenceNumber(clearance.reference_number)}
-                                                                    className="font-mono text-sm font-medium hover:text-blue-600 transition-colors"
-                                                                    title="Copy reference number"
-                                                                >
-                                                                    #{clearance.reference_number}
-                                                                </button>
-                                                                {clearance.clearance_number && (
-                                                                    <Badge variant="outline" size="sm" className="text-xs">
-                                                                        <FileCheck className="h-3 w-3 mr-1" />
-                                                                        #{clearance.clearance_number}
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                                Requested by: {clearance.resident?.first_name} {clearance.resident?.last_name}
-                                                                {clearance.resident_id === currentResident?.id && ' (You)'}
-                                                            </p>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div>
-                                                            <p className="font-medium text-gray-700 dark:text-gray-300">
-                                                                {getClearanceTypeDisplay(clearance.clearance_type)}
-                                                            </p>
-                                                            <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                                                                {clearance.purpose}
-                                                            </p>
-                                                            {clearance.specific_purpose && (
-                                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                                    {clearance.specific_purpose}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="space-y-1">
-                                                            <div>
-                                                                <p className="text-xs text-gray-500">Requested</p>
-                                                                <p className="text-sm">{formatDate(clearance.created_at)}</p>
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-xs text-gray-500">Needed By</p>
-                                                                <p className="text-sm">{formatDate(clearance.needed_date)}</p>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {getUrgencyBadge(clearance.urgency)}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <StatusBadge status={clearance.status} />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="font-bold">{formatCurrency(clearance.fee_amount)}</div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex justify-end gap-1">
-                                                            <Link href={`/my-clearances/${clearance.id}`}>
-                                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                                                    <Eye className="h-4 w-4" />
-                                                                </Button>
-                                                            </Link>
-                                                            {clearance.status === 'pending_payment' && (
-                                                                <Link href={`/resident/payments/create?clearance_id=${clearance.id}`}>
-                                                                    <Button size="sm" variant="default" className="h-8 px-3 text-xs">
-                                                                        Pay
-                                                                    </Button>
-                                                                </Link>
-                                                            )}
-                                                            {clearance.status === 'issued' && clearance.clearance_number && (
-                                                                <Button 
-                                                                    size="sm" 
-                                                                    variant="ghost" 
-                                                                    className="h-8 w-8 p-0"
-                                                                    onClick={() => toast.info('Download functionality would be implemented here')}
-                                                                >
-                                                                    <Download className="h-4 w-4" />
-                                                                </Button>
-                                                            )}
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger asChild>
-                                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                                                        <MoreVertical className="h-4 w-4" />
-                                                                    </Button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end">
-                                                                    <DropdownMenuItem onClick={() => copyReferenceNumber(clearance.reference_number)}>
-                                                                        <Copy className="h-4 w-4 mr-2" />
-                                                                        Copy Reference No.
-                                                                    </DropdownMenuItem>
-                                                                    {clearance.clearance_number && (
-                                                                        <DropdownMenuItem onClick={() => {
-                                                                            navigator.clipboard.writeText(clearance.clearance_number!);
-                                                                            toast.success(`Copied: ${clearance.clearance_number}`);
-                                                                        }}>
-                                                                            <Copy className="h-4 w-4 mr-2" />
-                                                                            Copy Clearance No.
-                                                                        </DropdownMenuItem>
-                                                                    )}
-                                                                    <DropdownMenuItem onClick={() => {
-                                                                        const reportWindow = window.open('', '_blank');
-                                                                        if (reportWindow) {
-                                                                            reportWindow.document.write(`
-                                                                                <h1>Clearance Request Details: ${clearance.reference_number}</h1>
-                                                                                <p><strong>Type:</strong> ${getClearanceTypeDisplay(clearance.clearance_type)}</p>
-                                                                                <p><strong>Purpose:</strong> ${clearance.purpose}</p>
-                                                                                <p><strong>Fee:</strong> ${formatCurrency(clearance.fee_amount)}</p>
-                                                                                <p><strong>Status:</strong> ${clearance.status}</p>
-                                                                            `);
-                                                                        }
-                                                                    }}>
-                                                                        <FileText className="h-4 w-4 mr-2" />
-                                                                        Generate Report
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem className="text-red-600" onClick={() => toast.info('Report issue feature would open a form')}>
-                                                                        <AlertCircle className="h-4 w-4 mr-2" />
-                                                                        Report Issue
-                                                                    </DropdownMenuItem>
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
+                                <ModernClearanceTable
+                                    clearances={currentClearances}
+                                    selectMode={selectMode}
+                                    selectedClearances={selectedClearances}
+                                    toggleSelectClearance={toggleSelectClearance}
+                                    selectAllClearances={selectAllClearances}
+                                    getClearanceTypeDisplay={getClearanceTypeDisplay}
+                                    formatDate={(date) => formatDate(date, isMobile)}
+                                    formatCurrency={formatCurrency}
+                                    currentResident={currentResident}
+                                    onCopyReference={handleCopyReference}
+                                    onViewDetails={handleViewDetails}
+                                    onMakePayment={handleMakePayment}
+                                    onDownloadClearance={handleDownloadClearance}
+                                    onGenerateReport={handleGenerateReport}
+                                    onReportIssue={handleReportIssue}
+                                />
                             )}
                             
-                            {/* Pagination */}
                             {clearances.last_page > 1 && (
-                                <div className="mt-4 md:mt-6">
-                                    <div className="flex items-center justify-between">
-                                        <div className="text-sm text-gray-500">
-                                            Page {clearances.current_page} of {clearances.last_page}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => updateFilters({ page: (clearances.current_page - 1).toString() })}
-                                                disabled={clearances.current_page <= 1 || loading}
-                                            >
-                                                <ChevronLeft className="h-4 w-4 mr-1" />
-                                                Previous
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => updateFilters({ page: (clearances.current_page + 1).toString() })}
-                                                disabled={clearances.current_page >= clearances.last_page || loading}
-                                            >
-                                                Next
-                                                <ChevronRight className="h-4 w-4 ml-1" />
-                                            </Button>
-                                        </div>
-                                    </div>
+                                <div className="mt-6">
+                                    <ModernPagination
+                                        currentPage={clearances.current_page}
+                                        lastPage={clearances.last_page}
+                                        onPageChange={handlePageChange}
+                                        loading={loading}
+                                    />
                                 </div>
                             )}
                         </>
@@ -1811,24 +883,24 @@ export default function MyClearances() {
         return (
             <ResidentLayout
                 breadcrumbs={[
-                    { title: 'Dashboard', href: '/resident/dashboard' },
-                    { title: 'My Clearances', href: '/my-clearances' }
+                    { title: 'Dashboard', href: '/portal/dashboard' },
+                    { title: 'My Clearances', href: '/portal/my-clearances' }
                 ]}
             >
-                <div className="space-y-6">
-                    <div>
-                        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">My Clearances</h1>
-                    </div>
-                    <Card>
-                        <CardContent className="py-12 text-center">
-                            <AlertCircle className="h-12 w-12 mx-auto text-red-400" />
-                            <h3 className="mt-4 text-lg font-semibold">Error</h3>
-                            <p className="text-gray-500 mt-2">
+                <Head title="My Clearances" />
+                <div className="min-h-[50vh] flex items-center justify-center px-4">
+                    <Card className="w-full max-w-md border-0 shadow-xl">
+                        <CardContent className="pt-6 text-center">
+                            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl flex items-center justify-center mb-4">
+                                <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+                            </div>
+                            <h3 className="text-lg font-semibold mb-2">Error</h3>
+                            <p className="text-gray-500 dark:text-gray-400 mb-4">
                                 {pageProps.error}
                             </p>
                             <Button 
-                                className="mt-4"
                                 onClick={() => window.location.href = '/dashboard'}
+                                className="bg-gradient-to-r from-blue-500 to-blue-600"
                             >
                                 Go to Dashboard
                             </Button>
@@ -1845,21 +917,21 @@ export default function MyClearances() {
             
             <ResidentLayout
                 breadcrumbs={[
-                    { title: 'Dashboard', href: '/resident/dashboard' },
-                    { title: 'My Clearances', href: '/my-clearances' }
+                    { title: 'Dashboard', href: '/portal/dashboard' },
+                    { title: 'My Clearances', href: '/portal/my-clearances' }
                 ]}
             >
-                <div className="space-y-4 md:space-y-6">
+                <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
                     {/* Mobile Header */}
                     {isMobile && (
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-10 py-3 px-4 -mx-4">
                             <div>
                                 <h1 className="text-xl font-bold">My Clearances</h1>
                                 <p className="text-xs text-gray-500">
                                     {stats.total_clearances} request{stats.total_clearances !== 1 ? 's' : ''} total
                                     {household && (
-                                        <span className="block">
-                                            Household: {household.household_number}
+                                        <span className="block text-xs">
+                                            {household.household_number}
                                         </span>
                                     )}
                                 </p>
@@ -1869,7 +941,7 @@ export default function MyClearances() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowStats(!showStats)}
-                                    className="h-8 px-2"
+                                    className="h-8 px-2 rounded-lg"
                                 >
                                     {showStats ? (
                                         <ChevronUp className="h-4 w-4" />
@@ -1880,14 +952,20 @@ export default function MyClearances() {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setShowFilters(!showFilters)}
-                                    className="h-8 px-2"
+                                    onClick={() => setShowMobileFilters(true)}
+                                    className="h-8 px-2 rounded-lg relative"
                                 >
                                     <Filter className="h-4 w-4" />
                                     {hasActiveFilters && (
-                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse" />
                                     )}
                                 </Button>
+                                <Link href="/portal/my-clearances/create">
+                                    <Button size="sm" className="h-8 px-3 bg-gradient-to-r from-blue-500 to-blue-600">
+                                        <Plus className="h-4 w-4 mr-1" />
+                                        Request
+                                    </Button>
+                                </Link>
                             </div>
                         </div>
                     )}
@@ -1909,68 +987,27 @@ export default function MyClearances() {
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" size="sm">
-                                            <Download className="h-4 w-4 mr-2" />
-                                            Export
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent>
-                                        <DropdownMenuItem onClick={exportToCSV} disabled={isExporting}>
-                                            <FileText className="h-4 w-4 mr-2" />
-                                            {isExporting ? 'Exporting...' : 'Export as CSV'}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={printClearances}>
-                                            <Printer className="h-4 w-4 mr-2" />
-                                            Print List
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={shareClearances}>
-                                            <Share2 className="h-4 w-4 mr-2" />
-                                            Copy Summary
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => {
-                                            const body = `
-Hello,
-
-Here's a summary of my clearance requests:
-
-Total Requests: ${getCurrentTabClearances().length}
-- Pending: ${getCurrentTabClearances().filter(c => c.status === 'pending').length}
-- Pending Payment: ${getCurrentTabClearances().filter(c => c.status === 'pending_payment').length}
-- Processing: ${getCurrentTabClearances().filter(c => c.status === 'processing').length}
-- Approved: ${getCurrentTabClearances().filter(c => c.status === 'approved').length}
-- Issued: ${getCurrentTabClearances().filter(c => c.status === 'issued').length}
-- Rejected: ${getCurrentTabClearances().filter(c => c.status === 'rejected').length}
-- Cancelled: ${getCurrentTabClearances().filter(c => c.status === 'cancelled').length}
-
-Total Fees: ${formatCurrency(stats.total_fees)}
-Total Paid: ${formatCurrency(stats.total_paid)}
-Balance Due: ${formatCurrency(stats.total_balance)}
-
-This summary was generated from the Barangay Management System.
-
-Best regards,
-${currentResident?.first_name} ${currentResident?.last_name}
-                                            `.trim();
-                                            const subject = `My Clearance Requests Summary - ${new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-                                            window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-                                        }}>
-                                            <Mail className="h-4 w-4 mr-2" />
-                                            Email Summary
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                                <Button onClick={printClearances} variant="outline" size="sm">
-                                    <Printer className="h-4 w-4 mr-2" />
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handlePrint}
+                                    className="gap-2 rounded-xl"
+                                >
+                                    <Printer className="h-4 w-4" />
                                     Print
                                 </Button>
-                                
-                                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-                                
-                                <Link href="/my-clearances/create">
-                                    <Button className="gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleExport}
+                                    disabled={isExporting}
+                                    className="gap-2 rounded-xl"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    {isExporting ? 'Exporting...' : 'Export'}
+                                </Button>
+                                <Link href="/portal/my-clearances/create">
+                                    <Button className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl">
                                         <Plus className="h-4 w-4" />
                                         <span>New Request</span>
                                     </Button>
@@ -1979,31 +1016,114 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                         </div>
                     )}
                     
-                    {/* Stats */}
+                    {/* Stats Section */}
                     {showStats && (
-                        <CollapsibleStats 
-                            showStats={showStats}
-                            setShowStats={setShowStats}
-                            statusFilter={statusFilter}
-                            stats={stats}
-                            clearances={clearances}
-                            getStatusCount={getStatusCount}
-                            formatCurrency={formatCurrency}
-                        />
-                    )}
-                    {!isMobile && (
-                        <DesktopStats 
-                            statusFilter={statusFilter}
-                            stats={stats}
-                            clearances={clearances}
-                            getStatusCount={getStatusCount}
-                            formatCurrency={formatCurrency}
-                        />
+                        <div className="animate-slide-down">
+                            <CollapsibleStats
+                                showStats={showStats}
+                                setShowStats={setShowStats}
+                                stats={stats}
+                                formatCurrency={formatCurrency}
+                            />
+                            <DesktopStats
+                                stats={stats}
+                                formatCurrency={formatCurrency}
+                            />
+                        </div>
                     )}
                     
-                    {/* Filters */}
-                    {(showFilters || !isMobile) && (
-                        <FiltersSection
+                    {/* Mobile Filter Modal */}
+                    <ModernFilterModal
+                        isOpen={showMobileFilters}
+                        onClose={() => setShowMobileFilters(false)}
+                        title="Filter Clearance Requests"
+                        description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
+                        search={search}
+                        onSearchChange={setSearch}
+                        onSearchSubmit={handleSearchSubmit}
+                        onSearchClear={handleSearchClear}
+                        loading={loading}
+                        hasActiveFilters={hasActiveFilters}
+                        onClearFilters={handleClearFilters}
+                    >
+                        {/* Clearance Type Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Clearance Type
+                            </label>
+                            <ModernSelect
+                                value={clearanceTypeFilter}
+                                onValueChange={handleClearanceTypeChange}
+                                placeholder="All types"
+                                options={availableClearanceTypes.map(type => ({
+                                    value: type.id.toString(),
+                                    label: type.name
+                                }))}
+                                disabled={loading}
+                                icon={FileText}
+                            />
+                        </div>
+
+                        {/* Resident Filter */}
+                        {householdResidents.length > 0 && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Resident
+                                </label>
+                                <ModernSelect
+                                    value={residentFilter}
+                                    onValueChange={handleResidentChange}
+                                    placeholder="All residents"
+                                    options={householdResidents.map(resident => ({
+                                        value: resident.id.toString(),
+                                        label: `${resident.first_name} ${resident.last_name}${resident.id === currentResident?.id ? ' (You)' : ''}`
+                                    }))}
+                                    disabled={loading}
+                                    icon={User}
+                                />
+                            </div>
+                        )}
+
+                        {/* Urgency Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Urgency
+                            </label>
+                            <ModernSelect
+                                value={urgencyFilter}
+                                onValueChange={handleUrgencyChange}
+                                placeholder="All urgency"
+                                options={[
+                                    { value: 'normal', label: 'Normal' },
+                                    { value: 'rush', label: 'Rush' },
+                                    { value: 'express', label: 'Express' },
+                                ]}
+                                disabled={loading}
+                            />
+                        </div>
+
+                        {/* Year Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Year
+                            </label>
+                            <ModernSelect
+                                value={yearFilter}
+                                onValueChange={handleYearChange}
+                                placeholder="All years"
+                                options={availableYears.map(year => ({
+                                    value: year.toString(),
+                                    label: year.toString()
+                                }))}
+                                disabled={loading}
+                                icon={Calendar}
+                            />
+                        </div>
+                    </ModernFilterModal>
+                    
+                    {/* Desktop Filters */}
+                    {!isMobile && (
+                        <ModernClearanceFilters
                             search={search}
                             setSearch={setSearch}
                             handleSearchSubmit={handleSearchSubmit}
@@ -2019,37 +1139,27 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                             loading={loading}
                             availableClearanceTypes={availableClearanceTypes}
                             householdResidents={householdResidents}
-                            currentResident={currentResident}
                             availableYears={availableYears}
-                            printClearances={printClearances}
-                            exportToCSV={exportToCSV}
+                            printClearances={handlePrint}
+                            exportToCSV={handleExport}
                             isExporting={isExporting}
-                            getCurrentTabClearances={getCurrentTabClearances}
                             hasActiveFilters={hasActiveFilters}
                             handleClearFilters={handleClearFilters}
-                            isMobile={isMobile}
-                            setShowFilters={setShowFilters}
+                            onCopySummary={handleCopySummary}
+                            onEmailSummary={handleEmailSummary}
+                            currentResident={currentResident}
                         />
                     )}
                     
                     {/* Custom Tabs Section */}
                     <div className="mt-4">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                            <h2 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                                Clearance Requests
-                            </h2>
-                            <div className="flex items-center gap-2">
-                                <div className="text-sm text-gray-500 dark:text-gray-400 hidden md:block">
-                                    Page {clearances.current_page} of {clearances.last_page}
-                                </div>
-                            </div>
-                        </div>
-                        
-               <ClearanceTabs 
-                    statusFilter={statusFilter}
-                    handleTabChange={handleTabChange}
-                    getStatusCount={getStatusCount}
-                    />
+                        <CustomTabs
+                            key="clearance-tabs"
+                            statusFilter={statusFilter || 'all'}
+                            handleTabChange={handleTabChange}
+                            getStatusCount={(status) => getStatusCount(stats, status)}
+                            tabsConfig={CLEARANCE_TABS}
+                        />
                         
                         {/* Tab Content */}
                         <div className="mt-4">
@@ -2059,12 +1169,12 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                 </div>
                 
                 {/* Mobile FAB */}
-                {isMobile && (
-                    <div className="fixed bottom-24 right-6 z-50 safe-bottom">
-                        <Link href="/my-clearances/create">
+                {isMobile && !showMobileFilters && (
+                    <div className="fixed bottom-6 right-6 z-50 safe-bottom animate-scale-in">
+                        <Link href="/portal/my-clearances/create">
                             <Button 
                                 size="lg" 
-                                className="rounded-full h-14 w-14 shadow-lg shadow-blue-500/20"
+                                className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                             >
                                 <Plus className="h-6 w-6" />
                             </Button>
@@ -2072,20 +1182,8 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                     </div>
                 )}
                 
-                {/* Mobile Footer */}
-                <div className="md:hidden">
-                    <ResidentMobileFooter />
-                </div>
-                
                 {/* Loading Overlay */}
-                {loading && (
-                    <div className="fixed inset-0 bg-black/10 backdrop-blur-sm z-50 flex items-center justify-center">
-                        <div className="bg-white p-6 rounded-lg shadow-lg">
-                            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-                            <p className="text-sm">Loading...</p>
-                        </div>
-                    </div>
-                )}
+                <ModernLoadingOverlay loading={loading} message="Loading clearance requests..." />
             </ResidentLayout>
         </>
     );

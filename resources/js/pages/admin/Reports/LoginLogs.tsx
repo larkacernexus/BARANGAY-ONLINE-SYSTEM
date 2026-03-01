@@ -411,7 +411,7 @@ export default function LoginLogs() {
                 ...buildFilterParams(),
                 status: undefined,
             });
-            router.get('/reports/login-logs', params, { // CHANGED HERE
+            router.get('/admin/reports/login-logs', params, { // CHANGED HERE
                 preserveScroll: true,
                 preserveState: true,
                 onStart: () => setIsLoading(true),
@@ -426,7 +426,7 @@ export default function LoginLogs() {
                     ...buildFilterParams(),
                     status: selectedTab.name,
                 });
-                router.get('/reports/login-logs', params, { // CHANGED HERE
+                router.get('/admin/reports/login-logs', params, { // CHANGED HERE
                     preserveScroll: true,
                     preserveState: true,
                     onStart: () => setIsLoading(true),
@@ -456,7 +456,7 @@ export default function LoginLogs() {
     const debouncedSearch = useMemo(
         () => debounce(() => {
             const params = buildFilterParams();
-            router.get('/reports/login-logs', params, { // CHANGED HERE
+            router.get('/admin/reports/login-logs', params, { // CHANGED HERE
                 preserveScroll: true,
                 preserveState: true,
                 onStart: () => setIsLoading(true),
@@ -481,7 +481,7 @@ export default function LoginLogs() {
             ...buildFilterParams(),
             status: value.trim() || undefined,
         });
-        router.get('/reports/login-logs', params, { // CHANGED HERE
+        router.get('/admin/reports/login-logs', params, { // CHANGED HERE
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -495,7 +495,7 @@ export default function LoginLogs() {
             ...buildFilterParams(),
             browser: value.trim() || undefined,
         });
-        router.get('/reports/login-logs', params, { // CHANGED HERE
+        router.get('/admin/reports/login-logs', params, { // CHANGED HERE
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -509,7 +509,7 @@ export default function LoginLogs() {
             ...buildFilterParams(),
             device_type: value.trim() || undefined,
         });
-        router.get('/reports/login-logs', params, { // CHANGED HERE
+        router.get('/admin/reports/login-logs', params, { // CHANGED HERE
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -523,7 +523,7 @@ export default function LoginLogs() {
             ...buildFilterParams(),
             user_id: value.trim() || undefined,
         });
-        router.get('/reports/login-logs', params, { // CHANGED HERE
+        router.get('/admin/reports/login-logs', params, { // CHANGED HERE
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -537,7 +537,7 @@ export default function LoginLogs() {
             ...buildFilterParams(),
             date_from: value.trim() || undefined,
         });
-        router.get('/reports/login-logs', params, { // CHANGED HERE
+        router.get('/admin/reports/login-logs', params, { // CHANGED HERE
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -551,7 +551,7 @@ export default function LoginLogs() {
             ...buildFilterParams(),
             date_to: value.trim() || undefined,
         });
-        router.get('/reports/login-logs', params, { // CHANGED HERE
+        router.get('/admin/reports/login-logs', params, { // CHANGED HERE
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -566,7 +566,7 @@ export default function LoginLogs() {
             ...buildFilterParams(),
             per_page: numValue !== 25 ? numValue : undefined,
         });
-        router.get('/reports/login-logs', params, { // CHANGED HERE
+        router.get('/admin/reports/login-logs', params, { // CHANGED HERE
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -587,7 +587,7 @@ export default function LoginLogs() {
         setActiveTab('all');
         setShowFilters(false);
         
-        router.get('/reports/login-logs', {}, { // CHANGED HERE
+        router.get('/admin/reports/login-logs', {}, { // CHANGED HERE
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -598,7 +598,7 @@ export default function LoginLogs() {
     // Refresh current filters
     const handleRefresh = () => {
         const params = buildFilterParams();
-        router.get('/reports/login-logs', params, { // CHANGED HERE
+        router.get('/admin/reports/login-logs', params, { // CHANGED HERE
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -617,7 +617,7 @@ export default function LoginLogs() {
             exportParams[key] = value;
         });
 
-        router.get('/reports/login-logs/export', exportParams, { // CHANGED HERE
+        router.get('/admin/reports/login-logs/export', exportParams, { // CHANGED HERE
             preserveScroll: true,
             onSuccess: () => {
                 setIsLoading(false);
@@ -658,8 +658,8 @@ export default function LoginLogs() {
         <AppLayout
             title="Login Logs"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Login Logs', href: '/reports/login-logs' } // CHANGED HERE
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Login Logs', href: '/admin/reports/login-logs' } // CHANGED HERE
             ]}
         >
             <Head title="Login Logs" />
@@ -1310,7 +1310,7 @@ export default function LoginLogs() {
                                                                 <div className="flex justify-end gap-2 pt-2">
                                                                     {log.user && (
                                                                         <Link
-                                                                            href={`/users/${log.user.id}`}
+                                                                            href={`/admin/users/${log.user.id}`}
                                                                             className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/10 rounded"
                                                                         >
                                                                             <UserIcon className="h-3 w-3" />
@@ -1318,7 +1318,7 @@ export default function LoginLogs() {
                                                                         </Link>
                                                                     )}
                                                                     <Link
-                                                                        href={`/reports/login-logs/${log.id}`} // CHANGED HERE
+                                                                        href={`/admin/reports/login-logs/${log.id}`} // CHANGED HERE
                                                                         className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
                                                                     >
                                                                         <Eye className="h-3 w-3" />
@@ -1367,7 +1367,7 @@ export default function LoginLogs() {
                                                                     }
                                                                 });
                                                                 
-                                                                router.get('/reports/login-logs', params, { // CHANGED HERE
+                                                                router.get('/admin/reports/login-logs', params, { // CHANGED HERE
                                                                     preserveScroll: true,
                                                                     preserveState: true,
                                                                     onStart: () => setIsLoading(true),
@@ -1552,7 +1552,7 @@ export default function LoginLogs() {
                             </div>
                             
                             <Link
-                                href="/reports/login-logs" // CHANGED HERE
+                                href="/admin/reports/login-logs" // CHANGED HERE
                                 className="mt-4 w-full text-center block px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/10 rounded-lg"
                             >
                                 View all logins

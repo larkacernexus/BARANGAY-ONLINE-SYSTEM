@@ -25,16 +25,16 @@ export default function CreatePurok() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post('/puroks');
+        post('/admin/puroks');
     };
 
     return (
         <AppLayout
             title="Add Purok"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Puroks', href: '/puroks' },
-                { title: 'Add Purok', href: '/puroks/create' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Puroks', href: '/admin/puroks' },
+                { title: 'Add Purok', href: '/admin/puroks/create' }
             ]}
         >
             <form onSubmit={handleSubmit}>
@@ -42,7 +42,7 @@ export default function CreatePurok() {
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href="/puroks">
+                            <Link href="/admin/puroks">
                                 <Button variant="ghost" size="sm" type="button">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back

@@ -70,6 +70,7 @@ export type ValueType = typeof VALUE_TYPES[keyof typeof VALUE_TYPES];
 // ============================================
 
 export interface FeeFormData {
+    billing_period(billing_period: any): string | number | readonly string[] | undefined;
     // Fee Type (from FeeType model)
     fee_type_id: string;
     
@@ -501,6 +502,9 @@ export const DEFAULT_FEE_FORM_DATA: FeeFormData = {
     ph_solo_parent_id_verified: false,
     ph_indigent_id_verified: false,
     ph_legal_compliance_notes: '',
+    billing_period: function (billing_period: any): string | number | readonly string[] | undefined {
+        throw new Error("Function not implemented.");
+    }
 };
 
 export const DEFAULT_BULK_FEE_FORM_DATA: BulkFeeFormData = {

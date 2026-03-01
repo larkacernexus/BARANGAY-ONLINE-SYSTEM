@@ -51,7 +51,7 @@ export default function ClearanceTypesHeader({
                         <p className="text-xs text-gray-500">Select multiple items for batch operations</p>
                     </TooltipContent>
                 </Tooltip>
-                <Link href={route('clearance-types.create')}>
+                <Link href="/admin/clearance-types/clearance-types/create">                    
                     <Button className="h-9">
                         <Plus className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">Create Type</span>

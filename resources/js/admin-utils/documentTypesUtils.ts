@@ -15,10 +15,105 @@ export const getFileSizeMB = (bytes: number): number => {
     return Math.round((bytes / 1024 / 1024) * 100) / 100;
 };
 
-// Format file formats
-export const formatFileFormats = (formats?: string[]): string => {
-    if (!formats || formats.length === 0) return 'All formats';
-    return formats.join(', ');
+// Format file formats - COMPLETELY FIXED
+export const formatFileFormats = (formats: any): string => {
+    // Handle null, undefined, or empty
+    if (formats === null || formats === undefined) {
+        return 'All formats';
+    }
+    
+    // If it's already an array
+    if (Array.isArray(formats)) {
+        return formats.length > 0 ? formats.join(', ') : 'All formats';
+    }
+    
+    // If it's a string
+    if (typeof formats === 'string') {
+        // Trim the string
+        const trimmed = formats.trim();
+        
+        // Empty string
+        if (trimmed === '') {
+            return 'All formats';
+        }
+        
+        // Try to parse as JSON (for when it's a JSON string from database)
+        let parsedJson = null;
+        try {
+            parsedJson = JSON.parse(trimmed);
+        } catch (error) {
+            // Not JSON, continue with string handling
+            // We need to use the error parameter to avoid the never type issue
+            console.debug('Not a JSON string:', error);
+        }
+        
+        // If we successfully parsed JSON
+        if (parsedJson) {
+            if (Array.isArray(parsedJson)) {
+                return parsedJson.length > 0 ? parsedJson.join(', ') : 'All formats';
+            }
+            // If parsed but not array, return the parsed value as string
+            return String(parsedJson);
+        }
+        
+        // Check if it's a comma-separated string
+        if (trimmed.includes(',')) {
+            return trimmed; // Return as is
+        }
+        
+        // Single format
+        return trimmed;
+    }
+    
+    // If it's an object (like from JSON.parse)
+    if (typeof formats === 'object') {
+        try {
+            // Try to convert object to array
+            if (formats) {
+                const values = Object.values(formats);
+                if (values.length > 0) {
+                    return values.join(', ');
+                }
+            }
+        } catch (error) {
+            // Fall through to default
+            console.debug('Error processing object:', error);
+        }
+    }
+    
+    // Default fallback
+    return 'All formats';
+};
+
+// Ultra simple version that won't have TypeScript issues
+export const formatFileFormatsSimple = (formats: any): string => {
+    try {
+        // If it's null/undefined
+        if (formats == null) return 'All formats';
+        
+        // If it's a string
+        if (typeof formats === 'string') {
+            // Try to parse JSON if it looks like an array
+            if (formats.trim().startsWith('[') && formats.trim().endsWith(']')) {
+                const parsed = JSON.parse(formats);
+                if (Array.isArray(parsed)) {
+                    return parsed.join(', ');
+                }
+            }
+            return formats.trim() || 'All formats';
+        }
+        
+        // If it's an array
+        if (Array.isArray(formats)) {
+            return formats.length > 0 ? formats.join(', ') : 'All formats';
+        }
+        
+        // Default
+        return 'All formats';
+    } catch {
+        // If anything fails, return a safe default
+        return 'All formats';
+    }
 };
 
 // Filter document types
@@ -62,7 +157,7 @@ export const filterDocumentTypes = (
     
     // Sort
     filtered.sort((a, b) => {
-        let aValue, bValue;
+        let aValue: string | number, bValue: string | number;
         
         switch (sortBy) {
             case 'name':
@@ -104,13 +199,29 @@ export const getSelectionStats = (selectedItems: DocumentType[]): SelectionStats
         inactive: selectedItems.filter(item => !item.is_active).length,
         required: selectedItems.filter(item => item.is_required).length,
         optional: selectedItems.filter(item => !item.is_required).length,
-        hasFormats: selectedItems.filter(item => 
-            item.accepted_formats && item.accepted_formats.length > 0
-        ).length,
+        hasFormats: selectedItems.filter(item => {
+            const formats = item.accepted_formats;
+            if (Array.isArray(formats)) {
+                return formats.length > 0;
+            }
+            if (typeof formats === 'string') {
+                // Try to parse as JSON
+                try {
+                    const parsed = JSON.parse(formats);
+                    return Array.isArray(parsed) && parsed.length > 0;
+                } catch {
+                    // If parsing fails, check if it's a non-empty string
+                    return formats.trim() !== '';
+                }
+            }
+            return false;
+        }).length,
         totalFileSizeMB: selectedItems.reduce((sum, item) => 
             sum + getFileSizeMB(item.max_file_size), 0
         ),
-        maxFileSizeMB: Math.max(...selectedItems.map(item => getFileSizeMB(item.max_file_size))),
+        maxFileSizeMB: selectedItems.length > 0 
+            ? Math.max(...selectedItems.map(item => getFileSizeMB(item.max_file_size)))
+            : 0,
         categories: {}
     };
     
@@ -134,7 +245,8 @@ export const formatForClipboard = (items: DocumentType[]): string => {
         item.is_required ? 'Yes' : 'No',
         item.is_active ? 'Active' : 'Inactive',
         `${getFileSizeMB(item.max_file_size)} MB`,
-        formatFileFormats(item.accepted_formats)
+        // Use the simple formatter
+        formatFileFormatsSimple(item.accepted_formats)
     ]);
     
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
@@ -144,4 +256,35 @@ export const formatForClipboard = (items: DocumentType[]): string => {
 export const safeNumber = (value: any, defaultValue: number = 0): number => {
     const num = Number(value);
     return isNaN(num) ? defaultValue : num;
+};
+
+// Helper function to safely get accepted_formats as array
+export const getAcceptedFormatsAsArray = (formats: any): string[] => {
+    if (Array.isArray(formats)) {
+        return formats;
+    }
+    
+    if (typeof formats === 'string') {
+        // Try to parse as JSON
+        try {
+            const parsed = JSON.parse(formats);
+            if (Array.isArray(parsed)) {
+                return parsed;
+            }
+        } catch {
+            // Not JSON
+        }
+        
+        // Check if it's a comma-separated string
+        if (formats.includes(',')) {
+            return formats.split(',').map(f => f.trim());
+        }
+        
+        // Single format
+        if (formats.trim() !== '') {
+            return [formats.trim()];
+        }
+    }
+    
+    return [];
 };

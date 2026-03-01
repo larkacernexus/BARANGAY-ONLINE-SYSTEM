@@ -50,7 +50,7 @@ export default function OfficialsHeader({
                         <p className="text-xs text-gray-500">Select multiple officials for batch operations</p>
                     </TooltipContent>
                 </Tooltip>
-                <Link href="/officials/create">
+                <Link href="/admin/officials/create">
                     <Button className="h-9">
                         <Plus className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">Add Official</span>

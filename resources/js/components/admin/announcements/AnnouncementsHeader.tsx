@@ -43,7 +43,7 @@ export default function AnnouncementsHeader({
                         </>
                     )}
                 </Button>
-                <Link href={route('announcements.create')}>
+                <Link href={route('admin.announcements.create')}>
                     <Button className="h-8 sm:h-9 px-2 sm:px-4">
                         <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                         <span className="hidden sm:inline">New Announcement</span>

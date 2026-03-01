@@ -188,7 +188,7 @@ class ResidentProfileController extends Controller
             ]);
         }
 
-        return Inertia::render('residentsettings/profile-edit', [
+        return Inertia::render('residentsettings/profile', [
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             'user' => [

@@ -152,7 +152,7 @@ export default function OfficialsTableView({
                                                         Clear Filters
                                                     </Button>
                                                 )}
-                                                <Link href="/officials/create">
+                                                <Link href="/admin/officials/create">
                                                     <Button className="h-8">
                                                         Add First Official
                                                     </Button>
@@ -288,14 +288,14 @@ export default function OfficialsTableView({
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" className="w-48">
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/officials/${official.id}`} className="flex items-center cursor-pointer">
+                                                            <Link href={`/admin/officials/${official.id}`} className="flex items-center cursor-pointer">
                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                 <span>View Details</span>
                                                             </Link>
                                                         </DropdownMenuItem>
                                                         
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/officials/${official.id}/edit`} className="flex items-center cursor-pointer">
+                                                            <Link href={`/admin/officials/${official.id}/edit`} className="flex items-center cursor-pointer">
                                                                 <Edit className="mr-2 h-4 w-4" />
                                                                 <span>Edit Official</span>
                                                             </Link>
@@ -349,7 +349,7 @@ export default function OfficialsTableView({
                                                         )}
                                                         
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/officials/${official.id}/print`} className="flex items-center cursor-pointer">
+                                                            <Link href={`/admin/officials/${official.id}/print`} className="flex items-center cursor-pointer">
                                                                 <Printer className="mr-2 h-4 w-4" />
                                                                 <span>Print Details</span>
                                                             </Link>

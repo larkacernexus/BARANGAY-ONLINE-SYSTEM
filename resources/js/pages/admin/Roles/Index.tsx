@@ -83,7 +83,7 @@ export default function Roles() {
                 }
             });
             
-            router.get('/roles', params, {
+            router.get('/admin/roles', params, {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
@@ -264,7 +264,7 @@ export default function Roles() {
                         break;
                     }
                     
-                    await router.post('/roles/bulk-action', {
+                    await router.post('/admin/roles/bulk-action', {
                         action: 'delete',
                         role_ids: deletableRoles.map(r => r.id),
                     }, {
@@ -281,7 +281,7 @@ export default function Roles() {
                     break;
 
                 case 'change_type':
-                    await router.post('/roles/bulk-action', {
+                    await router.post('/admin/roles/bulk-action', {
                         action: 'change_type',
                         role_ids: selectedRoles,
                         is_system_role: bulkEditValue === 'system'
@@ -340,7 +340,7 @@ export default function Roles() {
                     break;
 
                 case 'duplicate':
-                    await router.post('/roles/bulk-action', {
+                    await router.post('/admin/roles/bulk-action', {
                         action: 'duplicate',
                         role_ids: selectedRoles,
                     }, {
@@ -356,7 +356,7 @@ export default function Roles() {
                     break;
 
                 case 'archive':
-                    await router.post('/roles/bulk-action', {
+                    await router.post('/admin/roles/bulk-action', {
                         action: 'archive',
                         role_ids: selectedRoles,
                     }, {
@@ -373,7 +373,7 @@ export default function Roles() {
 
                 case 'generate_report':
                     const idsParam = selectedRoles.join(',');
-                    window.open(`/roles/generate-bulk-report?ids=${idsParam}`, '_blank');
+                    window.open(`/admin/roles/generate-bulk-report?ids=${idsParam}`, '_blank');
                     toast.success(`Generating report for ${selectedRoles.length} role(s)`);
                     break;
 
@@ -408,7 +408,7 @@ export default function Roles() {
     const handleDelete = (role: Role) => {
         if (canDeleteRole(role)) {
             if (confirm(`Are you sure you want to delete role "${role.name}"?`)) {
-                router.delete(`/roles/${role.id}`, {
+                router.delete(`/admin/roles/${role.id}`, {
                     preserveScroll: true,
                     onSuccess: () => {
                         setSelectedRoles(selectedRoles.filter(id => id !== role.id));
@@ -442,7 +442,7 @@ export default function Roles() {
             search: '',
             type: 'all'
         });
-        router.get('/roles');
+        router.get('/admin/roles');
     };
 
     const handleClearSelection = () => {
@@ -472,7 +472,7 @@ export default function Roles() {
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
-        router.get(`/roles?page=${page}`, {
+        router.get(`/admin/roles?page=${page}`, {
             preserveState: true,
             preserveScroll: true,
         });
@@ -482,15 +482,15 @@ export default function Roles() {
         const queryParams = new URLSearchParams();
         if (search) queryParams.append('search', search);
         if (filtersState.type !== 'all') queryParams.append('type', filtersState.type);
-        window.location.href = `/roles/export?${queryParams.toString()}`;
+        window.location.href = `/admin/roles/export?${queryParams.toString()}`;
     };
 
     return (
         <AdminLayout
             title="Roles Management"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Roles', href: '/roles' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Roles', href: '/admin/roles' }
             ]}
         >
             <TooltipProvider>

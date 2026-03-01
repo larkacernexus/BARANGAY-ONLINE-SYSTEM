@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Notifications\Notifiable;
 
 class Fee extends Model
 {
-    use HasFactory;
+    use HasFactory, Notifiable;
 
     protected $fillable = [
         // Basic identification
@@ -38,10 +39,10 @@ class Fee extends Model
         
         // Amounts
         'base_amount',        // Original amount before discounts
-        'total_discounts',    // Sum of all discounts applied
+        'discount_amount',    // Sum of all discounts applied
         'surcharge_amount',   // Calculated surcharge
         'penalty_amount',     // Calculated penalty
-        'total_amount',       // base_amount - total_discounts + surcharge + penalty
+        'total_amount',       // base_amount - discount_amount + surcharge + penalty
         'amount_paid',
         'balance',
         
@@ -67,7 +68,7 @@ class Fee extends Model
 
     protected $casts = [
         'base_amount' => 'decimal:2',
-        'total_discounts' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
         'surcharge_amount' => 'decimal:2',
         'penalty_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
@@ -261,12 +262,21 @@ class Fee extends Model
     }
 
     /**
-     * Calculate penalty based on fee type rules and overdue days
+     * Calculate penalty based on fee type rules and payment date
+     * FIXED: Penalty should only apply if payment is made AFTER due date
      */
-    public function calculatePenalty(): float
+    public function calculatePenalty($paymentDate = null): float
     {
-        if (!$this->feeType->has_penalty || !$this->isOverdue()) {
+        if (!$this->feeType->has_penalty) {
             return 0.00;
+        }
+
+        // Use provided payment date or current date
+        $checkDate = $paymentDate ?: now();
+        
+        // Only apply penalty if payment is being made AFTER the due date
+        if ($this->due_date && $checkDate->startOfDay()->lte($this->due_date)) {
+            return 0.00; // No penalty if paid on or before due date
         }
 
         if ($this->feeType->penalty_fixed > 0) {
@@ -282,15 +292,16 @@ class Fee extends Model
 
     /**
      * Recalculate all amounts
+     * FIXED: Pass payment date to penalty calculation
      */
-    public function recalculate(): self
+    public function recalculate($paymentDate = null): self
     {
-        $this->total_discounts = $this->calculateTotalDiscounts();
+        $this->discount_amount = $this->calculateTotalDiscounts();
         $this->surcharge_amount = $this->calculateSurcharge();
-        $this->penalty_amount = $this->calculatePenalty();
+        $this->penalty_amount = $this->calculatePenalty($paymentDate);
         
         $this->total_amount = $this->base_amount 
-            - $this->total_discounts 
+            - $this->discount_amount
             + $this->surcharge_amount 
             + $this->penalty_amount;
             
@@ -327,6 +338,7 @@ class Fee extends Model
 
     /**
      * Check if fee is overdue
+     * FIXED: Use proper date comparison
      */
     public function isOverdue(): bool
     {
@@ -334,7 +346,8 @@ class Fee extends Model
             return false;
         }
         
-        return $this->due_date && $this->due_date < now()->startOfDay();
+        // A fee is overdue if current date is AFTER the due date AND it's not paid
+        return $this->due_date && now()->startOfDay()->gt($this->due_date);
     }
 
     /**
@@ -364,6 +377,12 @@ class Fee extends Model
             }
             if (isset($paymentData['collected_by'])) {
                 $this->collected_by = $paymentData['collected_by'];
+            }
+            if (isset($paymentData['payment_date'])) {
+                // Recalculate penalty based on actual payment date
+                $this->penalty_amount = $this->calculatePenalty($paymentData['payment_date']);
+                $this->total_amount = $this->base_amount - $this->discount_amount + $this->surcharge_amount + $this->penalty_amount;
+                $this->balance = max(0, $this->total_amount - $this->amount_paid);
             }
         }
         
@@ -580,28 +599,28 @@ class Fee extends Model
     }
 
     public function getPayerTypeAttribute($value)
-{
-    // Convert legacy values to full class names
-    $morphMap = [
-        'resident' => 'App\Models\Resident',
-        'household' => 'App\Models\Household',
-        'App\Models\Resident' => 'App\Models\Resident',
-        'App\Models\Household' => 'App\Models\Household',
-    ];
-    
-    return $morphMap[$value] ?? $value;
-}
+    {
+        // Convert legacy values to full class names
+        $morphMap = [
+            'resident' => 'App\Models\Resident',
+            'household' => 'App\Models\Household',
+            'App\Models\Resident' => 'App\Models\Resident',
+            'App\Models\Household' => 'App\Models\Household',
+        ];
+        
+        return $morphMap[$value] ?? $value;
+    }
 
-public function setPayerTypeAttribute($value)
-{
-    // Ensure we store full class names
-    $morphMap = [
-        'resident' => 'App\Models\Resident',
-        'household' => 'App\Models\Household',
-        'App\Models\Resident' => 'App\Models\Resident',
-        'App\Models\Household' => 'App\Models\Household',
-    ];
-    
-    $this->attributes['payer_type'] = $morphMap[$value] ?? $value;
-}
+    public function setPayerTypeAttribute($value)
+    {
+        // Ensure we store full class names
+        $morphMap = [
+            'resident' => 'App\Models\Resident',
+            'household' => 'App\Models\Household',
+            'App\Models\Resident' => 'App\Models\Resident',
+            'App\Models\Household' => 'App\Models\Household',
+        ];
+        
+        $this->attributes['payer_type'] = $morphMap[$value] ?? $value;
+    }
 }

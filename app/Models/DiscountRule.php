@@ -14,18 +14,18 @@ class DiscountRule extends Model
         'code',
         'name',
         'description',
-        'discount_type', // SENIOR, PWD, SOLO_PARENT, INDIGENT, VETERAN
+        'discount_type', // SENIOR, PWD, SOLO_PARENT, INDIGENT, VETERAN, etc.
         'value_type', // percentage or fixed
-        'discount_value',
-        'maximum_discount_amount',
-        'minimum_purchase_amount',
-        'priority',
+        'discount_value', // e.g., 20 for 20%, or 50 for fixed amount
+        'maximum_discount_amount', // maximum discount amount (for percentage)
+        'minimum_purchase_amount', // minimum amount required
+        'priority', // lower number = higher priority (1 is highest)
         'requires_verification',
         'verification_document',
-        'applicable_to', // resident, household, business
+        'applicable_to', // resident, household, business, etc.
         'applicable_puroks',
-        'stackable',
-        'exclusive_with',
+        'stackable', // can be combined with other discounts
+        'exclusive_with', // discount types/rules it cannot be combined with
         'effective_date',
         'expiry_date',
         'is_active',
@@ -61,6 +61,13 @@ class DiscountRule extends Model
         'INDIGENT' => 'Indigent',
         'VETERAN' => 'Veteran',
         'STUDENT' => 'Student',
+        'EMPLOYEE' => 'Employee',
+        'MEMBER' => 'Organization Member',
+        'EARLY_BIRD' => 'Early Bird',
+        'LOYALTY' => 'Loyalty Discount',
+        'BULK' => 'Bulk Discount',
+        'PROMO' => 'Promotional',
+        'OTHER' => 'Other',
     ];
 
     const VALUE_TYPES = [
@@ -68,10 +75,19 @@ class DiscountRule extends Model
         'fixed' => 'Fixed Amount',
     ];
 
-    // Relationships - only to PaymentDiscount (no pivots to FeeType/ClearanceType)
-    public function paymentDiscounts()
+    // Relationships
+    public function feeTypes()
     {
-        return $this->hasMany(PaymentDiscount::class);
+        return $this->belongsToMany(FeeType::class, 'fee_type_discount_rules')
+                    ->withPivot('priority', 'is_active')
+                    ->withTimestamps();
+    }
+
+    public function clearanceTypes()
+    {
+        return $this->belongsToMany(ClearanceType::class, 'clearance_type_discount_rules')
+                    ->withPivot('priority', 'is_active')
+                    ->withTimestamps();
     }
 
     public function payments()
@@ -79,6 +95,11 @@ class DiscountRule extends Model
         return $this->belongsToMany(Payment::class, 'payment_discounts')
                     ->withPivot('discount_amount', 'verified_by', 'verified_at', 'id_presented', 'id_number', 'remarks')
                     ->withTimestamps();
+    }
+
+    public function paymentDiscounts()
+    {
+        return $this->hasMany(PaymentDiscount::class);
     }
 
     // Scopes
@@ -100,9 +121,9 @@ class DiscountRule extends Model
         return $query->where('discount_type', $type);
     }
 
-    public function scopeApplicableToResident($query)
+    public function scopeApplicableTo($query, $applicableTo)
     {
-        return $query->where('applicable_to', 'resident')
+        return $query->where('applicable_to', $applicableTo)
                     ->orWhere('applicable_to', 'all');
     }
 
@@ -136,10 +157,11 @@ class DiscountRule extends Model
         if ($this->value_type === 'percentage') {
             $discount = $amount * ($this->discount_value / 100);
             
+            // Apply maximum discount if set
             if ($this->maximum_discount_amount && $discount > $this->maximum_discount_amount) {
                 $discount = $this->maximum_discount_amount;
             }
-        } else {
+        } else { // fixed
             $discount = min($this->discount_value, $amount);
         }
 
@@ -148,10 +170,12 @@ class DiscountRule extends Model
 
     public function isApplicableToResident(Resident $resident): bool
     {
+        // Check if discount is active
         if (!$this->is_active) {
             return false;
         }
 
+        // Check effective/expiry dates
         if ($this->effective_date && $this->effective_date->isFuture()) {
             return false;
         }
@@ -160,6 +184,7 @@ class DiscountRule extends Model
             return false;
         }
 
+        // Check based on discount type
         switch ($this->discount_type) {
             case 'SENIOR':
                 return $resident->is_senior ?? false;
@@ -180,10 +205,12 @@ class DiscountRule extends Model
 
     public function canCombineWith(DiscountRule $otherRule): bool
     {
+        // If this rule is not stackable, it can't combine with any
         if (!$this->stackable) {
             return false;
         }
 
+        // Check exclusive_with list
         if (!empty($this->exclusive_with)) {
             if (in_array($otherRule->discount_type, $this->exclusive_with)) {
                 return false;

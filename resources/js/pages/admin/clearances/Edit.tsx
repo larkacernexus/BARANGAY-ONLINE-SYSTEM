@@ -180,7 +180,7 @@ export default function EditClearance() {
             fee_amount: parseFloat(data.fee_amount.toString()) || 0
         };
         
-        put(`/clearances/${clearance.id}`, formData);
+        put(`/admin/clearances/${clearance.id}`, formData);
     };
 
     const formatDate = (dateString?: string) => {
@@ -252,10 +252,10 @@ export default function EditClearance() {
             <AppLayout
                 title="Edit Clearance Request"
                 breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Clearance Requests', href: '/clearances' },
-                    { title: clearance.reference_number, href: `/clearances/${clearance.id}` },
-                    { title: 'Edit', href: `/clearances/${clearance.id}/edit` }
+                    { title: 'Dashboard', href: '/admin/dashboard' },
+                    { title: 'Clearance Requests', href: '/admin/clearances' },
+                    { title: clearance.reference_number, href: `/admin/clearances/${clearance.id}` },
+                    { title: 'Edit', href: `/admin/clearances/${clearance.id}/edit` }
                 ]}
             >
                 <div className="flex items-center justify-center h-96">
@@ -272,10 +272,10 @@ export default function EditClearance() {
         <AppLayout
             title="Edit Clearance Request"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Clearance Requests', href: '/clearances' },
-                { title: clearance.reference_number, href: `/clearances/${clearance.id}` },
-                { title: 'Edit', href: `/clearances/${clearance.id}/edit` }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Clearance Requests', href: '/admin/clearances' },
+                { title: clearance.reference_number, href: `/admin/clearances/${clearance.id}` },
+                { title: 'Edit', href: `/admin/clearances/${clearance.id}/edit` }
             ]}
         >
             <form onSubmit={submit}>
@@ -283,7 +283,7 @@ export default function EditClearance() {
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href={`/clearances/${clearance.id}`}>
+                            <Link href={`/admin/clearances/${clearance.id}`}>
                                 <Button variant="ghost" size="sm">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back to View
@@ -982,7 +982,7 @@ export default function EditClearance() {
                                             </>
                                         )}
                                     </Button>
-                                    <Link href={`/clearances/${clearance.id}`}>
+                                    <Link href={`/admin/clearances/${clearance.id}`}>
                                         <Button 
                                             type="button" 
                                             variant="outline" 

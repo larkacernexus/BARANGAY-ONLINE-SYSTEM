@@ -6,13 +6,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class ReportType  extends Model
+class ReportType extends Model
 {
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'name',
         'code',
+        'category',
+        'subcategory',
         'description',
         'icon',
         'color',
@@ -41,8 +43,11 @@ class ReportType  extends Model
 
     protected $appends = [
         'priority_label',
+        'priority_color',
+        'priority_icon',
         'expected_resolution_date',
         'formatted_required_fields',
+        'resolution_steps_list',
     ];
 
     /**
@@ -56,7 +61,7 @@ class ReportType  extends Model
     ];
 
     /**
-     * Common complaint types for barangay
+     * Common report types for barangay
      */
     const COMMON_TYPES = [
         'NOISE_POLLUTION' => [
@@ -215,19 +220,35 @@ class ReportType  extends Model
     ];
 
     /**
-     * Relationship with Complaints
+     * Relationship with Community Reports
      */
-    public function complaints()
+    public function communityReports()
     {
-        return $this->hasMany(Complaint::class);
+        return $this->hasMany(CommunityReport::class, 'report_type_id');
     }
 
     /**
-     * Scope active complaint types
+     * Alias for backward compatibility
+     */
+    public function reports()
+    {
+        return $this->hasMany(CommunityReport::class, 'report_type_id');
+    }
+
+    /**
+     * Scope active report types
      */
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope by category
+     */
+    public function scopeByCategory($query, $category)
+    {
+        return $query->where('category', $category);
     }
 
     /**
@@ -247,7 +268,7 @@ class ReportType  extends Model
     }
 
     /**
-     * Scope types that allow anonymous complaints
+     * Scope types that allow anonymous reports
      */
     public function scopeAllowsAnonymous($query)
     {
@@ -299,14 +320,14 @@ class ReportType  extends Model
     }
 
     /**
-     * Get default required fields based on complaint type
+     * Get default required fields based on report type
      */
     private function getDefaultRequiredFields(): array
     {
         $defaultFields = [
-            'complainant_name' => ['required' => true, 'type' => 'text', 'label' => 'Full Name'],
-            'complainant_contact' => ['required' => true, 'type' => 'tel', 'label' => 'Contact Number'],
-            'complainant_address' => ['required' => true, 'type' => 'text', 'label' => 'Address'],
+            'reporter_name' => ['required' => true, 'type' => 'text', 'label' => 'Full Name'],
+            'reporter_contact' => ['required' => true, 'type' => 'tel', 'label' => 'Contact Number'],
+            'reporter_address' => ['required' => true, 'type' => 'text', 'label' => 'Address'],
             'incident_location' => ['required' => true, 'type' => 'text', 'label' => 'Incident Location'],
             'incident_date' => ['required' => true, 'type' => 'date', 'label' => 'Date of Incident'],
             'incident_time' => ['required' => true, 'type' => 'time', 'label' => 'Time of Incident'],
@@ -321,7 +342,7 @@ class ReportType  extends Model
     }
 
     /**
-     * Get assigned roles for this complaint type
+     * Get assigned roles for this report type
      */
     public function getAssignedRolesAttribute()
     {
@@ -333,11 +354,11 @@ class ReportType  extends Model
     }
 
     /**
-     * Get default assigned roles based on complaint type
+     * Get default assigned roles based on report type
      */
     private function getDefaultAssignedRoles(): array
     {
-        // Default role assignments based on complaint type
+        // Default role assignments based on report type
         $roleAssignments = [
             'PEACE_ORDER' => ['barangay_tanod', 'barangay_captain'],
             'ELECTRICAL_HAZARD' => ['barangay_engineer', 'barangay_tanod'],
@@ -353,7 +374,7 @@ class ReportType  extends Model
     }
 
     /**
-     * Get resolution steps for this complaint type
+     * Get resolution steps for this report type
      */
     public function getResolutionStepsListAttribute()
     {
@@ -370,18 +391,18 @@ class ReportType  extends Model
     private function getDefaultResolutionSteps(): array
     {
         return [
-            ['step' => 1, 'action' => 'Complaint Received', 'description' => 'Complaint has been submitted and logged'],
-            ['step' => 2, 'action' => 'Initial Assessment', 'description' => 'Complaint is being reviewed and assigned'],
+            ['step' => 1, 'action' => 'Report Received', 'description' => 'Report has been submitted and logged'],
+            ['step' => 2, 'action' => 'Initial Assessment', 'description' => 'Report is being reviewed and assigned'],
             ['step' => 3, 'action' => 'Field Investigation', 'description' => 'Assigned personnel will conduct site visit'],
             ['step' => 4, 'action' => 'Resolution Planning', 'description' => 'Developing solution and action plan'],
             ['step' => 5, 'action' => 'Implementation', 'description' => 'Executing the resolution plan'],
             ['step' => 6, 'action' => 'Follow-up', 'description' => 'Monitoring and ensuring issue is resolved'],
-            ['step' => 7, 'action' => 'Case Closed', 'description' => 'Complaint has been successfully resolved'],
+            ['step' => 7, 'action' => 'Case Closed', 'description' => 'Report has been successfully resolved'],
         ];
     }
 
     /**
-     * Check if complaint type allows anonymous submission
+     * Check if report type allows anonymous submission
      */
     public function canBeAnonymous(): bool
     {
@@ -389,7 +410,7 @@ class ReportType  extends Model
     }
 
     /**
-     * Check if evidence is required for this complaint type
+     * Check if evidence is required for this report type
      */
     public function requiresEvidence(): bool
     {
@@ -408,5 +429,42 @@ class ReportType  extends Model
         }
 
         return $steps[$currentStep];
+    }
+
+    /**
+     * Get all unique categories
+     */
+    public static function getCategories()
+    {
+        return self::select('category')
+            ->distinct()
+            ->whereNotNull('category')
+            ->orderBy('category')
+            ->pluck('category')
+            ->toArray();
+    }
+
+    /**
+     * Get report count
+     */
+    public function getReportsCountAttribute()
+    {
+        return $this->communityReports()->count();
+    }
+
+    /**
+     * Get pending reports count
+     */
+    public function getPendingReportsCountAttribute()
+    {
+        return $this->communityReports()->where('status', 'pending')->count();
+    }
+
+    /**
+     * Get resolved reports count
+     */
+    public function getResolvedReportsCountAttribute()
+    {
+        return $this->communityReports()->where('status', 'resolved')->count();
     }
 }

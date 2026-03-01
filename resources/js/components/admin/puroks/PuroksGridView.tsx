@@ -80,7 +80,7 @@ export default function PuroksGridView({
             icon={<MapPin className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
             hasFilters={hasActiveFilters}
             onClearFilters={onClearFilters}
-            onCreateNew={() => window.location.href = '/puroks/create'}
+            onCreateNew={() => window.location.href = '/admin/puroks/create'}
             createLabel="Create Purok"
         />
     );
@@ -144,14 +144,14 @@ export default function PuroksGridView({
                                     <ActionDropdown>
                                         <ActionDropdownItem
                                             icon={<Eye className="h-4 w-4" />}
-                                            href={`/puroks/${purok.id}`}
+                                            href={`/admin/puroks/${purok.id}`}
                                         >
                                             View Details
                                         </ActionDropdownItem>
                                         
                                         <ActionDropdownItem
                                             icon={<Edit className="h-4 w-4" />}
-                                            href={`/puroks/${purok.id}/edit`}
+                                            href={`/admin/puroks/${purok.id}/edit`}
                                         >
                                             Edit Purok
                                         </ActionDropdownItem>

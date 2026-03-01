@@ -391,7 +391,7 @@ export default function CreateHousehold({ heads, puroks, available_residents = [
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post('/households', {
+        post('/admin/households', {
             preserveScroll: true,
             onSuccess: (page) => {
                 setMembers([]);
@@ -445,8 +445,8 @@ export default function CreateHousehold({ heads, puroks, available_residents = [
         <AppLayout
             title="Register Household"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Households', href: '/households' },
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Households', href: '/admin/households' },
                 { title: 'Register Household', href: '/households/create' }
             ]}
         >
@@ -455,7 +455,7 @@ export default function CreateHousehold({ heads, puroks, available_residents = [
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href="/households">
+                            <Link href="/admin/households">
                                 <Button variant="ghost" size="sm" type="button">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
@@ -944,7 +944,7 @@ export default function CreateHousehold({ heads, puroks, available_residents = [
                         </p>
                         <div className="flex flex-col sm:flex-row gap-3 justify-center">
                             <Link 
-                                href="/residents/create?return_to=/households/create"
+                                href="/admin/residents/create?return_to=/households/create"
                                 className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                                 onClick={() => setShowMemberSearch(false)}
                             >
@@ -973,7 +973,7 @@ export default function CreateHousehold({ heads, puroks, available_residents = [
                                     Try a different search term or create a new resident.
                                 </p>
                                 <Link 
-                                    href={`/residents/create?return_to=/households/create&name=${encodeURIComponent(searchQuery)}&household_head_id=${data.head_resident_id || ''}`}
+                                    href={`/admin/residents/create?return_to=/households/create&name=${encodeURIComponent(searchQuery)}&household_head_id=${data.head_resident_id || ''}`}
                                     className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                                     onClick={() => setShowMemberSearch(false)}
                                 >
@@ -1216,7 +1216,7 @@ export default function CreateHousehold({ heads, puroks, available_residents = [
                                                                 This member is not in the residents database yet.
                                                             </div>
                                                             <Link 
-                                                                href={`/residents/create?return_to=/households/create&name=${encodeURIComponent(member.name)}&age=${member.age}&relationship=${encodeURIComponent(member.relationship)}&household_head_id=${data.head_resident_id || ''}`}
+                                                                href={`/admin/residents/create?return_to=/households/create&name=${encodeURIComponent(member.name)}&age=${member.age}&relationship=${encodeURIComponent(member.relationship)}&household_head_id=${data.head_resident_id || ''}`}
                                                                 target="_blank"
                                                                 className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:underline"
                                                             >

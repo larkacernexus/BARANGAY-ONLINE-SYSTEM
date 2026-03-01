@@ -30,7 +30,7 @@ export default function HeaderSection({ duplicateFrom, processing, handleResetFo
                                 ({duplicateFrom.fee_type_name})
                             </span>
                             <Link
-                                href={`/fees/${duplicateFrom.id}`}
+                                href={`/admin/fees/${duplicateFrom.id}`}
                                 className="text-sm font-medium text-blue-600 hover:text-blue-800"
                             >
                                 View Original
@@ -43,7 +43,7 @@ export default function HeaderSection({ duplicateFrom, processing, handleResetFo
             {/* Header Actions */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Link href="/fees">
+                    <Link href="/admin/fees">
                         <Button variant="ghost" size="sm">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back

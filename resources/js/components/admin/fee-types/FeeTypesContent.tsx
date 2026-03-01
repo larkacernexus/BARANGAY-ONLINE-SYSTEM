@@ -245,7 +245,7 @@ export default function FeeTypesContent({
                                 onClick: onClearFilters
                             } : {
                                 label: "Add Fee Type",
-                                href: "/fee-types/create"
+                                href: "/admin/fee-types/create"
                             }}
                             className="py-12 sm:py-16"
                         />

@@ -1,5 +1,4 @@
 import ResidentLayout from '@/layouts/resident-app-layout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -7,54 +6,91 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  FileText,
-  Download,
-  Eye,
-  Calendar,
-  User,
-  Clock,
-  Lock,
-  Globe,
-  Shield,
-  AlertCircle,
-  ArrowLeft,
-  Printer,
-  Copy,
-  Trash2,
-  File,
-  Folder,
-  CheckCircle,
-  XCircle,
-  ArrowRight,
-  ChevronLeft,
-  Tag,
-  Check,
-  X,
-  ExternalLink,
-  Maximize2,
-  RotateCw,
-  ZoomIn,
-  ZoomOut,
-  X as CloseIcon,
-  ChevronRight,
-  ShieldCheck,
-  FileLock,
-  EyeOff,
-  MoreVertical,
-  Info,
-  Smartphone,
-  ChevronDown,
-  ChevronUp,
-  Share,
-  Bookmark,
-  HardDrive,
-  Key,
-  Mail,
-  Database,
-  Search,
-  Home,
-  Bell,
-  Menu,
+    FileText,
+    Download,
+    Eye,
+    Calendar,
+    User,
+    Clock,
+    Lock,
+    Globe,
+    Shield,
+    AlertCircle,
+    ArrowLeft,
+    Printer,
+    Copy,
+    File,
+    Folder,
+    CheckCircle,
+    XCircle,
+    ArrowRight,
+    ChevronLeft,
+    Tag,
+    X,
+    ExternalLink,
+    Maximize2,
+    RotateCw,
+    ZoomIn,
+    ZoomOut,
+    RefreshCw,
+    EyeOff,
+    MoreVertical,
+    Info,
+    ChevronDown,
+    ChevronUp,
+    Link2,
+    HardDrive,
+    Fingerprint,
+    FileLock,
+    History,
+    Scan,
+    ShieldAlert,
+    Timer,
+    Video,
+    Volume2,
+    Home,
+    Bell,
+    Menu,
+    Sparkles,
+    Smartphone,
+    Wifi,
+    WifiOff,
+    Cloud,
+    CloudOff,
+    QrCode,
+    BarChart3,
+    PieChart,
+    TrendingUp,
+    Activity,
+    Settings,
+    Palette,
+    PenTool,
+    Move,
+    Scale,
+    VolumeX,
+    Mic,
+    MicOff,
+    Camera,
+    CameraOff,
+    VideoOff,
+    Heart,
+    Star,
+    Bookmark,
+    Share,
+    Mail,
+    Database,
+    Key,
+    ShieldCheck,
+    ShieldQuestion,
+    Verified,
+    BadgeCheck,
+    Clock3,
+    Fingerprint as FingerprintIcon,
+    FileLock as FileLockIcon,
+    History as HistoryIcon,
+    Scan as ScanIcon,
+    Zap,
+    ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -63,2285 +99,2043 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Progress } from '@/components/ui/progress';
+import { motion, AnimatePresence } from 'framer-motion';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+
+// Import from reusable UI library
+import { formatDate, formatDateTime, formatFileSize } from '@/components/residentui/lib/resident-ui-utils';
+import { useMobileDetect } from '@/components/residentui/hooks/useResidentUI';
+import { ModernCard } from '@/components/residentui/modern-card';
+import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
+import { ModernLoadingOverlay } from '@/components/residentui/modern-loading-overlay';
+import { DOCUMENT_STATUS_CONFIG, FILE_TYPE_CONFIG,  } from '@/components/residentui/constants/document-ui';
 
 // Interfaces
 interface Document {
-  id: number;
-  name: string;
-  file_name?: string;
-  file_extension?: string;
-  file_size?: number;
-  file_size_human?: string;
-  mime_type?: string;
-  description?: string;
-  reference_number?: string;
-  issue_date?: string;
-  expiry_date?: string;
-  view_count?: number;
-  download_count?: number;
-  is_public?: boolean;
-  requires_password: boolean;
-  password?: string;
-  status?: string;
-  created_at?: string;
-  updated_at?: string;
-  deleted_at?: string;
-  resident?: {
-    id: number;
-    first_name: string;
-    last_name: string;
-  };
-  category?: {
     id: number;
     name: string;
-    icon: string;
-    color: string;
-  };
-  document_type?: {
-    id: number;
-    name: string;
-    code: string;
-  };
-  file_path?: string;
-  metadata?: Record<string, any> | null;
-  tags?: string[];
-  uploaded_by?: number;
-  uploaded_at?: string;
-  uploaded_by_user?: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  preview_url?: string;
-  security_options?: SecurityOptions;
+    file_name?: string;
+    file_extension?: string;
+    file_size?: number;
+    file_size_human?: string;
+    mime_type?: string;
+    description?: string;
+    reference_number?: string;
+    issue_date?: string;
+    expiry_date?: string;
+    view_count?: number;
+    download_count?: number;
+    is_public?: boolean;
+    requires_password: boolean;
+    password?: string;
+    status?: string;
+    created_at?: string;
+    updated_at?: string;
+    deleted_at?: string;
+    resident?: {
+        id: number;
+        first_name: string;
+        last_name: string;
+    };
+    category?: {
+        id: number;
+        name: string;
+        icon: string;
+        color: string;
+    };
+    document_type?: {
+        id: number;
+        name: string;
+        code: string;
+    };
+    file_path?: string;
+    metadata?: Record<string, any> | null;
+    tags?: string[];
+    uploaded_by?: number;
+    uploaded_at?: string;
+    uploaded_by_user?: {
+        id: number;
+        name: string;
+        email: string;
+    };
+    preview_url?: string;
+    security_options?: SecurityOptions;
 }
 
 interface SecurityOptions {
-  add_watermark?: boolean;
-  enable_encryption?: boolean;
-  audit_log_access?: boolean;
-  scan_quality?: 'low' | 'medium' | 'high' | 'original';
-  restrict_download?: boolean;
-  restrict_print?: boolean;
-  max_downloads?: number;
-  expiration_days?: number;
-  ip_restriction?: string[];
-  [key: string]: any;
+    add_watermark?: boolean;
+    enable_encryption?: boolean;
+    audit_log_access?: boolean;
+    scan_quality?: 'low' | 'medium' | 'high' | 'original';
+    restrict_download?: boolean;
+    restrict_print?: boolean;
+    max_downloads?: number;
+    expiration_days?: number;
+    ip_restriction?: string[];
+    [key: string]: any;
 }
 
 interface RelatedDocument {
-  id: number;
-  name: string;
-  file_extension?: string;
-  file_size_human?: string;
-  created_at?: string;
-  category?: {
+    id: number;
     name: string;
-  };
-  requires_password?: boolean;
+    file_extension?: string;
+    file_size_human?: string;
+    created_at?: string;
+    category?: {
+        name: string;
+    };
+    requires_password?: boolean;
 }
 
 interface PageProps {
-  document: Document;
-  relatedDocuments?: RelatedDocument[];
-  canDownload?: boolean;
-  canDelete?: boolean;
-  error?: string;
-  needsPassword?: boolean;
-  sessionExpiry?: string;
-  sessionData?: any;
-  debugMode?: boolean;
+    document: Document;
+    relatedDocuments?: RelatedDocument[];
+    canDownload?: boolean;
+    canDelete?: boolean;
+    error?: string;
+    needsPassword?: boolean;
+    sessionExpiry?: string;
+    sessionData?: any;
+    debugMode?: boolean;
 }
 
-// ==================== HELPER FUNCTIONS ====================
-function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-}
+// Helper functions
+const getDocumentStatus = (doc: Document): string => {
+    if (doc.status) return doc.status;
+    if (doc.expiry_date && new Date(doc.expiry_date) < new Date()) {
+        return 'expired';
+    }
+    return 'active';
+};
 
-function formatDate(dateString?: string): string {
-  if (!dateString) return 'Not specified';
-  try {
-    return new Date(dateString).toLocaleDateString('en-PH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  } catch {
-    return 'Invalid date';
-  }
-}
+const getFileIcon = (extension: string = '') => {
+    const config = FILE_TYPE_CONFIG[extension.toLowerCase() as keyof typeof FILE_TYPE_CONFIG];
+    return config?.icon || File;
+};
 
-function formatDateTime(dateString?: string): string {
-  if (!dateString) return 'Not specified';
-  try {
-    return new Date(dateString).toLocaleString('en-PH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return 'Invalid date';
-  }
-}
+const getFileColor = (extension: string = ''): string => {
+    const config = FILE_TYPE_CONFIG[extension.toLowerCase() as keyof typeof FILE_TYPE_CONFIG];
+    return config?.color || 'text-gray-600 bg-gray-50 dark:bg-gray-900 dark:text-gray-400';
+};
 
-function getDocumentStatus(doc: Document): string {
-  if (doc.status) return doc.status;
-  if (doc.expiry_date && new Date(doc.expiry_date) < new Date()) {
-    return 'expired';
-  }
-  return 'active';
-}
-
-function getStatusConfig(status: string) {
-  const configs: Record<string, { label: string; color: string; icon: any; bgColor: string }> = {
-    active: { 
-      label: 'Active', 
-      color: 'text-green-600', 
-      icon: CheckCircle, 
-      bgColor: 'bg-green-50 border-green-200' 
-    },
-    expired: { 
-      label: 'Expired', 
-      color: 'text-red-600', 
-      icon: XCircle, 
-      bgColor: 'bg-red-50 border-red-200' 
-    },
-    revoked: { 
-      label: 'Revoked', 
-      color: 'text-gray-600', 
-      icon: XCircle, 
-      bgColor: 'bg-gray-50 border-gray-200' 
-    },
-    pending: { 
-      label: 'Pending', 
-      color: 'text-amber-600', 
-      icon: AlertCircle, 
-      bgColor: 'bg-amber-50 border-amber-200' 
-    },
-  };
-  return configs[status] || { 
-    label: status, 
-    color: 'text-gray-600', 
-    icon: AlertCircle, 
-    bgColor: 'bg-gray-50 border-gray-200' 
-  };
-}
-
-function getFileIcon(extension: string) {
-  const icons: Record<string, any> = {
-    pdf: FileText,
-    doc: FileText,
-    docx: FileText,
-    xls: FileText,
-    xlsx: FileText,
-    jpg: File,
-    jpeg: File,
-    png: File,
-    gif: File,
-    txt: FileText,
-    csv: FileText,
-    zip: File,
-    rar: File,
-    mp4: File,
-    mp3: File,
-  };
-  return icons[extension.toLowerCase()] || File;
-}
-
-// ==================== FULLSCREEN DOCUMENT VIEWER ====================
-function FullScreenDocumentViewer({
-  document,
-  previewUrl,
-  isOpen,
-  onClose,
+// ==================== MODERN FULLSCREEN VIEWER ====================
+function ModernFullScreenViewer({
+    document,
+    previewUrl,
+    isOpen,
+    onClose,
 }: {
-  document: Document;
-  previewUrl: string;
-  isOpen: boolean;
-  onClose: () => void;
+    document: Document;
+    previewUrl: string;
+    isOpen: boolean;
+    onClose: () => void;
 }) {
-  const [zoom, setZoom] = useState(100);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  const safeFileExtension = document.file_extension || '';
-  const safeFileSizeHuman = document.file_size_human || formatBytes(document.file_size || 0);
-  const isPdf = safeFileExtension.toLowerCase() === 'pdf' || 
-                document.mime_type?.includes('pdf') || 
-                previewUrl.includes('.pdf');
-  const isImage = document.mime_type?.startsWith('image/') || 
-                  ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(safeFileExtension.toLowerCase());
+    const [zoom, setZoom] = useState(100);
+    const [rotation, setRotation] = useState(0);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'view' | 'info'>('view');
+    
+    const safeFileExtension = document.file_extension || '';
+    const isPdf = safeFileExtension.toLowerCase() === 'pdf' || 
+                  document.mime_type?.includes('pdf') || 
+                  previewUrl.includes('.pdf');
+    const isImage = document.mime_type?.startsWith('image/') || 
+                    ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(safeFileExtension.toLowerCase());
+    const FileIcon = getFileIcon(safeFileExtension);
+    const fileColor = getFileColor(safeFileExtension);
 
-  useEffect(() => {
-    if (!isOpen) return;
+    useEffect(() => {
+        if (!isOpen) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === '+' || e.key === '=') {
-          e.preventDefault();
-          handleZoomIn();
-        } else if (e.key === '-') {
-          e.preventDefault();
-          handleZoomOut();
-        } else if (e.key === '0') {
-          e.preventDefault();
-          handleZoomReset();
-        }
-      }
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                onClose();
+            }
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === '+' || e.key === '=') {
+                    e.preventDefault();
+                    setZoom(prev => Math.min(prev + 25, 300));
+                } else if (e.key === '-') {
+                    e.preventDefault();
+                    setZoom(prev => Math.max(prev - 25, 25));
+                } else if (e.key === '0') {
+                    e.preventDefault();
+                    setZoom(100);
+                    setRotation(0);
+                } else if (e.key === 'r') {
+                    e.preventDefault();
+                    setRotation(prev => (prev + 90) % 360);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
+    const handleIframeLoad = () => {
+        setIsLoading(false);
+        setError(null);
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+    const handleIframeError = () => {
+        setIsLoading(false);
+        setError('Unable to load document preview');
+    };
 
-  const handleIframeLoad = () => {
-    setIsLoading(false);
-    setError(null);
-  };
+    const handleDownload = () => {
+        window.open(`/my-records/${document.id}/download`, '_blank');
+    };
 
-  const handleIframeError = () => {
-    setIsLoading(false);
-    setError('Failed to load document preview');
-  };
+    if (!isOpen) return null;
 
-  const handleDownload = () => {
-    const downloadUrl = `/my-records/${document.id}/download`;
-    window.open(downloadUrl, '_blank');
-  };
-
-  const handlePrint = () => {
-    if (iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.print();
-    } else if (isImage && previewUrl) {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Print - ${document.name}</title>
-              <style>
-                body { margin: 0; padding: 20px; }
-                img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
-                @media print {
-                  body { padding: 0; }
-                }
-              </style>
-            </head>
-            <body>
-              <img src="${previewUrl}" alt="${document.name}" />
-              <script>
-                window.onload = function() {
-                  window.print();
-                  setTimeout(() => window.close(), 1000);
-                }
-              </script>
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
-      }
-    }
-  };
-
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 300));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 25, 25));
-  const handleZoomReset = () => setZoom(100);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-black">
-      {/* Top Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-black border-b border-gray-800 text-white">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="text-gray-300 hover:text-white hover:bg-gray-800 p-2"
-          >
-            <CloseIcon className="h-5 w-5" />
-          </Button>
-          
-          <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold truncate" title={document.name}>
-              {document.name}
-            </h2>
-            <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
-              <span>{safeFileExtension?.toUpperCase() || 'DOCUMENT'}</span>
-              <span>•</span>
-              <span>{safeFileSizeHuman}</span>
-              <span>•</span>
-              <span>{isPdf ? 'PDF' : isImage ? 'Image' : 'Document'}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-gray-900 rounded-lg px-2 py-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomOut}
-              disabled={zoom <= 25}
-              className="h-7 w-7 p-0 text-gray-300 hover:text-white hover:bg-gray-800"
-              title="Zoom Out (Ctrl -)"
-            >
-              <ZoomOut className="h-3 w-3" />
-            </Button>
-            <span className="text-sm font-medium px-1 min-w-[45px] text-center cursor-default" title="Zoom Level">
-              {zoom}%
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomIn}
-              disabled={zoom >= 300}
-              className="h-7 w-7 p-0 text-gray-300 hover:text-white hover:bg-gray-800"
-              title="Zoom In (Ctrl +)"
-            >
-              <ZoomIn className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomReset}
-              className="h-7 w-7 p-0 text-gray-300 hover:text-white hover:bg-gray-800"
-              title="Reset Zoom (Ctrl 0)"
-            >
-              <RotateCw className="h-3 w-3" />
-            </Button>
-          </div>
-
-          <Separator orientation="vertical" className="h-6 bg-gray-700 mx-1" />
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handlePrint}
-                  className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800"
-                  title="Print (Ctrl+P)"
-                >
-                  <Printer className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Print</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDownload}
-                  className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800"
-                  title="Download"
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Download</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </div>
-
-      {/* Document Viewer */}
-      <div className="flex-1 relative overflow-hidden bg-gray-900">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
-            <div className="text-center space-y-3">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
-              <p className="text-white text-sm">Loading document...</p>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
-            <div className="text-center p-6 max-w-md space-y-4">
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
-              <div>
-                <h3 className="text-lg font-medium text-white mb-2">Preview Unavailable</h3>
-                <p className="text-gray-300 text-sm">{error}</p>
-              </div>
-              <Button 
-                onClick={handleDownload}
-                className="gap-2 bg-blue-600 hover:bg-blue-700"
-              >
-                <Download className="h-4 w-4" />
-                Download Instead
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {isPdf ? (
-          <iframe
-            ref={iframeRef}
-            src={previewUrl}
-            title={`Fullscreen: ${document.name}`}
-            className="w-full h-full border-0"
-            style={{
-              transform: `scale(${zoom / 100})`,
-              transformOrigin: '0 0',
-              width: `${10000 / zoom}%`,
-              height: `${10000 / zoom}%`,
-            }}
-            allow="fullscreen"
-            onLoad={handleIframeLoad}
-            onError={handleIframeError}
-          />
-        ) : isImage ? (
-          <div className="w-full h-full flex items-center justify-center p-4">
-            <img
-              src={previewUrl}
-              alt={document.name}
-              className="max-w-full max-h-full object-contain"
-              style={{
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: 'center center',
-              }}
-              onLoad={() => {
-                setIsLoading(false);
-                setError(null);
-              }}
-              onError={() => {
-                setIsLoading(false);
-                setError('Failed to load image');
-              }}
-            />
-          </div>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-            <div className="text-center p-8 max-w-md space-y-6">
-              <div className="inline-block p-6 rounded-full bg-gray-800">
-                <FileText className="h-16 w-16 text-gray-400" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-semibold text-white">{document.name}</h3>
-                <div className="flex flex-col items-center gap-1 text-gray-300">
-                  {safeFileExtension && (
-                    <span className="px-3 py-1 bg-gray-800 rounded-full text-sm">
-                      {safeFileExtension.toUpperCase()}
-                    </span>
-                  )}
-                  <span className="text-sm">{safeFileSizeHuman}</span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <Button 
-                  onClick={handleDownload}
-                  className="w-full gap-2 bg-blue-600 hover:bg-blue-700"
-                >
-                  <Download className="h-4 w-4" />
-                  Download Document
-                </Button>
-                <Button
-                  onClick={onClose}
-                  variant="outline"
-                  className="w-full gap-2 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Document View
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom Info Bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-t border-gray-800 text-xs text-gray-400">
-        <div className="flex items-center gap-4">
-          <span className="truncate max-w-[200px]" title={document.name}>
-            {document.name}
-          </span>
-          {document.reference_number && (
-            <>
-              <Separator orientation="vertical" className="h-3 bg-gray-700" />
-              <span>Ref: {document.reference_number}</span>
-            </>
-          )}
-        </div>
-        <div className="flex items-center gap-4">
-          <span>Press ESC to exit fullscreen</span>
-          <Separator orientation="vertical" className="h-3 bg-gray-700" />
-          <span>Ctrl + +/- to zoom</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ==================== MOBILE COMPONENTS ====================
-function MobileQuickStats({ document }: { document: Document }) {
-  const safeViewCount = document.view_count || 0;
-  const safeDownloadCount = document.download_count || 0;
-  const safeFileSizeHuman = document.file_size_human || formatBytes(document.file_size || 0);
-
-  return (
-    <div className="grid grid-cols-3 gap-2 mb-4">
-      <div className="text-center p-3 border rounded-lg bg-blue-50">
-        <div className="text-sm font-bold text-blue-600">{safeViewCount}</div>
-        <div className="text-[10px] text-gray-600">Views</div>
-      </div>
-      <div className="text-center p-3 border rounded-lg bg-green-50">
-        <div className="text-sm font-bold text-green-600">{safeDownloadCount}</div>
-        <div className="text-[10px] text-gray-600">Downloads</div>
-      </div>
-      <div className="text-center p-3 border rounded-lg bg-gray-50">
-        <div className="text-sm font-bold text-gray-600">{safeFileSizeHuman}</div>
-        <div className="text-[10px] text-gray-600">Size</div>
-      </div>
-    </div>
-  );
-}
-
-function MobileDocumentActions({
-  document,
-  onDownload,
-  onFullscreen,
-  onNewTab,
-  onPrint,
-  onDelete,
-  canDownload,
-  canDelete,
-  isPdf,
-  restrictDownload,
-  restrictPrint,
-}: {
-  document: Document;
-  onDownload: () => void;
-  onFullscreen: () => void;
-  onNewTab: () => void;
-  onPrint: () => void;
-  onDelete: () => void;
-  canDownload: boolean;
-  canDelete: boolean;
-  isPdf: boolean;
-  restrictDownload: boolean;
-  restrictPrint: boolean;
-}) {
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-lg md:hidden safe-bottom">
-      <div className="flex items-center justify-around py-3 px-2">
-        {canDownload && !restrictDownload && (
-          <Button
-            variant="ghost"
-            onClick={onDownload}
-            className="flex flex-col items-center p-2 min-w-[60px]"
-          >
-            <Download className="h-5 w-5 mb-1" />
-            <span className="text-[10px]">Download</span>
-          </Button>
-        )}
-        
-        <Button
-          variant="ghost"
-          onClick={onFullscreen}
-          className="flex flex-col items-center p-2 min-w-[60px]"
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex flex-col bg-black"
         >
-          <Maximize2 className="h-5 w-5 mb-1" />
-          <span className="text-[10px]">Fullscreen</span>
-        </Button>
-        
-        {!restrictPrint && (
-          <Button
-            variant="ghost"
-            onClick={onPrint}
-            className="flex flex-col items-center p-2 min-w-[60px]"
-          >
-            <Printer className="h-5 w-5 mb-1" />
-            <span className="text-[10px]">Print</span>
-          </Button>
-        )}
-        
-        <Link href="/my-records" className="flex flex-col items-center p-2 min-w-[60px]">
-          <Button variant="ghost" className="flex flex-col items-center p-0">
-            <ArrowLeft className="h-5 w-5 mb-1" />
-            <span className="text-[10px]">Back</span>
-          </Button>
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function MobileDocumentDetails({ document }: { document: Document }) {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const safeReferenceNumber = document.reference_number || 'N/A';
-  const safeResidentName = document.resident ? 
-    `${document.resident.first_name} ${document.resident.last_name}` : 
-    'Unknown Resident';
-  const safeCategoryName = document.category?.name || 'Uncategorized';
-  const isExpired = document.status === 'expired' || 
-    (document.expiry_date && new Date(document.expiry_date) < new Date());
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border rounded-lg">
-      <CollapsibleTrigger className="flex items-center justify-between w-full p-4 text-left">
-        <span className="font-medium text-gray-900">Document Details</span>
-        {isOpen ? (
-          <ChevronUp className="h-5 w-5 text-gray-500" />
-        ) : (
-          <ChevronDown className="h-5 w-5 text-gray-500" />
-        )}
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="px-4 pb-4 space-y-4">
-          <div>
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-              Reference Number
-            </label>
-            <div className="flex items-center gap-2">
-              <code className="px-3 py-2 bg-gray-50 rounded-lg text-sm font-mono flex-1 truncate">
-                {safeReferenceNumber}
-              </code>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (document.reference_number) {
-                    navigator.clipboard.writeText(document.reference_number);
-                  }
-                }}
-                className="h-9 w-9 p-0"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-              Document Owner
-            </label>
-            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <User className="h-4 w-4 text-blue-600" />
-              </div>
-              <span className="font-medium truncate">{safeResidentName}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {document.issue_date && (
-              <div>
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-                  Issue Date
-                </label>
-                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                  <Calendar className="h-3 w-3 text-gray-400" />
-                  <span className="text-sm">{formatDate(document.issue_date)}</span>
-                </div>
-              </div>
-            )}
-
-            {document.expiry_date && (
-              <div>
-                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-                  Expiry Date
-                </label>
-                <div className={cn(
-                  "flex items-center gap-2 p-2 rounded-lg text-sm",
-                  isExpired 
-                    ? "bg-red-50 text-red-700 border border-red-200" 
-                    : "bg-gray-50"
-                )}>
-                  <Clock className="h-3 w-3" />
-                  <span className={isExpired ? "font-medium" : ""}>
-                    {formatDate(document.expiry_date)}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-              Upload Details
-            </label>
-            <div className="space-y-1">
-              {document.created_at && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600">Upload Date:</span>
-                  <span className="font-medium">{formatDate(document.created_at)}</span>
-                </div>
-              )}
-              {document.updated_at && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600">Last Updated:</span>
-                  <span className="font-medium">{formatDate(document.updated_at)}</span>
-                </div>
-              )}
-              {document.uploaded_by_user && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600">Uploaded By:</span>
-                  <span className="font-medium truncate max-w-[50%]">
-                    {document.uploaded_by_user.name}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {document.category && (
-            <div>
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-                Category
-              </label>
-              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                <Folder className="h-4 w-4 text-gray-400" />
-                <span>{safeCategoryName}</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-function MobileSecurityInfo({ document, securityOptions }: { document: Document; securityOptions: SecurityOptions }) {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const safeIsPublic = document.is_public || false;
-  const safeRestrictDownload = securityOptions.restrict_download || false;
-  const safeRestrictPrint = securityOptions.restrict_print || false;
-  const safeAddWatermark = securityOptions.add_watermark || false;
-  const safeEnableEncryption = securityOptions.enable_encryption || false;
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border rounded-lg">
-      <CollapsibleTrigger className="flex items-center justify-between w-full p-4 text-left">
-        <span className="font-medium text-gray-900">Security & Restrictions</span>
-        {isOpen ? (
-          <ChevronUp className="h-5 w-5 text-gray-500" />
-        ) : (
-          <ChevronDown className="h-5 w-5 text-gray-500" />
-        )}
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="px-4 pb-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Access Level</span>
-            <Badge variant={safeIsPublic ? 'default' : 'secondary'}>
-              {safeIsPublic ? 'Public' : 'Private'}
-            </Badge>
-          </div>
-
-          {document.requires_password && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Password Protected</span>
-              <Check className="h-4 w-4 text-green-600" />
-            </div>
-          )}
-
-          {(safeAddWatermark || safeEnableEncryption) && (
-            <div className="pt-2 border-t">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Advanced Security</h4>
-              <div className="space-y-2">
-                {safeAddWatermark && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="w-6 h-6 rounded bg-blue-100 flex items-center justify-center">
-                      <FileText className="h-3 w-3 text-blue-600" />
+            {/* Modern Toolbar */}
+            <div className="flex items-center justify-between px-4 py-3 bg-black/80 backdrop-blur-xl border-b border-white/10 text-white">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onClose}
+                        className="text-white/70 hover:text-white hover:bg-white/10 rounded-full"
+                    >
+                        <X className="h-5 w-5" />
+                    </Button>
+                    
+                    <div className="flex items-center gap-3">
+                        <div className={cn("p-2 rounded-xl", fileColor)}>
+                            <FileIcon className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-semibold text-white line-clamp-1 max-w-[300px]">
+                                {document.name}
+                            </h2>
+                            <div className="flex items-center gap-2 text-xs text-white/50">
+                                <span>{safeFileExtension?.toUpperCase() || 'DOC'}</span>
+                                <span>•</span>
+                                <span>{document.file_size_human || formatFileSize(document.file_size || 0)}</span>
+                                <span>•</span>
+                                <span>{isPdf ? 'PDF Document' : isImage ? 'Image' : 'File'}</span>
+                            </div>
+                        </div>
                     </div>
-                    <span className="text-gray-600">Watermark Protection</span>
-                  </div>
-                )}
-                {safeEnableEncryption && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="w-6 h-6 rounded bg-purple-100 flex items-center justify-center">
-                      <FileLock className="h-3 w-3 text-purple-600" />
-                    </div>
-                    <span className="text-gray-600">File Encryption</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+                </div>
 
-          {(safeRestrictDownload || safeRestrictPrint) && (
-            <div className="pt-2 border-t">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Restrictions</h4>
-              <div className="space-y-2">
-                {safeRestrictDownload && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Download className="h-4 w-4 text-red-500" />
-                    <span className="text-gray-600">Download Restricted</span>
-                  </div>
-                )}
-                {safeRestrictPrint && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Printer className="h-4 w-4 text-red-500" />
-                    <span className="text-gray-600">Print Restricted</span>
-                  </div>
-                )}
-              </div>
+                <div className="flex items-center gap-1">
+                    {/* Zoom Controls */}
+                    <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1 mr-2">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setZoom(prev => Math.max(prev - 25, 25))}
+                            disabled={zoom <= 25}
+                            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+                        >
+                            <ZoomOut className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm font-medium px-2 min-w-[45px] text-center text-white">
+                            {zoom}%
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setZoom(prev => Math.min(prev + 25, 300))}
+                            disabled={zoom >= 300}
+                            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+                        >
+                            <ZoomIn className="h-4 w-4" />
+                        </Button>
+                    </div>
+
+                    {isImage && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setRotation(prev => (prev + 90) % 360)}
+                            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+                            title="Rotate (Ctrl+R)"
+                        >
+                            <RotateCw className="h-4 w-4" />
+                        </Button>
+                    )}
+
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setZoom(100)}
+                        className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+                        title="Reset (Ctrl+0)"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                    </Button>
+
+                    <Separator orientation="vertical" className="h-6 bg-white/10 mx-2" />
+
+                    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="mr-2">
+                        <TabsList className="bg-white/5 h-8">
+                            <TabsTrigger value="view" className="text-xs px-3 data-[state=active]:bg-white/20">
+                                View
+                            </TabsTrigger>
+                            <TabsTrigger value="info" className="text-xs px-3 data-[state=active]:bg-white/20">
+                                Info
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleDownload}
+                        className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+                        title="Download"
+                    >
+                        <Download className="h-4 w-4" />
+                    </Button>
+                </div>
             </div>
-          )}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
+
+            {/* Document Viewer */}
+            <div className="flex-1 relative overflow-hidden bg-gradient-to-br from-gray-950 to-gray-900">
+                <AnimatePresence mode="wait">
+                    {activeTab === 'view' ? (
+                        <motion.div
+                            key="view"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="w-full h-full"
+                        >
+                            {isLoading && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="absolute inset-0 flex items-center justify-center bg-gray-950/50 backdrop-blur-sm z-10"
+                                >
+                                    <div className="text-center space-y-4">
+                                        <div className="relative">
+                                            <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <FileText className="h-6 w-6 text-white/50" />
+                                            </div>
+                                        </div>
+                                        <p className="text-white/70 text-sm">Loading document...</p>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {error && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="absolute inset-0 flex items-center justify-center"
+                                >
+                                    <div className="text-center p-8 max-w-md">
+                                        <div className="w-20 h-20 rounded-2xl bg-rose-500/10 flex items-center justify-center mx-auto mb-4">
+                                            <AlertCircle className="h-10 w-10 text-rose-500" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold text-white mb-2">Preview Unavailable</h3>
+                                        <p className="text-white/50 text-sm mb-6">{error}</p>
+                                        <Button onClick={handleDownload} className="gap-2">
+                                            <Download className="h-4 w-4" />
+                                            Download Instead
+                                        </Button>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {isPdf ? (
+                                <iframe
+                                    ref={iframeRef}
+                                    src={previewUrl}
+                                    title={`Fullscreen: ${document.name}`}
+                                    className="w-full h-full border-0"
+                                    style={{
+                                        transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                                        transformOrigin: 'center',
+                                        width: `${10000 / zoom}%`,
+                                        height: `${10000 / zoom}%`,
+                                    }}
+                                    onLoad={handleIframeLoad}
+                                    onError={handleIframeError}
+                                />
+                            ) : isImage ? (
+                                <div className="w-full h-full flex items-center justify-center p-8">
+                                    <motion.img
+                                        src={previewUrl}
+                                        alt={document.name}
+                                        className="max-w-full max-h-full object-contain"
+                                        style={{
+                                            transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                                            transformOrigin: 'center center',
+                                        }}
+                                        onLoad={() => {
+                                            setIsLoading(false);
+                                            setError(null);
+                                        }}
+                                        onError={() => {
+                                            setIsLoading(false);
+                                            setError('Failed to load image');
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="text-center p-8 max-w-md">
+                                        <div className={cn(
+                                            "w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6",
+                                            fileColor
+                                        )}>
+                                            <FileIcon className="h-12 w-12" />
+                                        </div>
+                                        <h3 className="text-xl font-semibold text-white mb-2">{document.name}</h3>
+                                        <p className="text-white/50 text-sm mb-6">
+                                            This file type cannot be previewed directly.
+                                        </p>
+                                        <Button onClick={handleDownload} size="lg" className="gap-2">
+                                            <Download className="h-5 w-5" />
+                                            Download File
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="info"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="w-full h-full overflow-auto p-8"
+                        >
+                            <div className="max-w-2xl mx-auto space-y-6">
+                                <ModernCard
+                                    title="Document Information"
+                                    icon={Info}
+                                    iconColor="from-blue-500 to-indigo-500"
+                                    className="bg-white/5 backdrop-blur-sm border-white/10"
+                                >
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="p-4 rounded-xl bg-white/5">
+                                                <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Reference</p>
+                                                <p className="text-sm text-white font-mono">{document.reference_number || '—'}</p>
+                                            </div>
+                                            <div className="p-4 rounded-xl bg-white/5">
+                                                <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Type</p>
+                                                <p className="text-sm text-white">{document.document_type?.name || document.category?.name || '—'}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <Separator className="bg-white/10" />
+                                        
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="p-4 rounded-xl bg-white/5">
+                                                <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Created</p>
+                                                <p className="text-sm text-white">{formatDateTime(document.created_at)}</p>
+                                            </div>
+                                            <div className="p-4 rounded-xl bg-white/5">
+                                                <p className="text-xs text-white/40 uppercase tracking-wider mb-1">Modified</p>
+                                                <p className="text-sm text-white">{formatDateTime(document.updated_at)}</p>
+                                            </div>
+                                        </div>
+
+                                        {document.description && (
+                                            <>
+                                                <Separator className="bg-white/10" />
+                                                <div className="p-4 rounded-xl bg-white/5">
+                                                    <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Description</p>
+                                                    <p className="text-sm text-white/80 whitespace-pre-line">{document.description}</p>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </ModernCard>
+
+                                <ModernCard
+                                    title="Statistics"
+                                    icon={BarChart3}
+                                    iconColor="from-purple-500 to-pink-500"
+                                    className="bg-white/5 backdrop-blur-sm border-white/10"
+                                >
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="text-center p-4 bg-white/5 rounded-xl">
+                                            <Eye className="h-5 w-5 text-blue-400 mx-auto mb-2" />
+                                            <div className="text-2xl font-bold text-white">{document.view_count || 0}</div>
+                                            <p className="text-xs text-white/40">Views</p>
+                                        </div>
+                                        <div className="text-center p-4 bg-white/5 rounded-xl">
+                                            <Download className="h-5 w-5 text-emerald-400 mx-auto mb-2" />
+                                            <div className="text-2xl font-bold text-white">{document.download_count || 0}</div>
+                                            <p className="text-xs text-white/40">Downloads</p>
+                                        </div>
+                                        <div className="text-center p-4 bg-white/5 rounded-xl">
+                                            <HardDrive className="h-5 w-5 text-purple-400 mx-auto mb-2" />
+                                            <div className="text-2xl font-bold text-white">{document.file_size_human || formatFileSize(document.file_size || 0)}</div>
+                                            <p className="text-xs text-white/40">Size</p>
+                                        </div>
+                                    </div>
+                                </ModernCard>
+
+                                <ModernCard
+                                    title="Security"
+                                    icon={Shield}
+                                    iconColor="from-amber-500 to-orange-500"
+                                    className="bg-white/5 backdrop-blur-sm border-white/10"
+                                >
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
+                                            <span className="text-sm text-white/60">Password Protected</span>
+                                            {document.requires_password ? (
+                                                <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-400">
+                                                    <Lock className="h-3 w-3 mr-1" />
+                                                    Yes
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                                                    <Shield className="h-3 w-3 mr-1" />
+                                                    No
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
+                                            <span className="text-sm text-white/60">Access Level</span>
+                                            <Badge variant="outline" className={cn(
+                                                document.is_public 
+                                                    ? "border-blue-500/30 bg-blue-500/10 text-blue-400"
+                                                    : "border-gray-500/30 bg-gray-500/10 text-gray-400"
+                                            )}>
+                                                {document.is_public ? (
+                                                    <>
+                                                        <Globe className="h-3 w-3 mr-1" />
+                                                        Public
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Lock className="h-3 w-3 mr-1" />
+                                                        Private
+                                                    </>
+                                                )}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </ModernCard>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+
+            {/* Bottom Bar */}
+            <div className="flex items-center justify-between px-4 py-2 bg-black/50 backdrop-blur-sm border-t border-white/5 text-xs text-white/40">
+                <div className="flex items-center gap-4">
+                    <span className="truncate max-w-[300px]">{document.name}</span>
+                    {document.reference_number && (
+                        <>
+                            <Separator orientation="vertical" className="h-3 bg-white/10" />
+                            <span>Ref: {document.reference_number}</span>
+                        </>
+                    )}
+                </div>
+                <div className="flex items-center gap-4">
+                    <span>ESC to exit</span>
+                    <Separator orientation="vertical" className="h-3 bg-white/10" />
+                    <span>Ctrl +/- zoom</span>
+                    {isImage && (
+                        <>
+                            <Separator orientation="vertical" className="h-3 bg-white/10" />
+                            <span>Ctrl+R rotate</span>
+                        </>
+                    )}
+                </div>
+            </div>
+        </motion.div>
+    );
 }
 
-// ==================== PASSWORD FORM COMPONENT ====================
-function PasswordForm({ document, error, onSubmit, isVerifying }: {
-  document: Document;
-  error?: string;
-  onSubmit: (e: React.FormEvent) => void;
-  isVerifying: boolean;
+// ==================== MODERN PASSWORD FORM ====================
+function ModernPasswordForm({ document, error, onSubmit, isVerifying }: {
+    document: Document;
+    error?: string;
+    onSubmit: (e: React.FormEvent) => void;
+    isVerifying: boolean;
 }) {
-  const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password.trim()) {
-      setPasswordError('Please enter a password');
-      return;
-    }
-    onSubmit(e);
-  };
-
-  return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-8">
-      <Card className="w-full max-w-md border-0 shadow-lg">
-        <CardHeader className="space-y-3 text-center pb-6">
-          <div className="mx-auto w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center">
-            <Lock className="h-8 w-8 text-blue-600" />
-          </div>
-          <CardTitle className="text-xl font-semibold">Password Required</CardTitle>
-          <CardDescription className="text-gray-600 text-sm">
-            Enter the password to access "{document.name}"
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          {error && (
-            <Alert variant="destructive" className="animate-in fade-in">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="text-sm">Access Expired</AlertTitle>
-              <AlertDescription className="text-sm">{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          <Alert className="bg-blue-50 border-blue-200">
-            <ShieldCheck className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-sm font-medium text-blue-800">
-              Protected Document
-            </AlertTitle>
-            <AlertDescription className="text-sm text-blue-700">
-              This document is protected with a password. Access will be granted for 30 minutes.
-            </AlertDescription>
-          </Alert>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Document Password
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setPasswordError('');
-                }}
-                required
-                className={cn(
-                  "w-full px-3 py-3 text-base border rounded-lg transition-colors",
-                  passwordError 
-                    ? "border-red-300 focus:border-red-500 focus:ring-red-500" 
-                    : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="min-h-[80vh] flex items-center justify-center px-4 py-8"
+        >
+            <ModernCard
+                title="Protected Document"
+                description={`Enter the password to access "${document.name}"`}
+                icon={Lock}
+                iconColor="from-blue-500 to-indigo-600"
+                className="w-full max-w-md"
+            >
+                {error && (
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                    >
+                        <Alert variant="destructive" className="border-rose-200 bg-rose-50 dark:bg-rose-950/20 dark:border-rose-900">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle className="text-sm font-medium">Access Denied</AlertTitle>
+                            <AlertDescription className="text-sm">{error}</AlertDescription>
+                        </Alert>
+                    </motion.div>
                 )}
-                placeholder="Enter document password"
-                disabled={isVerifying}
-                autoComplete="current-password"
-              />
-              {passwordError && (
-                <p className="text-sm text-red-600 mt-1">{passwordError}</p>
-              )}
+                
+                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-4 border border-blue-100 dark:border-blue-900">
+                    <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900">
+                            <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1">
+                                Secure Access
+                            </h4>
+                            <p className="text-xs text-blue-700 dark:text-blue-400">
+                                Your session will remain active for 30 minutes
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <form onSubmit={onSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                        <label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Document Password
+                        </label>
+                        <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                id="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                className="w-full pl-10 pr-12 py-3 text-base border border-gray-200 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                placeholder="Enter document password"
+                                disabled={isVerifying}
+                                autoComplete="current-password"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="flex gap-3 pt-2">
+                        <Link href="/portal/my-records" className="flex-1">
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                className="w-full border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 py-6"
+                            >
+                                <ArrowLeft className="h-4 w-4 mr-2" />
+                                Back
+                            </Button>
+                        </Link>
+                        <Button 
+                            type="submit" 
+                            disabled={isVerifying} 
+                            className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-6"
+                        >
+                            {isVerifying ? (
+                                <>
+                                    <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                                    Verifying...
+                                </>
+                            ) : (
+                                <>
+                                    <ArrowRight className="h-4 w-4 mr-2" />
+                                    Access
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </form>
+            </ModernCard>
+        </motion.div>
+    );
+}
+
+// ==================== MODERN MOBILE COMPONENTS ====================
+function ModernMobileHeader({ document, onFullscreen, onDownload, canDownload }: any) {
+    const status = getDocumentStatus(document);
+    const statusConfig = DOCUMENT_STATUS_CONFIG[status as keyof typeof DOCUMENT_STATUS_CONFIG] || DOCUMENT_STATUS_CONFIG.active;
+    const StatusIcon = statusConfig.icon;
+    const FileIcon = getFileIcon(document.file_extension || '');
+
+    return (
+        <div className="sticky top-0 z-40 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800">
+            <div className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                    <Link href="/portal/my-records">
+                        <Button variant="ghost" size="icon" className="rounded-full">
+                            <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                    </Link>
+                    
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                            <div className={cn("p-1.5 rounded-xl", getFileColor(document.file_extension || ''))}>
+                                <FileIcon className="h-4 w-4" />
+                            </div>
+                            <h1 className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                                {document.name}
+                            </h1>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 gap-1 bg-gray-50 dark:bg-gray-900">
+                                <Folder className="h-2.5 w-2.5" />
+                                {document.category?.name || 'Uncategorized'}
+                            </Badge>
+                            <div className={cn(
+                                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium",
+                                statusConfig.badge
+                            )}>
+                                <StatusIcon className="h-2.5 w-2.5" />
+                                {statusConfig.label}
+                            </div>
+                        </div>
+                    </div>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon" className="rounded-full">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={onFullscreen}>
+                                <Maximize2 className="h-4 w-4 mr-2" />
+                                Fullscreen
+                            </DropdownMenuItem>
+                            {canDownload && !document.security_options?.restrict_download && (
+                                <DropdownMenuItem onClick={onDownload}>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download
+                                </DropdownMenuItem>
+                            )}
+                            {!document.security_options?.restrict_print && (
+                                <DropdownMenuItem onClick={() => window.print()}>
+                                    <Printer className="h-4 w-4 mr-2" />
+                                    Print
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Link href="/my-records" className="flex-1">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  className="w-full border-gray-300 hover:bg-gray-50 py-3"
+        </div>
+    );
+}
+
+function ModernMobileStats({ document }: { document: Document }) {
+    return (
+        <div className="grid grid-cols-3 gap-2 p-4">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-4">
+                <div className="absolute top-2 right-2 opacity-10">
+                    <Eye className="h-12 w-12 text-blue-600" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{document.view_count || 0}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Views</p>
+            </div>
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-4">
+                <div className="absolute top-2 right-2 opacity-10">
+                    <Download className="h-12 w-12 text-emerald-600" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{document.download_count || 0}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Downloads</p>
+            </div>
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 p-4">
+                <div className="absolute top-2 right-2 opacity-10">
+                    <HardDrive className="h-12 w-12 text-purple-600" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white truncate">
+                    {document.file_size_human || formatFileSize(document.file_size || 0)}
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Size</p>
+            </div>
+        </div>
+    );
+}
+
+function ModernMobilePreview({ document, previewUrl, onFullscreen }: any) {
+    const [isLoading, setIsLoading] = useState(true);
+    const FileIcon = getFileIcon(document.file_extension || '');
+    const isPdf = document.file_extension?.toLowerCase() === 'pdf' || document.mime_type?.includes('pdf');
+    const isImage = document.mime_type?.startsWith('image/');
+
+    return (
+        <div className="px-4">
+            <ModernCard className="overflow-hidden p-0">
+                <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950">
+                    {isLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm z-10">
+                            <div className="text-center">
+                                <div className="relative">
+                                    <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <FileText className="h-5 w-5 text-blue-600 opacity-50" />
+                                    </div>
+                                </div>
+                                <p className="text-sm text-gray-500 mt-2">Loading preview...</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {isPdf ? (
+                        <iframe
+                            src={previewUrl}
+                            title={document.name}
+                            className="w-full h-[300px] border-0"
+                            onLoad={() => setIsLoading(false)}
+                            onError={() => setIsLoading(false)}
+                        />
+                    ) : isImage ? (
+                        <img
+                            src={previewUrl}
+                            alt={document.name}
+                            className="w-full h-auto max-h-[300px] object-contain"
+                            onLoad={() => setIsLoading(false)}
+                            onError={() => setIsLoading(false)}
+                        />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12 px-4">
+                            <div className={cn(
+                                "w-20 h-20 rounded-2xl flex items-center justify-center mb-4",
+                                getFileColor(document.file_extension || '')
+                            )}>
+                                <FileIcon className="h-10 w-10" />
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                                Preview not available for this file type
+                            </p>
+                        </div>
+                    )}
+
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onFullscreen}
+                        className="absolute bottom-4 right-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shadow-lg rounded-full px-4"
+                    >
+                        <Maximize2 className="h-4 w-4 mr-2" />
+                        Fullscreen
+                    </Button>
+                </div>
+
+                {document.description && (
+                    <div className="p-4 border-t border-gray-100 dark:border-gray-800">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
+                            {document.description}
+                        </p>
+                    </div>
+                )}
+            </ModernCard>
+        </div>
+    );
+}
+
+function ModernMobileDetails({ document }: { document: Document }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const status = getDocumentStatus(document);
+    const statusConfig = DOCUMENT_STATUS_CONFIG[status as keyof typeof DOCUMENT_STATUS_CONFIG] || DOCUMENT_STATUS_CONFIG.active;
+
+    return (
+        <div className="px-4">
+            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                <ModernCard className="overflow-hidden">
+                    <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+                            <div className="flex items-center gap-2">
+                                <Info className="h-5 w-5 text-blue-500" />
+                                <span className="font-semibold text-gray-900 dark:text-white">Document Details</span>
+                            </div>
+                            <Button variant="ghost" size="sm" className="rounded-full">
+                                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <div className="p-4 pt-0 space-y-4">
+                            {/* Reference Number */}
+                            <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                    Reference Number
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <code className="flex-1 font-mono text-sm bg-white dark:bg-gray-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                                        {document.reference_number || 'N/A'}
+                                    </code>
+                                    {document.reference_number && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => navigator.clipboard.writeText(document.reference_number!)}
+                                            className="rounded-full"
+                                        >
+                                            <Copy className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Owner */}
+                            <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                    Document Owner
+                                </p>
+                                <div className="flex items-center gap-3">
+                                    <Avatar>
+                                        <AvatarFallback className="bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300">
+                                            {document.resident?.first_name?.[0]}{document.resident?.last_name?.[0]}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        <p className="font-medium text-gray-900 dark:text-white">
+                                            {document.resident ? 
+                                                `${document.resident.first_name} ${document.resident.last_name}` : 
+                                                'Unknown Resident'}
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Resident</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Dates */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {document.issue_date && (
+                                    <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Issue Date</p>
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4 text-gray-400" />
+                                            <span className="font-medium text-sm">{formatDate(document.issue_date, 'short')}</span>
+                                        </div>
+                                    </div>
+                                )}
+                                {document.expiry_date && (
+                                    <div className={cn(
+                                        "rounded-xl p-4",
+                                        status === 'expired' 
+                                            ? 'bg-rose-50 dark:bg-rose-950/30' 
+                                            : 'bg-gray-50 dark:bg-gray-900'
+                                    )}>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Expiry Date</p>
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="h-4 w-4 text-gray-400" />
+                                            <span className={cn(
+                                                "font-medium text-sm",
+                                                status === 'expired' && "text-rose-600 dark:text-rose-400"
+                                            )}>
+                                                {formatDate(document.expiry_date, 'short')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Upload Info */}
+                            <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                    Upload Information
+                                </p>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600 dark:text-gray-400">Uploaded:</span>
+                                        <span className="font-medium">{formatDateTime(document.created_at)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600 dark:text-gray-400">Last Modified:</span>
+                                        <span className="font-medium">{formatDateTime(document.updated_at)}</span>
+                                    </div>
+                                    {document.uploaded_by_user && (
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-600 dark:text-gray-400">Uploaded By:</span>
+                                            <span className="font-medium truncate max-w-[150px]">
+                                                {document.uploaded_by_user.name}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Tags */}
+                            {document.tags && document.tags.length > 0 && (
+                                <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                        Tags
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {document.tags.map((tag, index) => (
+                                            <Badge key={index} variant="secondary" className="gap-1">
+                                                <Tag className="h-3 w-3" />
+                                                {tag}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </CollapsibleContent>
+                </ModernCard>
+            </Collapsible>
+        </div>
+    );
+}
+
+function ModernMobileSecurity({ document }: { document: Document }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const securityOptions = document.security_options || {};
+
+    return (
+        <div className="px-4">
+            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                <ModernCard className="overflow-hidden">
+                    <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+                            <div className="flex items-center gap-2">
+                                <Shield className="h-5 w-5 text-blue-500" />
+                                <span className="font-semibold text-gray-900 dark:text-white">Security</span>
+                            </div>
+                            <Button variant="ghost" size="sm" className="rounded-full">
+                                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <div className="p-4 pt-0 space-y-4">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                                    <div className="flex items-center gap-2">
+                                        <Lock className="h-4 w-4 text-gray-400" />
+                                        <span className="text-sm">Password Protected</span>
+                                    </div>
+                                    {document.requires_password ? (
+                                        <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600">
+                                            Yes
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600">
+                                            No
+                                        </Badge>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                                    <div className="flex items-center gap-2">
+                                        <Globe className="h-4 w-4 text-gray-400" />
+                                        <span className="text-sm">Access Level</span>
+                                    </div>
+                                    <Badge variant="outline" className={cn(
+                                        document.is_public 
+                                            ? "border-blue-500/30 bg-blue-500/10 text-blue-600"
+                                            : "border-gray-500/30 bg-gray-500/10 text-gray-600"
+                                    )}>
+                                        {document.is_public ? 'Public' : 'Private'}
+                                    </Badge>
+                                </div>
+
+                                {(securityOptions.add_watermark || securityOptions.enable_encryption) && (
+                                    <>
+                                        <div className="pt-2">
+                                            <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                                                Advanced Security
+                                            </h4>
+                                            <div className="space-y-2">
+                                                {securityOptions.add_watermark && (
+                                                    <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                                                        <Fingerprint className="h-4 w-4 text-blue-500" />
+                                                        <span className="text-sm">Watermark Protection</span>
+                                                    </div>
+                                                )}
+                                                {securityOptions.enable_encryption && (
+                                                    <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                                                        <FileLock className="h-4 w-4 text-purple-500" />
+                                                        <span className="text-sm">File Encryption</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {(securityOptions.restrict_download || securityOptions.restrict_print) && (
+                                    <>
+                                        <div className="pt-2">
+                                            <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                                                Restrictions
+                                            </h4>
+                                            <div className="space-y-2">
+                                                {securityOptions.restrict_download && (
+                                                    <div className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-950/30 rounded-lg text-rose-600 dark:text-rose-400">
+                                                        <Download className="h-4 w-4" />
+                                                        <span className="text-sm">Download Restricted</span>
+                                                    </div>
+                                                )}
+                                                {securityOptions.restrict_print && (
+                                                    <div className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-950/30 rounded-lg text-rose-600 dark:text-rose-400">
+                                                        <Printer className="h-4 w-4" />
+                                                        <span className="text-sm">Print Restricted</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </CollapsibleContent>
+                </ModernCard>
+            </Collapsible>
+        </div>
+    );
+}
+
+function ModernMobileRelated({ relatedDocuments }: { relatedDocuments: RelatedDocument[] }) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    if (!relatedDocuments || relatedDocuments.length === 0) return null;
+
+    return (
+        <div className="px-4">
+            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                <ModernCard className="overflow-hidden">
+                    <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+                            <div className="flex items-center gap-2">
+                                <Link2 className="h-5 w-5 text-blue-500" />
+                                <span className="font-semibold text-gray-900 dark:text-white">Related Documents</span>
+                            </div>
+                            <Button variant="ghost" size="sm" className="rounded-full">
+                                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <div className="p-4 pt-0 space-y-2">
+                            {relatedDocuments.map((doc) => {
+                                const FileIcon = getFileIcon(doc.file_extension || '');
+                                return (
+                                    <Link
+                                        key={doc.id}
+                                        href={`/portal/my-records/${doc.id}`}
+                                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors group"
+                                    >
+                                        <div className={cn("p-2 rounded-lg", getFileColor(doc.file_extension || ''))}>
+                                            <FileIcon className="h-4 w-4" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                                                {doc.name}
+                                            </p>
+                                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                {doc.file_extension && (
+                                                    <span>{doc.file_extension.toUpperCase()}</span>
+                                                )}
+                                                {doc.file_size_human && (
+                                                    <>
+                                                        <span>•</span>
+                                                        <span>{doc.file_size_human}</span>
+                                                    </>
+                                                )}
+                                                {doc.requires_password && (
+                                                    <Lock className="h-3 w-3 text-amber-500" />
+                                                )}
+                                            </div>
+                                        </div>
+                                        <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </CollapsibleContent>
+                </ModernCard>
+            </Collapsible>
+        </div>
+    );
+}
+
+function ModernMobileBottomBar({ document, onDownload, onFullscreen, canDownload }: any) {
+    const securityOptions = document.security_options || {};
+
+    return (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800 safe-bottom">
+            <div className="flex items-center justify-around py-3 px-4">
+                {canDownload && !securityOptions.restrict_download && (
+                    <Button
+                        variant="ghost"
+                        onClick={onDownload}
+                        className="flex flex-col items-center gap-1 h-auto py-1 px-3"
+                    >
+                        <Download className="h-5 w-5" />
+                        <span className="text-[10px]">Download</span>
+                    </Button>
+                )}
+                
+                <Button
+                    variant="ghost"
+                    onClick={onFullscreen}
+                    className="flex flex-col items-center gap-1 h-auto py-1 px-3"
                 >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  <span className="text-sm">Back</span>
+                    <Maximize2 className="h-5 w-5" />
+                    <span className="text-[10px]">Fullscreen</span>
                 </Button>
-              </Link>
-              <Button 
-                type="submit" 
-                disabled={isVerifying} 
-                className="flex-1 py-3"
-              >
-                {isVerifying ? (
-                  <>
-                    <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                    <span className="text-sm">Verifying...</span>
-                  </>
-                ) : (
-                  <>
-                    <ArrowRight className="h-4 w-4 mr-2" />
-                    <span className="text-sm">Access Document</span>
-                  </>
+                
+                {!securityOptions.restrict_print && (
+                    <Button
+                        variant="ghost"
+                        onClick={() => window.print()}
+                        className="flex flex-col items-center gap-1 h-auto py-1 px-3"
+                    >
+                        <Printer className="h-5 w-5" />
+                        <span className="text-[10px]">Print</span>
+                    </Button>
                 )}
-              </Button>
+                
+                <Link href="/portal/my-records" className="flex flex-col items-center gap-1 py-1 px-3">
+                    <Button variant="ghost" className="h-auto p-0 flex flex-col items-center gap-1">
+                        <ArrowLeft className="h-5 w-5" />
+                        <span className="text-[10px]">Back</span>
+                    </Button>
+                </Link>
             </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
+        </div>
+    );
+}
+
+// ==================== MODERN DESKTOP COMPONENTS ====================
+function ModernDesktopHeader({ document, onFullscreen, onDownload, canDownload, isDownloading }: any) {
+    const status = getDocumentStatus(document);
+    const statusConfig = DOCUMENT_STATUS_CONFIG[status as keyof typeof DOCUMENT_STATUS_CONFIG] || DOCUMENT_STATUS_CONFIG.active;
+    const StatusIcon = statusConfig.icon;
+    const FileIcon = getFileIcon(document.file_extension || '');
+
+    return (
+        <div className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
+            <div className="px-8 py-6">
+                <div className="flex items-start gap-4">
+                    <Link href="/portal/my-records">
+                        <Button variant="ghost" size="icon" className="rounded-full">
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                    </Link>
+                    
+                    <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className={cn("p-3 rounded-2xl", getFileColor(document.file_extension || ''))}>
+                                <FileIcon className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    {document.name}
+                                    {document.requires_password && (
+                                        <Lock className="h-5 w-5 text-amber-500" />
+                                    )}
+                                </h1>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="gap-1.5 bg-gray-50 dark:bg-gray-900">
+                                        <Folder className="h-3 w-3" />
+                                        {document.category?.name || 'Uncategorized'}
+                                    </Badge>
+                                    <div className={cn(
+                                        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium",
+                                        statusConfig.badge
+                                    )}>
+                                        <StatusIcon className="h-3 w-3" />
+                                        {statusConfig.label}
+                                    </div>
+                                    {document.is_public && (
+                                        <Badge variant="outline" className="gap-1.5 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400">
+                                            <Globe className="h-3 w-3" />
+                                            Public
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={onFullscreen}
+                            className="gap-2 border-gray-200 dark:border-gray-800"
+                        >
+                            <Maximize2 className="h-4 w-4" />
+                            Fullscreen
+                        </Button>
+                        
+                        {canDownload && !document.security_options?.restrict_download && (
+                            <Button
+                                onClick={onDownload}
+                                disabled={isDownloading}
+                                className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                            >
+                                {isDownloading ? (
+                                    <>
+                                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                                        Downloading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Download className="h-4 w-4" />
+                                        Download
+                                    </>
+                                )}
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ModernDesktopStats({ document }: { document: Document }) {
+    return (
+        <div className="grid grid-cols-4 gap-4">
+            <ModernCard className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                        <Eye className="h-5 w-5 text-blue-600" />
+                        <span className="text-3xl font-bold text-gray-900 dark:text-white">{document.view_count || 0}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Views</p>
+                    <div className="mt-4 h-1 bg-blue-200 dark:bg-blue-900 rounded-full overflow-hidden">
+                        <div className="h-full w-3/4 bg-blue-600 rounded-full" />
+                    </div>
+                </div>
+            </ModernCard>
+
+            <ModernCard className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                        <Download className="h-5 w-5 text-emerald-600" />
+                        <span className="text-3xl font-bold text-gray-900 dark:text-white">{document.download_count || 0}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Downloads</p>
+                    <div className="mt-4 h-1 bg-emerald-200 dark:bg-emerald-900 rounded-full overflow-hidden">
+                        <div className="h-full w-2/3 bg-emerald-600 rounded-full" />
+                    </div>
+                </div>
+            </ModernCard>
+
+            <ModernCard className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30">
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                        <HardDrive className="h-5 w-5 text-purple-600" />
+                        <span className="text-3xl font-bold text-gray-900 dark:text-white truncate">
+                            {document.file_size_human || formatFileSize(document.file_size || 0)}
+                        </span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">File Size</p>
+                    <div className="mt-4 h-1 bg-purple-200 dark:bg-purple-900 rounded-full overflow-hidden">
+                        <div className="h-full w-1/2 bg-purple-600 rounded-full" />
+                    </div>
+                </div>
+            </ModernCard>
+
+            <ModernCard className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                        <Calendar className="h-5 w-5 text-amber-600" />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                            {formatDate(document.created_at, 'short')}
+                        </span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Created</p>
+                    <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
+                        <Clock className="h-3 w-3" />
+                        <span>Last updated {formatDate(document.updated_at, 'short')}</span>
+                    </div>
+                </div>
+            </ModernCard>
+        </div>
+    );
+}
+
+function ModernDesktopPreview({ document, previewUrl, onFullscreen }: any) {
+    const [zoom, setZoom] = useState(100);
+    const [isLoading, setIsLoading] = useState(true);
+    const FileIcon = getFileIcon(document.file_extension || '');
+    const isPdf = document.file_extension?.toLowerCase() === 'pdf' || document.mime_type?.includes('pdf');
+    const isImage = document.mime_type?.startsWith('image/');
+
+    return (
+        <ModernCard title="Document Preview" icon={Eye} iconColor="from-blue-500 to-indigo-500">
+            <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-950 rounded-xl overflow-hidden min-h-[400px]">
+                {isLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm z-10">
+                        <div className="text-center">
+                            <div className="relative">
+                                <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <FileText className="h-6 w-6 text-blue-600 opacity-50" />
+                                </div>
+                            </div>
+                            <p className="text-sm text-gray-500 mt-3">Loading preview...</p>
+                        </div>
+                    </div>
+                )}
+
+                {isPdf ? (
+                    <iframe
+                        src={previewUrl}
+                        title={document.name}
+                        className="w-full h-[500px] border-0"
+                        style={{
+                            transform: `scale(${zoom / 100})`,
+                            transformOrigin: '0 0',
+                            width: `${10000 / zoom}%`,
+                            height: `${10000 / zoom}%`,
+                        }}
+                        onLoad={() => setIsLoading(false)}
+                        onError={() => setIsLoading(false)}
+                    />
+                ) : isImage ? (
+                    <img
+                        src={previewUrl}
+                        alt={document.name}
+                        className="w-full h-auto max-h-[500px] object-contain mx-auto"
+                        onLoad={() => setIsLoading(false)}
+                        onError={() => setIsLoading(false)}
+                    />
+                ) : (
+                    <div className="flex flex-col items-center justify-center py-16 px-4">
+                        <div className={cn(
+                            "w-24 h-24 rounded-2xl flex items-center justify-center mb-4",
+                            getFileColor(document.file_extension || '')
+                        )}>
+                            <FileIcon className="h-12 w-12" />
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-400 text-center mb-4">
+                            Preview not available for this file type
+                        </p>
+                        <Button onClick={onFullscreen} variant="outline" className="gap-2">
+                            <Maximize2 className="h-4 w-4" />
+                            Open in Fullscreen
+                        </Button>
+                    </div>
+                )}
+
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onFullscreen}
+                    className="absolute bottom-4 right-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shadow-lg rounded-full px-4"
+                >
+                    <Maximize2 className="h-4 w-4 mr-2" />
+                    Fullscreen
+                </Button>
+            </div>
+
+            {document.description && (
+                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                        <Info className="h-4 w-4" />
+                        Description
+                    </h4>
+                    <p className="text-gray-600 dark:text-gray-400 whitespace-pre-line">
+                        {document.description}
+                    </p>
+                </div>
+            )}
+        </ModernCard>
+    );
+}
+
+function ModernDesktopDetails({ document }: { document: Document }) {
+    return (
+        <ModernCard title="Document Information" icon={Info} iconColor="from-purple-500 to-pink-500">
+            <div className="space-y-6">
+                {/* Reference Number */}
+                <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
+                        Reference Number
+                    </label>
+                    <div className="flex items-center gap-2">
+                        <code className="flex-1 font-mono text-sm bg-gray-50 dark:bg-gray-900 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-800">
+                            {document.reference_number || 'N/A'}
+                        </code>
+                        {document.reference_number && (
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => navigator.clipboard.writeText(document.reference_number!)}
+                                className="rounded-xl"
+                            >
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Owner */}
+                <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
+                        Document Owner
+                    </label>
+                    <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                        <Avatar className="h-12 w-12">
+                            <AvatarFallback className="bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300 text-lg">
+                                {document.resident?.first_name?.[0]}{document.resident?.last_name?.[0]}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <p className="font-semibold text-gray-900 dark:text-white">
+                                {document.resident ? 
+                                    `${document.resident.first_name} ${document.resident.last_name}` : 
+                                    'Unknown Resident'}
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Resident</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Dates Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                    {document.issue_date && (
+                        <div>
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
+                                Issue Date
+                            </label>
+                            <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                                <Calendar className="h-5 w-5 text-gray-400" />
+                                <div>
+                                    <p className="font-medium text-gray-900 dark:text-white">
+                                        {formatDate(document.issue_date)}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        {new Date(document.issue_date).toLocaleDateString('en-PH', { weekday: 'long' })}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {document.expiry_date && (
+                        <div>
+                            <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
+                                Expiry Date
+                            </label>
+                            <div className={cn(
+                                "flex items-center gap-3 p-4 rounded-xl",
+                                getDocumentStatus(document) === 'expired'
+                                    ? 'bg-rose-50 dark:bg-rose-950/30'
+                                    : 'bg-gray-50 dark:bg-gray-900'
+                            )}>
+                                <Clock className="h-5 w-5 text-gray-400" />
+                                <div>
+                                    <p className={cn(
+                                        "font-medium",
+                                        getDocumentStatus(document) === 'expired' && "text-rose-600 dark:text-rose-400"
+                                    )}>
+                                        {formatDate(document.expiry_date)}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        {new Date(document.expiry_date).toLocaleDateString('en-PH', { weekday: 'long' })}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Upload Info */}
+                <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
+                        Upload Information
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Uploaded</p>
+                            <p className="font-medium">{formatDateTime(document.created_at)}</p>
+                        </div>
+                        <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last Modified</p>
+                            <p className="font-medium">{formatDateTime(document.updated_at)}</p>
+                        </div>
+                        {document.uploaded_by_user && (
+                            <div className="col-span-2 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Uploaded By</p>
+                                <p className="font-medium">{document.uploaded_by_user.name}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{document.uploaded_by_user.email}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Tags */}
+                {document.tags && document.tags.length > 0 && (
+                    <div>
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">
+                            Tags
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                            {document.tags.map((tag, index) => (
+                                <Badge key={index} variant="secondary" className="gap-1 px-3 py-1.5">
+                                    <Tag className="h-3 w-3" />
+                                    {tag}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </ModernCard>
+    );
+}
+
+function ModernDesktopSecurity({ document }: { document: Document }) {
+    const securityOptions = document.security_options || {};
+
+    return (
+        <ModernCard title="Security & Access" icon={Shield} iconColor="from-amber-500 to-orange-500">
+            <div className="space-y-4">
+                {/* Basic Security */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Lock className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm font-medium">Password</span>
+                        </div>
+                        {document.requires_password ? (
+                            <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400">
+                                Protected
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600">
+                                No Password
+                            </Badge>
+                        )}
+                    </div>
+
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Globe className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm font-medium">Access</span>
+                        </div>
+                        <Badge variant="outline" className={cn(
+                            document.is_public 
+                                ? "border-blue-500/30 bg-blue-500/10 text-blue-600"
+                                : "border-gray-500/30 bg-gray-500/10 text-gray-600"
+                        )}>
+                            {document.is_public ? 'Public' : 'Private'}
+                        </Badge>
+                    </div>
+                </div>
+
+                {/* Advanced Security */}
+                {(securityOptions.add_watermark || securityOptions.enable_encryption || securityOptions.audit_log_access) && (
+                    <div>
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Advanced Security</h4>
+                        <div className="space-y-2">
+                            {securityOptions.add_watermark && (
+                                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                                    <Fingerprint className="h-5 w-5 text-blue-500" />
+                                    <div>
+                                        <p className="font-medium">Watermark Protection</p>
+                                        <p className="text-xs text-gray-500">Document will display viewer information</p>
+                                    </div>
+                                </div>
+                            )}
+                            {securityOptions.enable_encryption && (
+                                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                                    <FileLock className="h-5 w-5 text-purple-500" />
+                                    <div>
+                                        <p className="font-medium">File Encryption</p>
+                                        <p className="text-xs text-gray-500">AES-256 encryption enabled</p>
+                                    </div>
+                                </div>
+                            )}
+                            {securityOptions.audit_log_access && (
+                                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                                    <History className="h-5 w-5 text-amber-500" />
+                                    <div>
+                                        <p className="font-medium">Audit Logging</p>
+                                        <p className="text-xs text-gray-500">All access is logged</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Restrictions */}
+                {(securityOptions.restrict_download || securityOptions.restrict_print) && (
+                    <div>
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Restrictions</h4>
+                        <div className="space-y-2">
+                            {securityOptions.restrict_download && (
+                                <div className="flex items-center gap-3 p-3 bg-rose-50 dark:bg-rose-950/30 rounded-xl text-rose-600 dark:text-rose-400">
+                                    <Download className="h-5 w-5" />
+                                    <div>
+                                        <p className="font-medium">Download Restricted</p>
+                                        <p className="text-xs opacity-80">Downloading is not permitted</p>
+                                    </div>
+                                </div>
+                            )}
+                            {securityOptions.restrict_print && (
+                                <div className="flex items-center gap-3 p-3 bg-rose-50 dark:bg-rose-950/30 rounded-xl text-rose-600 dark:text-rose-400">
+                                    <Printer className="h-5 w-5" />
+                                    <div>
+                                        <p className="font-medium">Print Restricted</p>
+                                        <p className="text-xs opacity-80">Printing is not permitted</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Scan Quality */}
+                {securityOptions.scan_quality && (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Scan className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm font-medium">Scan Quality</span>
+                        </div>
+                        <Badge variant="outline" className="capitalize">
+                            {securityOptions.scan_quality.replace('_', ' ')}
+                        </Badge>
+                    </div>
+                )}
+            </div>
+        </ModernCard>
+    );
+}
+
+function ModernDesktopSidebar({ document, relatedDocuments, onFullscreen, onDownload, canDownload, isDownloading }: any) {
+    return (
+        <div className="space-y-6">
+            {/* Quick Actions */}
+            <ModernCard title="Quick Actions" icon={Zap} iconColor="from-blue-500 to-indigo-500">
+                <div className="space-y-2">
+                    <Button
+                        variant="outline"
+                        onClick={onFullscreen}
+                        className="w-full justify-start gap-2 h-12"
+                    >
+                        <Maximize2 className="h-4 w-4" />
+                        Fullscreen View
+                        <kbd className="ml-auto text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">F11</kbd>
+                    </Button>
+                    
+                    {canDownload && !document.security_options?.restrict_download && (
+                        <Button
+                            variant="outline"
+                            onClick={onDownload}
+                            disabled={isDownloading}
+                            className="w-full justify-start gap-2 h-12"
+                        >
+                            <Download className="h-4 w-4" />
+                            {isDownloading ? 'Downloading...' : 'Download Document'}
+                        </Button>
+                    )}
+                    
+                    {!document.security_options?.restrict_print && (
+                        <Button
+                            variant="outline"
+                            onClick={() => window.print()}
+                            className="w-full justify-start gap-2 h-12"
+                        >
+                            <Printer className="h-4 w-4" />
+                            Print Document
+                        </Button>
+                    )}
+                    
+                    <Separator className="my-2" />
+                    
+                    <Link href="/portal/my-records">
+                        <Button variant="ghost" className="w-full justify-start gap-2 h-12">
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to All Documents
+                        </Button>
+                    </Link>
+                </div>
+            </ModernCard>
+
+            {/* Security Info */}
+            <ModernDesktopSecurity document={document} />
+
+            {/* Related Documents */}
+            {relatedDocuments && relatedDocuments.length > 0 && (
+                <ModernCard
+                    title="Related Documents"
+                    description={`Other documents in ${document.category?.name || 'this category'}`}
+                    icon={Link2}
+                    iconColor="from-teal-500 to-emerald-500"
+                >
+                    <div className="space-y-2">
+                        {relatedDocuments.map((doc) => {
+                            const FileIcon = getFileIcon(doc.file_extension || '');
+                            return (
+                                <Link
+                                    key={doc.id}
+                                    href={`/portal/my-records/${doc.id}`}
+                                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors group"
+                                >
+                                    <div className={cn("p-2 rounded-lg", getFileColor(doc.file_extension || ''))}>
+                                        <FileIcon className="h-4 w-4" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                                            {doc.name}
+                                        </p>
+                                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                            {doc.file_extension && (
+                                                <span>{doc.file_extension.toUpperCase()}</span>
+                                            )}
+                                            {doc.file_size_human && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span>{doc.file_size_human}</span>
+                                                </>
+                                            )}
+                                            {doc.requires_password && (
+                                                <Lock className="h-3 w-3 text-amber-500" />
+                                            )}
+                                        </div>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </ModernCard>
+            )}
+        </div>
+    );
 }
 
 // ==================== MAIN COMPONENT ====================
 export default function DocumentShow({ 
-  document, 
-  relatedDocuments = [], 
-  canDownload = false, 
-  canDelete = false,
-  error,
-  needsPassword = false,
-  sessionExpiry,
-  sessionData,
-  debugMode = false,
+    document, 
+    relatedDocuments = [], 
+    canDownload = false, 
+    canDelete = false,
+    error,
+    needsPassword = false,
+    sessionExpiry,
+    sessionData,
+    debugMode = false,
 }: PageProps) {
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isFullscreenViewerOpen, setIsFullscreenViewerOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [activeTab, setActiveTab] = useState('preview');
-  const [zoomLevel, setZoomLevel] = useState(100);
-  const [isLoadingPdf, setIsLoadingPdf] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [password, setPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [isSessionExpired, setIsSessionExpired] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState<string>('');
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [isFullscreenViewerOpen, setIsFullscreenViewerOpen] = useState(false);
+    const { isMobile } = useMobileDetect();
+    const [password, setPassword] = useState('');
+    const [passwordError, setPasswordError] = useState('');
 
-  const safeFileExtension = document.file_extension || '';
-  const safeFileName = document.file_name || document.name || 'Document';
-  const safeFileSizeHuman = document.file_size_human || formatBytes(document.file_size || 0);
-  const safeStatus = document.status || getDocumentStatus(document);
-  const safeViewCount = document.view_count || 0;
-  const safeDownloadCount = document.download_count || 0;
-  const safeIsPublic = document.is_public || false;
-  const safeDescription = document.description || '';
-  const safeReferenceNumber = document.reference_number || 'N/A';
-  const safeCategoryName = document.category?.name || 'Uncategorized';
-  const safeResidentName = document.resident ? 
-    `${document.resident.first_name} ${document.resident.last_name}` : 
-    'Unknown Resident';
-  const safeMimeType = document.mime_type || '';
-  const safeFilePath = document.file_path || '';
-  const safeTags = document.tags || [];
-  const safeMetadata = document.metadata || {};
-  const safeSecurityOptions = document.security_options || {} as SecurityOptions;
-  
-  const safeScanQuality = safeSecurityOptions.scan_quality || 'Not specified';
-  const safeAddWatermark = safeSecurityOptions.add_watermark || false;
-  const safeEnableEncryption = safeSecurityOptions.enable_encryption || false;
-  const safeAuditLogAccess = safeSecurityOptions.audit_log_access || false;
-  const safeRestrictDownload = safeSecurityOptions.restrict_download || false;
-  const safeRestrictPrint = safeSecurityOptions.restrict_print || false;
-
-  const isPdf = safeFileExtension.toLowerCase() === 'pdf' || safeMimeType.includes('pdf');
-  const isExpired = safeStatus === 'expired' || 
-    (document.expiry_date && new Date(document.expiry_date) < new Date());
-  const isImage = safeMimeType.startsWith('image/') || 
-                  ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(safeFileExtension.toLowerCase());
-  const FileIcon = getFileIcon(safeFileExtension);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F11') {
-        e.preventDefault();
-        handleFullscreen();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        handleFullscreen();
-      }
+    const handleDownload = () => {
+        if (isDownloading) return;
+        
+        setIsDownloading(true);
+        window.open(`/my-records/${document.id}/download`, '_blank');
+        
+        setTimeout(() => setIsDownloading(false), 1000);
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  useEffect(() => {
-    if (!sessionExpiry || !document.requires_password) return;
-
-    const updateCountdown = () => {
-      const expiryTime = new Date(sessionExpiry).getTime();
-      const now = new Date().getTime();
-      const diff = expiryTime - now;
-
-      if (diff <= 0) {
-        setTimeRemaining('00:00');
-        setIsSessionExpired(true);
-        if (countdownRef.current) {
-          clearInterval(countdownRef.current);
+    const handleDelete = () => {
+        if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+            return;
         }
-        return;
-      }
-
-      const minutes = Math.floor(diff / 1000 / 60);
-      const seconds = Math.floor((diff / 1000) % 60);
-      setTimeRemaining(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+        
+        setIsDeleting(true);
+        router.delete(`/my-records/${document.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                router.visit('/my-records');
+            },
+            onFinish: () => setIsDeleting(false),
+        });
     };
 
-    updateCountdown();
-    countdownRef.current = setInterval(updateCountdown, 1000);
+    const handlePasswordSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsVerifying(true);
 
-    return () => {
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current);
-      }
+        router.post(`/my-records/${document.id}/verify-password`, {
+            password: password,
+        }, {
+            preserveScroll: true,
+            preserveState: false,
+            onError: (errors) => {
+                setPasswordError(errors.password || 'Invalid password');
+                setIsVerifying(false);
+            },
+            onFinish: () => setIsVerifying(false),
+        });
     };
-  }, [sessionExpiry, document.requires_password]);
 
-  const handlePdfLoadStart = useCallback(() => {
-    setIsLoadingPdf(true);
-    setPdfError(null);
-  }, []);
+    const getPreviewUrl = () => {
+        if (document.preview_url) {
+            return document.preview_url;
+        }
+        if (document.file_path) {
+            return `/storage/${document.file_path}`;
+        }
+        return `/my-records/${document.id}/preview`;
+    };
 
-  const handlePdfLoad = useCallback(() => {
-    setIsLoadingPdf(false);
-  }, []);
+    const showPasswordForm = needsPassword || (document.requires_password && !sessionExpiry);
 
-  const handlePdfError = useCallback(() => {
-    setIsLoadingPdf(false);
-    setPdfError('Failed to load PDF preview. Please try downloading the file instead.');
-  }, []);
-
-  const getPreviewUrl = () => {
-    if (document.preview_url) {
-      return document.preview_url;
-    }
-    if (document.file_path) {
-      return `/storage/${document.file_path}`;
-    }
-    return `/my-records/${document.id}/preview`;
-  };
-
-  const handleDownload = () => {
-    if (isDownloading) return;
-    
-    setIsDownloading(true);
-    const downloadUrl = `/my-records/${document.id}/download`;
-    window.open(downloadUrl, '_blank');
-    
-    setTimeout(() => setIsDownloading(false), 1000);
-  };
-
-  const handleDelete = () => {
-    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
-      return;
-    }
-    
-    setIsDeleting(true);
-    router.delete(`/my-records/${document.id}`, {
-      preserveScroll: true,
-      onSuccess: () => {
-        router.visit('/my-records');
-      },
-      onFinish: () => setIsDeleting(false),
-    });
-  };
-
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password.trim()) {
-      setPasswordError('Please enter a password');
-      return;
+    if (showPasswordForm) {
+        return (
+            <ResidentLayout
+                title="Password Required"
+                breadcrumbs={[
+                    { title: 'Dashboard', href: '/portal/dashboard' },
+                    { title: 'My Records', href: '/portal/my-records' },
+                    { title: 'Password Required', href: '#' },
+                ]}
+            >
+                <Head title="Password Required" />
+                <ModernPasswordForm
+                    document={document}
+                    error={error}
+                    onSubmit={handlePasswordSubmit}
+                    isVerifying={isVerifying}
+                />
+            </ResidentLayout>
+        );
     }
 
-    setIsVerifying(true);
-    setPasswordError('');
+    // Mobile Layout
+    if (isMobile) {
+        return (
+            <>
+                <ModernFullScreenViewer
+                    document={document}
+                    previewUrl={getPreviewUrl()}
+                    isOpen={isFullscreenViewerOpen}
+                    onClose={() => setIsFullscreenViewerOpen(false)}
+                />
 
-    router.post(`/my-records/${document.id}/verify-password`, {
-      password: password,
-    }, {
-      preserveScroll: true,
-      preserveState: false,
-      onError: (errors) => {
-        setPasswordError(errors.password || 'Invalid password. Please try again.');
-        setIsVerifying(false);
-      },
-      onFinish: () => setIsVerifying(false),
-    });
-  };
+                <ResidentLayout
+                    title={`${document.name} - My Records`}
+                    breadcrumbs={[
+                        { title: 'Dashboard', href: '/portal/dashboard' },
+                        { title: 'My Records', href: '/portal/my-records' },
+                        { title: document.name, href: '#' },
+                    ]}
+                    hideMobileFooter={true}
+                >
+                    <Head title={`${document.name} - My Records`} />
 
-  const handlePrint = () => {
-    window.print();
-  };
+                    <div className="min-h-screen pb-24">
+                        <ModernMobileHeader
+                            document={document}
+                            onFullscreen={() => setIsFullscreenViewerOpen(true)}
+                            onDownload={handleDownload}
+                            canDownload={canDownload}
+                        />
 
-  const openPdfInNewTab = () => {
-    window.open(getPreviewUrl(), '_blank');
-  };
+                        <ModernMobileStats document={document} />
 
-  const handleFullscreen = () => {
-    setIsFullscreenViewerOpen(true);
-  };
-
-  const showPasswordForm = needsPassword || 
-                          (document.requires_password && !sessionExpiry);
-
-  if (showPasswordForm) {
-    return (
-      <ResidentLayout
-        title="Password Required"
-        breadcrumbs={[
-          { title: 'Dashboard', href: '/resident/dashboard' },
-          { title: 'My Records', href: '/my-records' },
-          { title: 'Password Required', href: '#' },
-        ]}
-      >
-        <Head title="Password Required" />
-        <PasswordForm
-          document={document}
-          error={error}
-          onSubmit={handlePasswordSubmit}
-          isVerifying={isVerifying}
-        />
-      </ResidentLayout>
-    );
-  }
-
-  // MOBILE LAYOUT
-  if (isMobile) {
-    return (
-      <>
-        <FullScreenDocumentViewer
-          document={document}
-          previewUrl={getPreviewUrl()}
-          isOpen={isFullscreenViewerOpen}
-          onClose={() => setIsFullscreenViewerOpen(false)}
-        />
-
-        <ResidentLayout
-          title={`${document.name} - My Records`}
-          breadcrumbs={[
-            { title: 'Dashboard', href: '/resident/dashboard' },
-            { title: 'My Records', href: '/my-records' },
-            { title: document.name, href: '#' },
-          ]}
-          hideMobileFooter={true}
-        >
-          <Head title={`${document.name} - My Records`} />
-
-          <div className="min-h-screen pb-24">
-            <div className="sticky top-0 z-40 bg-white border-b">
-              <div className="px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <Link href="/my-records" className="flex-shrink-0">
-                    <Button variant="ghost" size="sm" className="gap-1 p-2">
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                  </Link>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-blue-50">
-                        <FileIcon className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <h1 className="text-sm font-bold text-gray-900 truncate" title={document.name}>
-                        {document.name}
-                      </h1>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1 mt-1">
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
-                        <Folder className="h-2.5 w-2.5 mr-1" />
-                        {safeCategoryName}
-                      </Badge>
-                      
-                      <div className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border",
-                        getStatusConfig(safeStatus).bgColor,
-                        getStatusConfig(safeStatus).color
-                      )}>
-                        {(() => {
-                          const Icon = getStatusConfig(safeStatus).icon;
-                          return <Icon className="h-2.5 w-2.5" />;
-                        })()}
-                        {getStatusConfig(safeStatus).label}
-                      </div>
-                    </div>
-                  </div>
-
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <Button variant="outline" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="bottom" className="rounded-t-xl">
-                      <SheetHeader className="text-left">
-                        <SheetTitle>Document Actions</SheetTitle>
-                      </SheetHeader>
-                      <div className="mt-4 space-y-2">
-                        {canDownload && !safeRestrictDownload && (
-                          <Button
-                            onClick={handleDownload}
-                            className="w-full justify-start gap-3 h-12"
-                            variant="outline"
-                          >
-                            <Download className="h-5 w-5" />
-                            <span>Download</span>
-                          </Button>
-                        )}
-                        
-                        <Button
-                          onClick={handleFullscreen}
-                          className="w-full justify-start gap-3 h-12"
-                          variant="outline"
-                        >
-                          <Maximize2 className="h-5 w-5" />
-                          <span>Fullscreen View</span>
-                        </Button>
-                        
-                        {!safeRestrictPrint && (
-                          <Button
-                            onClick={handlePrint}
-                            className="w-full justify-start gap-3 h-12"
-                            variant="outline"
-                          >
-                            <Printer className="h-5 w-5" />
-                            <span>Print</span>
-                          </Button>
-                        )}
-                        
-                        {canDelete && (
-                          <Button
-                            onClick={handleDelete}
-                            className="w-full justify-start gap-3 h-12 text-red-600"
-                            variant="outline"
-                          >
-                            <Trash2 className="h-5 w-5" />
-                            <span>Delete</span>
-                          </Button>
-                        )}
-                      </div>
-                    </SheetContent>
-                  </Sheet>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-4 py-4">
-              <MobileQuickStats document={document} />
-
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-4">
-                  <TabsTrigger value="preview">Preview</TabsTrigger>
-                  <TabsTrigger value="details">Details</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="preview" className="space-y-4">
-                  <Card className="border-0 shadow-sm">
-                    <CardContent className="p-4">
-                      {isPdf ? (
-                        <div className="space-y-3">
-                          <div className="border rounded-lg overflow-hidden bg-gray-50 h-[300px]">
-                            {isLoadingPdf && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-gray-50/90 z-10">
-                                <div className="text-center space-y-2">
-                                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
-                                  <p className="text-gray-600 font-medium text-sm">Loading PDF...</p>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {pdfError && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-gray-50/90 z-10">
-                                <div className="text-center p-4 max-w-md space-y-3">
-                                  <AlertCircle className="h-8 w-8 text-red-500 mx-auto" />
-                                  <div>
-                                    <h3 className="text-base font-medium text-gray-900 mb-1">Preview Unavailable</h3>
-                                    <p className="text-gray-600 text-sm">{pdfError}</p>
-                                  </div>
-                                  {!safeRestrictDownload && (
-                                    <Button onClick={handleDownload} className="gap-2 text-sm">
-                                      <Download className="h-4 w-4" />
-                                      Download Instead
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                            
-                            <iframe
-                              src={getPreviewUrl()}
-                              title={document.name}
-                              className="w-full h-full"
-                              style={{
-                                transform: `scale(${zoomLevel / 100})`,
-                                transformOrigin: '0 0',
-                                width: `${10000 / zoomLevel}%`,
-                                height: `${10000 / zoomLevel}%`,
-                              }}
-                              onLoad={handlePdfLoad}
-                              onLoadStart={handlePdfLoadStart}
-                              onError={handlePdfError}
+                        <div className="space-y-4 py-4">
+                            <ModernMobilePreview
+                                document={document}
+                                previewUrl={getPreviewUrl()}
+                                onFullscreen={() => setIsFullscreenViewerOpen(true)}
                             />
-                          </div>
-                          
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setZoomLevel(prev => Math.max(prev - 25, 50))}
-                                disabled={zoomLevel <= 50}
-                                className="h-7 w-7 p-0"
-                              >
-                                <ZoomOut className="h-3 w-3" />
-                              </Button>
-                              <span className="text-xs font-medium px-1">{zoomLevel}%</span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setZoomLevel(prev => Math.min(prev + 25, 200))}
-                                disabled={zoomLevel >= 200}
-                                className="h-7 w-7 p-0"
-                              >
-                                <ZoomIn className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleFullscreen}
-                              className="h-7 px-2 text-xs bg-blue-50 text-blue-700 border-blue-200"
-                            >
-                              <Maximize2 className="h-3 w-3 mr-1" />
-                              Fullscreen
-                            </Button>
-                          </div>
-                        </div>
-                      ) : isImage && safeFilePath ? (
-                        <div className="border rounded-lg overflow-hidden bg-gray-50">
-                          <img 
-                            src={`/storage/${safeFilePath}`}
-                            alt={document.name}
-                            className="w-full h-auto max-h-[50vh] object-contain mx-auto"
-                            loading="lazy"
-                          />
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
-                          <div className="inline-block p-3 rounded-full bg-white border-4 border-gray-100 mb-3">
-                            <FileIcon className="h-12 w-12 text-gray-400" />
-                          </div>
-                          <h3 className="font-semibold text-base text-gray-900 mb-2">{safeFileName}</h3>
-                          <div className="flex flex-col items-center gap-1 text-sm text-gray-600 mb-4">
-                            {safeFileExtension && (
-                              <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                                {safeFileExtension.toUpperCase()}
-                              </span>
-                            )}
-                            <span className="text-xs">{safeFileSizeHuman}</span>
-                          </div>
-                          {!safeRestrictDownload && (
-                            <Button 
-                              onClick={handleDownload}
-                              disabled={isDownloading}
-                              className="gap-2 text-sm"
-                            >
-                              <Download className="h-4 w-4" />
-                              {isDownloading ? 'Downloading...' : 'Download File'}
-                            </Button>
-                          )}
-                        </div>
-                      )}
 
-                      {safeDescription && (
-                        <div className="mt-4 pt-4 border-t">
-                          <h4 className="font-medium text-gray-700 text-sm mb-2">Description</h4>
-                          <p className="text-gray-600 text-sm">{safeDescription}</p>
+                            <ModernMobileDetails document={document} />
+                            <ModernMobileSecurity document={document} />
+                            <ModernMobileRelated relatedDocuments={relatedDocuments} />
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
 
-                  <MobileSecurityInfo document={document} securityOptions={safeSecurityOptions} />
-                </TabsContent>
-                
-                <TabsContent value="details" className="space-y-4">
-                  <MobileDocumentDetails document={document} />
+                        <ModernMobileBottomBar
+                            document={document}
+                            onDownload={handleDownload}
+                            onFullscreen={() => setIsFullscreenViewerOpen(true)}
+                            canDownload={canDownload}
+                        />
+                    </div>
+                </ResidentLayout>
+            </>
+        );
+    }
 
-                  {relatedDocuments.length > 0 && (
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base font-semibold">Related Documents</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {relatedDocuments.slice(0, 3).map((relatedDoc) => {
-                            const RelatedFileIcon = getFileIcon(relatedDoc.file_extension || '');
-                            return (
-                              <Link
-                                key={relatedDoc.id}
-                                href={`/my-records/${relatedDoc.id}`}
-                                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                              >
-                                <div className="p-2 rounded-md bg-gray-100">
-                                  <RelatedFileIcon className="h-4 w-4 text-gray-600" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-sm truncate" title={relatedDoc.name}>
-                                    {relatedDoc.name}
-                                  </p>
-                                  <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                                    {relatedDoc.file_extension && (
-                                      <span>{relatedDoc.file_extension.toUpperCase()}</span>
-                                    )}
-                                    {relatedDoc.file_size_human && (
-                                      <>
-                                        <span>•</span>
-                                        <span>{relatedDoc.file_size_human}</span>
-                                      </>
-                                    )}
-                                    {relatedDoc.requires_password && (
-                                      <Lock className="h-3 w-3 text-amber-500" />
-                                    )}
-                                  </div>
-                                </div>
-                                <ChevronRight className="h-4 w-4 text-gray-400" />
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {safeTags.length > 0 && (
-                    <Card className="border-0 shadow-sm">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base font-semibold">Tags</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex flex-wrap gap-2">
-                          {safeTags.map((tag, index) => (
-                            <Badge key={index} variant="secondary" className="gap-1">
-                              <Tag className="h-3 w-3" />
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            <MobileDocumentActions
-              document={document}
-              onDownload={handleDownload}
-              onFullscreen={handleFullscreen}
-              onNewTab={openPdfInNewTab}
-              onPrint={handlePrint}
-              onDelete={handleDelete}
-              canDownload={canDownload}
-              canDelete={canDelete}
-              isPdf={isPdf}
-              restrictDownload={safeRestrictDownload}
-              restrictPrint={safeRestrictPrint}
+    // Desktop Layout
+    return (
+        <>
+            <ModernFullScreenViewer
+                document={document}
+                previewUrl={getPreviewUrl()}
+                isOpen={isFullscreenViewerOpen}
+                onClose={() => setIsFullscreenViewerOpen(false)}
             />
-          </div>
-        </ResidentLayout>
-      </>
+
+            <ResidentLayout
+                title={`${document.name} - My Records`}
+                breadcrumbs={[
+                    { title: 'Dashboard', href: '/portal/dashboard' },
+                    { title: 'My Records', href: '/portal/my-records' },
+                    { title: document.name, href: '#' },
+                ]}
+            >
+                <Head title={`${document.name} - My Records`} />
+
+                <div className="pb-8">
+                    <ModernDesktopHeader
+                        document={document}
+                        onFullscreen={() => setIsFullscreenViewerOpen(true)}
+                        onDownload={handleDownload}
+                        canDownload={canDownload}
+                        isDownloading={isDownloading}
+                    />
+
+                    <div className="px-8 py-6 space-y-6">
+                        <ModernDesktopStats document={document} />
+
+                        <div className="grid grid-cols-3 gap-6">
+                            <div className="col-span-2 space-y-6">
+                                <ModernDesktopPreview
+                                    document={document}
+                                    previewUrl={getPreviewUrl()}
+                                    onFullscreen={() => setIsFullscreenViewerOpen(true)}
+                                />
+                                <ModernDesktopDetails document={document} />
+                            </div>
+
+                            <div className="col-span-1">
+                                <ModernDesktopSidebar
+                                    document={document}
+                                    relatedDocuments={relatedDocuments}
+                                    onFullscreen={() => setIsFullscreenViewerOpen(true)}
+                                    onDownload={handleDownload}
+                                    canDownload={canDownload}
+                                    isDownloading={isDownloading}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <ModernLoadingOverlay loading={isDeleting} message="Deleting document..." />
+            </ResidentLayout>
+        </>
     );
-  }
-
-  // DESKTOP LAYOUT
-  return (
-    <>
-      <FullScreenDocumentViewer
-        document={document}
-        previewUrl={getPreviewUrl()}
-        isOpen={isFullscreenViewerOpen}
-        onClose={() => setIsFullscreenViewerOpen(false)}
-      />
-
-      <ResidentLayout
-        title={`${document.name} - My Records`}
-        breadcrumbs={[
-          { title: 'Dashboard', href: '/resident/dashboard' },
-          { title: 'My Records', href: '/my-records' },
-          { title: document.name, href: '#' },
-        ]}
-      >
-        <Head title={`${document.name} - My Records`} />
-
-        <div className="pb-6">
-          <div className="bg-white border-b">
-            <div className="px-6 py-6">
-              <div className="flex items-start gap-3">
-                <Link href="/my-records">
-                  <Button variant="ghost" size="sm" className="gap-2 text-gray-600 hover:text-gray-900">
-                    <ArrowLeft className="h-4 w-4" />
-                    Back
-                  </Button>
-                </Link>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="p-2 rounded-lg bg-blue-50">
-                      <FileIcon className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-gray-900 truncate" title={document.name}>
-                      {document.name}
-                    </h1>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className={cn(
-                      "gap-1.5 border",
-                      document.category ? 'bg-gray-50' : 'bg-blue-50 border-blue-200'
-                    )}>
-                      <Folder className="h-3 w-3" />
-                      {safeCategoryName}
-                    </Badge>
-                    
-                    {safeIsPublic && (
-                      <Badge variant="outline" className="gap-1.5 bg-green-50 text-green-700 border-green-200">
-                        <Globe className="h-3 w-3" />
-                        Public
-                      </Badge>
-                    )}
-                    
-                    {document.requires_password && (
-                      <Badge variant="outline" className="gap-1.5 bg-amber-50 text-amber-700 border-amber-200">
-                        <Lock className="h-3 w-3" />
-                        Protected
-                        {timeRemaining && !isSessionExpired && (
-                          <span className="ml-1 font-mono">{timeRemaining}</span>
-                        )}
-                      </Badge>
-                    )}
-
-                    <div className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border",
-                      getStatusConfig(safeStatus).bgColor,
-                      getStatusConfig(safeStatus).color
-                    )}>
-                      {(() => {
-                        const Icon = getStatusConfig(safeStatus).icon;
-                        return <Icon className="h-3 w-3" />;
-                      })()}
-                      {getStatusConfig(safeStatus).label}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          onClick={handleFullscreen}
-                          className="gap-2 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                        >
-                          <Maximize2 className="h-4 w-4" />
-                          Fullscreen
-                          <kbd className="ml-2 text-xs bg-white border border-blue-300 rounded px-1 py-0.5">
-                            F11
-                          </kbd>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Open in fullscreen mode (F11 or Ctrl+F)</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  
-                  {canDownload && !safeRestrictDownload && (
-                    <Button
-                      onClick={handleDownload}
-                      disabled={isDownloading}
-                      className="gap-2"
-                    >
-                      {isDownloading ? (
-                        <>
-                          <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                          <span>Downloading</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="h-4 w-4" />
-                          <span>Download</span>
-                        </>
-                      )}
-                    </Button>
-                  )}
-                  <Button variant="outline" size="icon" className="hidden lg:inline-flex">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-6 pb-6">
-           
-            {(safeRestrictDownload || safeRestrictPrint) && (
-              <div className="mb-4 space-y-2">
-                {safeRestrictDownload && (
-                  <Alert className="bg-amber-50 border-amber-200">
-                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                    <AlertTitle className="text-sm font-medium text-amber-800">
-                      Download Restricted
-                    </AlertTitle>
-                    <AlertDescription className="text-sm text-amber-700">
-                      Downloading this document is not permitted.
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {safeRestrictPrint && (
-                  <Alert className="bg-amber-50 border-amber-200">
-                    <Printer className="h-4 w-4 text-amber-600" />
-                    <AlertTitle className="text-sm font-medium text-amber-800">
-                      Print Restricted
-                    </AlertTitle>
-                    <AlertDescription className="text-sm text-amber-700">
-                      Printing this document is not permitted.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg font-semibold">Document Preview</CardTitle>
-                      {isPdf && (
-                        <div className="flex items-center gap-1">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setZoomLevel(prev => Math.max(prev - 25, 50))}
-                                  disabled={zoomLevel <= 50}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <ZoomOut className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Zoom Out</TooltipContent>
-                            </Tooltip>
-
-                            <span className="text-sm font-medium px-2">{zoomLevel}%</span>
-
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setZoomLevel(prev => Math.min(prev + 25, 200))}
-                                  disabled={zoomLevel >= 200}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <ZoomIn className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Zoom In</TooltipContent>
-                            </Tooltip>
-
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setZoomLevel(100)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <RotateCw className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Reset Zoom</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    {isPdf ? (
-                      <div className="relative border rounded-lg overflow-hidden bg-gray-50 h-[500px]">
-                        {isLoadingPdf && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-gray-50/90 z-10">
-                            <div className="text-center space-y-3">
-                              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
-                              <p className="text-gray-600 font-medium text-base">Loading PDF preview...</p>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {pdfError && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-gray-50/90 z-10">
-                            <div className="text-center p-6 max-w-md space-y-4">
-                              <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
-                              <div>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">Preview Unavailable</h3>
-                                <p className="text-gray-600 text-base">{pdfError}</p>
-                              </div>
-                              {!safeRestrictDownload && (
-                                <Button onClick={handleDownload} className="gap-2 text-base">
-                                  <Download className="h-4 w-4" />
-                                  Download Instead
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        
-                        <iframe
-                          src={getPreviewUrl()}
-                          title={document.name}
-                          className="w-full h-full"
-                          style={{
-                            transform: `scale(${zoomLevel / 100})`,
-                            transformOrigin: '0 0',
-                            width: `${10000 / zoomLevel}%`,
-                            height: `${10000 / zoomLevel}%`,
-                          }}
-                          onLoad={handlePdfLoad}
-                          onLoadStart={handlePdfLoadStart}
-                          onError={handlePdfError}
-                        />
-                      </div>
-                    ) : isImage && safeFilePath ? (
-                      <div className="border rounded-lg overflow-hidden bg-gray-50">
-                        <img 
-                          src={`/storage/${safeFilePath}`}
-                          alt={document.name}
-                          className="w-full h-auto max-h-[400px] object-contain mx-auto"
-                          loading="lazy"
-                        />
-                      </div>
-                    ) : (
-                      <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
-                        <div className="inline-block p-4 rounded-full bg-white border-4 border-gray-100 mb-4">
-                          <FileIcon className="h-16 w-16 text-gray-400" />
-                        </div>
-                        <h3 className="font-semibold text-lg text-gray-900 mb-2">{safeFileName}</h3>
-                        <div className="flex flex-col items-center gap-1 text-sm text-gray-600 mb-6">
-                          {safeFileExtension && (
-                            <span className="px-2 py-1 bg-gray-100 rounded text-sm">
-                              {safeFileExtension.toUpperCase()}
-                            </span>
-                          )}
-                          <span className="text-sm">{safeFileSizeHuman}</span>
-                          {safeViewCount > 0 && (
-                            <span className="flex items-center gap-1 text-sm">
-                              <Eye className="h-4 w-4" />
-                              {safeViewCount} views
-                            </span>
-                          )}
-                        </div>
-                        {!safeRestrictDownload && (
-                          <Button 
-                            onClick={handleDownload}
-                            disabled={isDownloading}
-                            size="lg"
-                            className="gap-2 text-base"
-                          >
-                            <Download className="h-5 w-5" />
-                            {isDownloading ? 'Downloading...' : 'Download File'}
-                          </Button>
-                        )}
-                      </div>
-                    )}
-
-                    {safeDescription && (
-                      <div className="mt-6 pt-6 border-t">
-                        <h4 className="font-medium text-gray-700 text-base mb-2">Description</h4>
-                        <p className="text-gray-600 whitespace-pre-line text-base">{safeDescription}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-semibold">Document Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-                            Reference Number
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <code className="px-3 py-2 bg-gray-50 rounded-lg text-sm font-mono flex-1 truncate">
-                              {safeReferenceNumber}
-                            </code>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                if (document.reference_number) {
-                                  navigator.clipboard.writeText(document.reference_number);
-                                }
-                              }}
-                              className="h-9 w-9 p-0"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-                            Document Owner
-                          </label>
-                          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                              <User className="h-4 w-4 text-blue-600" />
-                            </div>
-                            <span className="font-medium text-base truncate">{safeResidentName}</span>
-                          </div>
-                        </div>
-
-                        {document.issue_date && (
-                          <div>
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-                              Issue Date
-                            </label>
-                            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                              <Calendar className="h-4 w-4 text-gray-400" />
-                              <span className="text-base">{formatDate(document.issue_date)}</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {document.document_type && (
-                          <div>
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-                              Document Type
-                            </label>
-                            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                              <FileText className="h-4 w-4 text-gray-400" />
-                              <span className="text-base">{document.document_type.name}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-                            Expiry Date
-                          </label>
-                          <div className={cn(
-                            "flex items-center gap-2 p-3 rounded-lg text-base",
-                            isExpired 
-                              ? "bg-red-50 text-red-700 border border-red-200" 
-                              : "bg-gray-50"
-                          )}>
-                            <Clock className="h-4 w-4" />
-                            <span className={isExpired ? "font-medium" : ""}>
-                              {formatDate(document.expiry_date)}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-                            Upload Details
-                          </label>
-                          <div className="space-y-2">
-                            {document.created_at && (
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Upload Date:</span>
-                                <span className="font-medium">{formatDate(document.created_at)}</span>
-                              </div>
-                            )}
-                            {document.uploaded_at && (
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Upload Time:</span>
-                                <span className="font-medium">{formatDateTime(document.uploaded_at)}</span>
-                              </div>
-                            )}
-                            {document.updated_at && (
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Last Updated:</span>
-                                <span className="font-medium">{formatDate(document.updated_at)}</span>
-                              </div>
-                            )}
-                            {document.uploaded_by_user && (
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Uploaded By:</span>
-                                <span className="font-medium truncate max-w-[50%]">
-                                  {document.uploaded_by_user.name}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {safeScanQuality && safeScanQuality !== 'Not specified' && (
-                          <div>
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 block">
-                              Scan Quality
-                            </label>
-                            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                              <Shield className="h-4 w-4 text-gray-400" />
-                              <span className="text-base capitalize">{safeScanQuality.replace('_', ' ')}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {safeMetadata && Object.keys(safeMetadata).length > 0 && (
-                      <div className="mt-6 pt-6 border-t">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium text-gray-700 text-base">Metadata</h4>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {}}
-                            className="text-xs"
-                          >
-                            Show Metadata
-                          </Button>
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {Object.keys(safeMetadata).length} metadata fields available
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="space-y-6">
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                      <ShieldCheck className="h-5 w-5 text-blue-600" />
-                      Security & Features
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-3">
-                      {document.requires_password && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Password Protection</span>
-                          <div className="flex items-center gap-2">
-                            <Check className="h-4 w-4 text-green-600" />
-                            {timeRemaining && !isSessionExpired && (
-                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                                {timeRemaining}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Access Level</span>
-                        <Badge variant={safeIsPublic ? 'default' : 'secondary'}>
-                          {safeIsPublic ? 'Public' : 'Private'}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Document Status</span>
-                        <div className={cn(
-                          "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium",
-                          getStatusConfig(safeStatus).bgColor,
-                          getStatusConfig(safeStatus).color
-                        )}>
-                          {(() => {
-                            const Icon = getStatusConfig(safeStatus).icon;
-                            return <Icon className="h-3 w-3" />;
-                          })()}
-                          {getStatusConfig(safeStatus).label}
-                        </div>
-                      </div>
-                    </div>
-
-                    {(safeAddWatermark || safeEnableEncryption || safeAuditLogAccess) && (
-                      <div className="pt-4 border-t">
-                        <h4 className="text-sm font-medium text-gray-700 mb-3">Advanced Security</h4>
-                        <div className="space-y-2">
-                          {safeAddWatermark && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="w-6 h-6 rounded bg-blue-100 flex items-center justify-center">
-                                <FileText className="h-3 w-3 text-blue-600" />
-                              </div>
-                              <span className="text-gray-600">Watermark Protection</span>
-                            </div>
-                          )}
-                          {safeEnableEncryption && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="w-6 h-6 rounded bg-purple-100 flex items-center justify-center">
-                                <FileLock className="h-3 w-3 text-purple-600" />
-                              </div>
-                              <span className="text-gray-600">File Encryption</span>
-                            </div>
-                          )}
-                          {safeAuditLogAccess && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="w-6 h-6 rounded bg-amber-100 flex items-center justify-center">
-                                <EyeOff className="h-3 w-3 text-amber-600" />
-                              </div>
-                              <span className="text-gray-600">Access Audit Log</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {(safeRestrictDownload || safeRestrictPrint) && (
-                      <div className="pt-4 border-t">
-                        <h4 className="text-sm font-medium text-gray-700 mb-3">Restrictions</h4>
-                        <div className="space-y-2">
-                          {safeRestrictDownload && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="w-6 h-6 rounded bg-red-100 flex items-center justify-center">
-                                <Download className="h-3 w-3 text-red-600" />
-                              </div>
-                              <span className="text-gray-600">Download Restricted</span>
-                            </div>
-                          )}
-                          {safeRestrictPrint && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <div className="w-6 h-6 rounded bg-red-100 flex items-center justify-center">
-                                <Printer className="h-3 w-3 text-red-600" />
-                              </div>
-                              <span className="text-gray-600">Print Restricted</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="pt-4 border-t">
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Document Statistics</h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="text-center p-3 border rounded-lg bg-blue-50 border-blue-100">
-                          <div className="text-xl font-bold text-blue-600">{safeViewCount}</div>
-                          <div className="text-xs text-gray-600">Total Views</div>
-                        </div>
-                        <div className="text-center p-3 border rounded-lg bg-green-50 border-green-100">
-                          <div className="text-xl font-bold text-green-600">{safeDownloadCount}</div>
-                          <div className="text-xs text-gray-600">Downloads</div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {canDownload && !safeRestrictDownload && (
-                      <Button
-                        variant="outline"
-                        onClick={handleDownload}
-                        disabled={isDownloading}
-                        className="w-full justify-start gap-2"
-                      >
-                        <Download className="h-4 w-4" />
-                        Download Document
-                      </Button>
-                    )}
-                    
-                    <Button
-                      variant="outline"
-                      onClick={handleFullscreen}
-                      className="w-full justify-start gap-2 bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                      Fullscreen View
-                      <span className="ml-auto text-xs text-blue-500">F11</span>
-                    </Button>
-                    
-                    {isPdf && !safeRestrictPrint && (
-                      <Button
-                        variant="outline"
-                        onClick={openPdfInNewTab}
-                        className="w-full justify-start gap-2"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        Open in New Tab
-                      </Button>
-                    )}
-                    
-                    {!safeRestrictPrint && (
-                      <Button
-                        variant="outline"
-                        onClick={handlePrint}
-                        className="w-full justify-start gap-2"
-                      >
-                        <Printer className="h-4 w-4" />
-                        Print
-                      </Button>
-                    )}
-                    
-                    <Link href="/my-records" className="block">
-                      <Button variant="ghost" className="w-full justify-start gap-2">
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to All Documents
-                      </Button>
-                    </Link>
-                    
-                    {document.requires_password && isSessionExpired && (
-                      <Button
-                        variant="destructive"
-                        onClick={() => window.location.reload()}
-                        className="w-full justify-start gap-2"
-                      >
-                        <Lock className="h-4 w-4" />
-                        Re-enter Password
-                      </Button>
-                    )}
-                    
-                    {canDelete && (
-                      <Button
-                        variant="destructive"
-                        onClick={handleDelete}
-                        disabled={isDeleting}
-                        className="w-full justify-start gap-2"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        {isDeleting ? 'Deleting...' : 'Delete Document'}
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {relatedDocuments.length > 0 && (
-                  <Card className="border-0 shadow-sm">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg font-semibold">Related Documents</CardTitle>
-                      <CardDescription className="text-sm">
-                        Other documents in {safeCategoryName}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {relatedDocuments.map((relatedDoc) => {
-                          const RelatedFileIcon = getFileIcon(relatedDoc.file_extension || '');
-                          const isRelatedPdf = relatedDoc.file_extension?.toLowerCase() === 'pdf';
-                          
-                          return (
-                            <Link
-                              key={relatedDoc.id}
-                              href={`/my-records/${relatedDoc.id}`}
-                              className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors group"
-                            >
-                              <div className={cn(
-                                "p-2 rounded-md flex-shrink-0",
-                                isRelatedPdf 
-                                  ? "bg-blue-50 group-hover:bg-blue-100" 
-                                  : "bg-gray-100 group-hover:bg-gray-200"
-                              )}>
-                                <RelatedFileIcon className="h-4 w-4 text-gray-600" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate" title={relatedDoc.name}>
-                                  {relatedDoc.name}
-                                </p>
-                                <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                                  {relatedDoc.file_extension && (
-                                    <span>{relatedDoc.file_extension.toUpperCase()}</span>
-                                  )}
-                                  {relatedDoc.file_size_human && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{relatedDoc.file_size_human}</span>
-                                    </>
-                                  )}
-                                  {relatedDoc.requires_password && (
-                                    <Lock className="h-3 w-3 text-amber-500" />
-                                  )}
-                                </div>
-                              </div>
-                              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {safeTags.length > 0 && (
-                  <Card className="border-0 shadow-sm">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg font-semibold">Tags</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        {safeTags.map((tag, index) => (
-                          <Badge key={index} variant="secondary" className="gap-1">
-                            <Tag className="h-3 w-3" />
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </ResidentLayout>
-    </>
-  );
 }

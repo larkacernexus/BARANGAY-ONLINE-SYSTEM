@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Notifications\FeeCreatedNotification;
 use Illuminate\Support\Facades\Log;
 
 class FeeController extends Controller
@@ -731,60 +732,7 @@ public function index(Request $request)
         ];
     }
 
-    // Store new fee with bulk creation support
-    public function store(Request $request)
-    {
-        DB::beginTransaction();
-
-        try {
-            Log::info('FeeController@store started', [
-                'user_id' => Auth::id(),
-                'bulk_type' => $request->bulk_type ?? 'none',
-                'bulk_selection_count' => $this->getBulkSelectionCount($request)
-            ]);
-
-            $bulkType = $request->bulk_type ?? 'none';
-            $createdFees = [];
-
-            if ($bulkType === 'none') {
-                $fee = $this->createSingleFee($request);
-                if ($fee) {
-                    $createdFees[] = $fee;
-                }
-            } else {
-                $createdFees = $this->createBulkFees($request);
-            }
-
-            DB::commit();
-
-            Log::info('Fee(s) created successfully', [
-                'total_fees_created' => count($createdFees),
-                'fee_ids' => collect($createdFees)->pluck('id')->toArray()
-            ]);
-
-            if (count($createdFees) === 1) {
-                return redirect()->route('fees.show', $createdFees[0])
-                    ->with('success', 'Fee created successfully.');
-            } else {
-                return redirect()->route('fees.index')
-                    ->with('success', 'Successfully created ' . count($createdFees) . ' fees.');
-            }
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            DB::rollBack();
-            throw $e;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Fee creation failed', [
-                'user_id' => Auth::id(),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return back()->with('error', 'Failed to create fee. Please try again.');
-        }
-    }
+ 
 
     private function getBulkSelectionCount(Request $request)
     {
@@ -1561,7 +1509,7 @@ public function show(Fee $fee)
                 'new_status' => $fee->status
             ]);
 
-            return redirect()->route('fees.show', $fee)
+            return redirect()->route('admin.fees.show', $fee)
                 ->with('success', 'Payment of ₱' . number_format($validated['payment_amount'], 2) . ' recorded successfully. OR#: ' . $payment->or_number);
 
         } catch (\Exception $e) {
@@ -1719,7 +1667,7 @@ public function show(Fee $fee)
                     'allowed_statuses' => ['pending', 'issued']
                 ]);
 
-                return redirect()->route('fees.show', $fee)
+                return redirect()->route('admin.fees.show', $fee)
                     ->with('error', 'Only pending or issued fees can be edited.');
             }
 
@@ -1871,7 +1819,7 @@ public function show(Fee $fee)
                 'new_status' => $fee->status
             ]);
 
-            return redirect()->route('fees.show', $fee)
+            return redirect()->route('admin.fees.show', $fee)
                 ->with('success', 'Fee updated successfully.');
 
         } catch (\Exception $e) {

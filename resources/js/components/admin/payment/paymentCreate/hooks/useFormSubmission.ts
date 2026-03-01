@@ -55,7 +55,7 @@ export function useFormSubmission(initialFormData: PaymentFormData, isClearanceP
         
         console.log('🚀 Submitting form with validated data');
         
-        post('/payments', {
+        post('/admin/payments', {
             ...submissionData,
             preserveScroll: true,
             onSuccess: () => {

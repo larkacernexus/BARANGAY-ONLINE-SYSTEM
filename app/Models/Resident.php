@@ -532,6 +532,28 @@ class Resident extends Model
         });
     }
 
+    // Add to RELATIONSHIPS section
+        public function businesses(): HasMany
+        {
+            return $this->hasMany(Business::class, 'owner_id');
+        }
+
+        // Add to ACCESSORS section
+        public function getBusinessCountAttribute(): int
+        {
+            return $this->businesses()->count();
+        }
+
+        public function getIsBusinessOwnerAttribute(): bool
+        {
+            return $this->businesses()->exists();
+        }
+
+        public function getActiveBusinessesAttribute()
+        {
+            return $this->businesses()->where('status', 'active')->get();
+        }
+
     public function activities()
     {
         return $this->morphMany(ActivityModel::class, 'subject');

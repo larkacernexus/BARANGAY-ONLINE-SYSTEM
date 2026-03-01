@@ -261,7 +261,7 @@ export default function ClearanceTypesContent({
                                 onClick: onClearFilters
                             } : {
                                 label: "Create Clearance Type",
-                                href: "/clearance-types/create"
+                                href: "/admin/clearance-types/create"
                             }}
                             className="py-12 sm:py-16"
                         />

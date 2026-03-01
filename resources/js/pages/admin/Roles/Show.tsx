@@ -47,6 +47,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { route } from 'ziggy-js';
 
 interface Permission {
     id: number;
@@ -116,10 +117,10 @@ export default function RolesShow({ role }: RolesShowProps) {
 
     const handleDelete = () => {
         if (confirm(`Are you sure you want to delete role "${role.name}"? This action cannot be undone.`)) {
-            router.delete(route('roles.destroy', role.id), {
+            router.delete(route('admin.roles.destroy', role.id), {
                 preserveScroll: true,
                 onSuccess: () => {
-                    router.visit(route('roles.index'));
+                    router.visit(route('admin.roles.index'));
                 },
                 onError: (errors) => {
                     // Handle errors from controller
@@ -198,7 +199,7 @@ export default function RolesShow({ role }: RolesShowProps) {
     ] : [];
 
     const handleManagePermissions = () => {
-        router.get(route('roles.permissions', role.id));
+        router.get(route('admin.roles.permissions', role.id));
     };
 
     const handleExportDetails = () => {
@@ -234,9 +235,9 @@ export default function RolesShow({ role }: RolesShowProps) {
         <AdminLayout
             title={`Role: ${role.name}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: route('dashboard') },
-                { title: 'Roles', href: route('roles.index') },
-                { title: role.name, href: route('roles.show', role.id) }
+                { title: 'Dashboard', href: route('admin.dashboard') },
+                { title: 'Roles', href: route('admin.roles.index') },
+                { title: role.name, href: route('admin.roles.show', role.id) }
             ]}
         >
             <Head title={`Role: ${role.name}`} />
@@ -254,7 +255,7 @@ export default function RolesShow({ role }: RolesShowProps) {
                 {/* Header with Actions */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <Link href={route('roles.index')}>
+                        <Link href={route('admin.roles.index')}>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                 <ArrowLeft className="h-4 w-4" />
                                 <span className="sr-only">Back</span>
@@ -305,7 +306,7 @@ export default function RolesShow({ role }: RolesShowProps) {
                             <DropdownMenuContent align="end" className="w-48">
                                 {!role.is_system_role && (
                                     <DropdownMenuItem asChild>
-                                        <Link href={route('roles.edit', role.id)} className="flex items-center cursor-pointer">
+                                        <Link href={route('admin.roles.edit', role.id)} className="flex items-center cursor-pointer">
                                             <Edit className="mr-2 h-4 w-4" />
                                             <span>Edit Role</span>
                                         </Link>
@@ -365,7 +366,7 @@ export default function RolesShow({ role }: RolesShowProps) {
                         </DropdownMenu>
 
                         {!role.is_system_role && (
-                            <Link href={route('roles.edit', role.id)}>
+                            <Link href={route('admin.roles.edit', role.id)}>
                                 <Button size="sm">
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit Role
@@ -537,7 +538,7 @@ export default function RolesShow({ role }: RolesShowProps) {
                                             variant="outline" 
                                             className="w-full justify-start h-10"
                                             onClick={() => {
-                                                router.get(route('roles.create'), {
+                                                router.get(route('admin.roles.create'), {
                                                     duplicate: role.id,
                                                 });
                                             }}

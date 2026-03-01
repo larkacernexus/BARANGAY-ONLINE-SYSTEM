@@ -53,8 +53,8 @@ interface DocumentType {
     category: string;
     is_required: boolean;
     sort_order: number;
-    accepted_formats: string[];
-    max_file_size: number;
+    accepted_formats?: string[]; // Made optional with ?
+    max_file_size?: number; // Made optional with ?
     is_active: boolean;
 }
 
@@ -178,12 +178,19 @@ export default function CreateClearanceType({
     const filteredDocumentTypes = documentTypes.filter(doc => {
         const matchesCategory = documentCategory === 'all' || doc.category === documentCategory;
         const matchesSearch = doc.name.toLowerCase().includes(searchDocument.toLowerCase()) ||
-                            doc.description.toLowerCase().includes(searchDocument.toLowerCase());
+                            (doc.description && doc.description.toLowerCase().includes(searchDocument.toLowerCase()));
         return matchesCategory && matchesSearch;
     });
 
-    // Get unique categories from document types
-    const documentCategories = ['all', ...Array.from(new Set(documentTypes.map(doc => doc.category)))];
+    // Get unique categories from document types - with safe check
+    const documentCategories = [
+        'all', 
+        ...Array.from(new Set(
+            documentTypes
+                .map(doc => doc.category)
+                .filter(category => category != null && category !== '') // Filter out null/undefined/empty
+        ))
+    ];
 
     // Resident fields for eligibility criteria
     const residentFields = [
@@ -205,9 +212,9 @@ export default function CreateClearanceType({
         <AppLayout
             title="Create Clearance Type"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Clearance Types', href: '/clearance-types' },
-                { title: 'Create Type', href: '/clearance-types/create' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Clearance Types', href: '/admin/clearance-types' },
+                { title: 'Create Type', href: '/admin/clearance-types/create' }
             ]}
         >
             <form onSubmit={submit}>
@@ -215,7 +222,7 @@ export default function CreateClearanceType({
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href="/clearance-types">
+                            <Link href="/admin/clearance-types">
                                 <Button variant="ghost" size="sm">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
@@ -229,7 +236,7 @@ export default function CreateClearanceType({
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Link href="/clearance-types">
+                            <Link href="/admin/clearance-types">
                                 <Button variant="outline" type="button">
                                     Cancel
                                 </Button>
@@ -259,7 +266,7 @@ export default function CreateClearanceType({
                             </div>
                             <ul className="mt-2 ml-7 list-disc text-sm text-rose-700 dark:text-rose-400">
                                 {Object.entries(errors).map(([field, message]) => (
-                                    <li key={field}>{message}</li>
+                                    <li key={field}>{message as string}</li>
                                 ))}
                             </ul>
                         </div>
@@ -523,7 +530,7 @@ export default function CreateClearanceType({
                                         </div>
                                     )}
 
-                                    {/* Document List */}
+                                    {/* Document List - FIXED: Added safe checks for accepted_formats and max_file_size */}
                                     <div className="border rounded-lg divide-y max-h-[400px] overflow-y-auto">
                                         {filteredDocumentTypes.length === 0 ? (
                                             <div className="p-8 text-center text-gray-500">
@@ -558,13 +565,21 @@ export default function CreateClearanceType({
                                                                     {docType.description}
                                                                 </p>
                                                             </div>
-                                                            <Badge variant="outline" className="ml-2">
-                                                                {docType.category}
-                                                            </Badge>
+                                                            {docType.category && (
+                                                                <Badge variant="outline" className="ml-2">
+                                                                    {docType.category}
+                                                                </Badge>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-4 text-xs text-gray-500">
-                                                            <span>Formats: {docType.accepted_formats.join(', ')}</span>
-                                                            <span>Max: {docType.max_file_size / 1024} MB</span>
+                                                            {/* FIXED: Safe check for accepted_formats */}
+                                                            <span>Formats: {docType.accepted_formats?.length 
+                                                                ? docType.accepted_formats.join(', ') 
+                                                                : 'PDF, JPG, PNG'}</span>
+                                                            {/* FIXED: Safe check for max_file_size */}
+                                                            <span>Max: {docType.max_file_size 
+                                                                ? (docType.max_file_size / 1024).toFixed(1) 
+                                                                : 2} MB</span>
                                                             <span className={docType.is_active ? "text-emerald-600" : "text-rose-600"}>
                                                                 {docType.is_active ? 'Active' : 'Inactive'}
                                                             </span>
@@ -576,7 +591,7 @@ export default function CreateClearanceType({
                                     </div>
 
                                     <div className="text-sm text-gray-500">
-                                        <p>Documents are managed in the <Link href="/document-types" className="text-blue-600 hover:underline">Document Types</Link> section.</p>
+                                        <p>Documents are managed in the <Link href="/admin/document-types" className="text-blue-600 hover:underline">Document Types</Link> section.</p>
                                         <p>Selected documents will be required when applying for this clearance type.</p>
                                     </div>
                                 </CardContent>
@@ -866,7 +881,7 @@ export default function CreateClearanceType({
                                                 </>
                                             )}
                                         </Button>
-                                        <Link href="/clearance-types">
+                                        <Link href="/admin/clearance-types">
                                             <Button 
                                                 type="button" 
                                                 variant="outline" 

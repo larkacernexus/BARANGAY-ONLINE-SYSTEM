@@ -410,9 +410,9 @@ export default function FeeTypeShow({ feeType, recentFees = [], statistics = {} 
 
     // Breadcrumbs
     const breadcrumbs = [
-        { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Fee Types', href: route('fee-types.index') },
-        { title: feeType.name, href: route('fee-types.show', feeType.id) },
+        { title: 'Dashboard', href: '/admin/dashboard' },
+        { title: 'Fee Types', href: route('admin.fee-types.index') },
+        { title: feeType.name, href: route('admin.fee-types.show', feeType.id) },
     ];
 
     // Tab content based on active tab
@@ -1110,7 +1110,7 @@ export default function FeeTypeShow({ feeType, recentFees = [], statistics = {} 
                                                     </TableCell>
                                                     <TableCell>
                                                         <Button variant="ghost" size="sm" asChild>
-                                                            <Link href={route('fees.show', fee.id)}>
+                                                            <Link href={route('admin.fees.show', fee.id)}>
                                                                 <Eye className="h-4 w-4" />
                                                             </Link>
                                                         </Button>
@@ -1128,7 +1128,7 @@ export default function FeeTypeShow({ feeType, recentFees = [], statistics = {} 
                                         No fees have been created using this fee type
                                     </p>
                                     <Button asChild>
-                                        <Link href={route('fees.create', { fee_type: feeType.id })}>
+                                        <Link href={route('admin.fees.create', { fee_type: feeType.id })}>
                                             <Plus className="h-4 w-4 mr-2" />
                                             Create First Fee
                                         </Link>
@@ -1138,7 +1138,7 @@ export default function FeeTypeShow({ feeType, recentFees = [], statistics = {} 
                             {recentFees.length > 0 && (
                                 <div className="mt-4 flex justify-center">
                                     <Button variant="outline" asChild>
-                                        <Link href={route('fees.index', { fee_type: feeType.id })}>
+                                        <Link href={route('admin.fees.index', { fee_type: feeType.id })}>
                                             View All Associated Fees
                                         </Link>
                                     </Button>
@@ -1314,7 +1314,7 @@ export default function FeeTypeShow({ feeType, recentFees = [], statistics = {} 
                             size="sm"
                             asChild
                         >
-                            <Link href={route('fee-types.edit', feeType.id)}>
+                            <Link href={route('admin.fee-types.edit', feeType.id)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit
                             </Link>
@@ -1324,7 +1324,7 @@ export default function FeeTypeShow({ feeType, recentFees = [], statistics = {} 
                             size="sm"
                             asChild
                         >
-                            <Link href={route('fee-types.index')}>
+                            <Link href={route('admin.fee-types.index')}>
                                 <ChevronLeft className="h-4 w-4 mr-2" />
                                 Back to List
                             </Link>
@@ -1341,7 +1341,7 @@ export default function FeeTypeShow({ feeType, recentFees = [], statistics = {} 
                                     Duplicate
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                    <Link href={route('fees.index', { fee_type: feeType.id })}>
+                                    <Link href={route('admin.fees.index', { fee_type: feeType.id })}>
                                         <FileText className="h-4 w-4 mr-2" />
                                         View Associated Fees
                                     </Link>

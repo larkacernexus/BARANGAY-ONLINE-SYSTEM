@@ -240,7 +240,7 @@ export default function ReportTypesContent({
                                 onClick: onClearFilters
                             } : {
                                 label: "Add Report Type",
-                                href: "/report-types/create"
+                                href: "/admin/report-types/create"
                             }}
                             className="py-12 sm:py-16"
                         />

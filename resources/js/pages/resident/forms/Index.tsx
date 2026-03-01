@@ -4,14 +4,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Link, usePage, router, Head } from '@inertiajs/react';
+import { toast } from 'sonner';
+import { format, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+// Icons
 import {
     AlertCircle,
     Search,
@@ -30,7 +28,6 @@ import {
     Tag,
     Grid,
     List,
-    Zap,
     Loader2,
     CheckCircle,
     XCircle,
@@ -39,35 +36,43 @@ import {
     Printer,
     Mail,
     FilterX,
-    Hash,
-    PackageCheck,
-    PackageX,
-    ClipboardCopy,
-    PlayCircle,
-    PauseCircle,
-    Target,
-    Plus,
-    FileType,
     FolderOpen,
     Users,
     Shield,
     Building2,
     AlertTriangle,
+    Plus,
+    Clock,
+    Copy,
+    FileCheck,
+    ArrowUpDown,
+    Info,
 } from 'lucide-react';
-import { Link, usePage, router, Head } from '@inertiajs/react';
-import { toast } from 'sonner';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { format, parseISO } from 'date-fns';
-import ResidentMobileFooter from '@/layouts/resident-mobile-sticky-footer';
-import { route } from 'ziggy-js';
 
+// Reusable Components
+import { CustomTabs } from '@/components/residentui/CustomTabs';
+import { ModernSelect } from '@/components/residentui/modern-select';
+import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
+import { ModernStatsCards } from '@/components/residentui/modern-stats-cards';
+import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
+import { ModernPagination } from '@/components/residentui/modern-pagination';
+import { ModernLoadingOverlay } from '@/components/residentui/modern-loading-overlay';
+import { ModernSelectionBanner } from '@/components/residentui/modern-selection-banner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+// Form-specific components
+import { ModernFormCard } from '@/components/residentui/forms/modern-form-card';
+import { ModernFormGridCard } from '@/components/residentui/forms/modern-form-grid-card';
+import { ModernFormTable } from '@/components/residentui/forms/modern-form-table';
+import { ModernFormFilters } from '@/components/residentui/forms/modern-form-filters';
+
+// Types
 interface Form {
     id: number;
     title: string;
@@ -125,12 +130,30 @@ interface PageProps extends Record<string, any> {
     error?: string;
 }
 
+// Constants
+const FORM_TABS = [
+    { value: 'all', label: 'All Forms', icon: FileText },
+    { value: 'popular', label: 'Most Downloaded', icon: Download },
+    { value: 'recent', label: 'Recently Added', icon: Clock },
+];
+
+const SORT_OPTIONS = [
+    { value: 'title', label: 'Title (A-Z)' },
+    { value: 'created_at', label: 'Newest First' },
+    { value: 'download_count', label: 'Most Downloaded' },
+    { value: 'category', label: 'Category' },
+    { value: 'issuing_agency', label: 'Agency' },
+];
+
 // Helper functions
-const formatDate = (dateString: string) => {
+const formatDate = (dateString: string, shortFormat: boolean = false) => {
     if (!dateString) return 'N/A';
     try {
         const date = parseISO(dateString);
-        return format(date, 'MMM dd, yyyy');
+        if (shortFormat) {
+            return format(date, 'MMM d, yyyy');
+        }
+        return format(date, 'MMMM d, yyyy');
     } catch (error) {
         return 'N/A';
     }
@@ -140,7 +163,7 @@ const formatDateTime = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
         const date = parseISO(dateString);
-        return format(date, 'MMM dd, yyyy HH:mm');
+        return format(date, 'MMM d, yyyy h:mm a');
     } catch (error) {
         return 'N/A';
     }
@@ -152,7 +175,7 @@ const formatFileSize = (bytes: number): string => {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
 
 const getCategoryColor = (category: string): string => {
@@ -170,20 +193,28 @@ const getCategoryColor = (category: string): string => {
 };
 
 const getAgencyIcon = (agency: string) => {
-    if (!agency) return <Building className="h-4 w-4" />;
-    if (agency.includes('Mayor')) return <Building2 className="h-4 w-4" />;
-    if (agency.includes('DSWD')) return <Users className="h-4 w-4" />;
-    if (agency.includes('PNP') || agency.includes('Police')) return <Shield className="h-4 w-4" />;
-    if (agency.includes('Health')) return <AlertTriangle className="h-4 w-4" />;
-    return <Building className="h-4 w-4" />;
+    if (!agency) return Building;
+    if (agency.includes('Mayor')) return Building2;
+    if (agency.includes('DSWD')) return Users;
+    if (agency.includes('PNP') || agency.includes('Police')) return Shield;
+    if (agency.includes('Health')) return AlertTriangle;
+    return Building;
 };
 
 const getFileTypeIcon = (fileType: string) => {
-    if (!fileType) return <FileType className="h-4 w-4 text-gray-500" />;
-    if (fileType.includes('pdf')) return <FileType className="h-4 w-4 text-red-500" />;
-    if (fileType.includes('word') || fileType.includes('doc')) return <FileText className="h-4 w-4 text-blue-500" />;
-    if (fileType.includes('excel') || fileType.includes('sheet')) return <BarChart className="h-4 w-4 text-green-500" />;
-    return <FileText className="h-4 w-4 text-gray-500" />;
+    if (!fileType) return FileText;
+    if (fileType.includes('pdf')) return FileText;
+    if (fileType.includes('word') || fileType.includes('doc')) return FileText;
+    if (fileType.includes('excel') || fileType.includes('sheet')) return BarChart;
+    return FileText;
+};
+
+const getFileTypeColor = (fileType: string): string => {
+    if (!fileType) return 'text-gray-500';
+    if (fileType.includes('pdf')) return 'text-red-500';
+    if (fileType.includes('word') || fileType.includes('doc')) return 'text-blue-500';
+    if (fileType.includes('excel') || fileType.includes('sheet')) return 'text-green-500';
+    return 'text-gray-500';
 };
 
 const truncateText = (text: string, maxLength: number = 50): string => {
@@ -192,498 +223,255 @@ const truncateText = (text: string, maxLength: number = 50): string => {
     return text.substring(0, maxLength) + '...';
 };
 
-// Inline MobileFormCard Component
-const MobileFormCard = ({ 
-    form,
-    formatDate,
-    formatFileSize,
-    getCategoryColor,
-    getAgencyIcon,
-    getFileTypeIcon,
-    truncateText
-}: any) => (
-    <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 hover:shadow-md transition-shadow">
-        <div className="p-4">
-            <div className="space-y-3">
-                {/* Header */}
-                <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                            {getFileTypeIcon(form.file_type)}
-                            <h4 className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                                {truncateText(form.title, 40)}
-                            </h4>
-                        </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                            {truncateText(form.description, 80)}
-                        </p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">Category</p>
-                        <Badge variant="outline" className={getCategoryColor(form.category)}>
-                            {form.category}
-                        </Badge>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">Agency</p>
-                        <div className="flex items-center gap-2">
-                            {getAgencyIcon(form.issuing_agency)}
-                            <span className="truncate">{form.issuing_agency}</span>
-                        </div>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">Downloads</p>
-                        <p className="font-medium flex items-center gap-1">
-                            <Download className="h-3 w-3" />
-                            {form.download_count}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">File Size</p>
-                        <p className="font-medium">{formatFileSize(form.file_size)}</p>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                    <Link 
-                        href={route('resident.forms.show', form.id)}
-                        className="flex-1"
-                    >
-                        <Button variant="outline" size="sm" className="w-full">
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                        </Button>
-                    </Link>
-                    <div className="flex gap-1 ml-2">
-                        <Button 
-                            size="sm" 
-                            variant="default"
-                            asChild
-                        >
-                            <Link href={`/forms/${form.id}/download`}>
-                                <Download className="h-4 w-4" />
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-);
-
-// Inline DesktopGridViewCard Component
-const DesktopGridViewCard = ({ 
-    form,
-    formatDate,
-    formatFileSize,
-    getCategoryColor,
-    getAgencyIcon,
-    getFileTypeIcon,
-    truncateText
-}: any) => (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 hover:shadow-md transition-shadow h-full">
-        <div className="p-4 h-full flex flex-col">
-            <div className="space-y-3 flex-1">
-                {/* Header */}
-                <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                            {getFileTypeIcon(form.file_type)}
-                            <h4 className="font-semibold text-gray-900 dark:text-gray-100 truncate" title={form.title}>
-                                {truncateText(form.title, 60)}
-                            </h4>
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 mb-3" title={form.description}>
-                            {truncateText(form.description, 120)}
-                        </p>
-                    </div>
-                </div>
-
-                {/* Badges */}
-                <div className="flex flex-wrap gap-2 mb-3">
-                    <Badge variant="outline" className={getCategoryColor(form.category)}>
-                        {form.category}
-                    </Badge>
-                    <Badge variant="outline" className="flex items-center gap-1">
-                        {getAgencyIcon(form.issuing_agency)}
-                        <span className="truncate max-w-[100px]" title={form.issuing_agency}>
-                            {truncateText(form.issuing_agency, 15)}
-                        </span>
-                    </Badge>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="flex items-center gap-2">
-                        <Download className="h-4 w-4 text-gray-500" />
-                        <div>
-                            <p className="text-gray-500 dark:text-gray-400">Downloads</p>
-                            <p className="font-bold">{form.download_count.toLocaleString()}</p>
-                        </div>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">File Size</p>
-                        <p className="font-bold">{formatFileSize(form.file_size)}</p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">File Type</p>
-                        <p className="font-medium">{form.file_type}</p>
-                    </div>
-                    <div>
-                        <p className="text-gray-500 dark:text-gray-400">Uploaded</p>
-                        <p className="font-medium">{formatDate(form.created_at)}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 pt-3 mt-4 border-t border-gray-100 dark:border-gray-700">
-                <Link href={route('resident.forms.show', form.id)} className="flex-1">
-                    <Button variant="outline" size="sm" className="w-full">
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                    </Button>
-                </Link>
-                <Button 
-                    size="sm" 
-                    variant="default" 
-                    asChild
-                    className="flex-1"
-                >
-                    <Link href={`/forms/${form.id}/download`}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                    </Link>
-                </Button>
-            </div>
-        </div>
-    </div>
-);
-
-// Inline StatsSection Component
-const StatsSection = ({ 
-    stats,
-    isMobile,
-    showStats,
-    setShowStats
-}: any) => {
-    if (isMobile) {
-        return (
-            <div className="md:hidden">
-                <Button 
-                    variant="outline" 
-                    className="w-full justify-between bg-white dark:bg-gray-800"
-                    onClick={() => setShowStats(!showStats)}
-                >
-                    <div className="flex items-center gap-2">
-                        <BarChart className="h-4 w-4" />
-                        <span>{showStats ? 'Hide Statistics' : 'Show Statistics'}</span>
-                    </div>
-                    {showStats ? (
-                        <ChevronUp className="h-4 w-4" />
-                    ) : (
-                        <ChevronDown className="h-4 w-4" />
-                    )}
-                </Button>
-                
-                {showStats && (
-                    <div className="mt-2">
-                        <div className="grid grid-cols-2 gap-3">
-                            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10">
-                                <CardContent className="p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                                                Total Forms
-                                            </p>
-                                            <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                                {stats.total.toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <div className="p-2 bg-blue-100 dark:bg-blue-800/30 rounded-lg">
-                                            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10">
-                                <CardContent className="p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs font-medium text-purple-600 dark:text-purple-400">
-                                                Downloads
-                                            </p>
-                                            <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                                {stats.downloads.toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <div className="p-2 bg-purple-100 dark:bg-purple-800/30 rounded-lg">
-                                            <Download className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10">
-                                <CardContent className="p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs font-medium text-green-600 dark:text-green-400">
-                                                Categories
-                                            </p>
-                                            <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                                {stats.categories_count}
-                                            </p>
-                                        </div>
-                                        <div className="p-2 bg-green-100 dark:bg-green-800/30 rounded-lg">
-                                            <FolderOpen className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-900/10">
-                                <CardContent className="p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                                                Agencies
-                                            </p>
-                                            <p className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                                {stats.agencies_count}
-                                            </p>
-                                        </div>
-                                        <div className="p-2 bg-amber-100 dark:bg-amber-800/30 rounded-lg">
-                                            <Building className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
+const copyToClipboard = async (text: string, message: string) => {
+    try {
+        await navigator.clipboard.writeText(text);
+        toast.success(message);
+    } catch (err) {
+        toast.error('Failed to copy to clipboard');
     }
-
-    return (
-        <div className="hidden md:grid md:grid-cols-4 gap-4">
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10">
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                                Total Forms
-                            </p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                {stats.total.toLocaleString()}
-                            </p>
-                        </div>
-                        <div className="p-2 bg-blue-100 dark:bg-blue-800/30 rounded-lg">
-                            <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10">
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                                Total Downloads
-                            </p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                {stats.downloads.toLocaleString()}
-                            </p>
-                        </div>
-                        <div className="p-2 bg-purple-100 dark:bg-purple-800/30 rounded-lg">
-                            <Download className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10">
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                                Categories
-                            </p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                {stats.categories_count}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {stats.popular_categories?.[0]?.category || 'Various'} category is most popular
-                            </p>
-                        </div>
-                        <div className="p-2 bg-green-100 dark:bg-green-800/30 rounded-lg">
-                            <FolderOpen className="h-6 w-6 text-green-600 dark:text-green-400" />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-900/10">
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                                Issuing Agencies
-                            </p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-                                {stats.agencies_count}
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {stats.popular_agencies?.[0]?.agency || 'Various'} agency is most active
-                            </p>
-                        </div>
-                        <div className="p-2 bg-amber-100 dark:bg-amber-800/30 rounded-lg">
-                            <Building className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-    );
 };
 
-// Inline FiltersSection Component
-const FiltersSection = ({ 
-    search,
-    setSearch,
-    handleSearchSubmit,
-    handleSearchClear,
-    categoryFilter,
-    handleCategoryChange,
-    agencyFilter,
-    handleAgencyChange,
-    sortBy,
-    handleSortChange,
-    sortOrder,
-    handleSortOrderToggle,
-    loading,
-    categories,
-    agencies,
-    hasActiveFilters,
-    handleClearFilters,
-    isMobile,
-    setShowFilters
-}: any) => (
-    <Card>
-        <CardContent className="p-4">
-            <div className="space-y-4">
-                {/* Search Bar */}
-                <form onSubmit={handleSearchSubmit} className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                        placeholder="Search forms by title, description, category, or agency..."
-                        className="pl-10 pr-10 bg-white dark:bg-gray-800"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                    {search && (
-                        <button
-                            type="button"
-                            onClick={handleSearchClear}
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                    )}
-                </form>
+const printFormsList = (forms: Form[], filter: string, stats: Stats) => {
+    if (forms.length === 0) {
+        toast.error('No forms to print');
+        return;
+    }
 
-                {/* Filters Row */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex gap-2 flex-wrap">
-                        <Select value={categoryFilter} onValueChange={handleCategoryChange}>
-                            <SelectTrigger className="w-[160px] h-9">
-                                <SelectValue placeholder="Category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Categories</SelectItem>
-                                {categories.map(category => (
-                                    <SelectItem key={category} value={category}>
-                                        {category}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        toast.error('Please allow popups to print');
+        return;
+    }
 
-                        <Select value={agencyFilter} onValueChange={handleAgencyChange}>
-                            <SelectTrigger className="w-[180px] h-9">
-                                <SelectValue placeholder="Issuing Agency" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Agencies</SelectItem>
-                                {agencies.map(agency => (
-                                    <SelectItem key={agency} value={agency}>
-                                        {agency}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select value={sortBy} onValueChange={handleSortChange}>
-                            <SelectTrigger className="w-[150px] h-9">
-                                <SelectValue placeholder="Sort By" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="title">Title (A-Z)</SelectItem>
-                                <SelectItem value="created_at">Newest First</SelectItem>
-                                <SelectItem value="download_count">Most Downloaded</SelectItem>
-                                <SelectItem value="category">Category</SelectItem>
-                                <SelectItem value="issuing_agency">Agency</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-9 w-9 p-0"
-                            onClick={handleSortOrderToggle}
-                        >
-                            {sortOrder === 'asc' ? (
-                                <ChevronUp className="h-4 w-4" />
-                            ) : (
-                                <ChevronDown className="h-4 w-4" />
-                            )}
-                        </Button>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-end sm:self-auto">
-                        {hasActiveFilters && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleClearFilters}
-                                className="text-red-600 hover:text-red-700"
-                            >
-                                <FilterX className="h-4 w-4 mr-1" />
-                                Clear Filters
-                            </Button>
-                        )}
-                        
-                        {isMobile && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShowFilters(false)}
-                            >
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Done
-                            </Button>
-                        )}
-                    </div>
+    const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Forms Catalog Report</title>
+            <style>
+                body { font-family: 'Inter', system-ui, -apple-system, sans-serif; margin: 40px; }
+                h1 { color: #111; font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+                .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+                .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+                .stat-card { background: #f9fafb; padding: 16px; border-radius: 8px; }
+                .stat-label { color: #666; font-size: 12px; margin-bottom: 4px; }
+                .stat-value { font-size: 24px; font-weight: 600; color: #111; }
+                table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 14px; }
+                th { background: #f3f4f6; padding: 12px; text-align: left; font-weight: 500; color: #374151; }
+                td { padding: 12px; border-bottom: 1px solid #e5e7eb; }
+                .category-badge { background: #e5e7eb; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+                .footer { margin-top: 40px; text-align: center; color: #6b7280; font-size: 12px; }
+                @media print {
+                    body { margin: 0.5in; }
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Forms Catalog Report</h1>
+            <p class="subtitle">Generated on ${formatDateTime(new Date().toISOString())} • Filter: ${filter}</p>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Forms</div>
+                    <div class="stat-value">${stats.total.toLocaleString()}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Downloads</div>
+                    <div class="stat-value">${stats.downloads.toLocaleString()}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Categories</div>
+                    <div class="stat-value">${stats.categories_count}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Agencies</div>
+                    <div class="stat-value">${stats.agencies_count}</div>
                 </div>
             </div>
-        </CardContent>
-    </Card>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Agency</th>
+                        <th>Downloads</th>
+                        <th>File Size</th>
+                        <th>Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${forms.map(form => `
+                        <tr>
+                            <td>${form.title}</td>
+                            <td><span class="category-badge">${form.category}</span></td>
+                            <td>${form.issuing_agency}</td>
+                            <td>${form.download_count.toLocaleString()}</td>
+                            <td>${formatFileSize(form.file_size)}</td>
+                            <td>${formatDate(form.created_at, true)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            
+            <div class="footer">
+                <p>Generated from Barangay Forms Portal • Page 1 of 1</p>
+            </div>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+};
+
+const exportFormsToCSV = async (forms: Form[], filter: string, setIsExporting: (value: boolean) => void) => {
+    if (forms.length === 0) {
+        toast.error('No forms to export');
+        return;
+    }
+
+    setIsExporting(true);
+    
+    try {
+        const headers = ['Title', 'Description', 'Category', 'Issuing Agency', 'File Name', 'File Type', 'File Size', 'Downloads', 'Upload Date'];
+        
+        const csvData = forms.map(form => [
+            `"${form.title.replace(/"/g, '""')}"`,
+            `"${(form.description || '').replace(/"/g, '""')}"`,
+            form.category,
+            form.issuing_agency,
+            form.file_name,
+            form.file_type,
+            formatFileSize(form.file_size),
+            form.download_count.toString(),
+            formatDate(form.created_at, true)
+        ]);
+        
+        const csvContent = [
+            headers.join(','),
+            ...csvData.map(row => row.join(','))
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', `forms_catalog_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast.success(`${forms.length} forms exported successfully`);
+    } catch (error) {
+        toast.error('Failed to export forms');
+        console.error(error);
+    } finally {
+        setIsExporting(false);
+    }
+};
+
+// FIXED: Updated to use string for trend instead of object
+const getFormStatsCards = (stats: Stats, formatNumber: (num: number) => string) => {
+    return [
+        {
+            title: 'Total Forms',
+            value: formatNumber(stats.total),
+            icon: FileText,
+            color: 'blue',
+            trend: `${stats.active} active`, // Changed from object to string
+            trendPositive: true
+        },
+        {
+            title: 'Total Downloads',
+            value: formatNumber(stats.downloads),
+            icon: Download,
+            color: 'purple',
+        },
+        {
+            title: 'Categories',
+            value: stats.categories_count.toString(),
+            icon: Tag,
+            color: 'green',
+            subtitle: stats.popular_categories?.[0]?.category || 'Various'
+        },
+        {
+            title: 'Agencies',
+            value: stats.agencies_count.toString(),
+            icon: Building,
+            color: 'amber',
+            subtitle: stats.popular_agencies?.[0]?.agency || 'Various'
+        }
+    ];
+};
+
+const getStatusCount = (stats: Stats, status: string): number => {
+    switch (status) {
+        case 'all':
+            return stats.total;
+        case 'popular':
+            return stats.total;
+        case 'recent':
+            return stats.total;
+        default:
+            return 0;
+    }
+};
+
+// CollapsibleStats Component (Mobile)
+const CollapsibleStats = ({ 
+    showStats, 
+    setShowStats, 
+    stats,
+    formatNumber
+}: any) => (
+    <div className="md:hidden">
+        <Button 
+            variant="outline" 
+            className="w-full justify-between bg-white dark:bg-gray-800 rounded-xl border-gray-200 dark:border-gray-700"
+            onClick={() => setShowStats(!showStats)}
+        >
+            <div className="flex items-center gap-2">
+                <BarChart className="h-4 w-4" />
+                <span>{showStats ? 'Hide Statistics' : 'Show Statistics'}</span>
+            </div>
+            {showStats ? (
+                <ChevronUp className="h-4 w-4" />
+            ) : (
+                <ChevronDown className="h-4 w-4" />
+            )}
+        </Button>
+        
+        {showStats && (
+            <div className="mt-2 animate-slide-down">
+                <ModernStatsCards 
+                    cards={getFormStatsCards(stats, formatNumber)} 
+                    loading={false}
+                    gridCols="grid-cols-2"
+                />
+            </div>
+        )}
+    </div>
+);
+
+// DesktopStats Component
+const DesktopStats = ({ 
+    stats,
+    formatNumber
+}: any) => (
+    <div className="hidden md:block">
+        <ModernStatsCards 
+            cards={getFormStatsCards(stats, formatNumber)} 
+            loading={false}
+        />
+    </div>
 );
 
 export default function FormsIndex() {
@@ -722,8 +510,12 @@ export default function FormsIndex() {
     const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [showStats, setShowStats] = useState(true);
-    const [showFilters, setShowFilters] = useState(false);
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
+    const [selectedForms, setSelectedForms] = useState<number[]>([]);
+    const [isExporting, setIsExporting] = useState(false);
+    const [selectMode, setSelectMode] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [activeTab, setActiveTab] = useState('all');
     
     const hasInitialized = useRef(false);
     const searchTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -796,12 +588,38 @@ export default function FormsIndex() {
             }
         });
         
-        router.get('/forms', cleanFilters, {
+        router.get('/portal/forms', cleanFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
             onFinish: () => setLoading(false),
         });
+    };
+    
+    const handleTabChange = (tab: string) => {
+        setActiveTab(tab);
+        
+        let sortField = 'created_at';
+        let sortDir = 'desc';
+        
+        if (tab === 'popular') {
+            sortField = 'download_count';
+            sortDir = 'desc';
+        } else if (tab === 'recent') {
+            sortField = 'created_at';
+            sortDir = 'desc';
+        }
+        
+        setSortBy(sortField);
+        setSortOrder(sortDir);
+        
+        updateFilters({ 
+            sort_by: sortField,
+            sort_order: sortDir,
+            page: '1'
+        });
+        
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleCategoryChange = (category: string) => {
@@ -810,7 +628,7 @@ export default function FormsIndex() {
             category: category === 'all' ? '' : category,
             page: '1'
         });
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleAgencyChange = (agency: string) => {
@@ -819,7 +637,7 @@ export default function FormsIndex() {
             agency: agency === 'all' ? '' : agency,
             page: '1'
         });
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleSortChange = (sort: string) => {
@@ -845,14 +663,15 @@ export default function FormsIndex() {
         setAgencyFilter('all');
         setSortBy('created_at');
         setSortOrder('desc');
+        setActiveTab('all');
         
-        router.get('/forms', {}, {
+        router.get('/portal/forms', {}, {
             preserveState: true,
             preserveScroll: true,
             onFinish: () => setLoading(false),
         });
         
-        if (isMobile) setShowFilters(false);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const handleSearchSubmit = (e: React.FormEvent) => {
@@ -874,204 +693,401 @@ export default function FormsIndex() {
         });
     };
     
-    // Utility functions
+    // Selection mode functions
+    const toggleSelectForm = (id: number) => {
+        setSelectedForms(prev =>
+            prev.includes(id)
+                ? prev.filter(formId => formId !== id)
+                : [...prev, id]
+        );
+    };
+    
+    const selectAllForms = () => {
+        const currentForms = forms.data;
+        if (selectedForms.length === currentForms.length && currentForms.length > 0) {
+            setSelectedForms([]);
+        } else {
+            setSelectedForms(currentForms.map(f => f.id));
+        }
+    };
+    
+    const toggleSelectMode = () => {
+        if (selectMode) {
+            setSelectMode(false);
+            setSelectedForms([]);
+        } else {
+            setSelectMode(true);
+        }
+    };
+    
+    const handleDownloadSelected = () => {
+        toast.info(`Download functionality for ${selectedForms.length} forms would be implemented here`);
+    };
+    
+    const handleViewDetails = (id: number) => {
+        router.visit(`/portal/forms/${id}`);
+    };
+    
+    const handleDownloadForm = (form: Form) => {
+        window.location.href = `/portal/forms/${form.id}/download`;
+    };
+    
+    const handleCopyLink = (form: Form) => {
+        const url = `${window.location.origin}/portal/forms/${form.id}`;
+        copyToClipboard(url, `Link copied to clipboard`);
+    };
+    
+    const handleCopyTitle = (title: string) => {
+        copyToClipboard(title, `Title copied to clipboard`);
+    };
+    
+    const handleGenerateReport = (form: Form) => {
+        const reportWindow = window.open('', '_blank');
+        if (reportWindow) {
+            reportWindow.document.write(`
+                <h1>Form Details: ${form.title}</h1>
+                <p><strong>Category:</strong> ${form.category}</p>
+                <p><strong>Agency:</strong> ${form.issuing_agency}</p>
+                <p><strong>Description:</strong> ${form.description}</p>
+                <p><strong>Downloads:</strong> ${form.download_count.toLocaleString()}</p>
+                <p><strong>File Size:</strong> ${formatFileSize(form.file_size)}</p>
+                <p><strong>File Type:</strong> ${form.file_type}</p>
+                <p><strong>Uploaded:</strong> ${formatDateTime(form.created_at)}</p>
+            `);
+        }
+    };
+    
+    const handleReportIssue = (form: Form) => {
+        toast.info('Report issue feature would open a form');
+    };
+    
+    const getCurrentForms = () => {
+        return forms.data;
+    };
+    
     const hasActiveFilters = useMemo(() => {
         return Object.entries(filters).some(([key, value]) => 
             key !== 'page' && value && value !== '' && value !== 'all'
         );
     }, [filters]);
     
-    // Export functions
-    const printForms = () => {
-        if (forms.data.length === 0) {
-            toast.error('No forms to print');
-            return;
-        }
-        
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            toast.error('Please allow popups to print');
-            return;
-        }
-        
-        const printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Available Forms Report</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
-                    .print-header { margin-bottom: 30px; }
-                    .print-info { display: flex; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; }
-                    .forms-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                    .forms-table th { background-color: #f3f4f6; padding: 12px; text-align: left; border: 1px solid #ddd; }
-                    .forms-table td { padding: 10px; border: 1px solid #ddd; }
-                    .category-badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; display: inline-block; }
-                    .footer { margin-top: 40px; text-align: center; color: #6b7280; font-size: 12px; }
-                    @media print {
-                        body { margin: 0; }
-                        .no-print { display: none; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="print-header">
-                    <h1>Available Forms Report</h1>
-                    <div class="print-info">
-                        <div>
-                            <p><strong>Generated:</strong> ${new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                            <p><strong>Total Forms:</strong> ${forms.data.length}</p>
-                            <p><strong>Total Downloads:</strong> ${stats.downloads.toLocaleString()}</p>
-                        </div>
-                        <div>
-                            <p><strong>Categories:</strong> ${stats.categories_count}</p>
-                            <p><strong>Agencies:</strong> ${stats.agencies_count}</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <table class="forms-table">
-                    <thead>
-                        <tr>
-                            <th>Title</th>
-                            <th>Category</th>
-                            <th>Issuing Agency</th>
-                            <th>Downloads</th>
-                            <th>File Size</th>
-                            <th>Uploaded</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${forms.data.map(form => `
-                            <tr>
-                                <td>${form.title}</td>
-                                <td><span class="category-badge">${form.category}</span></td>
-                                <td>${form.issuing_agency}</td>
-                                <td>${form.download_count.toLocaleString()}</td>
-                                <td>${formatFileSize(form.file_size)}</td>
-                                <td>${formatDate(form.created_at)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-                
-                <div class="footer">
-                    <p>Generated from Barangay Forms Portal</p>
-                    <p>Page 1 of 1</p>
-                </div>
-            </body>
-            </html>
-        `;
-        
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
+    const handlePrint = () => {
+        printFormsList(forms.data, activeTab, stats);
     };
     
-    const exportToCSV = () => {
-        if (forms.data.length === 0) {
-            toast.error('No forms to export');
-            return;
-        }
-        
-        const headers = ['Title', 'Description', 'Category', 'Issuing Agency', 'File Name', 'File Type', 'File Size', 'Downloads', 'Upload Date'];
-        
-        const csvData = forms.data.map(form => [
-            `"${form.title.replace(/"/g, '""')}"`,
-            `"${(form.description || '').replace(/"/g, '""')}"`,
-            form.category,
-            form.issuing_agency,
-            form.file_name,
-            form.file_type,
-            formatFileSize(form.file_size),
-            form.download_count.toString(),
-            formatDate(form.created_at)
-        ]);
-        
-        const csvContent = [
-            headers.join(','),
-            ...csvData.map(row => row.join(','))
-        ].join('\n');
-        
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        
-        link.setAttribute('href', url);
-        link.setAttribute('download', `forms_catalog_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        toast.success('CSV file downloaded successfully');
+    const handleExport = () => {
+        exportFormsToCSV(forms.data, activeTab, setIsExporting);
     };
     
-    const shareForms = async () => {
-        if (forms.data.length === 0) {
-            toast.error('No forms to share');
-            return;
-        }
-
-        const summary = `Available Forms Catalog:\n\n` +
-            `Total Forms: ${forms.data.length}\n` +
+    const handleCopySummary = async () => {
+        const summary = `Forms Catalog Summary:\n\n` +
+            `Total Forms: ${stats.total}\n` +
+            `Active Forms: ${stats.active}\n` +
             `Total Downloads: ${stats.downloads.toLocaleString()}\n` +
             `Categories: ${stats.categories_count}\n` +
             `Agencies: ${stats.agencies_count}\n\n` +
-            `Most Popular Categories:\n` +
+            `Popular Categories:\n` +
             (stats.popular_categories?.slice(0, 3).map(c => `• ${c.category}: ${c.count} forms`).join('\n') || 'No data') + '\n\n' +
-            `Most Active Agencies:\n` +
+            `Active Agencies:\n` +
             (stats.popular_agencies?.slice(0, 3).map(a => `• ${a.agency}: ${a.count} forms`).join('\n') || 'No data') + '\n\n' +
-            `Browse all forms at: ${window.location.origin}/forms`;
+            `Generated on: ${new Date().toLocaleDateString()}\n` +
+            `View online: ${window.location.origin}/portal/forms`;
+        
+        await copyToClipboard(summary, 'Summary copied to clipboard');
+    };
+    
+    const handleEmailSummary = () => {
+        const body = `
+Hello,
 
-        try {
-            if (navigator.share) {
-                await navigator.share({
-                    title: 'Available Forms Catalog',
-                    text: summary,
-                });
-                toast.success('Shared successfully');
-            } else if (navigator.clipboard) {
-                await navigator.clipboard.writeText(summary);
-                toast.success('Summary copied to clipboard');
-            } else {
-                toast.error('Sharing not supported on this device');
-            }
-        } catch (error) {
-            if (error instanceof Error && error.name !== 'AbortError') {
-                console.error('Error sharing:', error);
-                toast.error('Failed to share');
-            }
-        }
+Here's a summary of available forms:
+
+Total Forms: ${stats.total}
+Active Forms: ${stats.active}
+Total Downloads: ${stats.downloads.toLocaleString()}
+Categories: ${stats.categories_count}
+Agencies: ${stats.agencies_count}
+
+Most Popular Categories:
+${stats.popular_categories?.slice(0, 3).map(c => `• ${c.category}: ${c.count} forms`).join('\n') || 'No data'}
+
+Most Active Agencies:
+${stats.popular_agencies?.slice(0, 3).map(a => `• ${a.agency}: ${a.count} forms`).join('\n') || 'No data'}
+
+Browse all forms at: ${window.location.origin}/portal/forms
+
+This summary was generated from the Barangay Forms Portal.
+
+Best regards,
+Forms Catalog System
+        `.trim();
+        
+        const subject = `Forms Catalog Summary - ${new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    };
+    
+    const handlePageChange = (page: number) => {
+        updateFilters({ page: page.toString() });
+    };
+    
+    const formatNumber = (num: number) => {
+        return num.toLocaleString();
+    };
+    
+    const renderTabContent = () => {
+        const currentForms = getCurrentForms();
+        const tabHasData = currentForms.length > 0;
+        
+        const displayTab = activeTab === 'all' ? 'All' : 
+                          activeTab === 'popular' ? 'Most Downloaded' : 'Recently Added';
+        
+        return (
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50">
+                <CardContent className="p-4 md:p-6">
+                    <ModernSelectionBanner
+                        selectMode={selectMode}
+                        selectedCount={selectedForms.length}
+                        totalCount={currentForms.length}
+                        onSelectAll={selectAllForms}
+                        onDeselectAll={() => setSelectedForms([])}
+                        onCancel={() => {
+                            setSelectMode(false);
+                            setSelectedForms([]);
+                        }}
+                        onDelete={handleDownloadSelected}
+                        deleteLabel="Download Selected"
+                    />
+                    
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                {displayTab} Forms
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {tabHasData 
+                                    ? `Showing ${currentForms.length} form${currentForms.length !== 1 ? 's' : ''}`
+                                    : `No forms found`
+                                }
+                                {selectMode && selectedForms.length > 0 && ` • ${selectedForms.length} selected`}
+                                {(categoryFilter !== 'all' || agencyFilter !== 'all' || search) && ' (filtered)'}
+                            </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                            {/* Sort Dropdown */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+                                        <ArrowUpDown className="h-4 w-4" />
+                                        Sort
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    {SORT_OPTIONS.map(option => (
+                                        <DropdownMenuItem 
+                                            key={option.value}
+                                            onClick={() => handleSortChange(option.value)}
+                                            className={sortBy === option.value ? 'bg-gray-100 dark:bg-gray-700' : ''}
+                                        >
+                                            {option.value === 'title' && <FileText className="h-4 w-4 mr-2" />}
+                                            {option.value === 'created_at' && <Calendar className="h-4 w-4 mr-2" />}
+                                            {option.value === 'download_count' && <Download className="h-4 w-4 mr-2" />}
+                                            {option.value === 'category' && <Tag className="h-4 w-4 mr-2" />}
+                                            {option.value === 'issuing_agency' && <Building className="h-4 w-4 mr-2" />}
+                                            {option.label}
+                                        </DropdownMenuItem>
+                                    ))}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handleSortOrderToggle}>
+                                        {sortOrder === 'asc' ? (
+                                            <ChevronUp className="h-4 w-4 mr-2" />
+                                        ) : (
+                                            <ChevronDown className="h-4 w-4 mr-2" />
+                                        )}
+                                        {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* View Toggle */}
+                            {!selectMode && tabHasData && (
+                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                                    <Button
+                                        variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setViewMode('grid')}
+                                        className={cn(
+                                            "h-8 w-8 p-0",
+                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm"
+                                        )}
+                                    >
+                                        <Grid className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant={viewMode === 'list' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setViewMode('list')}
+                                        className={cn(
+                                            "h-8 w-8 p-0",
+                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm"
+                                        )}
+                                    >
+                                        <List className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Select Mode Toggle */}
+                            {tabHasData && (
+                                <Button
+                                    variant={selectMode ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={toggleSelectMode}
+                                    className="gap-2 rounded-xl"
+                                >
+                                    <CheckCircle className="h-4 w-4" />
+                                    {selectMode ? 'Cancel' : 'Select'}
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {!tabHasData ? (
+                        <ModernEmptyState
+                            status={activeTab}
+                            hasFilters={hasActiveFilters}
+                            onClearFilters={handleClearFilters}
+                            icon={activeTab === 'all' ? FileText : 
+                                  activeTab === 'popular' ? Download :
+                                  activeTab === 'recent' ? Clock : FileText}
+                            title={`No ${activeTab === 'all' ? '' : activeTab} forms found`}
+                            message={hasActiveFilters 
+                                ? 'Try adjusting your filters or search criteria' 
+                                : 'There are currently no forms available in this category'}
+                        />
+                    ) : (
+                        <>
+                            {viewMode === 'grid' && (
+                                <>
+                                    {isMobile && (
+                                        <div className="pb-4">
+                                            {currentForms.map((form) => (
+                                                <ModernFormCard
+                                                    key={form.id}
+                                                    form={form}
+                                                    selectMode={selectMode}
+                                                    selectedForms={selectedForms}
+                                                    toggleSelectForm={toggleSelectForm}
+                                                    formatDate={(date) => formatDate(date, true)}
+                                                    formatFileSize={formatFileSize}
+                                                    getCategoryColor={getCategoryColor}
+                                                    getAgencyIcon={getAgencyIcon}
+                                                    getFileTypeIcon={getFileTypeIcon}
+                                                    getFileTypeColor={getFileTypeColor}
+                                                    truncateText={truncateText}
+                                                    onCopyLink={handleCopyLink}
+                                                    onCopyTitle={handleCopyTitle}
+                                                    onViewDetails={handleViewDetails}
+                                                    onDownload={handleDownloadForm}
+                                                    onGenerateReport={handleGenerateReport}
+                                                    onReportIssue={handleReportIssue}
+                                                    isMobile={isMobile}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                    
+                                    {!isMobile && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {currentForms.map((form) => (
+                                                <ModernFormGridCard
+                                                    key={form.id}
+                                                    form={form}
+                                                    selectMode={selectMode}
+                                                    selectedForms={selectedForms}
+                                                    toggleSelectForm={toggleSelectForm}
+                                                    formatDate={(date) => formatDate(date, true)}
+                                                    formatFileSize={formatFileSize}
+                                                    getCategoryColor={getCategoryColor}
+                                                    getAgencyIcon={getAgencyIcon}
+                                                    getFileTypeIcon={getFileTypeIcon}
+                                                    getFileTypeColor={getFileTypeColor}
+                                                    truncateText={truncateText}
+                                                    onCopyLink={handleCopyLink}
+                                                    onCopyTitle={handleCopyTitle}
+                                                    onViewDetails={handleViewDetails}
+                                                    onDownload={handleDownloadForm}
+                                                    onGenerateReport={handleGenerateReport}
+                                                    onReportIssue={handleReportIssue}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            
+                            {viewMode === 'list' && !isMobile && (
+                                <ModernFormTable
+                                    forms={currentForms}
+                                    selectMode={selectMode}
+                                    selectedForms={selectedForms}
+                                    toggleSelectForm={toggleSelectForm}
+                                    selectAllForms={selectAllForms}
+                                    formatDate={formatDateTime}
+                                    formatFileSize={formatFileSize}
+                                    getCategoryColor={getCategoryColor}
+                                    getAgencyIcon={getAgencyIcon}
+                                    getFileTypeIcon={getFileTypeIcon}
+                                    getFileTypeColor={getFileTypeColor}
+                                    truncateText={truncateText}
+                                    onCopyLink={handleCopyLink}
+                                    onCopyTitle={handleCopyTitle}
+                                    onViewDetails={handleViewDetails}
+                                    onDownload={handleDownloadForm}
+                                    onGenerateReport={handleGenerateReport}
+                                    onReportIssue={handleReportIssue}
+                                />
+                            )}
+                            
+                            {forms.last_page > 1 && (
+                                <div className="mt-6">
+                                    <ModernPagination
+                                        currentPage={forms.current_page}
+                                        lastPage={forms.last_page}
+                                        onPageChange={handlePageChange}
+                                        loading={loading}
+                                    />
+                                </div>
+                            )}
+                        </>
+                    )}
+                </CardContent>
+            </Card>
+        );
     };
     
     if (pageProps.error) {
         return (
             <ResidentLayout
                 breadcrumbs={[
-                    { title: 'Dashboard', href: '/resident/dashboard' },
-                    { title: 'Forms Catalog', href: '/forms' }
+                    { title: 'Dashboard', href: '/portal/dashboard' },
+                    { title: 'Forms Catalog', href: '/portal/forms' }
                 ]}
             >
-                <div className="space-y-6">
-                    <div>
-                        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Forms Catalog</h1>
-                    </div>
-                    <Card>
-                        <CardContent className="py-12 text-center">
-                            <AlertCircle className="h-12 w-12 mx-auto text-red-400" />
-                            <h3 className="mt-4 text-lg font-semibold">Error</h3>
-                            <p className="text-gray-500 mt-2">
+                <Head title="Forms Catalog" />
+                <div className="min-h-[50vh] flex items-center justify-center px-4">
+                    <Card className="w-full max-w-md border-0 shadow-xl">
+                        <CardContent className="pt-6 text-center">
+                            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl flex items-center justify-center mb-4">
+                                <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+                            </div>
+                            <h3 className="text-lg font-semibold mb-2">Error</h3>
+                            <p className="text-gray-500 dark:text-gray-400 mb-4">
                                 {pageProps.error}
                             </p>
                             <Button 
-                                className="mt-4"
-                                onClick={() => window.location.href = '/dashboard'}
+                                onClick={() => window.location.href = '/portal/dashboard'}
+                                className="bg-gradient-to-r from-blue-500 to-blue-600"
                             >
                                 Go to Dashboard
                             </Button>
@@ -1088,18 +1104,18 @@ export default function FormsIndex() {
             
             <ResidentLayout
                 breadcrumbs={[
-                    { title: 'Dashboard', href: '/resident/dashboard' },
-                    { title: 'Forms Catalog', href: '/forms' }
+                    { title: 'Dashboard', href: '/portal/dashboard' },
+                    { title: 'Forms Catalog', href: '/portal/forms' }
                 ]}
             >
-                <div className="space-y-4 md:space-y-6">
+                <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
                     {/* Mobile Header */}
                     {isMobile && (
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-10 py-3 px-4 -mx-4">
                             <div>
                                 <h1 className="text-xl font-bold">Forms Catalog</h1>
                                 <p className="text-xs text-gray-500">
-                                    {stats.total.toLocaleString()} forms available
+                                    {stats.total} form{stats.total !== 1 ? 's' : ''} available
                                 </p>
                             </div>
                             <div className="flex gap-2">
@@ -1107,7 +1123,7 @@ export default function FormsIndex() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowStats(!showStats)}
-                                    className="h-8 px-2"
+                                    className="h-8 px-2 rounded-lg"
                                 >
                                     {showStats ? (
                                         <ChevronUp className="h-4 w-4" />
@@ -1118,12 +1134,12 @@ export default function FormsIndex() {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setShowFilters(!showFilters)}
-                                    className="h-8 px-2"
+                                    onClick={() => setShowMobileFilters(true)}
+                                    className="h-8 px-2 rounded-lg relative"
                                 >
                                     <Filter className="h-4 w-4" />
                                     {hasActiveFilters && (
-                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
+                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse" />
                                     )}
                                 </Button>
                             </div>
@@ -1142,97 +1158,147 @@ export default function FormsIndex() {
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" size="sm">
-                                            <Download className="h-4 w-4 mr-2" />
-                                            Export
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent>
-                                        <DropdownMenuItem onClick={exportToCSV}>
-                                            <FileText className="h-4 w-4 mr-2" />
-                                            Export as CSV
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={printForms}>
-                                            <Printer className="h-4 w-4 mr-2" />
-                                            Print List
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={shareForms}>
-                                            <Share2 className="h-4 w-4 mr-2" />
-                                            Copy Summary
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => {
-                                            const body = `
-Hello,
-
-Here's a summary of available forms:
-
-Total Forms: ${stats.total}
-Total Downloads: ${stats.downloads.toLocaleString()}
-Categories: ${stats.categories_count}
-Agencies: ${stats.agencies_count}
-
-Most Popular Categories:
-${stats.popular_categories?.slice(0, 3).map(c => `• ${c.category}: ${c.count} forms`).join('\n') || 'No data'}
-
-Most Active Agencies:
-${stats.popular_agencies?.slice(0, 3).map(a => `• ${a.agency}: ${a.count} forms`).join('\n') || 'No data'}
-
-Browse all forms at: ${window.location.origin}/forms
-
-This summary was generated from the Barangay Forms Portal.
-
-Best regards,
-Forms Catalog System
-                                            `.trim();
-                                            const subject = `Forms Catalog Summary - ${new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-                                            window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-                                        }}>
-                                            <Mail className="h-4 w-4 mr-2" />
-                                            Email Summary
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                                
-                                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-                                
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant={viewMode === 'grid' ? 'default' : 'outline'}
-                                        size="sm"
-                                        onClick={() => setViewMode('grid')}
-                                        className="gap-2"
-                                    >
-                                        <Grid className="h-4 w-4" />
-                                        Grid
-                                    </Button>
-                                    <Button
-                                        variant={viewMode === 'list' ? 'default' : 'outline'}
-                                        size="sm"
-                                        onClick={() => setViewMode('list')}
-                                        className="gap-2"
-                                    >
-                                        <List className="h-4 w-4" />
-                                        List
-                                    </Button>
-                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handlePrint}
+                                    className="gap-2 rounded-xl"
+                                >
+                                    <Printer className="h-4 w-4" />
+                                    Print
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleExport}
+                                    disabled={isExporting}
+                                    className="gap-2 rounded-xl"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    {isExporting ? 'Exporting...' : 'Export'}
+                                </Button>
                             </div>
                         </div>
                     )}
                     
-                    {/* Stats */}
-                    <StatsSection 
-                        stats={stats}
-                        isMobile={isMobile}
-                        showStats={showStats}
-                        setShowStats={setShowStats}
-                    />
+                    {/* Stats Section */}
+                    {showStats && (
+                        <div className="animate-slide-down">
+                            <CollapsibleStats
+                                showStats={showStats}
+                                setShowStats={setShowStats}
+                                stats={stats}
+                                formatNumber={formatNumber}
+                            />
+                            <DesktopStats
+                                stats={stats}
+                                formatNumber={formatNumber}
+                            />
+                        </div>
+                    )}
                     
-                    {/* Filters */}
-                    {(showFilters || !isMobile) && (
-                        <FiltersSection
+                    {/* Mobile Filter Modal */}
+                    <ModernFilterModal
+                        isOpen={showMobileFilters}
+                        onClose={() => setShowMobileFilters(false)}
+                        title="Filter Forms"
+                        description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
+                        search={search}
+                        onSearchChange={setSearch}
+                        onSearchSubmit={handleSearchSubmit}
+                        onSearchClear={handleSearchClear}
+                        loading={loading}
+                        hasActiveFilters={hasActiveFilters}
+                        onClearFilters={handleClearFilters}
+                    >
+                        {/* Category Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Category
+                            </label>
+                            <ModernSelect
+                                value={categoryFilter}
+                                onValueChange={handleCategoryChange}
+                                placeholder="All categories"
+                                options={categories.map(category => ({
+                                    value: category,
+                                    label: category
+                                }))}
+                                disabled={loading}
+                                icon={Tag}
+                            />
+                        </div>
+
+                        {/* Agency Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Issuing Agency
+                            </label>
+                            <ModernSelect
+                                value={agencyFilter}
+                                onValueChange={handleAgencyChange}
+                                placeholder="All agencies"
+                                options={agencies.map(agency => ({
+                                    value: agency,
+                                    label: agency
+                                }))}
+                                disabled={loading}
+                                icon={Building}
+                            />
+                        </div>
+
+                        {/* Sort Options */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Sort By
+                            </label>
+                            <ModernSelect
+                                value={sortBy}
+                                onValueChange={handleSortChange}
+                                placeholder="Sort by"
+                                options={SORT_OPTIONS}
+                                disabled={loading}
+                                icon={ArrowUpDown}
+                            />
+                        </div>
+
+                        {/* Sort Order */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Sort Order
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    variant={sortOrder === 'asc' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => {
+                                        setSortOrder('asc');
+                                        updateFilters({ sort_order: 'asc', page: '1' });
+                                    }}
+                                    className="rounded-lg"
+                                >
+                                    <ChevronUp className="h-4 w-4 mr-2" />
+                                    Ascending
+                                </Button>
+                                <Button
+                                    variant={sortOrder === 'desc' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => {
+                                        setSortOrder('desc');
+                                        updateFilters({ sort_order: 'desc', page: '1' });
+                                    }}
+                                    className="rounded-lg"
+                                >
+                                    <ChevronDown className="h-4 w-4 mr-2" />
+                                    Descending
+                                </Button>
+                            </div>
+                        </div>
+                    </ModernFilterModal>
+                    
+                    {/* Desktop Filters */}
+                    {!isMobile && (
+                        <ModernFormFilters
                             search={search}
                             setSearch={setSearch}
                             handleSearchSubmit={handleSearchSubmit}
@@ -1248,270 +1314,36 @@ Forms Catalog System
                             loading={loading}
                             categories={categories}
                             agencies={agencies}
+                            sortOptions={SORT_OPTIONS}
+                            printForms={handlePrint}
+                            exportToCSV={handleExport}
+                            isExporting={isExporting}
                             hasActiveFilters={hasActiveFilters}
                             handleClearFilters={handleClearFilters}
-                            isMobile={isMobile}
-                            setShowFilters={setShowFilters}
+                            onCopySummary={handleCopySummary}
+                            onEmailSummary={handleEmailSummary}
                         />
                     )}
                     
-                    {/* Forms List Header */}
+                    {/* Custom Tabs Section */}
                     <div className="mt-4">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                            <div>
-                                <h2 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                                    Available Forms
-                                </h2>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    {forms.total > 0 
-                                        ? `Showing ${forms.from} to ${forms.to} of ${forms.total} forms`
-                                        : 'No forms found'}
-                                    {hasActiveFilters && ' (filtered)'}
-                                </p>
-                            </div>
-                            
-                            <div className="flex items-center gap-3">
-                                <div className="text-sm text-gray-500 dark:text-gray-400 hidden md:block">
-                                    Page {forms.current_page} of {forms.last_page}
-                                </div>
-                                
-                                {/* Mobile View Mode Toggle */}
-                                {isMobile && forms.total > 0 && (
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant={viewMode === 'grid' ? 'default' : 'outline'}
-                                            size="sm"
-                                            onClick={() => setViewMode('grid')}
-                                            className="flex-1"
-                                        >
-                                            <Grid className="h-4 w-4 mr-2" />
-                                            Grid
-                                        </Button>
-                                        <Button
-                                            variant={viewMode === 'list' ? 'default' : 'outline'}
-                                            size="sm"
-                                            onClick={() => setViewMode('list')}
-                                            className="flex-1"
-                                        >
-                                            <List className="h-4 w-4 mr-2" />
-                                            List
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        <CustomTabs
+                            key="form-tabs"
+                            statusFilter={activeTab}
+                            handleTabChange={handleTabChange}
+                            getStatusCount={(status) => getStatusCount(stats, status)}
+                            tabsConfig={FORM_TABS}
+                        />
                         
-                        {forms.total === 0 ? (
-                            <Card className="border border-gray-200 dark:border-gray-700">
-                                <CardContent className="py-12 text-center">
-                                    <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                                        <FileText className="h-8 w-8 text-gray-400" />
-                                    </div>
-                                    <h3 className="text-lg font-semibold mb-2">
-                                        No forms found
-                                    </h3>
-                                    <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                        {hasActiveFilters 
-                                            ? 'Try adjusting your filters or search criteria'
-                                            : 'There are currently no forms available'}
-                                    </p>
-                                    {hasActiveFilters && (
-                                        <Button variant="outline" onClick={handleClearFilters} size="sm">
-                                            Clear Filters
-                                        </Button>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <>
-                                {/* Grid View (Mobile & Desktop) */}
-                                {viewMode === 'grid' && (
-                                    <>
-                                        {/* Mobile Grid View */}
-                                        {isMobile && (
-                                            <div className="pb-4">
-                                                {forms.data.map((form) => (
-                                                    <MobileFormCard 
-                                                        key={form.id} 
-                                                        form={form}
-                                                        formatDate={formatDate}
-                                                        formatFileSize={formatFileSize}
-                                                        getCategoryColor={getCategoryColor}
-                                                        getAgencyIcon={getAgencyIcon}
-                                                        getFileTypeIcon={getFileTypeIcon}
-                                                        truncateText={truncateText}
-                                                    />
-                                                ))}
-                                            </div>
-                                        )}
-                                        
-                                        {/* Desktop Grid View */}
-                                        {!isMobile && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                {forms.data.map((form) => (
-                                                    <DesktopGridViewCard 
-                                                        key={form.id} 
-                                                        form={form}
-                                                        formatDate={formatDate}
-                                                        formatFileSize={formatFileSize}
-                                                        getCategoryColor={getCategoryColor}
-                                                        getAgencyIcon={getAgencyIcon}
-                                                        getFileTypeIcon={getFileTypeIcon}
-                                                        truncateText={truncateText}
-                                                    />
-                                                ))}
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                                
-                                {/* List/Table View (Desktop) */}
-                                {viewMode === 'list' && !isMobile && (
-                                    <Card className="border border-gray-200 dark:border-gray-700">
-                                        <CardContent className="p-0">
-                                            <div className="overflow-x-auto">
-                                                <Table>
-                                                    <TableHeader>
-                                                        <TableRow>
-                                                            <TableHead>Form Details</TableHead>
-                                                            <TableHead>Category</TableHead>
-                                                            <TableHead>Agency</TableHead>
-                                                            <TableHead>Downloads</TableHead>
-                                                            <TableHead>File Info</TableHead>
-                                                            <TableHead className="text-right">Actions</TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                        {forms.data.map((form) => (
-                                                            <TableRow key={form.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                                                                <TableCell>
-                                                                    <div>
-                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                            {getFileTypeIcon(form.file_type)}
-                                                                            <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                                                                                {truncateText(form.title, 60)}
-                                                                            </h4>
-                                                                        </div>
-                                                                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                                                                            {truncateText(form.description, 100)}
-                                                                        </p>
-                                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                                            Uploaded: {formatDateTime(form.created_at)}
-                                                                        </p>
-                                                                    </div>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <Badge variant="outline" className={getCategoryColor(form.category)}>
-                                                                        {form.category}
-                                                                    </Badge>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <div className="flex items-center gap-2">
-                                                                        {getAgencyIcon(form.issuing_agency)}
-                                                                        <span className="truncate max-w-[120px]" title={form.issuing_agency}>
-                                                                            {form.issuing_agency}
-                                                                        </span>
-                                                                    </div>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <div className="space-y-1">
-                                                                        <div className="text-sm font-medium">
-                                                                            {form.download_count.toLocaleString()}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-500">
-                                                                            downloads
-                                                                        </div>
-                                                                    </div>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <div className="space-y-1">
-                                                                        <div className="flex items-center gap-2">
-                                                                            {getFileTypeIcon(form.file_type)}
-                                                                            <span className="text-sm truncate max-w-[120px]" title={form.file_name}>
-                                                                                {truncateText(form.file_name, 20)}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-500">
-                                                                            {formatFileSize(form.file_size)} • {form.file_type}
-                                                                        </div>
-                                                                    </div>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <div className="flex justify-end gap-1">
-                                                                        <Link href={`/forms/${form.id}`}>
-                                                                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                                                                <Eye className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </Link>
-                                                                        <Button 
-                                                                            size="sm" 
-                                                                            variant="default"
-                                                                            asChild
-                                                                        >
-                                                                            <Link href={`/forms/${form.id}/download`}>
-                                                                                <Download className="h-4 w-4" />
-                                                                            </Link>
-                                                                        </Button>
-                                                                    </div>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-                                
-                                {/* Pagination */}
-                                {forms.last_page > 1 && (
-                                    <div className="mt-4 md:mt-6">
-                                        <div className="flex items-center justify-between">
-                                            <div className="text-sm text-gray-500">
-                                                Page {forms.current_page} of {forms.last_page}
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => updateFilters({ page: (forms.current_page - 1).toString() })}
-                                                    disabled={forms.current_page <= 1 || loading}
-                                                >
-                                                    <ChevronLeft className="h-4 w-4 mr-1" />
-                                                    Previous
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => updateFilters({ page: (forms.current_page + 1).toString() })}
-                                                    disabled={forms.current_page >= forms.last_page || loading}
-                                                >
-                                                    Next
-                                                    <ChevronRight className="h-4 w-4 ml-1" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        )}
+                        {/* Tab Content */}
+                        <div className="mt-4">
+                            {renderTabContent()}
+                        </div>
                     </div>
-                </div>
-                
-                {/* Mobile Footer */}
-                <div className="md:hidden">
-                    <ResidentMobileFooter />
                 </div>
                 
                 {/* Loading Overlay */}
-                {loading && (
-                    <div className="fixed inset-0 bg-black/10 backdrop-blur-sm z-50 flex items-center justify-center">
-                        <div className="bg-white p-6 rounded-lg shadow-lg">
-                            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-                            <p className="text-sm">Loading forms...</p>
-                        </div>
-                    </div>
-                )}
+                <ModernLoadingOverlay loading={loading} message="Loading forms..." />
             </ResidentLayout>
         </>
     );

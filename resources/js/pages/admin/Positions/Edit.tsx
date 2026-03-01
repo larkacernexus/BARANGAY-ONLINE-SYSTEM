@@ -92,7 +92,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(`/positions/${position.id}`, {
+        post(`/admin/positions/${position.id}`, {
             preserveScroll: true,
             onError: () => {
                 console.log('Error updating position:', errors);
@@ -110,11 +110,11 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
         }
         
         if (confirm('Are you sure you want to delete this position? This action cannot be undone.')) {
-            destroy(`/positions/${position.id}`, {
+            destroy(`/admin/positions/${position.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     // Redirect to positions list
-                    window.location.href = '/positions';
+                    window.location.href = '/admin/positions';
                 }
             });
         }
@@ -239,10 +239,10 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
         <AppLayout
             title={`Edit ${position.name}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Positions', href: '/positions' },
-                { title: position.name, href: `/positions/${position.id}` },
-                { title: 'Edit', href: `/positions/${position.id}/edit` }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Positions', href: '/admin/positions' },
+                { title: position.name, href: `/admin/positions/${position.id}` },
+                { title: 'Edit', href: `/admin/positions/${position.id}/edit` }
             ]}
         >
             <form onSubmit={handleSubmit}>
@@ -250,7 +250,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href="/positions">
+                            <Link href="/admin/positions">
                                 <Button variant="ghost" size="sm" type="button">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
@@ -646,7 +646,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                     <CardTitle>Quick Actions</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <Link href={`/positions/${position.id}`}>
+                                    <Link href={`/admin/positions/${position.id}`}>
                                         <Button variant="outline" className="w-full justify-start">
                                             <Shield className="h-4 w-4 mr-2" />
                                             View Position Details
@@ -654,7 +654,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                     </Link>
                                     
                                     {position.officials_count && position.officials_count > 0 && (
-                                        <Link href={`/officials?position=${position.id}`}>
+                                        <Link href={`/admin/officials?position=${position.id}`}>
                                             <Button variant="outline" className="w-full justify-start">
                                                 <Users className="h-4 w-4 mr-2" />
                                                 View Assigned Officials
@@ -713,12 +713,12 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                     {/* Form Actions */}
                     <div className="flex items-center justify-between pt-6 border-t">
                         <div className="flex items-center gap-2">
-                            <Link href={`/positions/${position.id}`}>
+                            <Link href={`/admin/positions/${position.id}`}>
                                 <Button variant="outline" type="button">
                                     View Details
                                 </Button>
                             </Link>
-                            <Link href="/positions">
+                            <Link href="/admin/positions">
                                 <Button variant="outline" type="button">
                                     Back to List
                                 </Button>

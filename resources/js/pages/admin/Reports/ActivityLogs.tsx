@@ -639,7 +639,7 @@ export default function ActivityLogs() {
                 ...buildFilterParams(),
                 log_name: undefined,
             });
-            router.get('/reports/activity-logs', params, {
+            router.get('/admin/reports/activity-logs', params, {
                 preserveScroll: true,
                 preserveState: true,
                 onStart: () => setIsLoading(true),
@@ -654,7 +654,7 @@ export default function ActivityLogs() {
                     ...buildFilterParams(),
                     log_name: selectedTab.name,
                 });
-                router.get('/reports/activity-logs', params, {
+                router.get('/admin/reports/activity-logs', params, {
                     preserveScroll: true,
                     preserveState: true,
                     onStart: () => setIsLoading(true),
@@ -683,7 +683,7 @@ export default function ActivityLogs() {
     const debouncedSearch = useMemo(
         () => debounce(() => {
             const params = buildFilterParams();
-            router.get('/reports/activity-logs', params, {
+            router.get('/admin/reports/activity-logs', params, {
                 preserveScroll: true,
                 preserveState: true,
                 onStart: () => setIsLoading(true),
@@ -708,7 +708,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             event_type: value.trim() || undefined,
         });
-        router.get('/reports/activity-logs', params, {
+        router.get('/admin/reports/activity-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -722,7 +722,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             log_name: value.trim() || undefined,
         });
-        router.get('/reports/activity-logs', params, {
+        router.get('/admin/reports/activity-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -736,7 +736,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             user_id: value.trim() || undefined,
         });
-        router.get('/reports/activity-logs', params, {
+        router.get('/admin/reports/activity-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -750,7 +750,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             date_from: value.trim() || undefined,
         });
-        router.get('/reports/activity-logs', params, {
+        router.get('/admin/reports/activity-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -764,7 +764,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             date_to: value.trim() || undefined,
         });
-        router.get('/reports/activity-logs', params, {
+        router.get('/admin/reports/activity-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -779,7 +779,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             per_page: numValue !== 25 ? numValue : undefined,
         });
-        router.get('/reports/activity-logs', params, {
+        router.get('/admin/reports/activity-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -799,7 +799,7 @@ export default function ActivityLogs() {
         setActiveTab('all');
         setShowFilters(false);
         
-        router.get('/reports/activity-logs', {}, {
+        router.get('/admin/reports/activity-logs', {}, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -810,7 +810,7 @@ export default function ActivityLogs() {
     // Refresh current filters
     const handleRefresh = () => {
         const params = buildFilterParams();
-        router.get('/reports/activity-logs', params, {
+        router.get('/admin/reports/activity-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -829,7 +829,7 @@ export default function ActivityLogs() {
             exportParams[key] = value;
         });
 
-        router.get('/reports/activity-logs/export', exportParams, {
+        router.get('/admin/reports/activity-logs/export', exportParams, {
             preserveScroll: true,
             onSuccess: () => {
                 setIsLoading(false);
@@ -869,8 +869,8 @@ export default function ActivityLogs() {
         <AppLayout
             title="Activity Logs"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Activity Logs', href: '/reports/activity-logs' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Activity Logs', href: '/admin/reports/activity-logs' }
             ]}
         >
             <Head title="Activity Logs" />
@@ -1558,7 +1558,7 @@ export default function ActivityLogs() {
                                                                 
                                                                 <div className="flex justify-end gap-2 pt-2">
                                                                     <Link
-                                                                        href={`/reports/activity-logs/${log.id}`}
+                                                                        href={`/admin/reports/activity-logs/${log.id}`}
                                                                         className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/10 rounded"
                                                                     >
                                                                         <Eye className="h-3 w-3" />
@@ -1566,7 +1566,7 @@ export default function ActivityLogs() {
                                                                     </Link>
                                                                     {log.causer && (
                                                                         <Link
-                                                                            href={`/users/${log.causer.id}`}
+                                                                            href={`/admin/users/${log.causer.id}`}
                                                                             className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
                                                                         >
                                                                             <UserIcon className="h-3 w-3" />
@@ -1616,7 +1616,7 @@ export default function ActivityLogs() {
                                                                     }
                                                                 });
                                                                 
-                                                                router.get('/reports/activity-logs', params, {
+                                                                router.get('/admin/reports/activity-logs', params, {
                                                                     preserveScroll: true,
                                                                     preserveState: true,
                                                                     onStart: () => setIsLoading(true),
@@ -1797,7 +1797,7 @@ export default function ActivityLogs() {
                             </div>
                             
                             <Link
-                                href="/reports/activity-logs"
+                                href="/admin/reports/activity-logs"
                                 className="mt-4 w-full text-center block px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/10 rounded-lg"
                             >
                                 View all activities

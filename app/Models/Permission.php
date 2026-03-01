@@ -29,6 +29,22 @@ class Permission extends Model
         return $this->belongsToMany(Role::class, 'role_permissions')->withTimestamps();
     }
 
+    /**
+     * Scope a query to only include active permissions.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope a query to order permissions by module.
+     */
+    public function scopeOrderedByModule($query)
+    {
+        return $query->orderBy('module')->orderBy('display_name');
+    }
+
     public static function getModules(): array
     {
         return [

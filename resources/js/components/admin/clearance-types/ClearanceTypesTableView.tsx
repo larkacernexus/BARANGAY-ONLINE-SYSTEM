@@ -331,21 +331,21 @@ export default function ClearanceTypesTableView({
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-48">
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={route('clearance-types.show', type.id)} className="flex items-center cursor-pointer">
+                                                        <Link href={route('admin.clearance-types.show', type.id)} className="flex items-center cursor-pointer">
                                                             <Eye className="mr-2 h-4 w-4" />
                                                             <span>View Details</span>
                                                         </Link>
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={route('clearance-types.edit', type.id)} className="flex items-center cursor-pointer">
+                                                        <Link href={route('admin.clearance-types.edit', type.id)} className="flex items-center cursor-pointer">
                                                             <Edit className="mr-2 h-4 w-4" />
                                                             <span>Edit Type</span>
                                                         </Link>
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={route('clearances.create', { type: type.id })} className="flex items-center cursor-pointer">
+                                                        <Link href={route('admin.clearances.create', { type: type.id })} className="flex items-center cursor-pointer">
                                                             <FileText className="mr-2 h-4 w-4" />
                                                             <span>Issue Clearance</span>
                                                         </Link>
@@ -376,7 +376,7 @@ export default function ClearanceTypesTableView({
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={route('clearance-types.print', type.id)} className="flex items-center cursor-pointer">
+                                                        <Link href={route('admin.clearance-types.print', type.id)} className="flex items-center cursor-pointer">
                                                             <Printer className="mr-2 h-4 w-4" />
                                                             <span>Print Details</span>
                                                         </Link>

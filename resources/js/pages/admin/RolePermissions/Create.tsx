@@ -214,7 +214,7 @@ export default function RolePermissionCreate({
 
         setIsSubmitting(true);
 
-        post(route('role-permissions.store'), {
+        post(route('admin.role-permissions.store'), {
             preserveScroll: true,
             onSuccess: () => {
                 setIsSubmitting(false);
@@ -260,8 +260,8 @@ export default function RolePermissionCreate({
         <AdminLayout
             title="Assign Permissions to Role"
             breadcrumbs={[
-                { title: 'Dashboard', href: route('dashboard') },
-                { title: 'Role Permissions', href: route('role-permissions.index') },
+                { title: 'Dashboard', href: route('admin.dashboard') },
+                { title: 'Role Permissions', href: route('admin.role-permissions.index') },
                 { title: 'Assign Permissions', href: '#' }
             ]}
         >
@@ -275,7 +275,7 @@ export default function RolePermissionCreate({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => router.visit(route('role-permissions.index'))}
+                                onClick={() => router.visit(route('admin.role-permissions.index'))}
                                 className="h-8 w-8 p-0"
                             >
                                 <ArrowLeft className="h-4 w-4" />
@@ -735,7 +735,7 @@ export default function RolePermissionCreate({
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => router.visit(route('role-permissions.index'))}
+                                        onClick={() => router.visit(route('admin.role-permissions.index'))}
                                         disabled={processing || isSubmitting}
                                     >
                                         Cancel
@@ -866,7 +866,7 @@ export default function RolePermissionCreate({
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => router.visit(route('role-permissions.index'))}
+                                        onClick={() => router.visit(route('admin.role-permissions.index'))}
                                         className="w-full"
                                     >
                                         <Calendar className="mr-2 h-4 w-4" />

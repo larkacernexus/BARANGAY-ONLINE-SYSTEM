@@ -26,6 +26,18 @@ export interface ClearanceType {
 }
 
 export interface ClearanceRequest {
+    household_id: boolean;
+    business_id: boolean;
+    amount_paid(amount_paid: any): unknown;
+    contact_name: boolean;
+    payer_name: any;
+    payer_type: string;
+    household: any;
+    business: boolean;
+    payer_id: any;
+    contact_address: string | undefined;
+    contact_purok: string | undefined;
+    payment_status: boolean;
     resident_name: unknown;
     contact_number: unknown;
     address: unknown;

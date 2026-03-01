@@ -170,11 +170,39 @@ class LoginController extends Controller
     }
     
     /**
+     * Get user's role ID.
+     */
+    private function getRoleId(User $user): ?int
+    {
+        return $user->role ? $user->role->id : null;
+    }
+    
+    /**
+     * Check if user is a household user (role_id = 13)
+     */
+    private function isHouseholdUser(User $user): bool
+    {
+        return $this->getRoleId($user) === 13;
+    }
+    
+    /**
+     * Check if user is an admin/official user (all roles except Household Head)
+     */
+    private function isAdminUser(User $user): bool
+    {
+        $roleId = $this->getRoleId($user);
+        
+        // All roles except Household Head (13) are considered admin/official users
+        return $roleId !== null && $roleId !== 13;
+    }
+    
+    /**
      * Redirect user based on their role.
      */
     private function redirectBasedOnRole(User $user)
     {
         $roleName = $this->getRoleName($user);
+        $roleId = $this->getRoleId($user);
         
         if (!$roleName) {
             Auth::logout();
@@ -184,24 +212,47 @@ class LoginController extends Controller
                 ]);
         }
         
+        // Get resident_id if user is linked to a resident
+        $residentId = $user->resident_id;
+        $isHouseholdHead = $user->is_household_head ?? false;
+        
         // Store role in session
         session()->put([
             'user.role' => $roleName,
+            'user.role_id' => $roleId,
             'user.permissions' => $user->getPermissionNames(),
             'user.full_name' => $user->full_name,
+            'user.resident_id' => $residentId,
+            'user.is_household_head' => $isHouseholdHead,
             'user.show_password_change_modal' => $user->require_password_change || is_null($user->password_changed_at),
         ]);
         
-        // Define redirect logic
-        $residentRoles = ['Resident', 'Barangay Kagawad'];
+        // REDIRECTION LOGIC
         
-        if (in_array($roleName, $residentRoles)) {
-            return redirect()->intended('/residentdashboard')
-                ->with('status', 'Login successful');
-        } else {
-            return redirect()->intended('/dashboard')
-                ->with('status', 'Login successful');
+        // Case 1: Household Head (role_id = 13)
+        if ($this->isHouseholdUser($user)) {
+            // Check if they have a resident record
+            if (!$residentId) {
+                \Log::warning('Household user has no resident_id', ['user_id' => $user->id]);
+            }
+            
+            return redirect()->intended('/portal/dashboard')
+                ->with('status', 'Login successful. Welcome to your household portal.');
         }
+        
+        // Case 2: All other roles (Admin/Official users including Kagawad, Captain, etc.)
+        if ($this->isAdminUser($user)) {
+            // For Kagawad (role_id = 5) or other officials, redirect to admin dashboard
+            return redirect()->intended('/admin/dashboard')
+                ->with('status', 'Login successful. Welcome to the Barangay Administration.');
+        }
+        
+        // Fallback (should never reach here)
+        Auth::logout();
+        return redirect()->route('login')
+            ->withErrors([
+                'email' => 'Unable to determine user type. Please contact administrator.',
+            ]);
     }
     
     /**

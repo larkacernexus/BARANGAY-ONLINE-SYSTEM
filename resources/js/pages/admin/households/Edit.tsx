@@ -369,14 +369,14 @@ export default function EditHousehold({
             return;
         }
         
-        put(`/households/${household.id}`, {
+        put(`/admin/households/${household.id}`, {
             preserveScroll: true,
         });
     };
 
     const deleteHousehold = () => {
         if (confirm('Are you sure you want to delete this household? This action cannot be undone.')) {
-            window.location.href = `/households/${household.id}/delete`;
+            window.location.href = `/admin/households/${household.id}/delete`;
         }
     };
 
@@ -394,10 +394,10 @@ export default function EditHousehold({
         <AppLayout
             title={`Edit Household: ${household.household_number}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Households', href: '/households' },
-                { title: household.household_number, href: `/households/${household.id}` },
-                { title: 'Edit Household', href: `/households/${household.id}/edit` }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Households', href: '/admin/households' },
+                { title: household.household_number, href: `/admin/households/${household.id}` },
+                { title: 'Edit Household', href: `/admin/households/${household.id}/edit` }
             ]}
         >
             <form onSubmit={handleSubmit}>
@@ -405,7 +405,7 @@ export default function EditHousehold({
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href={`/households/${household.id}`}>
+                            <Link href={`/admin/households/${household.id}`}>
                                 <Button variant="ghost" size="sm" type="button">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
@@ -729,7 +729,7 @@ export default function EditHousehold({
                                                         </p>
                                                         <div className="flex flex-col sm:flex-row gap-3 justify-center">
                                                             <Link 
-                                                                href={`/residents/create?return_to=/households/${household.id}/edit&purok_id=${data.purok_id || ''}`}
+                                                                href={`/admin/residents/create?return_to=/households/${household.id}/edit&purok_id=${data.purok_id || ''}`}
                                                                 className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                                                                 onClick={() => setShowMemberSearch(false)}
                                                             >
@@ -758,7 +758,7 @@ export default function EditHousehold({
                                                                     Try a different search term or create a new resident.
                                                                 </p>
                                                                 <Link 
-                                                                    href={`/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(searchQuery)}&household_id=${household.id}&purok_id=${data.purok_id || ''}`}
+                                                                    href={`/admin/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(searchQuery)}&household_id=${household.id}&purok_id=${data.purok_id || ''}`}
                                                                     className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                                                                     onClick={() => setShowMemberSearch(false)}
                                                                 >
@@ -937,7 +937,7 @@ export default function EditHousehold({
                                                         </Button>
                                                         {available_residents.length > 0 && (
                                                             <Link 
-                                                                href={`/residents/create?return_to=/households/${household.id}/edit&purok_id=${data.purok_id || ''}`}
+                                                                href={`/admin/residents/create?return_to=/households/${household.id}/edit&purok_id=${data.purok_id || ''}`}
                                                                 className="inline-flex items-center justify-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                                                                 onClick={() => setShowMemberSearch(false)}
                                                             >
@@ -1087,7 +1087,7 @@ export default function EditHousehold({
                                                                     This member is not in the residents database yet.
                                                                 </div>
                                                                 <Link 
-                                                                    href={`/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(member.name)}&age=${member.age}&relationship=${encodeURIComponent(member.relationship)}&household_id=${household.id}&purok_id=${data.purok_id || ''}`}
+                                                                    href={`/admin/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(member.name)}&age=${member.age}&relationship=${encodeURIComponent(member.relationship)}&household_id=${household.id}&purok_id=${data.purok_id || ''}`}
                                                                     target="_blank"
                                                                     className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:underline"
                                                                 >
@@ -1388,7 +1388,7 @@ export default function EditHousehold({
                     {/* Form Actions */}
                     <div className="flex items-center justify-between pt-6 border-t">
                         <div className="flex items-center gap-2">
-                            <Link href={`/households/${household.id}`}>
+                            <Link href={`/admin/households/${household.id}`}>
                                 <Button variant="ghost" type="button">
                                     Cancel
                                 </Button>

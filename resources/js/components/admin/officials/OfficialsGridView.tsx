@@ -56,7 +56,7 @@ export default function OfficialsGridView({
             icon={<Shield className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
             hasFilters={hasActiveFilters}
             onClearFilters={onClearFilters}
-            onCreateNew={() => window.location.href = '/officials/create'}
+            onCreateNew={() => window.location.href = '/admin/officials/create'}
             createLabel="Add Official"
         />
     );
@@ -127,21 +127,21 @@ export default function OfficialsGridView({
                                     <ActionDropdown>
                                         <ActionDropdownItem
                                             icon={<Eye className="h-4 w-4" />}
-                                            href={`/officials/${official.id}`}
+                                            href={`/admin/officials/${official.id}`}
                                         >
                                             View Details
                                         </ActionDropdownItem>
                                         
                                         <ActionDropdownItem
                                             icon={<Edit className="h-4 w-4" />}
-                                            href={`/officials/${official.id}/edit`}
+                                            href={`/admin/officials/${official.id}/edit`}
                                         >
                                             Edit Official
                                         </ActionDropdownItem>
                                         
                                         <ActionDropdownItem
                                             icon={<Printer className="h-4 w-4" />}
-                                            href={`/officials/${official.id}/print`}
+                                            href={`/admin/officials/${official.id}/print`}
                                         >
                                             Print Details
                                         </ActionDropdownItem>

@@ -54,8 +54,8 @@ interface DocumentType {
     category: string;
     is_required: boolean;
     sort_order: number;
-    accepted_formats: string[];
-    max_file_size: number;
+    accepted_formats?: string[];
+    max_file_size?: number;
     is_active: boolean;
 }
 
@@ -96,6 +96,25 @@ const safeNumber = (value: any, defaultValue = 0): number => {
     return isNaN(num) ? defaultValue : num;
 };
 
+// Helper function to safely format accepted formats
+const formatAcceptedFormats = (formats: any): string => {
+    if (!formats) return 'None specified';
+    if (Array.isArray(formats)) {
+        return formats.length > 0 ? formats.join(', ') : 'None specified';
+    }
+    if (typeof formats === 'string') {
+        return formats.split(',').map(f => f.trim()).filter(f => f).join(', ') || 'None specified';
+    }
+    return 'None specified';
+};
+
+// Helper function to safely format file size
+const formatFileSize = (size: any): string => {
+    const num = Number(size);
+    if (isNaN(num) || num <= 0) return 'Not specified';
+    return `${num / 1024} MB`;
+};
+
 // Helper function to compare numbers with tolerance
 const numbersEqual = (a: number, b: number, tolerance = 0.001): boolean => {
     return Math.abs(a - b) < tolerance;
@@ -114,8 +133,8 @@ export default function EditClearanceType({
             <AppLayout
                 title="Edit Clearance Type"
                 breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Clearance Types', href: '/clearance-types' },
+                    { title: 'Dashboard', href: '/admin/dashboard' },
+                    { title: 'Clearance Types', href: '/admin/clearance-types' },
                     { title: 'Edit', href: '#' }
                 ]}
             >
@@ -135,13 +154,17 @@ export default function EditClearanceType({
     );
     const [newPurposeOption, setNewPurposeOption] = useState('');
     const [eligibilityCriteria, setEligibilityCriteria] = useState<EligibilityCriterion[]>(
-        initialClearanceType.eligibility_criteria || []
+        Array.isArray(initialClearanceType.eligibility_criteria) ? initialClearanceType.eligibility_criteria : []
     );
     const [showEligibilityForm, setShowEligibilityForm] = useState(false);
     const [selectedDocumentTypes, setSelectedDocumentTypes] = useState<number[]>(
-        initialClearanceType.document_types?.map(doc => doc.id) || []
+        Array.isArray(initialClearanceType.document_types) 
+            ? initialClearanceType.document_types.map(doc => doc.id).filter(id => id) 
+            : []
     );
-    const [documentTypes, setDocumentTypes] = useState<DocumentType[]>(initialDocumentTypes);
+    const [documentTypes, setDocumentTypes] = useState<DocumentType[]>(
+        Array.isArray(initialDocumentTypes) ? initialDocumentTypes : []
+    );
     const [documentCategory, setDocumentCategory] = useState<string>('all');
     const [searchDocument, setSearchDocument] = useState('');
 
@@ -156,14 +179,20 @@ export default function EditClearanceType({
         requires_payment: Boolean(initialClearanceType.requires_payment),
         requires_approval: Boolean(initialClearanceType.requires_approval || false),
         is_online_only: Boolean(initialClearanceType.is_online_only || false),
-        document_type_ids: initialClearanceType.document_types?.map(doc => doc.id) || [],
-        eligibility_criteria: initialClearanceType.eligibility_criteria || [],
+        document_type_ids: Array.isArray(initialClearanceType.document_types) 
+            ? initialClearanceType.document_types.map(doc => doc.id).filter(id => id) 
+            : [],
+        eligibility_criteria: Array.isArray(initialClearanceType.eligibility_criteria) 
+            ? initialClearanceType.eligibility_criteria 
+            : [],
         purpose_options: initialClearanceType.purpose_options || defaultPurposeOptions.join(', '),
     });
 
     // Auto-select common type based on existing data
     useEffect(() => {
         const findMatchingCommonType = () => {
+            if (!initialClearanceType) return 'custom';
+            
             // First try exact code match
             const exactCodeMatch = Object.entries(commonTypes || {}).find(([_, type]) => 
                 type.code === initialClearanceType.code
@@ -174,9 +203,9 @@ export default function EditClearanceType({
             }
             
             // Then try name similarity (case-insensitive, ignoring special characters)
-            const normalizedName = initialClearanceType.name.toLowerCase().replace(/[^a-z0-9]/g, ' ');
+            const normalizedName = (initialClearanceType.name || '').toLowerCase().replace(/[^a-z0-9]/g, ' ');
             for (const [key, type] of Object.entries(commonTypes || {})) {
-                const normalizedTypeName = type.name.toLowerCase().replace(/[^a-z0-9]/g, ' ');
+                const normalizedTypeName = (type.name || '').toLowerCase().replace(/[^a-z0-9]/g, ' ');
                 
                 // Check if names are similar (contains or contained by)
                 if (normalizedName.includes(normalizedTypeName) || 
@@ -214,12 +243,12 @@ export default function EditClearanceType({
             if (isDataUnchanged) {
                 setData({
                     ...data,
-                    name: commonType.name,
-                    code: commonType.code,
-                    description: commonType.description,
-                    fee: commonType.fee,
-                    processing_days: commonType.processing_days,
-                    validity_days: commonType.validity_days,
+                    name: commonType.name || '',
+                    code: commonType.code || '',
+                    description: commonType.description || '',
+                    fee: commonType.fee || 0,
+                    processing_days: commonType.processing_days || 1,
+                    validity_days: commonType.validity_days || 30,
                     requires_payment: commonType.requires_payment !== false,
                 });
             }
@@ -233,9 +262,9 @@ export default function EditClearanceType({
             // Reset to original values when selecting custom
             setData({
                 ...data,
-                name: initialClearanceType.name,
-                code: initialClearanceType.code,
-                description: initialClearanceType.description,
+                name: initialClearanceType.name || '',
+                code: initialClearanceType.code || '',
+                description: initialClearanceType.description || '',
                 fee: safeNumber(initialClearanceType.fee, 0),
                 processing_days: safeNumber(initialClearanceType.processing_days, 1),
                 validity_days: safeNumber(initialClearanceType.validity_days, 30),
@@ -248,12 +277,12 @@ export default function EditClearanceType({
         if (commonType) {
             setData({
                 ...data,
-                name: commonType.name,
-                code: commonType.code,
-                description: commonType.description,
-                fee: commonType.fee,
-                processing_days: commonType.processing_days,
-                validity_days: commonType.validity_days,
+                name: commonType.name || '',
+                code: commonType.code || '',
+                description: commonType.description || '',
+                fee: commonType.fee || 0,
+                processing_days: commonType.processing_days || 1,
+                validity_days: commonType.validity_days || 30,
                 requires_payment: commonType.requires_payment !== false,
             });
         }
@@ -261,12 +290,10 @@ export default function EditClearanceType({
 
     const handleDocumentTypeToggle = (documentTypeId: number) => {
         setSelectedDocumentTypes(prev => {
-            let updatedSelection;
-            if (prev.includes(documentTypeId)) {
-                updatedSelection = prev.filter(id => id !== documentTypeId);
-            } else {
-                updatedSelection = [...prev, documentTypeId];
-            }
+            const updatedSelection = prev.includes(documentTypeId)
+                ? prev.filter(id => id !== documentTypeId)
+                : [...prev, documentTypeId];
+            
             setData('document_type_ids', updatedSelection);
             return updatedSelection;
         });
@@ -298,7 +325,7 @@ export default function EditClearanceType({
 
     const handleUpdateEligibilityCriterion = (index: number, field: keyof EligibilityCriterion, value: string) => {
         const updatedCriteria = [...eligibilityCriteria];
-        updatedCriteria[index][field] = value;
+        updatedCriteria[index] = { ...updatedCriteria[index], [field]: value };
         setEligibilityCriteria(updatedCriteria);
         setData('eligibility_criteria', updatedCriteria);
     };
@@ -314,16 +341,22 @@ export default function EditClearanceType({
         put(route('clearance-types.update', initialClearanceType.id));
     };
 
-    // Filter document types based on category and search
-    const filteredDocumentTypes = documentTypes.filter(doc => {
-        const matchesCategory = documentCategory === 'all' || doc.category === documentCategory;
-        const matchesSearch = doc.name.toLowerCase().includes(searchDocument.toLowerCase()) ||
-                            doc.description.toLowerCase().includes(searchDocument.toLowerCase());
+    // Safely filter document types
+    const filteredDocumentTypes = (Array.isArray(documentTypes) ? documentTypes : []).filter(doc => {
+        const matchesCategory = documentCategory === 'all' || (doc.category || '') === documentCategory;
+        const matchesSearch = (doc.name || '').toLowerCase().includes((searchDocument || '').toLowerCase()) ||
+                            (doc.description || '').toLowerCase().includes((searchDocument || '').toLowerCase());
         return matchesCategory && matchesSearch;
     });
 
-    // Get unique categories from document types
-    const documentCategories = ['all', ...Array.from(new Set(documentTypes.map(doc => doc.category)))];
+    // Get unique categories from document types safely
+    const documentCategories = [
+        'all', 
+        ...Array.from(new Set((Array.isArray(documentTypes) ? documentTypes : [])
+            .map(doc => doc.category)
+            .filter(category => category) // Remove undefined/null categories
+        ))
+    ];
 
     // Resident fields for eligibility criteria
     const residentFields = [
@@ -345,9 +378,9 @@ export default function EditClearanceType({
         <AppLayout
             title="Edit Clearance Type"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Clearance Types', href: '/clearance-types' },
-                { title: `Edit: ${initialClearanceType.name}`, href: `/clearance-types/${initialClearanceType.id}/edit` }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Clearance Types', href: '/admin/clearance-types' },
+                { title: `Edit: ${initialClearanceType.name || 'Clearance Type'}`, href: `/admin/clearance-types/${initialClearanceType.id}/edit` }
             ]}
         >
             <form onSubmit={submit}>
@@ -355,7 +388,7 @@ export default function EditClearanceType({
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href="/clearance-types">
+                            <Link href="/admin/clearance-types">
                                 <Button variant="ghost" size="sm">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
@@ -369,13 +402,13 @@ export default function EditClearanceType({
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Link href={`/clearance-types/${initialClearanceType.id}`}>
+                            <Link href={`/admin/clearance-types/${initialClearanceType.id}`}>
                                 <Button variant="outline" type="button">
                                     <Eye className="h-4 w-4 mr-2" />
                                     View
                                 </Button>
                             </Link>
-                            <Link href="/clearance-types">
+                            <Link href="/admin/clearance-types">
                                 <Button variant="outline" type="button">
                                     Cancel
                                 </Button>
@@ -437,13 +470,13 @@ export default function EditClearanceType({
                                             >
                                                 <div className="flex-1">
                                                     <div className="font-medium flex items-center gap-2">
-                                                        {type.name}
+                                                        {type.name || 'Unnamed'}
                                                         {selectedCommonType === key && (
                                                             <CheckCircle className="h-4 w-4 text-emerald-600" />
                                                         )}
                                                     </div>
                                                     <div className="text-xs text-gray-500 mt-1">
-                                                        {formatCurrency(type.fee)} • {type.processing_days} day{type.processing_days !== 1 ? 's' : ''}
+                                                        {formatCurrency(type.fee)} • {type.processing_days || 1} day{(type.processing_days || 1) !== 1 ? 's' : ''}
                                                     </div>
                                                 </div>
                                             </Button>
@@ -474,7 +507,7 @@ export default function EditClearanceType({
                                             <div className="flex items-center gap-2 text-emerald-800">
                                                 <CheckCircle className="h-5 w-5" />
                                                 <span className="font-medium">
-                                                    Using template: {commonTypes[selectedCommonType].name}
+                                                    Using template: {commonTypes[selectedCommonType].name || 'Unnamed'}
                                                 </span>
                                             </div>
                                             <p className="text-sm text-emerald-700 mt-1">
@@ -677,14 +710,14 @@ export default function EditClearanceType({
                                             <Label>Selected Documents ({selectedDocumentTypes.length})</Label>
                                             <div className="flex flex-wrap gap-2">
                                                 {selectedDocumentTypes.map(docId => {
-                                                    const doc = documentTypes.find(d => d.id === docId);
+                                                    const doc = (Array.isArray(documentTypes) ? documentTypes : []).find(d => d.id === docId);
                                                     return doc ? (
                                                         <Badge
                                                             key={doc.id}
                                                             variant="secondary"
                                                             className="flex items-center gap-1"
                                                         >
-                                                            {doc.name}
+                                                            {doc.name || 'Unnamed'}
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleDocumentTypeToggle(doc.id)}
@@ -723,7 +756,7 @@ export default function EditClearanceType({
                                                                     htmlFor={`doc-${docType.id}`}
                                                                     className="font-medium cursor-pointer"
                                                                 >
-                                                                    {docType.name}
+                                                                    {docType.name || 'Unnamed Document'}
                                                                     {docType.is_required && (
                                                                         <span className="ml-2 text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 px-2 py-0.5 rounded">
                                                                             Required
@@ -731,16 +764,16 @@ export default function EditClearanceType({
                                                                     )}
                                                                 </Label>
                                                                 <p className="text-sm text-gray-500 mt-1">
-                                                                    {docType.description}
+                                                                    {docType.description || 'No description provided'}
                                                                 </p>
                                                             </div>
                                                             <Badge variant="outline" className="ml-2">
-                                                                {docType.category}
+                                                                {docType.category || 'Uncategorized'}
                                                             </Badge>
                                                         </div>
                                                         <div className="flex items-center gap-4 text-xs text-gray-500">
-                                                            <span>Formats: {docType.accepted_formats.join(', ')}</span>
-                                                            <span>Max: {docType.max_file_size / 1024} MB</span>
+                                                            <span>Formats: {formatAcceptedFormats(docType.accepted_formats)}</span>
+                                                            <span>Max: {formatFileSize(docType.max_file_size)}</span>
                                                             <span className={docType.is_active ? "text-emerald-600" : "text-rose-600"}>
                                                                 {docType.is_active ? 'Active' : 'Inactive'}
                                                             </span>
@@ -752,7 +785,7 @@ export default function EditClearanceType({
                                     </div>
 
                                     <div className="text-sm text-gray-500">
-                                        <p>Documents are managed in the <Link href="/document-types" className="text-blue-600 hover:underline">Document Types</Link> section.</p>
+                                        <p>Documents are managed in the <Link href="/admin/document-types" className="text-blue-600 hover:underline">Document Types</Link> section.</p>
                                         <p>Selected documents will be required when applying for this clearance type.</p>
                                     </div>
                                 </CardContent>
@@ -911,7 +944,7 @@ export default function EditClearanceType({
                                                     </div>
                                                     <div className="grid gap-2">
                                                         <Select
-                                                            value={criterion.field}
+                                                            value={criterion.field || ''}
                                                             onValueChange={(value) => 
                                                                 handleUpdateEligibilityCriterion(index, 'field', value)
                                                             }
@@ -928,7 +961,7 @@ export default function EditClearanceType({
                                                             </SelectContent>
                                                         </Select>
                                                         <Select
-                                                            value={criterion.operator}
+                                                            value={criterion.operator || ''}
                                                             onValueChange={(value) => 
                                                                 handleUpdateEligibilityCriterion(index, 'operator', value)
                                                             }
@@ -937,7 +970,7 @@ export default function EditClearanceType({
                                                                 <SelectValue placeholder="Select operator" />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                {eligibilityOperators.map((operator) => (
+                                                                {(Array.isArray(eligibilityOperators) ? eligibilityOperators : []).map((operator) => (
                                                                     <SelectItem key={operator.value} value={operator.value}>
                                                                         {operator.label}
                                                                     </SelectItem>
@@ -945,7 +978,7 @@ export default function EditClearanceType({
                                                             </SelectContent>
                                                         </Select>
                                                         <Input
-                                                            value={criterion.value}
+                                                            value={criterion.value || ''}
                                                             onChange={(e) => 
                                                                 handleUpdateEligibilityCriterion(index, 'value', e.target.value)
                                                             }
@@ -1042,7 +1075,7 @@ export default function EditClearanceType({
                                                 </>
                                             )}
                                         </Button>
-                                        <Link href="/clearance-types">
+                                        <Link href="/admin/clearance-types">
                                             <Button 
                                                 type="button" 
                                                 variant="outline" 

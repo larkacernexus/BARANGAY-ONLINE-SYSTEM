@@ -448,8 +448,8 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, p
     return (
         <ResidentLayout
             breadcrumbs={[
-                { title: 'Dashboard', href: '/resident/dashboard' },
-                { title: 'Announcements', href: '/resident-announcements' },
+                { title: 'Dashboard', href: '/portal/dashboard' },
+                { title: 'Announcements', href: '/portal/resident-announcements' },
                 { title: announcement.title, href: '#' }
             ]}
         >
@@ -457,7 +457,7 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, p
                 {/* Mobile Header */}
                 <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b pb-3 pt-2 px-4 -mx-4 mb-4 lg:hidden">
                     <div className="flex items-center gap-3">
-                        <Link href="/resident-announcements">
+                        <Link href="/portal/resident-announcements">
                             <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
                                 <ArrowLeft className="h-5 w-5" />
                             </Button>
@@ -485,7 +485,7 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, p
                 {/* Desktop Header */}
                 <div className="hidden lg:flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">
-                        <Link href="/resident-announcements">
+                        <Link href="/portal/resident-announcements">
                             <Button variant="ghost" size="sm" className="gap-2 rounded-lg">
                                 <ArrowLeft className="h-4 w-4" />
                                 Back to Announcements
@@ -883,7 +883,7 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, p
                                     <h2 className="text-xl font-bold text-gray-900">Related Announcements</h2>
                                     <p className="text-sm text-gray-500 mt-1">You might also be interested in these</p>
                                 </div>
-                                <Link href="/resident-announcements">
+                                <Link href="/portal/resident-announcements">
                                     <Button variant="ghost" size="sm" className="gap-1">
                                         View All
                                         <ChevronRight className="h-3.5 w-3.5" />
@@ -900,7 +900,7 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, p
                                     return (
                                         <Link 
                                             key={related.id} 
-                                            href={`/resident-announcements/${related.id}`}
+                                            href={`/portal/resident-announcements/${related.id}`}
                                             className="block"
                                         >
                                             <Card className="h-full border hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">

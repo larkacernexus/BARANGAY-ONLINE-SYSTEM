@@ -1,8 +1,8 @@
+// @/layouts/app/resident-layout.tsx
 import AppLayoutTemplate from '@/layouts/app/resident-app-sidebar-layout';
 import { type BreadcrumbItem } from '@/types';
 import { type ReactNode } from 'react';
 import ResidentMobileFooter from '@/layouts/resident-mobile-sticky-footer';
-import { Breadcrumbs } from '@/components/breadcrumbs'; // Import Breadcrumbs component
 
 interface AppLayoutProps {
     children: ReactNode;
@@ -11,76 +11,38 @@ interface AppLayoutProps {
 }
 
 export default ({ children, breadcrumbs = [], className = '', ...props }: AppLayoutProps) => {
-    // Update mobile footer items to use only icon names that exist in iconMap
-    const mobileFooterItems = [
-        { 
-            icon: 'home', 
-            label: 'Dashboard', 
-            href: '/dashboard',
-            activePaths: ['/dashboard', '/']
-        },
-        { 
-            icon: 'search',
-            label: 'Residents', 
-            href: '/residents',
-            activePaths: ['/residents', '/residents/create', '/residents/edit']
-        },
-        { 
-            icon: 'user',
-            label: 'Households', 
-            href: '/households',
-            activePaths: ['/households', '/households/create', '/households/edit']
-        },
-        { 
-            icon: 'bell',
-            label: 'Payments', 
-            href: '/payments',
-            activePaths: ['/payments', '/payments/create']
-        },
-        { 
-            icon: 'menu', 
-            label: 'More', 
-            href: '#',
-            activePaths: ['/clearances', '/settings', '/users'],
-        },
-    ];
-
     return (
         <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-900">
             {/* Use a flex container for sidebar + main content */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
                 <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
-                    {/* Main content container with consistent spacing */}
-                    <div className={`h-full overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 ${className}`}>
-                        {/* Mobile breadcrumbs - only visible on small screens */}
-                        {breadcrumbs && breadcrumbs.length > 0 && (
-                            <div className="md:hidden mb-4">
-                                <Breadcrumbs breadcrumbs={breadcrumbs} />
-                            </div>
-                        )}
-                        
-                        {/* Desktop breadcrumbs spacing - managed by AppLayoutTemplate */}
-                        {breadcrumbs && breadcrumbs.length > 0 && (
-                            <div className="hidden md:block mb-6">
-                                {/* Breadcrumbs will be rendered by AppLayoutTemplate in header */}
-                            </div>
-                        )}
-                        
-                        {/* Main content with proper margins */}
-                        <main className="max-w-full mx-auto">
-                            {/* Add spacing wrapper around children */}
-                            <div className="space-y-6">
-                                {children}
-                            </div>
-                        </main>
+                    {/* Main content container - scrollable area above footer */}
+                    <div className="flex-1 overflow-y-auto">
+                        <div className={`px-4 sm:px-6 lg:px-8 py-6 ${className}`}>
+                            {/* Mobile breadcrumbs - only visible on small screens */}
+                            {breadcrumbs && breadcrumbs.length > 0 && (
+                                <div className="md:hidden mb-4">
+                                    {/* Breadcrumbs are handled by AppLayoutTemplate */}
+                                    <div className="text-sm text-muted-foreground">
+                                        {/* This space will be used for mobile breadcrumbs if needed */}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Main content */}
+                            <main className="max-w-full mx-auto">
+                                {/* Add spacing wrapper around children */}
+                                <div className="space-y-6">
+                                    {children}
+                                </div>
+                            </main>
+                        </div>
                     </div>
                 </AppLayoutTemplate>
             </div>
             
-            {/* Mobile sticky footer - only visible on small screens */}
-            <div className="md:hidden">
-                <ResidentMobileFooter /> {/* Updated component */}
-            </div>
+            {/* Mobile sticky footer - always at the bottom on mobile */}
+            <ResidentMobileFooter />
         </div>
     );
 };

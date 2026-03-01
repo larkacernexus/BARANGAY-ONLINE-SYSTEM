@@ -378,7 +378,7 @@ const MobileSidebar = ({
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
-            <div className="p-6">
+            <div className="p-6 pb-24">
               {/* Back button for child items view */}
               {activeParent && (
                 <Button
@@ -628,11 +628,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
   }, []);
 
   return (
-    <div className="px-4 py-6 sm:px-6 lg:px-8">
+    <div className="px-4 py-6 sm:px-6 lg:px-8 pb-24 md:pb-6">
       {/* Header Section - Mobile Optimized */}
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-primary/10 rounded-xl">
                 <SettingsIcon className="h-6 w-6 text-primary" />
@@ -645,25 +645,15 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
               </div>
             </div>
             
-            {/* Mobile Menu Button - IMPORTANT: Remove focus when menu opens */}
+            {/* Mobile Menu Button - Now matches the one in the footer */}
             <Button
               variant="outline"
               size="icon"
-              className="lg:hidden ml-auto h-10 w-10"
+              className="lg:hidden h-10 w-10"
               onClick={handleMobileMenuToggle}
               aria-label="Open settings menu"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-sidebar"
-              // Blur on click to prevent focus retention when menu opens
-              onMouseDown={(e) => e.preventDefault()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleMobileMenuToggle();
-                  // Blur the button to release focus
-                  (e.currentTarget as HTMLButtonElement).blur();
-                }
-              }}
             >
               <Menu className="h-5 w-5" />
             </Button>
@@ -698,42 +688,27 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
           />
         </div>
 
-        {/* Main Content Area - Mobile Optimized */}
+        {/* Main Content Area */}
         <div className="flex-1 min-w-0">
-          {/* Mobile Breadcrumb and Menu Button */}
-          <div className="lg:hidden mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 px-3"
-                  onClick={handleMobileMenuToggle}
-                  aria-label="Open settings menu"
-                  aria-expanded={mobileMenuOpen}
-                  aria-controls="mobile-sidebar"
-                  onMouseDown={(e) => e.preventDefault()}
-                >
-                  <Menu className="mr-2 h-4 w-4" />
-                  Menu
-                </Button>
-                {currentSection && (
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <ChevronRight className="h-4 w-4 mx-2" />
-                    <span className="font-medium text-foreground truncate max-w-[150px]">
-                      {currentSection.title}
-                    </span>
-                  </div>
-                )}
-              </div>
+          {/* Mobile Breadcrumb */}
+          <div className="lg:hidden mb-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Settings</span>
+              {currentSection && (
+                <>
+                  <ChevronRight className="h-4 w-4" />
+                  <span className="font-medium text-foreground truncate max-w-[150px]">
+                    {currentSection.title}
+                  </span>
+                </>
+              )}
             </div>
-            <Separator />
           </div>
 
           <div className="lg:border-l lg:pl-8 lg:border-border/50">
             {/* Content Header */}
             <div className="mb-6 pb-4 border-b border-border/50">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="text-xl font-semibold truncate">
                     {currentSection?.title || 'Settings'}
@@ -742,18 +717,6 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     {currentSection?.description || 'Manage your account settings'}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    Updated: Today
-                  </span>
-                </div>
-              </div>
-              
-              {/* Progress indicators - Simplified for mobile */}
-              <div className="flex items-center gap-2 mt-4">
-                <div className="h-1 flex-1 max-w-[200px] bg-primary rounded-full" />
-                <div className="h-1 w-6 bg-border rounded-full" />
-                <div className="h-1 w-6 bg-border rounded-full" />
               </div>
             </div>
 
@@ -765,11 +728,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                 </div>
               </div>
 
-              {/* Content Footer - Mobile Optimized */}
-              <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-sm text-muted-foreground">
+              {/* Content Footer - Simplified */}
+              <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Shield className="h-4 w-4 flex-shrink-0" />
-                  <span className="text-sm">Changes saved automatically</span>
+                  <span>Changes saved automatically</span>
                 </div>
                 <Button 
                   variant="ghost" 
@@ -786,56 +749,6 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
           </div>
         </div>
       </div>
-
-      {/* Bottom Navigation for Mobile */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t py-3 px-4 z-50">
-        <div className="flex items-center justify-around">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex flex-col items-center gap-1 h-auto"
-            onClick={handleMobileMenuToggle}
-            aria-label="Open settings menu"
-            aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-sidebar"
-            onMouseDown={(e) => e.preventDefault()}
-          >
-            <Menu className="h-5 w-5" />
-            <span className="text-xs">Menu</span>
-          </Button>
-          
-          {currentSection && (
-            <>
-              <Separator orientation="vertical" className="h-8" />
-              <div className="flex flex-col items-center min-w-0 max-w-[100px]">
-                <span className="text-xs text-muted-foreground truncate w-full text-center">
-                  Current
-                </span>
-                <span className="text-sm font-medium truncate w-full text-center">
-                  {currentSection.title}
-                </span>
-              </div>
-            </>
-          )}
-          
-          <Separator orientation="vertical" className="h-8" />
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            asChild
-            className="flex flex-col items-center gap-1 h-auto"
-          >
-            <Link href="/help/settings">
-              <HelpCircle className="h-5 w-5" />
-              <span className="text-xs">Help</span>
-            </Link>
-          </Button>
-        </div>
-      </div>
-      
-      {/* Bottom padding for mobile bottom nav */}
-      <div className="h-16 lg:h-0" />
     </div>
   );
 }

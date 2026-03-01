@@ -42,7 +42,7 @@ export default function ResidentsHeader({
                     )}
                 </Button>
                 <Button asChild>
-                    <a href="/residents/create">
+                    <a href="/admin/residents/create">
                         <Plus className="h-4 w-4 mr-2" />
                         Add Resident
                     </a>

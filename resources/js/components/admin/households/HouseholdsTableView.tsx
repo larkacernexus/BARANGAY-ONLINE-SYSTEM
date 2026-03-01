@@ -193,7 +193,7 @@ export default function HouseholdsTableView({
                                             icon={<Home className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
                                             hasFilters={hasActiveFilters}
                                             onClearFilters={onClearFilters}
-                                            onCreateNew={() => router.get('/households/create')}
+                                            onCreateNew={() => router.get('/admin/households/create')}
                                             createLabel="Register Household"
                                         />
                                     </TableCell>
@@ -357,14 +357,14 @@ export default function HouseholdsTableView({
                                                 <ActionDropdown>
                                                     <ActionDropdownItem
                                                         icon={<Eye className="h-4 w-4" />}
-                                                        href={`/households/${household.id}`}
+                                                        href={`/admin/households/${household.id}`}
                                                     >
                                                         View Details
                                                     </ActionDropdownItem>
                                                     
                                                     <ActionDropdownItem
                                                         icon={<Edit className="h-4 w-4" />}
-                                                        href={`/households/${household.id}/edit`}
+                                                        href={`/admin/households/${household.id}/edit`}
                                                     >
                                                         Edit Household
                                                     </ActionDropdownItem>

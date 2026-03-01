@@ -1,4 +1,3 @@
-// app/Pages/Admin/Payments/utils.ts
 
 import { OutstandingFee, BackendFee, FeeType, Resident, ResidentDiscount } from './types';
 

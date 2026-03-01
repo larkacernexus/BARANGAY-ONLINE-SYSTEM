@@ -13,7 +13,17 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             DocumentTypesSeeder::class, 
-            // PermessionSeeder::class,
+            PermissionsSeeder::class,
+            ClearanceTypesTableSeeder::class,
+            DiscountRuleSeeder::class,
+            DiscountTypeSeeder::class,
+            // DocumentCategorySeeder::class,
+            DocumentTypesSeeder::class,
+            FeeTypesTableSeeder::class,
+            // PurokSeeder::class,
+            ReportTypeSeeder::class,
+            ResidentSeeder::class,
+            
             // ClearanceTypeSeeder::class,
         ]);
     }

@@ -115,7 +115,7 @@ export default function RolesTableView({
                                                         Clear Filters
                                                     </Button>
                                                 )}
-                                                <Link href="/roles/create">
+                                                <Link href="/admin/roles/create">
                                                     <Button className="h-8">
                                                         Create First Role
                                                     </Button>
@@ -243,7 +243,7 @@ export default function RolesTableView({
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end" className="w-48">
                                                                 <DropdownMenuItem asChild>
-                                                                    <Link href={`/roles/${role.id}`} className="flex items-center cursor-pointer">
+                                                                    <Link href={`/admin/roles/${role.id}`} className="flex items-center cursor-pointer">
                                                                         <Eye className="mr-2 h-4 w-4" />
                                                                         <span>View Details</span>
                                                                     </Link>
@@ -251,7 +251,7 @@ export default function RolesTableView({
                                                                 
                                                                 <DropdownMenuItem asChild>
                                                                     <Link 
-                                                                        href={`/roles/${role.id}/edit`} 
+                                                                        href={`/admin/roles/${role.id}/edit`} 
                                                                         className={`flex items-center cursor-pointer ${role.is_system_role ? 'pointer-events-none opacity-50' : ''}`}
                                                                     >
                                                                         <Edit className="mr-2 h-4 w-4" />
@@ -265,7 +265,7 @@ export default function RolesTableView({
                                                                 </DropdownMenuItem>
                                                                 
                                                                 <DropdownMenuItem asChild>
-                                                                    <Link href={`/roles/${role.id}/permissions`} className="flex items-center cursor-pointer">
+                                                                    <Link href={`/admin/roles/${role.id}/permissions`} className="flex items-center cursor-pointer">
                                                                         <Key className="mr-2 h-4 w-4" />
                                                                         <span>Manage Permissions</span>
                                                                     </Link>
@@ -367,7 +367,7 @@ export default function RolesTableView({
                                                             <div>
                                                                 <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Quick Actions</h4>
                                                                 <div className="grid grid-cols-2 gap-2">
-                                                                    <Link href={`/roles/${role.id}/permissions`}>
+                                                                    <Link href={`/admin/roles/${role.id}/permissions`}>
                                                                         <Button variant="outline" size="sm" className="w-full justify-start h-8">
                                                                             <Key className="h-3 w-3 mr-2" />
                                                                             Permissions
@@ -375,7 +375,7 @@ export default function RolesTableView({
                                                                     </Link>
                                                                     
                                                                     <Link 
-                                                                        href={`/roles/${role.id}/edit`}
+                                                                        href={`/admin/roles/${role.id}/edit`}
                                                                     >
                                                                         <Button 
                                                                             variant="outline" 
@@ -400,7 +400,7 @@ export default function RolesTableView({
                                                                         <Copy className="h-3 w-3 mr-2" />
                                                                         Copy Name
                                                                     </Button>
-                                                                    <Link href={`/roles/${role.id}`}>
+                                                                    <Link href={`/admin/roles/${role.id}`}>
                                                                         <Button variant="outline" size="sm" className="w-full justify-start h-8">
                                                                             <Eye className="h-3 w-3 mr-2" />
                                                                             View Details

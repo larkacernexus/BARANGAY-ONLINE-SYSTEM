@@ -14,7 +14,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { cn } from '@/lib/utils';
 import { NavResident } from './nav-resident';
 import { 
-  LayoutGrid, 
+  LayoutDashboard, 
   CreditCard, 
   FileText, 
   MessageSquare,
@@ -28,53 +28,65 @@ import {
   Shield,
   Phone,
   MapPin,
-  Building2,
+  Building,
   FileCheck,
   Receipt,
   AlertCircle,
-  Zap, // For Quick Actions
-  ChevronRight, // For active state indicator
-  FileBarChart // For Reports icon alternative
+  Zap,
+  ChevronRight,
+  BarChart3,
+  FolderOpen,
+  ScrollText,
+  DollarSign,
+  HelpCircle,
+  Wallet,
+  Clock,
+  ShieldCheck,
+  Newspaper
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 
-// Resident-specific navigation - UPDATED with My Reports
+// Resident navigation with fixed widths for text
 const residentNav = [
-  { title: 'Dashboard', href: '/residentdashboard', icon: LayoutGrid },
-  { title: 'My Profile', href: '/residentsettings/profile', icon: User },
-  { title: 'My Fees', href: '/residentfees', icon: Receipt },
-  { title: 'My Payments', href: '/my-payments', icon: CreditCard },
-  { title: 'My Clearances', href: '/my-clearances', icon: FileCheck },
-  { title: 'My Reports', href: '/community-reports', icon: FileBarChart }, // Changed to My Reports with appropriate icon
-  { title: 'Document Vault', href: '/my-records', icon: History },
+  { title: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard, shortTitle: 'Dashboard' },
+  { title: 'Profile', href: '/residentsettings/profile', icon: User, shortTitle: 'Profile' },
+  { title: 'Fees & Charges', href: '/portal/fees', icon: Receipt, shortTitle: 'Fees' },
+  { title: 'Payment History', href: '/portal/my-payments', icon: Wallet, shortTitle: 'Payments' },
+  { title: 'Clearances', href: '/portal/my-clearances', icon: ShieldCheck, shortTitle: 'Clearances' },
+  { title: 'Community Reports', href: '/portal/community-reports', icon: BarChart3, shortTitle: 'Reports' },
+  { title: 'Documents', href: '/portal/my-records', icon: FolderOpen, shortTitle: 'Documents' },
 ];
 
 const residentQuickActions = [
   { 
-    title: 'Pay Fees', 
-    href: '/my-payments/pay', 
-    icon: CreditCard, 
-    color: 'text-emerald-600 bg-emerald-50 border border-emerald-100' 
+    title: 'Make Payment', 
+    shortTitle: 'Pay',
+    href: '/portal/my-payments/pay', 
+    icon: DollarSign, 
+    description: 'Pay fees online'
   },
   { 
     title: 'Request Clearance', 
-    href: '/my-clearances/request', 
-    icon: FileText, 
-    color: 'text-blue-600 bg-blue-50 border border-blue-100' 
+    shortTitle: 'Clearance',
+    href: '/portal/my-clearances/request', 
+    icon: ScrollText, 
+    description: 'Get documents'
   },
   { 
     title: 'Submit Report', 
-    href: '/community-reports/create', 
-    icon: FileBarChart, 
-    color: 'text-amber-600 bg-amber-50 border border-amber-100' 
+    shortTitle: 'Report',
+    href: '/portal/community-reports/create', 
+    icon: AlertCircle, 
+    description: 'Report issue'
   },
 ];
 
 const residentResources = [
-  { title: 'Announcements', href: '/resident-announcements', icon: Bell },
-  { title: 'Forms & Documents', href: '/resident-forms', icon: Download },
-  { title: 'Settings', href: '/resident/settings', icon: Settings },
+  { title: 'Announcements', href: '/portal/announcements', icon: Newspaper, badge: '2', shortTitle: 'News' },
+  { title: 'Forms & Templates', href: '/portal/forms', icon: FileText, shortTitle: 'Forms' },
+  { title: 'Support Center', href: '/portal/support', icon: HelpCircle, shortTitle: 'Support' },
+  { title: 'Settings', href: '/portal/settings', icon: Settings, shortTitle: 'Settings' },
 ];
 
 export function ResidentSidebar({ className }: { className?: string }) {
@@ -86,43 +98,45 @@ export function ResidentSidebar({ className }: { className?: string }) {
     return url === href || url.startsWith(href + '/');
   };
   
-  const isAnnouncementsActive = url === '/resident-announcements' || url.startsWith('/resident-announcements/');
-  
   return (
     <TooltipProvider delayDuration={300}>
       <Sidebar 
         collapsible="icon" 
         variant="inset" 
-        className={cn("border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950", className)}
+        className={cn(
+          "border-r border-gray-200/50 dark:border-gray-800/50 bg-white dark:bg-gray-950",
+          "shadow-sm backdrop-blur-sm transition-all duration-300",
+          className
+        )}
       >
         {/* Header */}
-        <SidebarHeader className="border-b border-gray-100 dark:border-gray-800 px-4 py-3">
+        <SidebarHeader className="border-b border-gray-200/50 dark:border-gray-800/50 px-4 py-4">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild size="lg">
+              <SidebarMenuButton asChild size="lg" className="hover:bg-transparent w-full">
                 <Link 
-                  href="/resident/dashboard"
+                  href="/portal/dashboard"
                   className={cn(
-                    "flex items-center transition-all duration-200 hover:bg-transparent",
-                    isCollapsed ? "px-0 justify-center" : "px-2"
+                    "flex items-center transition-all duration-300 w-full",
+                    isCollapsed ? "px-0 justify-center" : "px-1"
                   )}
                 >
                   {isCollapsed ? (
                     <div className="flex items-center justify-center">
-                      <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-blue-700 to-blue-900 flex items-center justify-center shadow-md">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 flex-shrink-0">
                         <Home className="h-5 w-5 text-white" />
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3 w-full">
-                      <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-blue-700 to-blue-900 flex items-center justify-center shadow-md">
+                    <div className="flex items-center gap-3 w-full min-w-0">
+                      <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 flex-shrink-0">
                         <Home className="h-5 w-5 text-white" />
                       </div>
-                      <div className="flex flex-col overflow-hidden">
+                      <div className="flex flex-col min-w-0 flex-1">
                         <span className="font-semibold text-gray-900 dark:text-white text-sm tracking-tight truncate">
                           Resident Portal
                         </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate font-medium">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
                           Barangay Kibawe
                         </span>
                       </div>
@@ -134,64 +148,91 @@ export function ResidentSidebar({ className }: { className?: string }) {
           </SidebarMenu>
         </SidebarHeader>
 
-        {/* Content */}
-        <SidebarContent className="space-y-6 px-3 py-4">
-          {/* Emergency Contact - Professional styling */}
+        {/* Content - Fixed overflow and spacing with native scrollbar styling */}
+        <SidebarContent 
+          className={cn(
+            "flex-1 overflow-y-auto overflow-x-hidden px-3 py-5",
+            // Custom scrollbar styles using global CSS classes
+            "custom-scrollbar"
+          )}
+        >
+          {/* Emergency Contact - Fixed positioning and visibility */}
           {!isCollapsed && (
-            <div className="rounded-lg bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10 border border-red-100 dark:border-red-800/30 p-3 mb-2">
-              <div className="flex items-center gap-2 mb-2">
-                <Shield className="h-4 w-4 text-red-700 dark:text-red-400" />
-                <span className="text-xs font-semibold text-red-900 dark:text-red-200 uppercase tracking-wide">
-                  Emergency Contacts
-                </span>
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-red-800 dark:text-red-300 font-medium">Emergency Hotline</span>
-                  <span className="text-xs font-bold text-red-900 dark:text-red-100">911</span>
+            <div className="relative mb-4 w-full block">
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-500/5 via-red-400/5 to-orange-400/5 dark:from-red-500/10 dark:via-red-400/10 dark:to-orange-400/10 p-4 border border-red-200/50 dark:border-red-800/30 w-full">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl" />
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="p-1.5 rounded-lg bg-red-500/10 dark:bg-red-500/20 flex-shrink-0">
+                    <Shield className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  </div>
+                  <span className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wider truncate">
+                    Emergency
+                  </span>
                 </div>
-                <div className="text-[10px] text-red-700 dark:text-red-400 font-medium tracking-tight">
-                  Police • Fire • Medical
+                <div className="space-y-2.5 w-full">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">Emergency Hotline</span>
+                    <span className="text-sm font-bold text-red-600 dark:text-red-400 flex-shrink-0 whitespace-nowrap">911</span>
+                  </div>
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">Barangay Hall</span>
+                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100 flex-shrink-0 whitespace-nowrap">(082) 123-4567</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-red-200/30 dark:border-red-800/30 w-full">
+                    <Phone className="h-3 w-3 text-red-500 flex-shrink-0" />
+                    <span className="text-xs text-red-600 dark:text-red-400 font-medium truncate">
+                      24/7 Hotline Available
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
           {/* Quick Actions Section */}
-          <SidebarGroup>
+          <SidebarGroup className="w-full mb-6">
             {!isCollapsed && (
-              <SidebarGroupLabel className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 mb-2">
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-1 mb-3 w-full">
                 Quick Actions
               </SidebarGroupLabel>
             )}
-            <SidebarMenu>
+            <SidebarMenu className="w-full">
               {residentQuickActions.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.title} className="w-full">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <SidebarMenuButton asChild>
+                      <SidebarMenuButton asChild className="w-full">
                         <Link 
                           href={item.href} 
                           className={cn(
-                            "flex items-center gap-2.5 transition-colors duration-150",
-                            isCollapsed ? "justify-center px-0" : "px-2"
+                            "group flex items-center gap-3 transition-all duration-200 rounded-lg w-full",
+                            isCollapsed ? "justify-center p-2" : "px-3 py-2"
                           )}
                         >
                           <div className={cn(
-                            "flex items-center justify-center rounded-md transition-all duration-200",
-                            isCollapsed ? `h-9 w-9 ${item.color}` : "h-8 w-8"
+                            "flex items-center justify-center rounded-lg transition-all duration-200 flex-shrink-0",
+                            isCollapsed 
+                              ? "h-10 w-10 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200/50 dark:border-blue-800/30" 
+                              : "h-8 w-8 bg-gray-100 dark:bg-gray-800 rounded-md group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
                           )}>
                             <item.icon className={cn(
-                              "h-3.5 w-3.5",
-                              isCollapsed ? "text-current" : item.color.split(' ')[0]
+                              "transition-colors",
+                              isCollapsed 
+                                ? "h-4 w-4 text-blue-600 dark:text-blue-400" 
+                                : "h-3.5 w-3.5 text-gray-600 dark:text-gray-400"
                             )} />
                           </div>
                           {!isCollapsed && (
-                            <div className="flex items-center justify-between flex-1 min-w-0">
-                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">
-                                {item.title}
-                              </span>
-                              <Zap className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between w-full">
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-[120px]">
+                                  {item.title}
+                                </span>
+                                <Zap className="h-3.5 w-3.5 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-1" />
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[140px]">
+                                {item.description}
+                              </p>
                             </div>
                           )}
                         </Link>
@@ -206,52 +247,54 @@ export function ResidentSidebar({ className }: { className?: string }) {
             </SidebarMenu>
           </SidebarGroup>
 
-          {/* Main Navigation Section */}
-          <SidebarGroup>
+          {/* Main Navigation */}
+          <SidebarGroup className="w-full mb-6">
             {!isCollapsed && (
-              <SidebarGroupLabel className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 mb-2">
-                Account Navigation
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-1 mb-3 w-full">
+                Navigation
               </SidebarGroupLabel>
             )}
-            <SidebarMenu>
+            <SidebarMenu className="w-full">
               {residentNav.map((item) => {
                 const active = isActive(item.href);
                 return (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={item.title} className="w-full">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <SidebarMenuButton asChild>
+                        <SidebarMenuButton asChild className="w-full">
                           <Link 
                             href={item.href} 
                             className={cn(
-                              "flex items-center gap-2.5 py-2 transition-all duration-200",
-                              active && "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300",
-                              isCollapsed ? "justify-center px-0" : "px-2"
+                              "group flex items-center gap-3 transition-all duration-200 rounded-lg w-full",
+                              active && "bg-blue-50 dark:bg-blue-900/20",
+                              isCollapsed ? "justify-center p-2" : "px-3 py-2"
                             )}
                           >
                             <div className={cn(
-                              "flex items-center justify-center rounded-md",
-                              isCollapsed ? "h-9 w-9" : "h-8 w-8",
-                              active ? "bg-blue-100 dark:bg-blue-800/30" : "bg-gray-100 dark:bg-gray-800",
-                              !active && "hover:bg-gray-200 dark:hover:bg-gray-700"
+                              "flex items-center justify-center rounded-lg transition-all duration-200 flex-shrink-0",
+                              isCollapsed ? "h-10 w-10" : "h-8 w-8",
+                              active 
+                                ? "bg-blue-100 dark:bg-blue-800/30 text-blue-600 dark:text-blue-400" 
+                                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
                             )}>
                               <item.icon className={cn(
-                                "h-3.5 w-3.5 transition-colors",
-                                active ? "text-blue-700 dark:text-blue-300" : "text-gray-600 dark:text-gray-400"
+                                isCollapsed ? "h-4 w-4" : "h-3.5 w-3.5"
                               )} />
                             </div>
                             {!isCollapsed && (
-                              <div className="flex items-center justify-between flex-1 min-w-0">
+                              <>
                                 <span className={cn(
-                                  "text-sm font-medium truncate",
-                                  active ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300"
+                                  "flex-1 text-sm font-medium transition-colors truncate",
+                                  active 
+                                    ? "text-blue-600 dark:text-blue-400" 
+                                    : "text-gray-700 dark:text-gray-300"
                                 )}>
                                   {item.title}
                                 </span>
                                 {active && (
-                                  <ChevronRight className="h-3.5 w-3.5 text-blue-700 dark:text-blue-300 flex-shrink-0" />
+                                  <ChevronRight className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                                 )}
-                              </div>
+                              </>
                             )}
                           </Link>
                         </SidebarMenuButton>
@@ -267,69 +310,62 @@ export function ResidentSidebar({ className }: { className?: string }) {
           </SidebarGroup>
 
           {/* Resources Section */}
-          <SidebarGroup>
+          <SidebarGroup className="w-full mb-6">
             {!isCollapsed && (
-              <SidebarGroupLabel className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-1 mb-2">
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-1 mb-3 w-full">
                 Resources
               </SidebarGroupLabel>
             )}
-            <SidebarMenu>
+            <SidebarMenu className="w-full">
               {residentResources.map((item) => {
                 const active = isActive(item.href);
-                const isAnnouncement = item.title === 'Announcements';
-                
                 return (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={item.title} className="w-full">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <SidebarMenuButton asChild>
+                        <SidebarMenuButton asChild className="w-full">
                           <Link 
                             href={item.href} 
                             className={cn(
-                              "flex items-center gap-2.5 py-2 transition-all duration-200 relative",
-                              active && "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300",
-                              isCollapsed ? "justify-center px-0" : "px-2"
+                              "group flex items-center gap-3 transition-all duration-200 rounded-lg w-full relative",
+                              active && "bg-blue-50 dark:bg-blue-900/20",
+                              isCollapsed ? "justify-center p-2" : "px-3 py-2"
                             )}
                           >
                             <div className={cn(
-                              "flex items-center justify-center rounded-md relative",
-                              isCollapsed ? "h-9 w-9" : "h-8 w-8",
-                              active ? "bg-blue-100 dark:bg-blue-800/30" : "bg-gray-100 dark:bg-gray-800",
-                              !active && "hover:bg-gray-200 dark:hover:bg-gray-700"
+                              "flex items-center justify-center rounded-lg transition-all duration-200 relative flex-shrink-0",
+                              isCollapsed ? "h-10 w-10" : "h-8 w-8",
+                              active 
+                                ? "bg-blue-100 dark:bg-blue-800/30 text-blue-600 dark:text-blue-400" 
+                                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
                             )}>
                               <item.icon className={cn(
-                                "h-3.5 w-3.5 transition-colors",
-                                active ? "text-blue-700 dark:text-blue-300" : "text-gray-600 dark:text-gray-400"
+                                isCollapsed ? "h-4 w-4" : "h-3.5 w-3.5"
                               )} />
-                              
-                              {/* Announcements indicator */}
-                              {isAnnouncement && !active && (
-                                <div className="absolute -top-1 -right-1">
-                                  <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse ring-2 ring-white dark:ring-gray-950" />
-                                </div>
+                              {item.badge && !active && (
+                                <span className="absolute -top-1 -right-1 h-2 w-2">
+                                  <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-75" />
+                                  <span className="relative rounded-full h-2 w-2 bg-red-500" />
+                                </span>
                               )}
                             </div>
                             
                             {!isCollapsed && (
-                              <div className="flex items-center justify-between flex-1 min-w-0">
+                              <>
                                 <span className={cn(
-                                  "text-sm font-medium truncate",
-                                  active ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300"
+                                  "flex-1 text-sm font-medium transition-colors truncate",
+                                  active 
+                                    ? "text-blue-600 dark:text-blue-400" 
+                                    : "text-gray-700 dark:text-gray-300"
                                 )}>
                                   {item.title}
                                 </span>
-                                
-                                {active ? (
-                                  <ChevronRight className="h-3.5 w-3.5 text-blue-700 dark:text-blue-300 flex-shrink-0" />
-                                ) : isAnnouncement ? (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="h-5 px-1.5 text-[10px] font-medium bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-700"
-                                  >
-                                    New
+                                {item.badge && !active && (
+                                  <Badge className="bg-red-500 text-white border-0 text-[10px] px-1.5 py-0.5 flex-shrink-0">
+                                    {item.badge}
                                   </Badge>
-                                ) : null}
-                              </div>
+                                )}
+                              </>
                             )}
                           </Link>
                         </SidebarMenuButton>
@@ -337,8 +373,10 @@ export function ResidentSidebar({ className }: { className?: string }) {
                       <TooltipContent side="right" className="font-medium">
                         <div className="flex items-center gap-2">
                           {item.title}
-                          {isAnnouncement && !active && (
-                            <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                          {item.badge && (
+                            <Badge className="bg-red-500 text-white border-0 text-[10px] px-1.5">
+                              {item.badge}
+                            </Badge>
                           )}
                         </div>
                       </TooltipContent>
@@ -349,43 +387,54 @@ export function ResidentSidebar({ className }: { className?: string }) {
             </SidebarMenu>
           </SidebarGroup>
 
-          {/* Barangay Information - Professional layout */}
+          {/* Barangay Information */}
           {!isCollapsed && (
-            <div className="mt-8 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 p-3">
-              <div className="flex items-center gap-2 mb-3">
-                <Building2 className="h-4 w-4 text-gray-700 dark:text-gray-300" />
-                <span className="text-xs font-semibold text-gray-900 dark:text-white uppercase tracking-wide">
-                  Barangay Office
-                </span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-400">Contact</span>
-                  <span className="text-xs text-gray-900 dark:text-gray-300 font-mono">(082) 123-4567</span>
-                </div>
-                <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                  <MapPin className="h-3 w-3 text-gray-500 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 dark:text-gray-400 leading-tight">
-                    Barangay Hall, Poblacion, Kibawe, Bukidnon
+            <div className="mt-auto pt-4 w-full">
+              <div className="rounded-xl border border-gray-200/50 dark:border-gray-800/50 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-950 p-4 w-full">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 flex-shrink-0">
+                    <Building className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider truncate">
+                    Barangay Office
                   </span>
+                </div>
+                <div className="space-y-3 w-full">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate">Contact</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100 flex-shrink-0 whitespace-nowrap">(082) 123-4567</span>
+                  </div>
+                  <div className="flex items-start gap-2 pt-2 border-t border-gray-200/50 dark:border-gray-800/50 w-full">
+                    <MapPin className="h-3.5 w-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <span className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed truncate">
+                      Poblacion, Kibawe
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 w-full">
+                    <Clock className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">8AM - 5PM, Mon-Fri</span>
+                  </div>
                 </div>
               </div>
             </div>
           )}
         </SidebarContent>
 
-        {/* Footer - Resident Profile */}
-        <SidebarFooter className="border-t border-gray-100 dark:border-gray-800 px-3 py-3">
+        {/* Footer */}
+        <SidebarFooter className="border-t border-gray-200/50 dark:border-gray-800/50 px-3 py-4">
           <Tooltip>
             <TooltipTrigger asChild>
-              <div>
+              <div className={cn(
+                "transition-all duration-200 w-full",
+                isCollapsed ? "flex justify-center" : ""
+              )}>
                 {!isCollapsed ? (
-                  <NavResident />
+                  <div className="w-full">
+                    <NavResident />
+                  </div>
                 ) : (
-                  <div className="flex justify-center">
-                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-700 to-blue-900 flex items-center justify-center shadow-md">
-                      <User className="h-4 w-4 text-white" />
-                    </div>
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 cursor-pointer hover:shadow-xl hover:scale-105 transition-all flex-shrink-0">
+                    <User className="h-5 w-5 text-white" />
                   </div>
                 )}
               </div>

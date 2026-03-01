@@ -138,7 +138,7 @@ export default function FeesIndex({
 
     // ===== ADDED MISSING HANDLERS =====
     const handleViewDetails = (fee: any) => {
-        router.get(route('fees.show', fee.id));
+        router.get(route('admin.fees.show', fee.id));
     };
 
     const handleEdit = (fee: any) => {
@@ -169,8 +169,8 @@ export default function FeesIndex({
         <AppLayout
             title="Fees Management"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Fees', href: '/fees' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Fees', href: '/admin/fees' }
             ]}
             actions={
                 <div className="flex items-center gap-2">

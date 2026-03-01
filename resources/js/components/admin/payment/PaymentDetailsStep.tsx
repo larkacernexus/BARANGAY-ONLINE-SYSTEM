@@ -51,9 +51,29 @@ import {
     DollarSign,
     Wallet,
     TrendingUp,
+    Globe,
 } from 'lucide-react';
 import { PaymentItem, PaymentFormData, DiscountRule } from './paymentCreate/types';
 
+// ========== IMPORT FROM UTILS (only what's available) ==========
+import { 
+    generateORNumber
+} from '@/components/admin/payment/paymentCreate/utils';
+
+// ========== LOCAL HELPER FUNCTIONS ==========
+function formatCurrency(amount: number | undefined | null): string {
+    if (amount === undefined || amount === null || isNaN(amount)) return '₱0.00';
+    const numAmount = typeof amount === 'number' ? amount : parseFloat(String(amount));
+    if (isNaN(numAmount)) return '₱0.00';
+    return `₱${numAmount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
+}
+
+function formatPercentage(percent: number | undefined | null): string {
+    if (percent === undefined || percent === null || isNaN(percent)) return '0%';
+    return `${percent.toFixed(1)}%`;
+}
+
+// ========== INTERFACE DEFINITIONS ==========
 interface ClearanceType {
     id: string | number;
     code: string;
@@ -132,6 +152,31 @@ interface HouseholdInfo {
     members?: any[];
 }
 
+interface BusinessInfo {
+    id: string | number;
+    business_name: string;
+    owner_name: string;
+    owner_id?: string | number;
+    contact_number?: string;
+    email?: string;
+    address: string;
+    purok?: string;
+    purok_id?: string | number;
+    business_type?: string;
+    business_type_label?: string;
+    status?: string;
+    permit_expiry_date?: string;
+    is_permit_valid?: boolean;
+    dti_sec_number?: string;
+    tin_number?: string;
+    mayors_permit_number?: string;
+    employee_count?: number;
+    capital_amount?: number;
+    monthly_gross?: number;
+    formatted_capital?: string;
+    formatted_monthly_gross?: string;
+}
+
 interface ResidentDetails {
     id: number | string;
     name: string;
@@ -179,43 +224,14 @@ interface PaymentDetailsStepProps {
     processing: boolean;
     handlePurposeChange: (value: string) => void;
     handlePeriodCoveredChange: (value: string) => void;
-    handleClearanceTypeChange?: (id: string | number) => void;
     userModifiedPurpose: boolean;
     setUserModifiedPurpose: (value: boolean) => void;
     generatePurpose: () => string;
-    clearanceTypes?: ClearanceType[];
-    isClearancePayment?: boolean;
-    clearanceRequest?: any;
-    selectedClearanceType?: ClearanceType | null;
-    getClearanceTypeName?: (id: string | number) => string;
     selectedResident?: ResidentDetails | null;
     selectedHousehold?: any;
-    payerSource?: 'residents' | 'households' | 'clearance' | 'fees' | 'other';
+    selectedBusiness?: BusinessInfo | null;
+    payerSource?: 'residents' | 'households' | 'businesses' | 'clearance' | 'fees' | 'other';
     feeTypes?: FeeType[];
-}
-
-// ========== HELPER FUNCTIONS ==========
-function formatCurrency(amount: number | undefined | null): string {
-    if (amount === undefined || amount === null || isNaN(amount)) return '₱0.00';
-    const numAmount = typeof amount === 'number' ? amount : parseFloat(String(amount));
-    if (isNaN(numAmount)) return '₱0.00';
-    return `₱${numAmount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
-}
-
-// FIXED: Added null check for percentage
-function formatPercentage(percent: number | undefined | null): string {
-    if (percent === undefined || percent === null || isNaN(percent)) return '0%';
-    return `${percent.toFixed(1)}%`;
-}
-
-function generateORNumber(): string {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const timestamp = Date.now();
-    const random = String(timestamp % 1000).padStart(3, '0');
-    return `BAR-${year}${month}${day}-${random}`;
 }
 
 export function PaymentDetailsStep({
@@ -231,17 +247,12 @@ export function PaymentDetailsStep({
     processing,
     handlePurposeChange,
     handlePeriodCoveredChange,
-    handleClearanceTypeChange,
     userModifiedPurpose,
     setUserModifiedPurpose,
     generatePurpose,
-    clearanceTypes = [],
-    isClearancePayment = false,
-    clearanceRequest = null,
-    selectedClearanceType = null,
-    getClearanceTypeName = (id: string | number) => 'Clearance',
     selectedResident = null,
     selectedHousehold = null,
+    selectedBusiness = null,
     payerSource = 'residents',
     feeTypes = []
 }: PaymentDetailsStepProps) {
@@ -253,20 +264,38 @@ export function PaymentDetailsStep({
         penalty: data.penalty,
         discount: data.discount,
         amount_paid: data.amount_paid,
-        total_amount: data.total_amount
+        total_amount: data.total_amount,
+        payer_type: data.payer_type,
+        payer_name: data.payer_name
     });
 
     // ========== STATE DECLARATIONS ==========
     const [purposeError, setPurposeError] = useState<string>('');
     const [isCleared, setIsCleared] = useState(data.is_cleared || false);
     const [validityDate, setValidityDate] = useState(data.validity_date || '');
-    const [clearanceError, setClearanceError] = useState<string>('');
     const [autoGeneratedOR, setAutoGeneratedOR] = useState<boolean>(false);
     
     // Amount paid state
     const [amountTendered, setAmountTendered] = useState<string>(
         data.amount_paid ? data.amount_paid.toString() : ''
     );
+    
+    // ========== 🔥 FIX: SYNC AMOUNT TENDERED WITH DATA ==========
+    useEffect(() => {
+        // When data.amount_paid changes from outside (like from discount application),
+        // update the local amountTendered state
+        if (data.amount_paid !== undefined && data.amount_paid !== null) {
+            const amountValue = typeof data.amount_paid === 'number' 
+                ? data.amount_paid.toString() 
+                : data.amount_paid;
+            
+            // Only update if different to avoid loops
+            if (amountTendered !== amountValue) {
+                setAmountTendered(amountValue);
+                console.log('💰 Syncing amountTendered with data.amount_paid:', amountValue);
+            }
+        }
+    }, [data.amount_paid]); // This dependency is key - runs whenever amount_paid changes
     
     // ========== CORRECTED CALCULATIONS ==========
     // Original amount BEFORE discount (subtotal + surcharge + penalty)
@@ -307,6 +336,7 @@ export function PaymentDetailsStep({
         discountPercentage: discountPercentage,
         amountDue: amountDue,
         amountPaid: amountPaid,
+        amountTendered: amountTendered,
         isExactAmount,
         isOverpaid,
         isUnderpaid,
@@ -315,13 +345,15 @@ export function PaymentDetailsStep({
         paymentStatus
     });
 
-    const isClearanceFeePayment = isClearancePayment || paymentItems.some(item => 
+    const isClearanceFeePayment = paymentItems.some(item => 
         item.metadata?.is_clearance_fee || item.category === 'clearance'
     );
 
     const isFeePayment = payerSource === 'fees' || paymentItems.some(item => 
         item.metadata?.is_outstanding_fee === true && !item.metadata?.is_clearance_fee
     );
+
+    const isBusinessPayment = data.payer_type === 'business' || payerSource === 'businesses';
 
     const clearanceItem = paymentItems.find(item => 
         item.metadata?.is_clearance_fee || item.category === 'clearance'
@@ -334,11 +366,34 @@ export function PaymentDetailsStep({
     const selectedDiscountRule = discountRules.find(rule => rule.code === selectedDiscountCode);
 
     // Get display values with fallbacks
-    const displayPayerName = data.payer_name || (selectedResident?.name) || 'Unknown';
-    const displayContactNumber = data.contact_number || (selectedResident?.contact_number) || '';
-    const displayAddress = data.address || (selectedResident?.address) || '';
-    const displayHouseholdNumber = data.household_number || (selectedResident?.household_number) || '';
-    const displayPurok = data.purok || (selectedResident?.purok) || '';
+    const displayPayerName = data.payer_name || 
+                             (selectedResident?.name) || 
+                             (selectedHousehold?.head_name) || 
+                             (selectedBusiness?.business_name) || 
+                             'Unknown';
+    
+    const displayContactNumber = data.contact_number || 
+                                 (selectedResident?.contact_number) || 
+                                 (selectedHousehold?.contact_number) || 
+                                 (selectedBusiness?.contact_number) || 
+                                 '';
+    
+    const displayAddress = data.address || 
+                          (selectedResident?.address) || 
+                          (selectedHousehold?.address) || 
+                          (selectedBusiness?.address) || 
+                          '';
+    
+    const displayHouseholdNumber = data.household_number || 
+                                   (selectedResident?.household_number) || 
+                                   (selectedHousehold?.household_number) || 
+                                   '';
+    
+    const displayPurok = data.purok || 
+                        (selectedResident?.purok) || 
+                        (selectedHousehold?.purok) || 
+                        (selectedBusiness?.purok) || 
+                        '';
 
     // ========== DISCOUNT ELIGIBILITY CHECKING ==========
     
@@ -452,44 +507,45 @@ export function PaymentDetailsStep({
             }
         });
         
-        if (clearanceItem && selectedClearanceType) {
+        // Check clearance-specific discounts from the clearance item metadata
+        if (clearanceItem && clearanceItem.metadata) {
             const clearanceDiscounts = [];
             
-            if (selectedResident.is_senior && selectedClearanceType.has_senior_discount) {
+            if (selectedResident.is_senior && clearanceItem.metadata.has_senior_discount) {
                 clearanceDiscounts.push({
                     type: 'senior',
                     label: 'Senior Citizen',
-                    percentage: selectedClearanceType.senior_discount_percentage || 20,
+                    percentage: clearanceItem.metadata.senior_discount_percentage || 20,
                     id_number: selectedResident.senior_id_number,
                     has_id: !!selectedResident.senior_id_number
                 });
             }
             
-            if (selectedResident.is_pwd && selectedClearanceType.has_pwd_discount) {
+            if (selectedResident.is_pwd && clearanceItem.metadata.has_pwd_discount) {
                 clearanceDiscounts.push({
                     type: 'pwd',
                     label: 'Person with Disability',
-                    percentage: selectedClearanceType.pwd_discount_percentage || 20,
+                    percentage: clearanceItem.metadata.pwd_discount_percentage || 20,
                     id_number: selectedResident.pwd_id_number,
                     has_id: !!selectedResident.pwd_id_number
                 });
             }
             
-            if (selectedResident.is_solo_parent && selectedClearanceType.has_solo_parent_discount) {
+            if (selectedResident.is_solo_parent && clearanceItem.metadata.has_solo_parent_discount) {
                 clearanceDiscounts.push({
                     type: 'solo_parent',
                     label: 'Solo Parent',
-                    percentage: selectedClearanceType.solo_parent_discount_percentage || 10,
+                    percentage: clearanceItem.metadata.solo_parent_discount_percentage || 10,
                     id_number: selectedResident.solo_parent_id_number,
                     has_id: !!selectedResident.solo_parent_id_number
                 });
             }
             
-            if (selectedResident.is_indigent && selectedClearanceType.has_indigent_discount) {
+            if (selectedResident.is_indigent && clearanceItem.metadata.has_indigent_discount) {
                 clearanceDiscounts.push({
                     type: 'indigent',
                     label: 'Indigent',
-                    percentage: selectedClearanceType.indigent_discount_percentage || 25,
+                    percentage: clearanceItem.metadata.indigent_discount_percentage || 25,
                     id_number: selectedResident.indigent_id_number,
                     has_id: !!selectedResident.indigent_id_number
                 });
@@ -512,7 +568,7 @@ export function PaymentDetailsStep({
         );
         
         return discounts;
-    }, [selectedResident, feeItems, clearanceItem, selectedClearanceType, getBestDiscountForFee]);
+    }, [selectedResident, feeItems, clearanceItem, getBestDiscountForFee]);
 
     const isDiscountRuleApplicable = useCallback((rule: DiscountRule): boolean => {
         if (!selectedResident) return true;
@@ -584,25 +640,6 @@ export function PaymentDetailsStep({
         }
     }, []);
 
-    useEffect(() => {
-        if (selectedClearanceType && selectedClearanceType.validity_days && !data.validity_date) {
-            const today = new Date();
-            const validUntil = new Date(today);
-            validUntil.setDate(today.getDate() + selectedClearanceType.validity_days);
-            
-            const formattedDate = validUntil.toISOString().split('T')[0];
-            setValidityDate(formattedDate);
-            
-            if (typeof setData === 'function') {
-                if (setData.length === 2) {
-                    setData('validity_date', formattedDate);
-                } else {
-                    setData((prev: PaymentFormData) => ({ ...prev, validity_date: formattedDate }));
-                }
-            }
-        }
-    }, [selectedClearanceType]);
-
     // Auto-set amount paid to amount due if not set
     useEffect(() => {
         if (!data.amount_paid && amountDue > 0) {
@@ -667,14 +704,6 @@ export function PaymentDetailsStep({
         handleQuickAmount(amountDue);
     };
 
-    const handleClearanceTypeSelect = (value: string) => {
-        const id = value;
-        if (handleClearanceTypeChange) {
-            handleClearanceTypeChange(id);
-        }
-        setClearanceError('');
-    };
-
     const handleClearedChange = (checked: boolean) => {
         setIsCleared(checked);
         if (typeof setData === 'function') {
@@ -729,7 +758,6 @@ export function PaymentDetailsStep({
         let isValid = true;
         
         setPurposeError('');
-        setClearanceError('');
         
         if (!data.purpose || data.purpose.trim() === '') {
             setPurposeError('Purpose of payment is required');
@@ -756,13 +784,6 @@ export function PaymentDetailsStep({
                 } else {
                     setData((prev: PaymentFormData) => ({ ...prev, payment_date: today }));
                 }
-            }
-        }
-        
-        if (isClearanceFeePayment && clearanceTypes.length > 0) {
-            if (!data.clearance_type_id || String(data.clearance_type_id).trim() === '') {
-                setClearanceError('Please select a clearance type');
-                isValid = false;
             }
         }
         
@@ -850,6 +871,14 @@ export function PaymentDetailsStep({
     const PayerIcon = getPayerTypeIcon();
 
     const getPaymentTypeEmphasis = () => {
+        if (isBusinessPayment) {
+            return {
+                badge: 'Business Payment',
+                color: 'bg-orange-600',
+                icon: <Building className="h-3 w-3 mr-1" />,
+                description: 'Business Fees'
+            };
+        }
         if (isClearanceFeePayment && isFeePayment) {
             return {
                 badge: 'Combined Payment',
@@ -924,7 +953,7 @@ export function PaymentDetailsStep({
 
         if (selectedResident.is_voter) {
             classifications.push({
-                icon: <Vote className="h-3 w-3" />,
+                icon: <Award className="h-3 w-3" />,
                 label: 'Registered Voter',
                 color: 'bg-blue-100 text-blue-800 border-blue-200',
                 idNumber: null,
@@ -1134,6 +1163,74 @@ export function PaymentDetailsStep({
         );
     };
 
+    const renderBusinessInfo = () => {
+        if (!selectedBusiness) return null;
+
+        return (
+            <div className="mt-4 pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+                    <Briefcase className="h-3 w-3" />
+                    Business Details
+                </div>
+                <div className="space-y-2">
+                    {selectedBusiness.business_type && (
+                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                            <Building className="h-3 w-3 mr-1" />
+                            {selectedBusiness.business_type_label || selectedBusiness.business_type}
+                        </Badge>
+                    )}
+                    
+                    {selectedBusiness.owner_name && (
+                        <div className="flex items-center gap-2 text-xs">
+                            <User className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">Owner:</span>
+                            <span className="font-medium text-gray-900">{selectedBusiness.owner_name}</span>
+                        </div>
+                    )}
+
+                    {selectedBusiness.permit_expiry_date && (
+                        <div className="flex items-center gap-2 text-xs">
+                            <Calendar className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">Permit Expiry:</span>
+                            <span className={`font-medium ${selectedBusiness.is_permit_valid ? 'text-green-600' : 'text-yellow-600'}`}>
+                                {new Date(selectedBusiness.permit_expiry_date).toLocaleDateString()}
+                            </span>
+                            {!selectedBusiness.is_permit_valid && (
+                                <Badge variant="outline" className="text-[10px] bg-yellow-100 text-yellow-800">
+                                    Expiring Soon
+                                </Badge>
+                            )}
+                        </div>
+                    )}
+
+                    {selectedBusiness.employee_count && (
+                        <div className="flex items-center gap-2 text-xs">
+                            <Users className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">Employees:</span>
+                            <span className="font-medium">{selectedBusiness.employee_count}</span>
+                        </div>
+                    )}
+
+                    {selectedBusiness.capital_amount && (
+                        <div className="flex items-center gap-2 text-xs">
+                            <DollarSign className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">Capital:</span>
+                            <span className="font-medium">{selectedBusiness.formatted_capital || formatCurrency(selectedBusiness.capital_amount)}</span>
+                        </div>
+                    )}
+
+                    {selectedBusiness.monthly_gross && (
+                        <div className="flex items-center gap-2 text-xs">
+                            <TrendingUp className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-600">Monthly Gross:</span>
+                            <span className="font-medium">{selectedBusiness.formatted_monthly_gross || formatCurrency(selectedBusiness.monthly_gross)}</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     const renderFeeItemsWithDiscountInfo = () => {
         if (feeItems.length === 0) return null;
 
@@ -1220,67 +1317,6 @@ export function PaymentDetailsStep({
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {/* Clearance Type Selection */}
-                        {isClearanceFeePayment && clearanceTypes.length > 0 && (
-                            <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <FileBadge className="h-5 w-5 text-purple-600" />
-                                    <h3 className="font-medium text-purple-900">Clearance Type</h3>
-                                </div>
-                                
-                                <Select
-                                    value={String(data.clearance_type_id || "")}
-                                    onValueChange={handleClearanceTypeSelect}
-                                >
-                                    <SelectTrigger className={`bg-white ${clearanceError ? 'border-red-300' : ''}`}>
-                                        <SelectValue placeholder="Select clearance type..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {clearanceTypes.map((type) => (
-                                            <SelectItem key={type.id} value={String(type.id)}>
-                                                <div className="flex items-center justify-between w-full">
-                                                    <span>{type.name}</span>
-                                                    <span className="text-xs text-gray-500 ml-2">
-                                                        {type.formatted_fee || formatCurrency(Number(type.fee))}
-                                                    </span>
-                                                </div>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                
-                                {clearanceError && (
-                                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                                        <AlertCircle className="h-3 w-3" />
-                                        {clearanceError}
-                                    </p>
-                                )}
-
-                                {selectedClearanceType && (
-                                    <div className="mt-3 grid grid-cols-2 gap-3">
-                                        <div>
-                                            <Label className="text-xs text-gray-500">Valid Until</Label>
-                                            <Input
-                                                type="date"
-                                                value={validityDate}
-                                                onChange={(e) => handleValidityDateChange(e.target.value)}
-                                                className="mt-1 bg-white"
-                                                min={new Date().toISOString().split('T')[0]}
-                                            />
-                                        </div>
-                                        <div className="flex items-center">
-                                            <Switch
-                                                checked={isCleared}
-                                                onCheckedChange={handleClearedChange}
-                                                className="data-[state=checked]:bg-green-600 mr-2"
-                                            />
-                                            <Label className="text-xs">Ready to issue</Label>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         {/* Receipt Details */}
                         <div className="space-y-3">
                             <h3 className="font-medium flex items-center gap-2">
@@ -1347,7 +1383,7 @@ export function PaymentDetailsStep({
 
                         <Separator />
 
-                        {/* Amount Paid Section - CORRECTED */}
+                        {/* Amount Paid Section */}
                         <div className="space-y-3">
                             <h3 className="font-medium flex items-center gap-2">
                                 <Wallet className="h-4 w-4" />
@@ -1581,6 +1617,10 @@ export function PaymentDetailsStep({
                                 {[
                                     { id: 'cash', icon: Banknote, name: 'Cash', desc: 'Cash payment' },
                                     { id: 'gcash', icon: Smartphone, name: 'GCash', desc: 'Mobile payment' },
+                                    { id: 'maya', icon: Smartphone, name: 'Maya', desc: 'Mobile payment' },
+                                    { id: 'bank', icon: Building, name: 'Bank Transfer', desc: 'Bank transfer' },
+                                    { id: 'check', icon: FileText, name: 'Check', desc: 'Check payment' },
+                                    { id: 'online', icon: Globe, name: 'Online', desc: 'Online payment' },
                                 ].map((method) => {
                                     const Icon = method.icon;
                                     const isSelected = data.payment_method === method.id;
@@ -1730,6 +1770,7 @@ export function PaymentDetailsStep({
                                 )}
                             </div>
 
+                            {/* Render appropriate info based on payer type */}
                             {data.payer_type === 'resident' && selectedResident && (
                                 <>
                                     {renderResidentClassifications()}
@@ -1737,6 +1778,29 @@ export function PaymentDetailsStep({
                                     {renderDiscountEligibilities()}
                                 </>
                             )}
+                            
+                            {data.payer_type === 'household' && selectedHousehold && (
+                                <div className="mt-3 pt-2 border-t border-gray-100">
+                                    <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+                                        <Home className="h-3 w-3" />
+                                        Household Details
+                                    </div>
+                                    <div className="space-y-1 text-xs">
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Number:</span>
+                                            <span className="font-medium">{selectedHousehold.household_number}</span>
+                                        </div>
+                                        {selectedHousehold.member_count && (
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500">Members:</span>
+                                                <span className="font-medium">{selectedHousehold.member_count}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {data.payer_type === 'business' && selectedBusiness && renderBusinessInfo()}
                         </div>
                     </CardContent>
                 </Card>
@@ -1767,7 +1831,8 @@ export function PaymentDetailsStep({
                             </div>
                         )}
 
-                        {isClearanceFeePayment && selectedClearanceType && clearanceItem && (
+                        {/* Updated to show clearance details from payment items */}
+                        {isClearanceFeePayment && clearanceItem && (
                             <div className="bg-purple-50 p-3 rounded-md border border-purple-200">
                                 <div className="flex items-center gap-2 text-purple-700 font-medium mb-2">
                                     <FileBadge className="h-4 w-4" />
@@ -1775,20 +1840,25 @@ export function PaymentDetailsStep({
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-600">Type:</span>
-                                    <span className="font-medium text-purple-700">{selectedClearanceType.name}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm mt-1">
-                                    <span className="text-gray-600">Code:</span>
-                                    <span className="font-mono text-xs text-gray-700">{selectedClearanceType.code}</span>
+                                    <span className="font-medium text-purple-700">
+                                        {clearanceItem.metadata?.clearance_type_name || 'Clearance'}
+                                    </span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm mt-1">
                                     <span className="text-gray-600">Fee:</span>
-                                    <span className="font-medium text-purple-700">{formatCurrency(clearanceItem?.total_amount || 0)}</span>
+                                    <span className="font-medium text-purple-700">{formatCurrency(clearanceItem.total_amount)}</span>
                                 </div>
-                                {validityDate && (
+                                {data.validity_date && (
                                     <div className="flex justify-between items-center text-sm mt-1">
                                         <span className="text-gray-600">Valid Until:</span>
-                                        <span className="text-xs text-gray-700">{new Date(validityDate).toLocaleDateString()}</span>
+                                        <span className="text-xs text-gray-700">{new Date(data.validity_date).toLocaleDateString()}</span>
+                                    </div>
+                                )}
+                                {/* Clearance status */}
+                                {data.is_cleared && (
+                                    <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        Ready to issue
                                     </div>
                                 )}
                             </div>
@@ -1800,6 +1870,7 @@ export function PaymentDetailsStep({
                             <div className="space-y-2 max-h-48 overflow-y-auto">
                                 {paymentItems.map((item) => {
                                     const isClearance = item.metadata?.is_clearance_fee || item.category === 'clearance';
+                                    const isBusiness = item.category === 'business' || item.metadata?.is_business_fee;
                                     return (
                                         <div key={item.id} className="flex justify-between items-start text-sm">
                                             <div className="flex-1">
@@ -1808,6 +1879,11 @@ export function PaymentDetailsStep({
                                                     {isClearance && (
                                                         <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
                                                             Clearance
+                                                        </Badge>
+                                                    )}
+                                                    {isBusiness && (
+                                                        <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                                                            Business
                                                         </Badge>
                                                     )}
                                                 </div>
@@ -1824,7 +1900,7 @@ export function PaymentDetailsStep({
 
                         <Separator />
 
-                        {/* Totals - CORRECTED */}
+                        {/* Totals */}
                         <div className="space-y-1.5">
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Subtotal</span>

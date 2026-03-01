@@ -57,7 +57,7 @@ export default function PuroksHeader({
                     <span className="hidden sm:inline">Update Stats</span>
                     <span className="sm:hidden">Stats</span>
                 </Button>
-                <Link href="/puroks/create">
+                <Link href="/admin/puroks/create">
                     <Button className="h-9">
                         <Plus className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">Add Purok</span>

@@ -100,7 +100,7 @@ export default function CommitteesIndex({ committees, filters = {}, stats }: Com
 
     // Handle page change
     const handlePageChange = (page: number) => {
-        router.get('/committees', {
+        router.get('/admin/committees', {
             ...filters,
             page: page
         }, {
@@ -112,7 +112,7 @@ export default function CommitteesIndex({ committees, filters = {}, stats }: Com
     // Handle committee delete
     const handleDelete = (committee: Committee) => {
         if (confirm(`Are you sure you want to delete committee "${committee.name}"?`)) {
-            router.delete(`/committees/${committee.id}`, {
+            router.delete(`/admin/committees/${committee.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success('Committee deleted successfully');
@@ -126,7 +126,7 @@ export default function CommitteesIndex({ committees, filters = {}, stats }: Com
 
     // Handle toggle status
     const handleToggleStatus = (committee: Committee) => {
-        router.post(`/committees/${committee.id}/toggle-status`, {}, {
+        router.post(`/admin/committees/${committee.id}/toggle-status`, {}, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Committee status updated');
@@ -150,8 +150,8 @@ export default function CommitteesIndex({ committees, filters = {}, stats }: Com
         <AppLayout
             title="Committees"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Committees', href: '/committees' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Committees', href: '/admin/committees' }
             ]}
         >
             <TooltipProvider>

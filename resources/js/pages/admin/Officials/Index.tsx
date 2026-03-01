@@ -80,7 +80,7 @@ export default function Officials() {
                 }
             });
             
-            router.get('/officials', params, {
+            router.get('/admin/officials', params, {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
@@ -263,7 +263,7 @@ export default function Officials() {
             switch (operation) {
                 case 'delete':
                     if (confirm(`Are you sure you want to delete ${selectedOfficials.length} selected official(s)?`)) {
-                        await router.post('/officials/bulk-delete', {
+                        await router.post('/admin/officials/bulk-delete', {
                             ids: selectedOfficials,
                         }, {
                             preserveScroll: true,
@@ -280,7 +280,7 @@ export default function Officials() {
                     break;
 
                 case 'activate':
-                    await router.post('/officials/bulk-activate', {
+                    await router.post('/admin/officials/bulk-activate', {
                         ids: selectedOfficials,
                     }, {
                         preserveScroll: true,
@@ -295,7 +295,7 @@ export default function Officials() {
                     break;
 
                 case 'deactivate':
-                    await router.post('/officials/bulk-deactivate', {
+                    await router.post('/admin/officials/bulk-deactivate', {
                         ids: selectedOfficials,
                     }, {
                         preserveScroll: true,
@@ -310,7 +310,7 @@ export default function Officials() {
                     break;
 
                 case 'make_current':
-                    await router.post('/officials/bulk-make-current', {
+                    await router.post('/admin/officials/bulk-make-current', {
                         ids: selectedOfficials,
                     }, {
                         preserveScroll: true,
@@ -325,7 +325,7 @@ export default function Officials() {
                     break;
 
                 case 'make_former':
-                    await router.post('/officials/bulk-make-former', {
+                    await router.post('/admin/officials/bulk-make-former', {
                         ids: selectedOfficials,
                     }, {
                         preserveScroll: true,
@@ -356,14 +356,14 @@ export default function Officials() {
 
                 case 'print':
                     selectedOfficials.forEach(id => {
-                        window.open(`/officials/${id}/print`, '_blank');
+                        window.open(`/admin/officials/${id}/print`, '_blank');
                     });
                     toast.success(`${selectedOfficials.length} official(s) opened for printing`);
                     break;
 
                 case 'generate_report':
                     const idsParam = selectedOfficials.join(',');
-                    window.open(`/officials/report?ids=${idsParam}`, '_blank');
+                    window.open(`/admin/officials/report?ids=${idsParam}`, '_blank');
                     toast.success(`Generating report for ${selectedOfficials.length} official(s)`);
                     break;
 
@@ -415,7 +415,7 @@ export default function Officials() {
     // Individual official operations
     const handleDelete = (official: Official) => {
         if (confirm(`Are you sure you want to delete official "${official.resident?.full_name || 'Untitled'}"?`)) {
-            router.delete(`/officials/${official.id}`, {
+            router.delete(`/admin/officials/${official.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedOfficials(selectedOfficials.filter(id => id !== official.id));
@@ -476,8 +476,8 @@ export default function Officials() {
         <AppLayout
             title="Barangay Officials"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Officials', href: '/officials' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Officials', href: '/admin/officials' }
             ]}
         >
             <TooltipProvider>

@@ -523,8 +523,8 @@ export default function FeeTypesIndex({
         <AppLayout
             title="Fee Types"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Fee Types', href: '/fee-types' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Fee Types', href: '/admin/fee-types' }
             ]}
         >
             <TooltipProvider>

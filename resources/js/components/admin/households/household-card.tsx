@@ -84,14 +84,14 @@ export function HouseholdCard({
                         <ActionDropdown>
                             <ActionDropdownItem
                                 icon={<Eye className="h-4 w-4" />}
-                                href={`/households/${household.id}`}
+                                href={`/admin/households/${household.id}`}
                             >
                                 View Details
                             </ActionDropdownItem>
                             
                             <ActionDropdownItem
                                 icon={<Edit className="h-4 w-4" />}
-                                href={`/households/${household.id}/edit`}
+                                href={`/admin/households/${household.id}/edit`}
                             >
                                 Edit Household
                             </ActionDropdownItem>

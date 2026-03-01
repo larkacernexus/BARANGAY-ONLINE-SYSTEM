@@ -220,14 +220,14 @@ export default function UsersTableRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem asChild>
-              <Link href={`/users/${user.id}`} className="flex items-center cursor-pointer">
+              <Link href={`/admin/users/${user.id}`} className="flex items-center cursor-pointer">
                 <Eye className="mr-2 h-4 w-4" />
                 <span>View Profile</span>
               </Link>
             </DropdownMenuItem>
             
             <DropdownMenuItem asChild>
-              <Link href={`/users/${user.id}/edit`} className="flex items-center cursor-pointer">
+              <Link href={`/admin/users/${user.id}/edit`} className="flex items-center cursor-pointer">
                 <Edit className="mr-2 h-4 w-4" />
                 <span>Edit User</span>
               </Link>

@@ -407,9 +407,9 @@ export default function FeeTypesEdit({
         <AppLayout
             title={`Edit Fee Type: ${feeType.name}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Fee Types', href: '/fee-types' },
-                { title: `Edit: ${feeType.name}`, href: `/fee-types/${feeType.id}/edit` }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Fee Types', href: '/admin/fee-types' },
+                { title: `Edit: ${feeType.name}`, href: `/admin/fee-types/${feeType.id}/edit` }
             ]}
         >
             <Head title={`Edit Fee Type: ${feeType.name}`} />
@@ -419,7 +419,7 @@ export default function FeeTypesEdit({
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href="/fee-types">
+                            <Link href="/admin/fee-types">
                                 <Button variant="ghost" size="sm">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back

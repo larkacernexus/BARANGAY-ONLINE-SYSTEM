@@ -285,9 +285,9 @@ export default function FeeTypesCreate({
         <AppLayout
             title="Create Fee Type"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Fee Types', href: '/fee-types' },
-                { title: 'Create Fee Type', href: '/fee-types/create' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Fee Types', href: '/admin/fee-types' },
+                { title: 'Create Fee Type', href: '/admin/fee-types/create' }
             ]}
         >
             <Head title="Create Fee Type" />
@@ -297,7 +297,7 @@ export default function FeeTypesCreate({
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href="/fee-types">
+                            <Link href="/admin/fee-types">
                                 <Button variant="ghost" size="sm">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back

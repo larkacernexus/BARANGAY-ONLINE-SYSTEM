@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class Purok extends Model
@@ -70,10 +71,12 @@ class Purok extends Model
         return $query->where('status', 'inactive');
     }
 
+// Add to updateStatistics method
     public function updateStatistics()
     {
         $this->total_households = $this->households()->count();
         $this->total_residents = $this->residents()->count();
+        $this->total_businesses = $this->businesses()->count(); // Add this line
         $this->save();
     }
 
@@ -215,9 +218,11 @@ class Purok extends Model
         return null;
     }
 
-    /**
-     * Get short Google Maps URL (for display)
-     */
+        public function businesses(): HasMany
+    {
+        return $this->hasMany(Business::class, 'purok_id');
+    }
+
     public function getShortGoogleMapsUrlAttribute()
     {
         if (!$this->google_maps_url) {

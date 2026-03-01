@@ -8,6 +8,9 @@ use App\Models\FeeType;
 use App\Models\Resident;
 use App\Models\DocumentCategory;
 use App\Models\Household;
+use App\Models\HouseholdMember;
+use App\Models\User;
+use App\Notifications\FeeCreatedNotification; // Add this
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -17,62 +20,276 @@ use Illuminate\Support\Facades\Log;
 class FeeStoreController extends Controller
 {
     // Store new fee with bulk creation support
-    public function store(Request $request)
-    {
-        DB::beginTransaction();
+public function store(Request $request)
+{
+    DB::beginTransaction();
 
-        try {
-            Log::info('FeeStoreController@store started', [
-                'user_id' => Auth::id(),
-                'bulk_type' => $request->bulk_type ?? 'none',
-                'bulk_selection_count' => $this->getBulkSelectionCount($request)
-            ]);
+    try {
+        Log::info('FeeStoreController@store started', [
+            'user_id' => Auth::id(),
+            'bulk_type' => $request->bulk_type ?? 'none',
+            'bulk_selection_count' => $this->getBulkSelectionCount($request)
+        ]);
 
-            // Determine if this is bulk creation
-            $bulkType = $request->bulk_type ?? 'none';
-            $createdFees = [];
+        // Determine if this is bulk creation
+        $bulkType = $request->bulk_type ?? 'none';
+        $createdFees = [];
 
-            if ($bulkType === 'none') {
-                // Single fee creation
-                $fee = $this->createSingleFee($request);
-                if ($fee) {
-                    $createdFees[] = $fee;
-                }
-            } else {
-                // Bulk fee creation
-                $createdFees = $this->createBulkFees($request);
+        if ($bulkType === 'none') {
+            // Single fee creation
+            $fee = $this->createSingleFee($request);
+            if ($fee) {
+                $createdFees[] = $fee;
             }
+        } else {
+            // Bulk fee creation
+            $createdFees = $this->createBulkFees($request);
+        }
 
-            DB::commit();
+        DB::commit();
 
-            Log::info('Fee(s) created successfully', [
-                'total_fees_created' => count($createdFees),
-                'fee_ids' => collect($createdFees)->pluck('id')->toArray()
-            ]);
+        // SEND NOTIFICATIONS AFTER SUCCESSFUL COMMIT
+        if (!empty($createdFees)) {
+            $this->sendFeeNotifications($createdFees, $request);
+        }
 
-            if (count($createdFees) === 1) {
-                return redirect()->route('fees.show', $createdFees[0])
-                    ->with('success', 'Fee created successfully.');
-            } else {
-                return redirect()->route('fees.index')
-                    ->with('success', 'Successfully created ' . count($createdFees) . ' fees.');
-            }
+        Log::info('Fee(s) created successfully', [
+            'total_fees_created' => count($createdFees),
+            'fee_ids' => collect($createdFees)->pluck('id')->toArray()
+        ]);
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            DB::rollBack();
-            throw $e;
+        if (count($createdFees) === 1) {
+            return redirect()->route('admin.fees.show', $createdFees[0])
+                ->with('success', 'Fee created successfully.');
+        } else {
+            return redirect()->route('fees.index')
+                ->with('success', 'Successfully created ' . count($createdFees) . ' fees.');
+        }
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Fee creation failed', [
-                'user_id' => Auth::id(),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        DB::rollBack();
+        throw $e;
 
-            return back()->with('error', 'Failed to create fee. Please try again.');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Fee creation failed', [
+            'user_id' => Auth::id(),
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return back()->with('error', 'Failed to create fee. Please try again.');
+    }
+}
+   private function findHouseholdHeadUser($householdId)
+{
+    if (!$householdId) {
+        return null;
+    }
+    
+    // Direct approach: The household has a user_id column
+    $household = Household::with('user')->find($householdId);
+    
+    if ($household && $household->user_id) {
+        // Verify the user exists and is active
+        $user = User::find($household->user_id);
+        if ($user && $user->status === 'active') {
+            return $user;
         }
     }
+    
+    return null;
+}
+
+// Alternative approach if household doesn't have user_id:
+private function findHouseholdHeadUserAlternative($householdId)
+{
+    if (!$householdId) {
+        return null;
+    }
+    
+    // Find the household head member
+    $headMember = HouseholdMember::with('resident')
+        ->where('household_id', $householdId)
+        ->where('is_head', true)
+        ->first();
+    
+    if (!$headMember || !$headMember->resident) {
+        return null;
+    }
+    
+    // Find the user account linked to this household head's resident
+    // Users have resident_id pointing to the head resident
+    return User::where('resident_id', $headMember->resident->id)->first();
+}
+
+/**
+ * Send notifications to the household head (payer)
+ */
+private function sendFeeNotifications($fees, $request)
+{
+    try {
+        Log::info('========== START NOTIFICATION DEBUG ==========');
+        Log::info('Starting notification process for ' . count($fees) . ' fees');
+
+        $usersToNotify = collect();
+        
+        foreach ($fees as $index => $fee) {
+            Log::info('Processing fee #' . ($index + 1), [
+                'fee_id' => $fee->id,
+                'fee_code' => $fee->fee_code,
+                'payer_type' => $fee->payer_type,
+                'payer_id' => $fee->payer_id,  // This is the key!
+                'payer_name' => $fee->payer_name
+            ]);
+            
+            $householdId = null;
+            $residentName = null;
+            
+            // === USE THE POLYMORPHIC RELATIONSHIP TO FIND THE HOUSEHOLD ===
+            
+            // Case 1: Fee is for a resident
+            if ($fee->payer_type === 'App\Models\Resident' && $fee->payer_id) {
+                Log::info('Fee is for resident', ['payer_id' => $fee->payer_id]);
+                
+                // Find the resident with their household
+                $resident = Resident::with('household')->find($fee->payer_id);
+                
+                if ($resident) {
+                    Log::info('Found resident', [
+                        'resident_id' => $resident->id,
+                        'resident_name' => $resident->full_name,
+                        'household_id' => $resident->household_id
+                    ]);
+                    
+                    $residentName = $resident->full_name;
+                    $fee->resident_name = $residentName;
+                    
+                    if ($resident->household_id) {
+                        $householdId = $resident->household_id;
+                    } else {
+                        Log::warning('Resident has no household assigned');
+                    }
+                } else {
+                    Log::error('Resident not found', ['payer_id' => $fee->payer_id]);
+                }
+            }
+            
+            // Case 2: Fee is for a household directly
+            elseif ($fee->payer_type === 'App\Models\Household' && $fee->payer_id) {
+                Log::info('Fee is for household', ['payer_id' => $fee->payer_id]);
+                $householdId = $fee->payer_id;
+            }
+            
+            // Case 3: Unknown payer type
+            else {
+                Log::warning('Unknown payer type or missing payer_id', [
+                    'payer_type' => $fee->payer_type,
+                    'payer_id' => $fee->payer_id
+                ]);
+            }
+            
+            // Find the household head user
+            if ($householdId) {
+                Log::info('Looking for user with household_id = ' . $householdId);
+                
+                // Find user by household_id (this links to the household head's account)
+                $householdHeadUser = User::where('household_id', $householdId)
+                    ->where('status', 'active')
+                    ->first();
+                
+                if ($householdHeadUser) {
+                    Log::info('✓ Found household head user', [
+                        'user_id' => $householdHeadUser->id,
+                        'user_name' => $householdHeadUser->full_name,
+                        'user_household_id' => $householdHeadUser->household_id
+                    ]);
+                    
+                    $usersToNotify->push($householdHeadUser);
+                } else {
+                    Log::warning('No active user found for household', [
+                        'household_id' => $householdId
+                    ]);
+                    
+                    // Alternative: Try to find by resident_id of the head member
+                    $headMember = HouseholdMember::with('resident')
+                        ->where('household_id', $householdId)
+                        ->where('is_head', true)
+                        ->first();
+                    
+                    if ($headMember && $headMember->resident) {
+                        $userFromResident = User::where('resident_id', $headMember->resident_id)
+                            ->where('status', 'active')
+                            ->first();
+                        
+                        if ($userFromResident) {
+                            Log::info('✓ Found user from head resident', [
+                                'user_id' => $userFromResident->id
+                            ]);
+                            $usersToNotify->push($userFromResident);
+                        }
+                    }
+                }
+            } else {
+                Log::warning('No household_id found for this fee');
+            }
+        }
+        
+        $usersToNotify = $usersToNotify->unique('id');
+        
+        Log::info('Final count - Total household heads to notify: ' . $usersToNotify->count());
+
+        if ($usersToNotify->isEmpty()) {
+            Log::warning('❌ No household heads found to notify');
+            Log::info('========== END NOTIFICATION DEBUG ==========');
+            return;
+        }
+
+        // Log the users we're notifying
+        foreach ($usersToNotify as $user) {
+            Log::info('✓ WILL NOTIFY USER:', [
+                'user_id' => $user->id,
+                'user_name' => $user->full_name,
+                'user_household_id' => $user->household_id
+            ]);
+        }
+
+        // Send notifications
+        if (count($fees) > 1) {
+            $firstFee = $fees[0];
+            $bulkCount = count($fees);
+            
+            foreach ($usersToNotify as $user) {
+                $user->notify(new FeeCreatedNotification(
+                    $firstFee,
+                    'bulk_created',
+                    $bulkCount
+                ));
+            }
+            Log::info('Bulk notifications sent to ' . $usersToNotify->count() . ' users');
+        } else {
+            foreach ($fees as $fee) {
+                foreach ($usersToNotify as $user) {
+                    $user->notify(new FeeCreatedNotification(
+                        $fee, 
+                        'created',
+                        null,
+                        $fee->resident_name ?? null
+                    ));
+                }
+            }
+            Log::info('Single notification sent to ' . $usersToNotify->count() . ' users');
+        }
+        
+        Log::info('========== END NOTIFICATION DEBUG ==========');
+
+    } catch (\Exception $e) {
+        Log::error('Failed to send fee notifications', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+    }
+}
 
     private function getBulkSelectionCount(Request $request)
     {
@@ -97,47 +314,83 @@ class FeeStoreController extends Controller
     }
 
     // Helper method to create a single fee
-    private function createSingleFee($request)
-    {
-        // Validate all fields including bulk fields
-        $validated = $this->validateFeeRequest($request);
+   private function createSingleFee($request)
+{
+    // Log the incoming request data
+    Log::info('createSingleFee - Request data', [
+        'payer_type' => $request->payer_type,
+        'resident_id' => $request->resident_id,
+        'household_id' => $request->household_id,
+        'payer_name' => $request->payer_name
+    ]);
 
-        // Set payer_id and payer_model based on payer type
-        if ($request->payer_type === 'resident' && $request->resident_id) {
-            $validated['payer_id'] = $request->resident_id;
-            $validated['payer_model'] = Resident::class;
-        } elseif ($request->payer_type === 'household' && $request->household_id) {
-            $validated['payer_id'] = $request->household_id;
-            $validated['payer_model'] = Household::class;
-        } else {
-            $validated['payer_id'] = null;
-            $validated['payer_model'] = null;
-        }
+    // Validate all fields including bulk fields
+    $validated = $this->validateFeeRequest($request);
+    
+    Log::info('createSingleFee - After validation', [
+        'validated_data' => $validated
+    ]);
 
-        // SIMPLIFIED: No discounts at creation time - will be applied during payment
-        $validated['discount_amount'] = 0;
-
-        // Calculate total amount (no discount subtraction)
-        $validated['total_amount'] = $validated['base_amount']
-            + ($validated['surcharge_amount'] ?? 0)
-            + ($validated['penalty_amount'] ?? 0);
-
-        // Set default values
-        $validated = $this->setDefaultFeeValues($validated, $request->fee_type_id);
-
-        // Convert arrays to JSON
-        if (isset($validated['requirements_submitted'])) {
-            $validated['requirements_submitted'] = json_encode($validated['requirements_submitted']);
-        }
-
-        // Create the fee
-        $fee = Fee::create($validated);
-
-        // Generate identifiers
-        $this->generateFeeIdentifiers($fee);
-
-        return $fee;
+    // Set payer_id and payer_model based on payer type
+    if ($request->payer_type === 'resident' && $request->resident_id) {
+        $validated['payer_id'] = $request->resident_id;
+        $validated['payer_model'] = Resident::class;
+        Log::info('createSingleFee - Set resident payer', [
+            'payer_id' => $request->resident_id,
+            'payer_model' => Resident::class
+        ]);
+    } elseif ($request->payer_type === 'household' && $request->household_id) {
+        $validated['payer_id'] = $request->household_id;
+        $validated['payer_model'] = Household::class;
+        Log::info('createSingleFee - Set household payer', [
+            'payer_id' => $request->household_id,
+            'payer_model' => Household::class
+        ]);
+    } else {
+        $validated['payer_id'] = null;
+        $validated['payer_model'] = null;
+        Log::warning('createSingleFee - No payer ID set', [
+            'payer_type' => $request->payer_type,
+            'has_resident_id' => !empty($request->resident_id),
+            'has_household_id' => !empty($request->household_id)
+        ]);
     }
+
+    // SIMPLIFIED: No discounts at creation time - will be applied during payment
+    $validated['discount_amount'] = 0;
+
+    // Calculate total amount (no discount subtraction)
+    $validated['total_amount'] = $validated['base_amount']
+        + ($validated['surcharge_amount'] ?? 0)
+        + ($validated['penalty_amount'] ?? 0);
+
+    // Set default values
+    $validated = $this->setDefaultFeeValues($validated, $request->fee_type_id);
+
+    // Convert arrays to JSON
+    if (isset($validated['requirements_submitted'])) {
+        $validated['requirements_submitted'] = json_encode($validated['requirements_submitted']);
+    }
+
+    Log::info('createSingleFee - Before create', [
+        'data_to_create' => $validated
+    ]);
+
+    // Create the fee
+    $fee = Fee::create($validated);
+
+    Log::info('createSingleFee - After create', [
+        'fee_id' => $fee->id,
+        'payer_type' => $fee->payer_type,
+        'payer_id' => $fee->payer_id,
+        'payer_name' => $fee->payer_name
+    ]);
+
+    // Generate identifiers
+    $this->generateFeeIdentifiers($fee);
+
+    return $fee;
+}
 
     // Helper method to create bulk fees
     private function createBulkFees($request)
@@ -254,9 +507,6 @@ class FeeStoreController extends Controller
             'ph_legal_compliance_notes' => 'nullable|string',
         ];
 
-        // REMOVED: All discount-related validation rules
-        // REMOVED: discount_type_ids, discount_amount validation
-
         // Add bulk validation rules if in bulk mode
         $bulkType = $request->bulk_type ?? 'none';
         if ($bulkType !== 'none') {
@@ -282,8 +532,6 @@ class FeeStoreController extends Controller
 
         return $request->validate($rules);
     }
-
-    // REMOVED: processDiscounts method - discounts are now handled at payment time
 
     private function createFeeForResident($request, $resident)
     {
@@ -371,42 +619,45 @@ class FeeStoreController extends Controller
     }
 
     // Prepare base fee data from request
-    private function prepareFeeData($request)
-    {
-        // Extract only the fee data, excluding bulk fields
-        $feeData = [
-            'fee_type_id' => $request->fee_type_id,
-            'base_amount' => $request->base_amount,
-            'surcharge_amount' => $request->surcharge_amount ?? 0,
-            'penalty_amount' => $request->penalty_amount ?? 0,
-            'discount_amount' => 0, // Always 0 for new fees - discounts applied at payment
-            'total_amount' => $request->base_amount + ($request->surcharge_amount ?? 0) + ($request->penalty_amount ?? 0),
-            'issue_date' => $request->issue_date,
-            'due_date' => $request->due_date,
-            'purpose' => $request->purpose,
-            'remarks' => $request->remarks,
-            'billing_period' => $request->billing_period,
-            'period_start' => $request->period_start,
-            'period_end' => $request->period_end,
-            'property_description' => $request->property_description,
-            'business_type' => $request->business_type,
-            'area' => $request->area,
-            'zone' => $request->zone,
-            'requirements_submitted' => json_encode($request->requirements_submitted ?? []),
-            'ph_legal_compliance_notes' => $request->ph_legal_compliance_notes,
-            // REMOVED: discount_type_ids and discount_type fields
-        ];
+   private function prepareFeeData($request)
+{
+    // Extract only the fee data, excluding bulk fields
+    $feeData = [
+        'fee_type_id' => $request->fee_type_id,
+        'payer_type' => $request->payer_type,
+        // DON'T include payer_id here - it's set in createSingleFee
+        'payer_name' => $request->payer_name,
+        'contact_number' => $request->contact_number,
+        'address' => $request->address,
+        'purok' => $request->purok,
+        'zone' => $request->zone,
+        'billing_period' => $request->billing_period,
+        'period_start' => $request->period_start,
+        'period_end' => $request->period_end,
+        'issue_date' => $request->issue_date,
+        'due_date' => $request->due_date,
+        'base_amount' => $request->base_amount,
+        'surcharge_amount' => $request->surcharge_amount ?? 0,
+        'penalty_amount' => $request->penalty_amount ?? 0,
+        'discount_amount' => 0,
+        'total_amount' => $request->base_amount + ($request->surcharge_amount ?? 0) + ($request->penalty_amount ?? 0),
+        'purpose' => $request->purpose,
+        'remarks' => $request->remarks,
+        'property_description' => $request->property_description,
+        'business_type' => $request->business_type,
+        'area' => $request->area,
+        'requirements_submitted' => json_encode($request->requirements_submitted ?? []),
+        'ph_legal_compliance_notes' => $request->ph_legal_compliance_notes,
+    ];
 
-        // Add Philippine law fields (stored for verification reference)
-        $feeData['ph_senior_id_verified'] = false;
-        $feeData['ph_pwd_id_verified'] = false;
-        $feeData['ph_solo_parent_id_verified'] = false;
-        $feeData['ph_indigent_id_verified'] = false;
+    // Add Philippine law fields (stored for verification reference)
+    $feeData['ph_senior_id_verified'] = false;
+    $feeData['ph_pwd_id_verified'] = false;
+    $feeData['ph_solo_parent_id_verified'] = false;
+    $feeData['ph_indigent_id_verified'] = false;
 
-        return $feeData;
-    }
-
-    // REMOVED: calculateTotalAmount method - no need to subtract discounts
+    return $feeData;
+}
 
     // Helper method to set default fee values
     private function setDefaultFeeValues($validated, $feeTypeId)

@@ -60,6 +60,28 @@ interface Household {
     total_outstanding_balance?: string;
 }
 
+// ADD BUSINESS INTERFACE
+interface Business {
+    id: string | number;
+    business_name: string;
+    owner_name: string;
+    owner_id?: string | number;
+    contact_number?: string;
+    email?: string;
+    address: string;
+    purok?: string;
+    purok_id?: string | number;
+    business_type?: string;
+    business_type_label?: string;
+    status?: string;
+    permit_expiry_date?: string;
+    is_permit_valid?: boolean;
+    outstanding_fees?: any[];
+    has_outstanding_fees?: boolean;
+    outstanding_fee_count?: number;
+    total_outstanding_balance?: string;
+}
+
 interface ClearanceRequest {
     id: string | number;
     resident_id: string | number;
@@ -98,6 +120,7 @@ interface Fee {
     payer_type: 'resident' | 'household' | 'business';
     resident_id: string | number | null;
     household_id: string | number | null;
+    business_id: string | number | null;
     business_name: string | null;
     payer_name: string;
     contact_number: string | null;
@@ -147,29 +170,36 @@ interface Fee {
     
     fee_type_name?: string;
     fee_type_category?: string;
+    business_details?: any;
+    resident_details?: any;
+    household_details?: any;
 }
 
 interface PayerSelectionStepProps {
     residents: Resident[];
     households: Household[];
+    businesses?: Business[]; // ADDED
     clearanceRequests?: ClearanceRequest[];
     fees?: Fee[];
-    payerSource: 'residents' | 'households' | 'clearance' | 'fees';
-    setPayerSource: (source: 'residents' | 'households' | 'clearance' | 'fees') => void;
+    payerSource: 'residents' | 'households' | 'businesses' | 'clearance' | 'fees'; // UPDATED
+    setPayerSource: (source: 'residents' | 'households' | 'businesses' | 'clearance' | 'fees') => void; // UPDATED
     searchQuery: string;
     setSearchQuery: (query: string) => void;
-    handleSelectPayer: (payer: Resident | Household | ClearanceRequest | Fee) => void;
+    handleSelectPayer: (payer: Resident | Household | Business | ClearanceRequest | Fee) => void; // UPDATED
     handleManualPayer: () => void;
     preSelectedPayerId?: string | number;
     preSelectedPayerType?: string;
     isClearancePayment?: boolean;
     clearanceRequest?: ClearanceRequest | null;
     clearanceTypes?: Record<string, string>;
+    preFilledData?: any;
+    selectedFeeDetails?: any;
 }
 
 export function PayerSelectionStep({
     residents,
     households,
+    businesses = [], // ADDED with default
     clearanceRequests = [],
     fees = [],
     payerSource,
@@ -182,7 +212,9 @@ export function PayerSelectionStep({
     preSelectedPayerType,
     isClearancePayment = false,
     clearanceRequest = null,
-    clearanceTypes = {}
+    clearanceTypes = {},
+    preFilledData,
+    selectedFeeDetails
 }: PayerSelectionStepProps) {
     
     const getClearanceTypeNameSafe = (code: string): string => {
@@ -199,6 +231,7 @@ export function PayerSelectionStep({
         const icons = {
             'residents': User,
             'households': Home,
+            'businesses': Building, // ADDED
             'clearance': FileText,
             'fees': Receipt,
         };
@@ -235,6 +268,10 @@ export function PayerSelectionStep({
             
             case 'households':
                 baseList = households;
+                break;
+            
+            case 'businesses': // ADDED
+                baseList = businesses;
                 break;
             
             case 'clearance':
@@ -275,6 +312,14 @@ export function PayerSelectionStep({
                            payer.address.toLowerCase().includes(query) ||
                            (payer.contact_number?.toLowerCase() || '').includes(query);
                 
+                case 'businesses': // ADDED
+                    return payer.business_name.toLowerCase().includes(query) ||
+                           (payer.owner_name?.toLowerCase() || '').includes(query) ||
+                           (payer.business_type?.toLowerCase() || '').includes(query) ||
+                           payer.address.toLowerCase().includes(query) ||
+                           (payer.contact_number?.toLowerCase() || '').includes(query) ||
+                           (payer.purok?.toLowerCase() || '').includes(query);
+                
                 case 'clearance':
                     return (payer.reference_number.toLowerCase().includes(query)) ||
                            (payer.resident?.name?.toLowerCase().includes(query)) ||
@@ -307,6 +352,9 @@ export function PayerSelectionStep({
             case 'households':
                 return households.length;
             
+            case 'businesses': // ADDED
+                return businesses.length;
+            
             case 'clearance':
                 return clearanceRequests.filter(cr => 
                     cr.can_be_paid === true
@@ -329,6 +377,8 @@ export function PayerSelectionStep({
             return payer.name;
         } else if (payerSource === 'households') {
             return payer.head_name;
+        } else if (payerSource === 'businesses') { // ADDED
+            return payer.business_name;
         } else if (payerSource === 'clearance') {
             const clearanceTypeName = payer.clearance_type?.code ? 
                 getClearanceTypeNameSafe(payer.clearance_type.code) : 
@@ -338,7 +388,7 @@ export function PayerSelectionStep({
             const feeTypeName = getFeeTypeName(payer);
             return `${payer.payer_name} - ${feeTypeName}`;
         }
-        return payer.name || payer.head_name || payer.payer_name || 'Unknown';
+        return payer.name || payer.head_name || payer.business_name || payer.payer_name || 'Unknown';
     };
 
     const getPayerDescription = (payer: any) => {
@@ -386,6 +436,39 @@ export function PayerSelectionStep({
                     <div className="text-xs">
                         {payer.address}
                         {payer.family_members && ` • ${payer.family_members} members`}
+                    </div>
+                    {hasFees && (
+                        <div className="text-xs font-medium text-amber-600 mt-1 flex items-center gap-1">
+                            <CreditCard className="h-3 w-3" />
+                            <span>
+                                {payer.outstanding_fee_count || 0} outstanding fee{payer.outstanding_fee_count !== 1 ? 's' : ''}
+                                {payer.total_outstanding_balance && ` • ${payer.total_outstanding_balance}`}
+                            </span>
+                        </div>
+                    )}
+                </>
+            );
+        } else if (payerSource === 'businesses') { // ADDED
+            const hasFees = payer.has_outstanding_fees || (payer.outstanding_fees && payer.outstanding_fees.length > 0);
+            const permitStatus = payer.is_permit_valid ? 'Valid Permit' : 
+                                (payer.permit_expiry_date ? 'Permit Expiring' : 'No Permit');
+            
+            return (
+                <>
+                    <div className="flex items-center gap-1 mb-1">
+                        <Briefcase className="h-3 w-3" />
+                        <span className="text-xs">{payer.business_type_label || payer.business_type || 'Business'}</span>
+                        {payer.permit_expiry_date && (
+                            <Badge variant="outline" className={`text-xs ${
+                                payer.is_permit_valid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                                {permitStatus}
+                            </Badge>
+                        )}
+                    </div>
+                    <div className="text-xs">
+                        Owner: {payer.owner_name}
+                        {payer.purok && ` • Purok ${payer.purok}`}
                     </div>
                     {hasFees && (
                         <div className="text-xs font-medium text-amber-600 mt-1 flex items-center gap-1">
@@ -602,18 +685,23 @@ export function PayerSelectionStep({
     useEffect(() => {
         if (preSelectedPayerId && preSelectedPayerType) {
             if (preSelectedPayerType === 'resident') {
-                const preSelectedResident = residents.find(r => r.id === preSelectedPayerId);
+                const preSelectedResident = residents.find(r => r.id == preSelectedPayerId);
                 if (preSelectedResident) {
                     handleSelectPayer(preSelectedResident);
                 }
             } else if (preSelectedPayerType === 'household') {
-                const preSelectedHousehold = households.find(h => h.id === preSelectedPayerId);
+                const preSelectedHousehold = households.find(h => h.id == preSelectedPayerId);
                 if (preSelectedHousehold) {
                     handleSelectPayer(preSelectedHousehold);
                 }
+            } else if (preSelectedPayerType === 'business') { // ADDED
+                const preSelectedBusiness = businesses.find(b => b.id == preSelectedPayerId);
+                if (preSelectedBusiness) {
+                    handleSelectPayer(preSelectedBusiness);
+                }
             }
         }
-    }, [preSelectedPayerId, preSelectedPayerType, residents, households, handleSelectPayer]);
+    }, [preSelectedPayerId, preSelectedPayerType, residents, households, businesses, handleSelectPayer]);
 
     useEffect(() => {
         if (isClearancePayment && clearanceRequest) {
@@ -642,16 +730,17 @@ export function PayerSelectionStep({
                             Who is Paying?
                         </CardTitle>
                         <CardDescription>
-                            Select from residents, households, clearance requests, or outstanding fees
+                            Select from residents, households, businesses, clearance requests, or outstanding fees
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="mb-6">
                             <Label className="mb-3 block">Select Payment Type</Label>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2"> {/* UPDATED to 5 columns */}
                                 {[
                                     { value: 'residents', icon: User, label: 'Residents', count: getPayerCount('residents'), color: 'text-blue-600 border-blue-200' },
                                     { value: 'households', icon: Home, label: 'Households', count: getPayerCount('households'), color: 'text-green-600 border-green-200' },
+                                    { value: 'businesses', icon: Building, label: 'Businesses', count: getPayerCount('businesses'), color: 'text-orange-600 border-orange-200' }, // ADDED
                                     { value: 'clearance', icon: FileText, label: 'Clearance', count: getPayerCount('clearance'), color: 'text-purple-600 border-purple-200' },
                                     { value: 'fees', icon: Receipt, label: 'Outstanding Fees', count: getPayerCount('fees'), color: 'text-amber-600 border-amber-200' },
                                 ].map((source) => (
@@ -681,6 +770,7 @@ export function PayerSelectionStep({
                             <Label className="mb-2 block">
                                 {payerSource === 'residents' ? 'Search residents...' :
                                  payerSource === 'households' ? 'Search households...' :
+                                 payerSource === 'businesses' ? 'Search businesses...' : // ADDED
                                  payerSource === 'clearance' ? 'Search clearance requests...' :
                                  'Search outstanding fees...'}
                             </Label>
@@ -690,6 +780,7 @@ export function PayerSelectionStep({
                                     placeholder={
                                         payerSource === 'residents' ? 'Search residents by name, household, or purok...' :
                                         payerSource === 'households' ? 'Search households by head name, household number, or address...' :
+                                        payerSource === 'businesses' ? 'Search businesses by name, owner, type, or address...' : // ADDED
                                         payerSource === 'clearance' ? 'Search clearance requests by reference number, resident name, or purpose...' :
                                         'Search fees by payer name, fee code, purpose, or address...'
                                     }
@@ -712,6 +803,8 @@ export function PayerSelectionStep({
                                             ? 'No residents found matching your search'
                                             : payerSource === 'households'
                                             ? 'No households found matching your search'
+                                            : payerSource === 'businesses' // ADDED
+                                            ? 'No businesses found matching your search'
                                             : payerSource === 'clearance'
                                             ? 'No payable clearance requests found'
                                             : 'No outstanding fees found matching your search'}
@@ -733,6 +826,7 @@ export function PayerSelectionStep({
                                                     payerSource === 'clearance' ? 'bg-purple-100 text-purple-600' :
                                                     payerSource === 'fees' ? 'bg-amber-100 text-amber-600' :
                                                     payerSource === 'residents' && payer.has_outstanding_fees ? 'bg-blue-100 text-blue-600' :
+                                                    payerSource === 'businesses' ? 'bg-orange-100 text-orange-600' : // ADDED
                                                     'bg-primary/10 text-primary'
                                                 }`}>
                                                     {getPayerSourceIcon(payerSource)}
@@ -758,6 +852,11 @@ export function PayerSelectionStep({
                                                         {payerSource === 'fees' && payer.status === 'partially_paid' && (
                                                             <Badge className="ml-2 px-2 py-0.5 text-xs bg-amber-100 text-amber-600 rounded-full">
                                                                 Partial Payment
+                                                            </Badge>
+                                                        )}
+                                                        {payerSource === 'businesses' && payer.permit_expiry_date && !payer.is_permit_valid && (
+                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-yellow-100 text-yellow-600 rounded-full">
+                                                                Permit Expiring
                                                             </Badge>
                                                         )}
                                                     </div>
@@ -822,6 +921,18 @@ export function PayerSelectionStep({
                                     <p className="text-gray-500">Select from registered households</p>
                                     <div className="text-xs text-green-600 mt-1">
                                         Collect household-level payments
+                                    </div>
+                                </div>
+                            </div>
+                            {/* ADDED BUSINESS SECTION */}
+                            <div className="flex items-start gap-2">
+                                <Building className="h-4 w-4 text-orange-600 mt-0.5" />
+                                <div>
+                                    <div className="font-medium text-orange-700">Businesses</div>
+                                    <p className="text-gray-500">Select from registered businesses</p>
+                                    <div className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+                                        <Briefcase className="h-3 w-3" />
+                                        <span>Business permits and fees</span>
                                     </div>
                                 </div>
                             </div>
@@ -902,6 +1013,11 @@ export function PayerSelectionStep({
                             <div className="space-y-1">
                                 <div className="text-gray-500">Total Households</div>
                                 <div className="font-semibold text-green-600">{households.length}</div>
+                            </div>
+                            {/* ADDED BUSINESS COUNT */}
+                            <div className="space-y-1">
+                                <div className="text-gray-500">Total Businesses</div>
+                                <div className="font-semibold text-orange-600">{businesses.length}</div>
                             </div>
                             <div className="space-y-1">
                                 <div className="text-gray-500">Pending Clearance</div>

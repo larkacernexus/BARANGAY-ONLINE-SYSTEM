@@ -145,13 +145,13 @@ function ThreeDotsMenu({
         {
             icon: <Eye className="h-4 w-4" />,
             label: 'View Details',
-            href: `/roles/${role.id}`,
+            href: `/admin/roles/${role.id}`,
             onClick: () => setOpen(false)
         },
         {
             icon: <Edit className="h-4 w-4" />,
             label: 'Edit Role',
-            href: `/roles/${role.id}/edit`,
+            href: `/admin/roles/${role.id}/edit`,
             disabled: role.is_system_role,
             tooltip: role.is_system_role ? 'System roles cannot be edited' : undefined,
             onClick: () => setOpen(false)
@@ -159,7 +159,7 @@ function ThreeDotsMenu({
         {
             icon: <Key className="h-4 w-4" />,
             label: 'Manage Permissions',
-            href: `/roles/${role.id}/permissions`,
+            href: `/admin/roles/${role.id}/permissions`,
             onClick: () => setOpen(false)
         },
         {
@@ -372,7 +372,7 @@ export default function RolesGridView({
             icon={<Shield className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
             hasFilters={hasActiveFilters}
             onClearFilters={onClearFilters}
-            onCreateNew={() => window.location.href = '/roles/create'}
+            onCreateNew={() => window.location.href = '/admin/roles/create'}
             createLabel="Create Role"
         />
     );

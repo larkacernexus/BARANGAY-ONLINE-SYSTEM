@@ -89,7 +89,7 @@ export default function Header({
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                     <Link
-                        href={route('payments.index')}
+                        href={route('admin.payments.index')}
                         className="text-gray-500 hover:text-gray-700 transition-colors"
                     >
                         <ArrowLeft className="w-5 h-5" />

@@ -1,7 +1,7 @@
+// resources/js/pages/residents/index.tsx
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
 import { ResidentsProps, Resident, FilterState, BulkOperation, SelectionMode } from '@/types';
 import { 
@@ -64,38 +64,30 @@ export default function Residents() {
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/residents', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== filters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, filters.search]);
+    // Immediate search handler
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearch(value);
+        
+        const params = {
+            ...filtersState,
+            search: value
+        };
+        
+        // Clean up empty values
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/residents', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
 
     // Handle window resize
     useEffect(() => {
@@ -263,7 +255,7 @@ export default function Residents() {
             switch (operation) {
                 case 'delete':
                     if (confirm(`Are you sure you want to delete ${selectedResidents.length} selected resident(s)?`)) {
-                        await router.post('/residents/bulk-action', {
+                        await router.post('/admin/residents/bulk-action', {
                             action: 'delete',
                             resident_ids: selectedResidents,
                         }, {
@@ -281,7 +273,7 @@ export default function Residents() {
                     break;
 
                 case 'activate':
-                    await router.post('/residents/bulk-action', {
+                    await router.post('/admin/residents/bulk-action', {
                         action: 'activate',
                         resident_ids: selectedResidents,
                     }, {
@@ -297,7 +289,7 @@ export default function Residents() {
                     break;
 
                 case 'deactivate':
-                    await router.post('/residents/bulk-action', {
+                    await router.post('/admin/residents/bulk-action', {
                         action: 'deactivate',
                         resident_ids: selectedResidents,
                     }, {
@@ -363,7 +355,7 @@ export default function Residents() {
     // Individual resident operations
     const handleDelete = (resident: Resident) => {
         if (confirm(`Are you sure you want to delete resident "${getFullName(resident) || 'Untitled'}"?`)) {
-            router.delete(`/residents/${resident.id}`, {
+            router.delete(`/admin/residents/${resident.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedResidents(selectedResidents.filter(id => id !== resident.id));
@@ -378,7 +370,7 @@ export default function Residents() {
 
     const handleToggleStatus = (resident: Resident) => {
         const newStatus = resident.status === 'active' ? 'inactive' : 'active';
-        router.post(`/residents/${resident.id}/update-status`, {
+        router.post(`/admin/residents/${resident.id}/update-status`, {
             status: newStatus
         }, {
             preserveScroll: true,
@@ -411,6 +403,28 @@ export default function Residents() {
             sort_by: column,
             sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc'
         }));
+        
+        // Trigger server-side sort update
+        const params = {
+            ...filtersState,
+            sort_by: column,
+            sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc',
+            search: search
+        };
+        
+        // Clean up empty values
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/residents', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearFilters = () => {
@@ -427,6 +441,25 @@ export default function Residents() {
             sort_by: 'last_name',
             sort_order: 'asc'
         });
+        
+        // Trigger server-side filter clear
+        router.get('/admin/residents', {
+            search: '',
+            status: 'all',
+            purok_id: 'all',
+            gender: 'all',
+            min_age: '',
+            max_age: '',
+            civil_status: 'all',
+            is_voter: 'all',
+            is_head: 'all',
+            sort_by: 'last_name',
+            sort_order: 'asc'
+        }, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearSelection = () => {
@@ -436,6 +469,27 @@ export default function Residents() {
 
     const updateFilter = (key: keyof FilterState, value: string) => {
         setFiltersState(prev => ({ ...prev, [key]: value }));
+        
+        // Trigger server-side filter update
+        const params = {
+            ...filtersState,
+            [key]: value,
+            search: search
+        };
+        
+        // Clean up empty values
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/residents', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const hasActiveFilters = 
@@ -453,8 +507,8 @@ export default function Residents() {
         <AppLayout
             title="Residents"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Residents', href: '/residents' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Residents', href: '/admin/residents' }
             ]}
         >
             <TooltipProvider>
@@ -471,6 +525,7 @@ export default function Residents() {
                         stats={stats}
                         search={search}
                         setSearch={setSearch}
+                        onSearchChange={handleSearchChange}
                         filtersState={filtersState}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
@@ -484,6 +539,7 @@ export default function Residents() {
                         totalItems={totalItems}
                         startIndex={startIndex}
                         endIndex={endIndex}
+                        searchInputRef={searchInputRef}
                     />
 
                     <ResidentsContent

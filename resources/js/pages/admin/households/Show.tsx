@@ -237,16 +237,16 @@ export default function ShowHousehold({ household }: ShowHouseholdProps) {
         <AppLayout
             title={`Household: ${household.household_number}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Households', href: '/households' },
-                { title: household.household_number, href: `/households/${household.id}` }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Households', href: '/admin/households' },
+                { title: household.household_number, href: `/admin/households/${household.id}` }
             ]}
         >
             <div className="space-y-6">
                 {/* Header with Actions */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/households">
+                        <Link href="/admin/households">
                             <Button variant="ghost" size="sm">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to List
@@ -279,7 +279,7 @@ export default function ShowHousehold({ household }: ShowHouseholdProps) {
                             <Download className="h-4 w-4 mr-2" />
                             Export
                         </Button>
-                        <Link href={`/households/${household.id}/edit`}>
+                        <Link href={`/admin/households/${household.id}/edit`}>
                             <Button size="sm">
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Household
@@ -424,7 +424,7 @@ export default function ShowHousehold({ household }: ShowHouseholdProps) {
                                             {household.member_count} members
                                         </Badge>
                                     </div>
-                                    <Link href={`/households/${household.id}/edit?tab=members`}>
+                                    <Link href={`/admin/households/${household.id}/edit?tab=members`}>
                                         <Button variant="outline" size="sm">
                                             Manage Members
                                         </Button>
@@ -517,7 +517,7 @@ export default function ShowHousehold({ household }: ShowHouseholdProps) {
                                         <div className="text-center py-8 text-gray-500">
                                             <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                                             <p>No members added to this household yet.</p>
-                                            <Link href={`/households/${household.id}/edit?tab=members`}>
+                                            <Link href={`/admin/households/${household.id}/edit?tab=members`}>
                                                 <Button variant="outline" size="sm" className="mt-3">
                                                     Add Members
                                                 </Button>
@@ -622,7 +622,7 @@ export default function ShowHousehold({ household }: ShowHouseholdProps) {
                                 <CardTitle>Quick Actions</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
-                                <Link href={`/households/${household.id}/edit`} className="w-full">
+                                <Link href={`/admin/households/${household.id}/edit`} className="w-full">
                                     <Button variant="outline" className="w-full justify-start">
                                         <Edit className="h-4 w-4 mr-2" />
                                         Edit Household

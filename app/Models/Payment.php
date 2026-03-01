@@ -185,6 +185,11 @@ class Payment extends Model
         return $this->hasMany(PaymentDiscount::class);
     }
 
+    public function receipt()
+    {
+        return $this->hasOne(Receipt::class);
+    }
+
     // Get discount rules through discounts
     public function discountRules()
     {

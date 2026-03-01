@@ -6,24 +6,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Button } from '@/components/ui/button';
 import { 
     FileText, 
-    DollarSign,
-    Percent,
-    Calendar,
-    Tag,
-    CheckCircle,
-    Clock,
-    XCircle,
-    Edit,
-    Trash2,
-    Copy,
-    Eye,
-    List,
-    Grid3X3,
-    CheckSquare,
-    Square,
-    Download,
-    Printer,
-    FileSpreadsheet
 } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';

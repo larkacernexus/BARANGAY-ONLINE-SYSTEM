@@ -2,7 +2,6 @@
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
 import {  BulkOperation, SelectionMode } from '@/types';
 import { 
@@ -150,37 +149,30 @@ export default function Households({ households, stats, filters, puroks, allHous
         }
     }, [isBulkMode]);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/households', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== safeFilters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, safeFilters.search]);
+    // Immediate search handler
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearch(value);
+        
+        const params = {
+            ...filtersState,
+            search: value
+        };
+        
+        // Remove empty params
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/households', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
 
     // Filter households client-side
     const filteredHouseholds = useMemo(() => {
@@ -276,7 +268,7 @@ export default function Households({ households, stats, filters, puroks, allHous
             switch (operation) {
                 case 'delete':
                     if (confirm(`Are you sure you want to delete ${selectedHouseholds.length} selected household(s)?`)) {
-                        await router.post('/households/bulk-action', {
+                        await router.post('/admin/households/bulk-action', {
                             action: 'delete',
                             household_ids: selectedHouseholds,
                         }, {
@@ -294,7 +286,7 @@ export default function Households({ households, stats, filters, puroks, allHous
                     break;
 
                 case 'activate':
-                    await router.post('/households/bulk-action', {
+                    await router.post('/admin/households/bulk-action', {
                         action: 'activate',
                         household_ids: selectedHouseholds,
                     }, {
@@ -310,7 +302,7 @@ export default function Households({ households, stats, filters, puroks, allHous
                     break;
 
                 case 'deactivate':
-                    await router.post('/households/bulk-action', {
+                    await router.post('/admin/households/bulk-action', {
                         action: 'deactivate',
                         household_ids: selectedHouseholds,
                     }, {
@@ -368,7 +360,7 @@ export default function Households({ households, stats, filters, puroks, allHous
     // Individual household operations
     const handleDelete = (household: any) => {
         if (confirm(`Are you sure you want to delete household "${household.household_number || 'Untitled'}"?`)) {
-            router.delete(`/households/${household.id}`, {
+            router.delete(`/admin/households/${household.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedHouseholds(selectedHouseholds.filter(id => id !== household.id));
@@ -382,7 +374,7 @@ export default function Households({ households, stats, filters, puroks, allHous
     };
 
     const handleToggleStatus = (household: any) => {
-        router.post(`/households/${household.id}/toggle-status`, {}, {
+        router.post(`/admin/households/${household.id}/toggle-status`, {}, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Household status updated');
@@ -417,6 +409,19 @@ export default function Households({ households, stats, filters, puroks, allHous
             sort_by: 'household_number',
             sort_order: 'asc'
         });
+        
+        // Trigger search with cleared filters
+        router.get('/admin/households', {
+            search: '',
+            status: 'all',
+            purok_id: 'all',
+            sort_by: 'household_number',
+            sort_order: 'asc'
+        }, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearSelection = () => {
@@ -426,6 +431,26 @@ export default function Households({ households, stats, filters, puroks, allHous
 
     const updateFilter = (key: keyof typeof filtersState, value: string) => {
         setFiltersState(prev => ({ ...prev, [key]: value }));
+        
+        // Trigger server-side filter update
+        const params = {
+            ...filtersState,
+            [key]: value,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/households', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const hasActiveFilters = 
@@ -437,8 +462,8 @@ export default function Households({ households, stats, filters, puroks, allHous
         <AppLayout
             title="Households"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Households', href: '/households' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Households', href: '/admin/households' }
             ]}
         >
             <TooltipProvider>
@@ -453,6 +478,7 @@ export default function Households({ households, stats, filters, puroks, allHous
                         stats={safeStats}
                         search={search}
                         setSearch={setSearch}
+                        onSearchChange={handleSearchChange}
                         filtersState={filtersState}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
@@ -465,6 +491,7 @@ export default function Households({ households, stats, filters, puroks, allHous
                         startIndex={startIndex}
                         endIndex={endIndex}
                         filteredHouseholds={filteredHouseholds}
+                        searchInputRef={searchInputRef}
                     />
 
                     <HouseholdsContent

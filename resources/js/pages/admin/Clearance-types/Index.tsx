@@ -32,12 +32,15 @@ interface PageProps {
         search?: string;
         status?: string;
         requires_payment?: string;
+        discountable?: string;
         sort?: string;
         direction?: string;
     };
     stats: {
         total: number;
         active: number;
+        discountable: number;
+        non_discountable: number;
         requires_payment: number;
         requires_approval: number;
         online_only: number;
@@ -51,6 +54,7 @@ interface ClearanceType {
     description: string;
     fee: number;
     formatted_fee: string;
+    is_discountable: boolean;
     processing_days: number;
     validity_days: number;
     is_active: boolean;
@@ -64,14 +68,15 @@ interface ClearanceType {
     document_types_count?: number;
 }
 
-type BulkOperation = 'activate' | 'deactivate' | 'delete' | 'export' | 'duplicate' | 'toggle-payment' | 'toggle-approval' | 'toggle-online' | 'update';
-type BulkEditField = 'processing_days' | 'validity_days' | 'fee' | 'requires_payment' | 'requires_approval' | 'is_online_only';
+type BulkOperation = 'activate' | 'deactivate' | 'delete' | 'export' | 'duplicate' | 'toggle-payment' | 'toggle-approval' | 'toggle-online' | 'update' | 'mark_discountable' | 'mark_non_discountable';
+type BulkEditField = 'processing_days' | 'validity_days' | 'fee' | 'requires_payment' | 'requires_approval' | 'is_online_only' | 'is_discountable';
 type SelectionMode = 'page' | 'filtered' | 'all';
 
 interface FilterState {
     search: string;
     status: string;
     requires_payment: string;
+    discountable: string;
     sort: string;
     direction: string;
 }
@@ -99,6 +104,10 @@ const safeNumber = (value: any, defaultValue: number = 0): number => {
 
 const getStatusBadgeVariant = (isActive: boolean): "default" | "secondary" | "destructive" | "outline" => {
     return isActive ? 'default' : 'secondary';
+};
+
+const getDiscountableBadgeVariant = (isDiscountable: boolean): "default" | "secondary" | "destructive" | "outline" => {
+    return isDiscountable ? 'default' : 'secondary';
 };
 
 const getPurposeOptionsCount = (type: ClearanceType) => {
@@ -131,6 +140,8 @@ const getSelectionStats = (selectedTypes: ClearanceType[]) => {
     return {
         active: selectedTypes.filter(t => Boolean(t.is_active)).length,
         inactive: selectedTypes.filter(t => !t.is_active).length,
+        discountable: selectedTypes.filter(t => Boolean(t.is_discountable)).length,
+        non_discountable: selectedTypes.filter(t => !t.is_discountable).length,
         paid: selectedTypes.filter(t => Boolean(t.requires_payment)).length,
         free: selectedTypes.filter(t => !t.requires_payment).length,
         needsApproval: selectedTypes.filter(t => Boolean(t.requires_approval)).length,
@@ -172,6 +183,12 @@ const filterClearanceTypes = (
         filtered = filtered.filter(type => type.requires_payment === requiresPayment);
     }
     
+    // Apply discountable filter
+    if (filters.discountable !== 'all') {
+        const isDiscountable = filters.discountable === 'yes';
+        filtered = filtered.filter(type => type.is_discountable === isDiscountable);
+    }
+    
     // Apply sorting
     filtered.sort((a, b) => {
         let aValue, bValue;
@@ -184,6 +201,10 @@ const filterClearanceTypes = (
             case 'fee':
                 aValue = a.fee;
                 bValue = b.fee;
+                break;
+            case 'is_discountable':
+                aValue = a.is_discountable ? 1 : 0;
+                bValue = b.is_discountable ? 1 : 0;
                 break;
             case 'clearances_count':
                 aValue = a.clearances_count || 0;
@@ -210,6 +231,7 @@ const formatForClipboard = (types: ClearanceType[]): string => {
         Name: type.name,
         Code: type.code,
         Fee: type.formatted_fee,
+        Discountable: type.is_discountable ? 'Yes' : 'No',
         Status: type.is_active ? 'Active' : 'Inactive',
         Processing: `${type.processing_days} days`,
         Issued: type.clearances_count || 0
@@ -231,6 +253,7 @@ export default function ClearanceTypesIndex() {
         search: filters.search || '',
         status: filters.status || 'all',
         requires_payment: filters.requires_payment || 'all',
+        discountable: filters.discountable || 'all',
         sort: filters.sort || 'name',
         direction: filters.direction || 'asc'
     });
@@ -451,6 +474,42 @@ export default function ClearanceTypesIndex() {
                     setShowBulkDeactivateDialog(true);
                     break;
 
+                case 'mark_discountable':
+                    if (confirm(`Mark ${selectedTypes.length} clearance type(s) as discountable?`)) {
+                        await router.post(route('clearance-types.bulk-mark-discountable'), {
+                            ids: selectedTypes
+                        }, {
+                            preserveScroll: true,
+                            onSuccess: () => {
+                                toast.success(`${selectedTypes.length} clearance type(s) marked as discountable`);
+                                setSelectedTypes([]);
+                            },
+                            onError: (errors) => {
+                                toast.error('Failed to mark as discountable');
+                                console.error('Mark discountable errors:', errors);
+                            }
+                        });
+                    }
+                    break;
+
+                case 'mark_non_discountable':
+                    if (confirm(`Mark ${selectedTypes.length} clearance type(s) as non-discountable?`)) {
+                        await router.post(route('clearance-types.bulk-mark-non-discountable'), {
+                            ids: selectedTypes
+                        }, {
+                            preserveScroll: true,
+                            onSuccess: () => {
+                                toast.success(`${selectedTypes.length} clearance type(s) marked as non-discountable`);
+                                setSelectedTypes([]);
+                            },
+                            onError: (errors) => {
+                                toast.error('Failed to mark as non-discountable');
+                                console.error('Mark non-discountable errors:', errors);
+                            }
+                        });
+                    }
+                    break;
+
                 case 'export':
                     const exportData = selectedTypesData.map(type => ({
                         ID: type.id,
@@ -458,6 +517,7 @@ export default function ClearanceTypesIndex() {
                         Code: type.code,
                         Description: type.description,
                         Fee: type.fee,
+                        Discountable: type.is_discountable ? 'Yes' : 'No',
                         'Processing Days': type.processing_days,
                         'Validity Days': type.validity_days,
                         Active: type.is_active ? 'Yes' : 'No',
@@ -537,6 +597,16 @@ export default function ClearanceTypesIndex() {
         }
     };
 
+    // Smart bulk toggle discountable
+    const handleSmartBulkDiscountableToggle = () => {
+        const hasNonDiscountable = selectedTypesData.some(t => !t.is_discountable);
+        if (hasNonDiscountable) {
+            handleBulkOperation('mark_discountable');
+        } else {
+            handleBulkOperation('mark_non_discountable');
+        }
+    };
+
     // Copy selected data to clipboard
     const handleCopySelectedData = () => {
         if (selectedTypesData.length === 0) {
@@ -563,6 +633,20 @@ export default function ClearanceTypesIndex() {
                 },
                 onError: () => {
                     toast.error('Failed to toggle status');
+                },
+            });
+        }
+    };
+
+    const handleToggleDiscountable = (type: ClearanceType) => {
+        if (confirm(`Are you sure you want to mark "${type.name}" as ${type.is_discountable ? 'non-discountable' : 'discountable'}?`)) {
+            router.post(route('clearance-types.toggle-discountable', type.id), {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(`Clearance type marked as ${type.is_discountable ? 'non-discountable' : 'discountable'} successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to toggle discountable status');
                 },
             });
         }
@@ -633,6 +717,7 @@ export default function ClearanceTypesIndex() {
             search: '',
             status: 'all',
             requires_payment: 'all',
+            discountable: 'all',
             sort: 'name',
             direction: 'asc'
         });
@@ -660,7 +745,8 @@ export default function ClearanceTypesIndex() {
     const hasActiveFilters = 
         search || 
         filtersState.status !== 'all' || 
-        filtersState.requires_payment !== 'all';
+        filtersState.requires_payment !== 'all' ||
+        filtersState.discountable !== 'all';
 
     const handleViewPhoto = (type: ClearanceType) => {
         // Implement if needed
@@ -677,8 +763,8 @@ export default function ClearanceTypesIndex() {
         <AppLayout
             title="Clearance Types"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Clearance Types', href: '/clearance-types' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Clearance Types', href: '/admin/clearance-types' }
             ]}
         >
             <TooltipProvider>
@@ -728,6 +814,7 @@ export default function ClearanceTypesIndex() {
                         onClearSelection={handleClearSelection}
                         onDelete={handleDelete}
                         onToggleStatus={handleToggleStatus}
+                        onToggleDiscountable={handleToggleDiscountable}
                         onDuplicate={handleDuplicate}
                         onViewPhoto={handleViewPhoto}
                         onCopyToClipboard={handleCopyToClipboard}
@@ -735,6 +822,7 @@ export default function ClearanceTypesIndex() {
                         onSort={handleSort}
                         onBulkOperation={handleBulkOperation}
                         onSmartBulkToggle={handleSmartBulkToggle}
+                        onSmartBulkDiscountableToggle={handleSmartBulkDiscountableToggle}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                         setShowBulkEditDialog={setShowBulkEditDialog}
                         filtersState={filtersState}
@@ -743,6 +831,7 @@ export default function ClearanceTypesIndex() {
                         selectionStats={selectionStats}
                         truncateText={truncateText}
                         getStatusBadgeVariant={getStatusBadgeVariant}
+                        getDiscountableBadgeVariant={getDiscountableBadgeVariant}
                         getPurposeOptionsCount={getPurposeOptionsCount}
                         formatDate={formatDate}
                         getTruncationLength={(type: 'name' | 'description' | 'code') => {

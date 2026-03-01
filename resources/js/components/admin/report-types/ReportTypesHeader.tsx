@@ -51,13 +51,13 @@ export default function ReportTypesHeader({
                         <p className="text-xs text-gray-500">Select multiple report types for batch operations</p>
                     </TooltipContent>
                 </Tooltip>
-                <Link href={route('report-types.create')}>
-                    <Button className="h-9">
-                        <Plus className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">New Report Type</span>
-                        <span className="sm:hidden">New</span>
-                    </Button>
-                </Link>
+              <Link href="/admin/report-types/report-types/create">
+    <Button className="h-9">
+        <Plus className="h-4 w-4 mr-2" />
+        <span className="hidden sm:inline">New Report Type</span>
+        <span className="sm:hidden">New</span>
+    </Button>
+</Link>
             </div>
         </div>
     );

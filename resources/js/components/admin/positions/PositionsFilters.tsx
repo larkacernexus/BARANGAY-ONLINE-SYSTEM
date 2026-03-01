@@ -82,7 +82,7 @@ export default function PositionsFilters({
         if (filtersState.requires_account !== 'all') queryParams.append('requires_account', filtersState.requires_account);
         if (filtersState.sort_by) queryParams.append('sort_by', filtersState.sort_by);
         if (filtersState.sort_order) queryParams.append('sort_order', filtersState.sort_order);
-        window.location.href = `/positions/export?${queryParams.toString()}`;
+        window.location.href = `/admin/positions/export?${queryParams.toString()}`;
     };
 
     return (

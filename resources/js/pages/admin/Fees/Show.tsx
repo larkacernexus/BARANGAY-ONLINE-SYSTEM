@@ -447,23 +447,23 @@ export default function FeesShow({
     // Handle actions - SIMILAR pattern as Clearance
     const handlePrint = () => {
         setIsPrinting(true);
-        router.get(`/fees/${fee.id}/print`, {}, {
+        router.get(`/admin/fees/${fee.id}/print`, {}, {
             onFinish: () => setIsPrinting(false)
         });
     };
 
     const handleDownload = () => {
-        router.get(`/fees/${fee.id}/download`);
+        router.get(`/admin/fees/${fee.id}/download`);
     };
 
     const handleRecordPayment = () => {
-        router.get(`/payments/create?fee_id=${fee.id}`);
+        router.get(`/admin/payments/create?fee_id=${fee.id}`);
     };
 
     const handleSendReminder = () => {
         if (confirm('Send payment reminder to payer?')) {
             setIsProcessing(true);
-            router.post(`/fees/${fee.id}/send-reminder`, {}, {
+            router.post(`/admin/fees/${fee.id}/send-reminder`, {}, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -473,7 +473,7 @@ export default function FeesShow({
     const handleApprove = () => {
         if (confirm('Approve this fee?')) {
             setIsProcessing(true);
-            router.post(`/fees/${fee.id}/approve`, {}, {
+            router.post(`   /fees/${fee.id}/approve`, {}, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -483,7 +483,7 @@ export default function FeesShow({
     const handleCollect = () => {
         if (confirm('Mark this fee as collected?')) {
             setIsProcessing(true);
-            router.post(`/fees/${fee.id}/collect`, {}, {
+            router.post(`/admin/fees/${fee.id}/collect`, {}, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -494,7 +494,7 @@ export default function FeesShow({
         const reason = prompt('Please enter the reason for waiving this fee:');
         if (reason) {
             setIsProcessing(true);
-            router.post(`/fees/${fee.id}/waive`, { reason }, {
+            router.post(`/admin/fees/${fee.id}/waive`, { reason }, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -505,7 +505,7 @@ export default function FeesShow({
         const reason = prompt('Please enter the reason for cancellation:');
         if (reason !== null) {
             setIsProcessing(true);
-            router.post(`/fees/${fee.id}/cancel`, { reason }, {
+            router.post(`/admin/fees/${fee.id}/cancel`, { reason }, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -514,12 +514,12 @@ export default function FeesShow({
 
     const handleDelete = () => {
         if (confirm('Are you sure you want to delete this fee? This action cannot be undone.')) {
-            router.delete(`/fees/${fee.id}`);
+            router.delete(`/admin/fees/${fee.id}`);
         }
     };
 
     const handleEdit = () => {
-        router.visit(`/fees/${fee.id}/edit`);
+        router.visit(`/admin/fees/${fee.id}/edit`);
     };
 
     // Copy reference number to clipboard
@@ -582,16 +582,16 @@ export default function FeesShow({
         <AppLayout
             title={`Fee: ${fee.fee_code}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Fees', href: '/fees' },
-                { title: fee.fee_code, href: `/fees/${fee.id}` }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Fees', href: '/admin/fees' },
+                { title: fee.fee_code, href: `/admin/fees/${fee.id}` }
             ]}
         >
             <div className="space-y-6">
                 {/* Header with Actions - EXACT SAME structure as Clearance */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/fees">
+                        <Link href="/admin/fees">
                             <Button variant="outline" size="sm">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to List

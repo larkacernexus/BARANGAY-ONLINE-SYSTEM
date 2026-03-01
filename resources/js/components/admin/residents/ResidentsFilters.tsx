@@ -10,7 +10,12 @@ import {
 } from '@/components/ui/select';
 import { Download, Filter, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
-import { CivilStatusOption, Purok } from '@/types';
+type CivilStatusOption = {
+    value: string;
+    label: string;
+};
+
+import { Purok } from '@/types';
 
 interface ResidentsFiltersProps {
     stats?: any;
@@ -84,7 +89,7 @@ export default function ResidentsFilters({
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                            const exportUrl = new URL('/residents/export', window.location.origin);
+                            const exportUrl = new URL('/admin/residents/export', window.location.origin);
                             if (search) exportUrl.searchParams.append('search', search);
                             Object.keys(filtersState).forEach(key => {
                                 if (filtersState[key] && filtersState[key] !== 'all') {

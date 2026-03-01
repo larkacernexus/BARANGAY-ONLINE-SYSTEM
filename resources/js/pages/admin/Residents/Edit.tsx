@@ -184,7 +184,7 @@ export default function EditResident({
             return;
         }
         
-        post(`/residents/${resident.id}`, {
+        post(`/admin/residents/${resident.id}`, {
             ...data,
             _method: 'PUT',
             preserveScroll: true,
@@ -247,8 +247,8 @@ export default function EditResident({
         <AppLayout
             title={`Edit Resident: ${resident.first_name} ${resident.last_name}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Residents', href: '/residents' },
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Residents', href: '/admin/residents' },
                 { title: `Resident #${resident.resident_id}`, href: `/residents/${resident.id}` },
                 { title: 'Edit Resident', href: `/residents/${resident.id}/edit` }
             ]}
@@ -258,7 +258,7 @@ export default function EditResident({
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href={`/residents/${resident.id}`}>
+                            <Link href={`/admin/residents/${resident.id}`}>
                                 <Button variant="ghost" size="sm" type="button">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back to Profile

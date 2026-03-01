@@ -336,7 +336,7 @@ export default function DocumentTypesTableView({
                                                     <DropdownMenuItem asChild>
                                                         <Link
                                                             href={route(
-                                                                'document-types.show',
+                                                                'admin.document-types.show',
                                                                 documentType.id,
                                                             )}
                                                             className="flex cursor-pointer items-center"
@@ -351,7 +351,7 @@ export default function DocumentTypesTableView({
                                                     <DropdownMenuItem asChild>
                                                         <Link
                                                             href={route(
-                                                                'document-types.edit',
+                                                                'admin.document-types.edit',
                                                                 documentType.id,
                                                             )}
                                                             className="flex cursor-pointer items-center"

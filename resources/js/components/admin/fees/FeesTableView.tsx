@@ -135,7 +135,7 @@ export default function FeesTableView({
         if (onViewDetails) {
             onViewDetails(fee);
         } else {
-            router.get(route('fees.show', fee.id));
+            router.get(route('admin.fees.show', fee.id));
         }
     };
 
@@ -317,21 +317,29 @@ export default function FeesTableView({
                                                 </div>
                                             </div>
                                         </TableCell>
-                                       <TableCell className="px-4 py-3">
-    <div className="space-y-1">
-        <div className="font-bold text-lg">
-            {formatCurrency(fee.amount_paid)}
-        </div>
-        <div className="text-xs text-gray-500">
-            Total: {formatCurrency(fee.total_amount)}
-        </div>
-        {fee.balance > 0 && (
-            <div className="text-sm text-red-600">
-                Balance: {formatCurrency(fee.balance)}
-            </div>
-        )}
-    </div>
-</TableCell>
+                                        <TableCell className="px-4 py-3">
+                                            <div className="space-y-1">
+                                                <div className="font-bold text-lg">
+                                                    {formatCurrency(fee.total_amount)}
+                                                </div>
+                                                {fee.amount_paid > 0 && (
+                                                    <div className="text-sm text-green-600 flex items-center gap-1">
+                                                        <CheckCircle className="h-3 w-3" />
+                                                        Paid: {formatCurrency(fee.amount_paid)}
+                                                    </div>
+                                                )}
+                                                {fee.balance > 0 && (
+                                                    <div className="text-sm text-red-600 font-medium">
+                                                        Balance: {formatCurrency(fee.balance)}
+                                                    </div>
+                                                )}
+                                                {fee.amount_paid === 0 && fee.balance === fee.total_amount && (
+                                                    <div className="text-sm text-gray-500">
+                                                        No payments yet
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="px-4 py-3">
                                             <Badge variant="outline" className="flex items-center gap-1">
                                                 {getStatusIcon(fee.status)}
@@ -370,7 +378,7 @@ export default function FeesTableView({
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/fees/${fee.id}/print`}>
+                                                        <Link href={`/admin/fees/${fee.id}/print`}>
                                                             <Printer className="mr-2 h-4 w-4" />
                                                             Print Invoice
                                                         </Link>
@@ -379,7 +387,7 @@ export default function FeesTableView({
                                                     {fee.status !== 'paid' && fee.balance > 0 && (
                                                         <DropdownMenuItem asChild>
                                                             <Link 
-                                                                href={route('payments.create', { 
+                                                                href={route('admin.payments.create', { 
                                                                     fee_id: fee.id,
                                                                     payer_type: fee.payer_type,
                                                                     payer_id: fee.payer_type === 'resident' ? fee.resident_id : fee.household_id,

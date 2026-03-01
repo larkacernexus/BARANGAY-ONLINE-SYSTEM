@@ -38,7 +38,6 @@ import {
     Bell,
     Briefcase,
     Building2,
-    Calendar,
     CheckCircle,
     ChevronDown,
     Clock,
@@ -81,7 +80,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-const DASHBOARD_URL = '/dashboard';
+const DASHBOARD_URL = '/admin/dashboard';
 
 // Define interfaces
 interface SidebarItem {
@@ -110,7 +109,9 @@ interface QuickAction extends SidebarItem {
         | 'lime'
         | 'pink'
         | 'violet'
-        | 'yellow';
+        | 'yellow'
+        | 'emerald'
+        | 'teal';
 }
 
 interface SidebarCategory {
@@ -133,7 +134,7 @@ const CompactMenuItem = ({
     const { url: currentUrl } = usePage();
     const isActive = item.isActive
         ? item.isActive(currentUrl)
-        : currentUrl === item.href;
+        : currentUrl === item.href || currentUrl.startsWith(item.href + '/');
 
     const colors = {
         operations: {
@@ -225,7 +226,7 @@ const RegularMenuItem = ({
     const { url: currentUrl } = usePage();
     const isActive = item.isActive
         ? item.isActive(currentUrl)
-        : currentUrl === item.href;
+        : currentUrl === item.href || currentUrl.startsWith(item.href + '/');
 
     const colors = {
         operations: {
@@ -394,7 +395,7 @@ const CategoryItem = ({
 
     // For multiple items, use dropdown
     const isAnyActive = category.items.some((item) =>
-        item.isActive ? item.isActive(currentUrl) : currentUrl === item.href,
+        item.isActive ? item.isActive(currentUrl) : currentUrl.startsWith(item.href),
     );
 
     const colors = {
@@ -556,6 +557,8 @@ const QuickActionItem = ({
         pink: 'bg-pink-100 dark:bg-pink-800 text-pink-600 dark:text-pink-400',
         violet: 'bg-violet-100 dark:bg-violet-800 text-violet-600 dark:text-violet-400',
         yellow: 'bg-yellow-100 dark:bg-yellow-800 text-yellow-600 dark:text-yellow-400',
+        emerald: 'bg-emerald-100 dark:bg-emerald-800 text-emerald-600 dark:text-emerald-400',
+        teal: 'bg-teal-100 dark:bg-teal-800 text-teal-600 dark:text-teal-400',
     };
 
     const hoverIconClasses = {
@@ -571,6 +574,8 @@ const QuickActionItem = ({
         pink: 'hover:bg-pink-200 dark:hover:bg-pink-700 hover:text-pink-700 dark:hover:text-pink-300',
         violet: 'hover:bg-violet-200 dark:hover:bg-violet-700 hover:text-violet-700 dark:hover:text-violet-300',
         yellow: 'hover:bg-yellow-200 dark:hover:bg-yellow-700 hover:text-yellow-700 dark:hover:text-yellow-300',
+        emerald: 'hover:bg-emerald-200 dark:hover:bg-emerald-700 hover:text-emerald-700 dark:hover:text-emerald-300',
+        teal: 'hover:bg-teal-200 dark:hover:bg-teal-700 hover:text-teal-700 dark:hover:text-teal-300',
     };
 
     if (isCollapsed) {
@@ -641,7 +646,7 @@ const QuickActionItem = ({
                             <Sparkles className="h-2.5 w-2.5 shrink-0 text-amber-500 dark:text-amber-400" />
                         </div>
                         <span className="truncate text-[10px] text-gray-500 dark:text-gray-400">
-                            Quick action
+                            {action.description || 'Quick action'}
                         </span>
                     </div>
                 </Link>
@@ -783,12 +788,12 @@ export function AppSidebar({ className }: { className?: string }) {
     const { url: currentUrl, props } = usePage() as any;
     const [activeTab, setActiveTab] = useState<SidebarTab>('operations');
 
-    // Get user permissions and role from Inertia props
-    const user = props?.auth?.user;
-    const userPermissions = (user?.permissions || []) as string[];
-    const userRoleName = (user?.role_name || user?.role?.name || '') as string;
+    // SAFELY get user permissions and role from Inertia props with fallbacks
+    const user = props?.auth?.user || {};
+    const userPermissions = Array.isArray(user?.permissions) ? user.permissions : [];
+    const userRoleName = user?.role_name || user?.role?.name || '';
 
-    // Get report stats from props if available
+    // SAFELY get report stats from props with fallbacks
     const reportStats = props?.reportStats || {
         total: 0,
         pending: 0,
@@ -817,32 +822,32 @@ export function AppSidebar({ className }: { className?: string }) {
 
         // Settings pages
         const settingsPaths = [
-            '/adminsettings',
-            '/users',
-            '/roles',
-            '/permissions',
-            '/role-permissions',
-            '/audit-logs',
-            '/security',
-            '/backup',
-            '/puroks',
-            '/positions',
-            '/committees',
-            '/officials',
-            '/clearance-types',
-            '/fee-types',
-            '/report-types',
-            '/document-types',
-            '/reports/activity-logs',
-            '/reports/login-logs',
+            '/admin/settings',
+            '/admin/users',
+            '/admin/roles',
+            '/admin/permissions',
+            '/admin/role-permissions',
+            '/admin/reports/audit-logs',
+            '/admin/reports/activity-logs',
+            '/admin/reports/login-logs',
+            '/admin/security',
+            '/admin/backup',
+            '/admin/puroks',
+            '/admin/positions',
+            '/admin/committees',
+            '/admin/officials',
+            '/admin/clearance-types',
+            '/admin/fee-types',
+            '/admin/report-types',
+            '/admin/document-types',
         ];
 
         if (settingsPaths.some((path) => url.startsWith(path))) {
             setActiveTab('settings');
         }
-    }, []);
+    }, [currentUrl]);
 
-    // Operations navigation - categorized WITH PERMISSIONS
+    // Operations navigation - categorized WITH PERMISSIONS (UPDATED WITH /admin PREFIX)
     const operationsCategories = useMemo(() => {
         const allCategories: SidebarCategory[] = [
             {
@@ -851,12 +856,12 @@ export function AppSidebar({ className }: { className?: string }) {
                 items: [
                     {
                         title: 'Overview',
-                        href: '/dashboard',
+                        href: '/admin/dashboard',
                         icon: LayoutGrid,
                         description: 'System overview',
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) =>
-                            url === '/dashboard' || url === '/admin',
+                            url === '/admin/dashboard' || url === '/admin',
                         requiredPermission: 'view-dashboard',
                     },
                 ],
@@ -876,17 +881,6 @@ export function AppSidebar({ className }: { className?: string }) {
                             !url.includes('/create'),
                         requiredPermission: 'view-reports',
                         badge: reportStats.total,
-                    },
-                    {
-                        title: 'New Report',
-                        href: '/admin/community-reports/create',
-                        icon: FilePlus,
-                        description: 'Create community report',
-                        color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
-                        isActive: (url: string) =>
-                            url === '/admin/community-reports/create',
-                        requiredPermission: 'create-reports',
-                        isNew: true,
                     },
                     {
                         title: 'Pending Review',
@@ -928,7 +922,8 @@ export function AppSidebar({ className }: { className?: string }) {
                         description: 'Mediation cases',
                         color: 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-400',
                         isActive: (url: string) =>
-                            url.startsWith('/admin/blotters'),
+                            url.startsWith('/admin/blotters') &&
+                            !url.includes('/create'),
                         requiredPermission: 'manage-blotters',
                         badge: reportStats.blotters,
                         isUpdated: true,
@@ -941,26 +936,36 @@ export function AppSidebar({ className }: { className?: string }) {
                 items: [
                     {
                         title: 'All Residents',
-                        href: '/residents',
+                        href: '/admin/residents',
                         icon: Users,
                         description: 'Manage residents',
-                        badge: 5,
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) =>
-                            url.startsWith('/residents') &&
+                            url.startsWith('/admin/residents') &&
                             !url.includes('/create'),
                         requiredPermission: 'manage-residents',
                     },
                     {
                         title: 'Households',
-                        href: '/households',
+                        href: '/admin/households',
                         icon: Home,
                         description: 'Manage households',
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) =>
-                            url.startsWith('/households') &&
+                            url.startsWith('/admin/households') &&
                             !url.includes('/create'),
                         requiredPermission: 'manage-households',
+                    },
+                    {
+                        title: 'Businesses',
+                        href: '/admin/businesses',
+                        icon: Briefcase,
+                        description: 'Manage businesses',
+                        color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
+                        isActive: (url: string) =>
+                            url.startsWith('/admin/businesses') &&
+                            !url.includes('/create'),
+                        requiredPermission: 'manage-businesses',
                     },
                 ],
             },
@@ -970,46 +975,37 @@ export function AppSidebar({ className }: { className?: string }) {
                 items: [
                     {
                         title: 'Forms',
-                        href: '/forms',
+                        href: '/admin/forms',
                         icon: FileText,
                         description: 'Downloadable forms',
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) =>
-                            url.startsWith('/forms') &&
+                            url.startsWith('/admin/forms') &&
                             !url.includes('/create'),
                         requiredPermission: 'manage-forms',
                     },
                     {
                         title: 'Announcements',
-                        href: '/announcements',
+                        href: '/admin/announcements',
                         icon: Megaphone,
                         description: 'Public announcements',
                         color: 'bg-orange-100 dark:bg-orange-800 text-orange-600 dark:text-orange-400',
                         isActive: (url: string) =>
-                            url.startsWith('/announcements') &&
+                            url.startsWith('/admin/announcements') &&
                             !url.includes('/create'),
                         requiredPermission: 'view-announcements',
                     },
                     {
                         title: 'Clearances',
-                        href: '/clearances',
+                        href: '/admin/clearances',
                         icon: CheckCircle,
                         description: 'Barangay clearances',
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) =>
-                            url.startsWith('/clearances') &&
-                            !url.startsWith('/clearances/approval'),
+                            url.startsWith('/admin/clearances') &&
+                            !url.startsWith('/admin/clearances/approval') &&
+                            !url.includes('/create'),
                         requiredPermission: 'view-clearances',
-                    },
-                    {
-                        title: 'Calendar',
-                        href: '/calendar',
-                        icon: Calendar,
-                        description: 'Events & schedules',
-                        color: 'bg-indigo-100 dark:bg-indigo-800 text-indigo-600 dark:text-indigo-400',
-                        isActive: (url: string) => url.startsWith('/calendar'),
-                        requiredPermission: 'view-calendar',
-                        isNew: true,
                     },
                 ],
             },
@@ -1019,32 +1015,32 @@ export function AppSidebar({ className }: { className?: string }) {
                 items: [
                     {
                         title: 'Fees',
-                        href: '/fees',
+                        href: '/admin/fees',
                         icon: DollarSign,
                         description: 'Manage fees',
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) =>
-                            url.startsWith('/fees') && !url.includes('/create'),
+                            url.startsWith('/admin/fees') && !url.includes('/create'),
                         requiredPermission: 'view-fees',
                     },
                     {
                         title: 'Payments',
-                        href: '/payments',
+                        href: '/admin/payments',
                         icon: CreditCard,
                         description: 'Payment records',
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) =>
-                            url.startsWith('/payments') &&
+                            url.startsWith('/admin/payments') &&
                             !url.includes('/create'),
                         requiredPermission: 'view-payments',
                     },
                     {
                         title: 'Receipts',
-                        href: '/receipts',
+                        href: '/admin/receipts',
                         icon: Receipt,
                         description: 'Generate receipts',
                         color: 'bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-400',
-                        isActive: (url: string) => url.startsWith('/receipts'),
+                        isActive: (url: string) => url.startsWith('/admin/receipts'),
                         requiredPermission: 'manage-payments',
                     },
                 ],
@@ -1055,33 +1051,22 @@ export function AppSidebar({ className }: { className?: string }) {
                 items: [
                     {
                         title: 'Collections',
-                        href: '/reports/collections',
+                        href: '/admin/reports/collections',
                         icon: FileText,
                         description: 'Payment collections',
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) =>
-                            url === '/reports/collections',
+                            url === '/admin/reports/collections',
                         requiredPermission: 'view-reports',
                     },
                     {
                         title: 'Revenue',
-                        href: '/reports/revenue',
+                        href: '/admin/reports/revenue',
                         icon: BarChart3,
                         description: 'Revenue analytics',
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
-                        isActive: (url: string) => url === '/reports/revenue',
+                        isActive: (url: string) => url === '/admin/reports/revenue',
                         requiredPermission: 'view-reports',
-                    },
-                    {
-                        title: 'Community Reports',
-                        href: '/admin/community-reports/statistics',
-                        icon: FileBarChart,
-                        description: 'Report analytics',
-                        color: 'bg-orange-100 dark:bg-orange-800 text-orange-600 dark:text-orange-400',
-                        isActive: (url: string) =>
-                            url === '/admin/community-reports/statistics',
-                        requiredPermission: 'view-reports',
-                        isNew: true,
                     },
                 ],
             },
@@ -1098,7 +1083,7 @@ export function AppSidebar({ className }: { className?: string }) {
             .filter((category) => category.items.length > 0);
     }, [userPermissions, userRoleName, reportStats]);
 
-    // Settings navigation WITH PERMISSIONS
+    // Settings navigation WITH PERMISSIONS (UPDATED WITH /admin PREFIX)
     const settingsCategories = useMemo(() => {
         const allCategories: SidebarCategory[] = [
             {
@@ -1107,32 +1092,32 @@ export function AppSidebar({ className }: { className?: string }) {
                 items: [
                     {
                         title: 'Profile',
-                        href: '/adminsettings/profile',
+                        href: '/admin/settings/profile',
                         icon: User,
                         description: 'Personal info',
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) =>
-                            url === '/adminsettings/profile',
+                            url === '/admin/settings/profile',
                         requiredPermission: undefined,
                     },
                     {
                         title: 'Password',
-                        href: '/adminsettings/password',
+                        href: '/admin/settings/password',
                         icon: Lock,
                         description: 'Change password',
                         color: 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-400',
                         isActive: (url: string) =>
-                            url === '/adminsettings/password',
+                            url === '/admin/settings/password',
                         requiredPermission: undefined,
                     },
                     {
                         title: 'Theme',
-                        href: '/adminsettings/appearance',
+                        href: '/admin/settings/appearance',
                         icon: Palette,
                         description: 'Appearance',
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) =>
-                            url === '/adminsettings/appearance',
+                            url === '/admin/settings/appearance',
                         requiredPermission: undefined,
                     },
                 ],
@@ -1143,39 +1128,39 @@ export function AppSidebar({ className }: { className?: string }) {
                 items: [
                     {
                         title: 'Puroks',
-                        href: '/puroks',
+                        href: '/admin/puroks',
                         icon: Briefcase,
                         description: 'Manage zones',
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
-                        isActive: (url: string) => url.startsWith('/puroks'),
+                        isActive: (url: string) => url.startsWith('/admin/puroks') && !url.includes('/create'),
                         requiredPermission: 'manage-puroks',
                     },
                     {
                         title: 'Positions',
-                        href: '/positions',
+                        href: '/admin/positions',
                         icon: Briefcase,
                         description: 'Official roles',
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
-                        isActive: (url: string) => url.startsWith('/positions'),
+                        isActive: (url: string) => url.startsWith('/admin/positions') && !url.includes('/create'),
                         requiredPermission: 'manage-positions',
                     },
                     {
                         title: 'Committees',
-                        href: '/committees',
+                        href: '/admin/committees',
                         icon: Users2,
                         description: 'Barangay committees',
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) =>
-                            url.startsWith('/committees'),
+                            url.startsWith('/admin/committees') && !url.includes('/create'),
                         requiredPermission: 'manage-committees',
                     },
                     {
                         title: 'Officials',
-                        href: '/officials',
+                        href: '/admin/officials',
                         icon: Award,
                         description: 'Manage officials',
                         color: 'bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-400',
-                        isActive: (url: string) => url.startsWith('/officials'),
+                        isActive: (url: string) => url.startsWith('/admin/officials') && !url.includes('/create'),
                         requiredPermission: 'manage-officials',
                     },
                 ],
@@ -1186,40 +1171,40 @@ export function AppSidebar({ className }: { className?: string }) {
                 items: [
                     {
                         title: 'Users',
-                        href: '/users',
+                        href: '/admin/users',
                         icon: Users,
                         description: 'Manage users',
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
-                        isActive: (url: string) => url.startsWith('/users'),
+                        isActive: (url: string) => url.startsWith('/admin/users') && !url.includes('/create'),
                         requiredPermission: 'manage-users',
                     },
                     {
                         title: 'Roles',
-                        href: '/roles',
+                        href: '/admin/roles',
                         icon: Shield,
                         description: 'Manage roles',
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
-                        isActive: (url: string) => url.startsWith('/roles'),
+                        isActive: (url: string) => url.startsWith('/admin/roles') && !url.includes('/create'),
                         requiredPermission: 'manage-roles',
                     },
                     {
                         title: 'Permissions',
-                        href: '/permissions',
+                        href: '/admin/permissions',
                         icon: Key,
                         description: 'Manage permissions',
                         color: 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-400',
                         isActive: (url: string) =>
-                            url.startsWith('/permissions'),
+                            url.startsWith('/admin/permissions') && !url.includes('/create'),
                         requiredPermission: 'manage-permissions',
                     },
                     {
                         title: 'Assign Permissions',
-                        href: '/role-permissions',
+                        href: '/admin/role-permissions',
                         icon: LinkIcon,
                         description: 'Assign permissions to roles',
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) =>
-                            url.startsWith('/role-permissions'),
+                            url.startsWith('/admin/role-permissions'),
                         requiredPermission: 'manage-permissions',
                         isNew: true,
                     },
@@ -1231,60 +1216,60 @@ export function AppSidebar({ className }: { className?: string }) {
                 items: [
                     {
                         title: 'Security Audit',
-                        href: '/security/security-audit',
+                        href: '/admin/security/security-audit',
                         icon: ShieldCheck,
                         description: 'Compliance reports',
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) =>
-                            url === '/security/security-audit',
+                            url === '/admin/security/security-audit',
                         requiredPermission: 'view-security-logs',
                     },
                     {
                         title: 'Access Logs',
-                        href: '/security/access-logs',
+                        href: '/admin/security/access-logs',
                         icon: Eye,
                         description: 'Access monitoring',
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) =>
-                            url === '/security/access-logs',
+                            url === '/admin/security/access-logs',
                         requiredPermission: 'view-security-logs',
                     },
                     {
                         title: 'Audit Logs',
-                        href: '/audit-logs',
+                        href: '/admin/reports/audit-logs',
                         icon: History,
                         description: 'Compliance audit trail',
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
-                        isActive: (url: string) => url === '/audit-logs',
+                        isActive: (url: string) => url === '/admin/reports/audit-logs',
                         requiredPermission: 'view-reports',
                     },
                     {
                         title: 'Activity Logs',
-                        href: '/reports/activity-logs',
+                        href: '/admin/reports/activity-logs',
                         icon: Activity,
                         description: 'System activities',
                         color: 'bg-orange-100 dark:bg-orange-800 text-orange-600 dark:text-orange-400',
                         isActive: (url: string) =>
-                            url.startsWith('/reports/activity-logs'),
+                            url.startsWith('/admin/reports/activity-logs'),
                         requiredPermission: 'view-reports',
                     },
                     {
                         title: 'Login Logs',
-                        href: '/reports/login-logs',
+                        href: '/admin/reports/login-logs',
                         icon: LogIn,
                         description: 'Authentication history',
                         color: 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-400',
                         isActive: (url: string) =>
-                            url.startsWith('/reports/login-logs'),
+                            url.startsWith('/admin/reports/login-logs'),
                         requiredPermission: 'view-reports',
                     },
                     {
                         title: 'Sessions',
-                        href: '/security/sessions',
+                        href: '/admin/security/sessions',
                         icon: Monitor,
                         description: 'Active sessions',
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
-                        isActive: (url: string) => url === '/security/sessions',
+                        isActive: (url: string) => url === '/admin/security/sessions',
                         requiredPermission: 'view-security-logs',
                     },
                 ],
@@ -1295,51 +1280,51 @@ export function AppSidebar({ className }: { className?: string }) {
                 items: [
                     {
                         title: 'Backup',
-                        href: '/backup',
+                        href: '/admin/backup',
                         icon: Database,
                         description: 'Backup & restore',
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
-                        isActive: (url: string) => url.startsWith('/backup'),
+                        isActive: (url: string) => url.startsWith('/admin/backup'),
                         requiredPermission: 'manage-backups',
                     },
                     {
                         title: 'Clearance Types',
-                        href: '/clearance-types',
+                        href: '/admin/clearance-types',
                         icon: FileType,
                         description: 'Clearance categories',
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) =>
-                            url.startsWith('/clearance-types'),
+                            url.startsWith('/admin/clearance-types') && !url.includes('/create'),
                         requiredPermission: 'manage-clearance-types',
                     },
                     {
                         title: 'Fee Types',
-                        href: '/fee-types',
+                        href: '/admin/fee-types',
                         icon: Tag,
                         description: 'Fee categories',
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
-                        isActive: (url: string) => url.startsWith('/fee-types'),
+                        isActive: (url: string) => url.startsWith('/admin/fee-types') && !url.includes('/create'),
                         requiredPermission: 'manage-fee-types',
                     },
                     {
                         title: 'Report Types',
-                        href: '/report-types',
+                        href: '/admin/report-types',
                         icon: FileText,
                         description: 'Community report categories',
                         color: 'bg-orange-100 dark:bg-orange-800 text-orange-600 dark:text-orange-400',
                         isActive: (url: string) =>
-                            url.startsWith('/report-types'),
+                            url.startsWith('/admin/report-types') && !url.includes('/create'),
                         requiredPermission: 'manage-report-types',
                         isNew: true,
                     },
                     {
                         title: 'Document Types',
-                        href: '/document-types',
+                        href: '/admin/document-types',
                         icon: FileBox,
                         description: 'Document categories & requirements',
                         color: 'bg-indigo-100 dark:bg-indigo-800 text-indigo-600 dark:text-indigo-400',
                         isActive: (url: string) =>
-                            url.startsWith('/document-types'),
+                            url.startsWith('/admin/document-types') && !url.includes('/create'),
                         requiredPermission: 'manage-document-types',
                         isNew: true,
                     },
@@ -1358,64 +1343,370 @@ export function AppSidebar({ className }: { className?: string }) {
             .filter((category) => category.items.length > 0);
     }, [userPermissions, userRoleName]);
 
-    // Quick Actions with permission checks
-    const quickActions = useMemo(() => {
-        const actions: QuickAction[] = [
-            {
-                title: 'Requests',
-                href: '/clearances/approval/requests',
-                icon: FilePlus,
-                color: 'orange',
-                requiredPermission: 'issue-clearances',
-            },
-            {
-                title: 'Add Resident',
-                href: '/residents/create',
-                icon: Users,
-                color: 'blue',
-                requiredPermission: 'manage-residents',
-            },
-            {
-                title: 'Add Household',
-                href: '/households/create',
-                icon: Home,
-                color: 'green',
-                requiredPermission: 'manage-households',
-            },
-            {
-                title: 'New Announcement',
-                href: '/announcements/create',
-                icon: Bell,
-                color: 'red',
-                requiredPermission: 'manage-announcements',
-            },
-            {
-                title: 'Upload Form',
-                href: '/forms/create',
-                icon: PlusCircle,
-                color: 'purple',
-                requiredPermission: 'manage-forms',
-            },
-            {
-                title: 'New Report',
-                href: '/admin/community-reports/create',
-                icon: AlertCircle,
-                color: 'yellow',
-                requiredPermission: 'create-reports',
-            },
-            {
-                title: 'Assigned to Me',
-                href: '/admin/community-reports?assigned_to=me',
-                icon: User,
-                color: 'indigo',
-                requiredPermission: 'view-reports',
-            },
-        ];
+    // Grouped Quick Actions for Operations tab (UPDATED WITH /admin PREFIX)
+    const operationsQuickActionGroups = useMemo(() => {
+        const groups = {
+            reports: [
+                {
+                    title: 'New Report',
+                    href: '/admin/community-reports/community-reports/create',
+                    icon: AlertCircle,
+                    color: 'orange' as const,
+                    requiredPermission: 'create-reports',
+                    description: 'Create incident report',
+                    isNew: true,
+                },
+                {
+                    title: 'New Blotter',
+                    href: '/admin/blotters/create',
+                    icon: Scale,
+                    color: 'red' as const,
+                    requiredPermission: 'manage-blotters',
+                    description: 'File new blotter case',
+                },
+            ],
+            residents: [
+                {
+                    title: 'Add Resident',
+                    href: '/admin/residents/create',
+                    icon: Users,
+                    color: 'blue' as const,
+                    requiredPermission: 'manage-residents',
+                    description: 'Register new resident',
+                },
+                {
+                    title: 'Add Household',
+                    href: '/admin/households/create',
+                    icon: Home,
+                    color: 'green' as const,
+                    requiredPermission: 'manage-households',
+                    description: 'Create new household',
+                },
+                {
+                    title: 'Add Business',
+                    href: '/admin/businesses/create',
+                    icon: Briefcase,
+                    color: 'purple' as const,
+                    requiredPermission: 'manage-businesses',
+                    description: 'Register new business',
+                },
+            ],
+            services: [
+                {
+                    title: 'Issue Clearance',
+                    href: '/admin/clearances/clearances/create',
+                    icon: CheckCircle,
+                    color: 'emerald' as const,
+                    requiredPermission: 'issue-clearances',
+                    description: 'Issue barangay clearance',
+                },
+                {
+                    title: 'Record Payment',
+                    href: '/admin/payments/payments/create',
+                    icon: CreditCard,
+                    color: 'cyan' as const,
+                    requiredPermission: 'manage-payments',
+                    description: 'Record new payment',
+                },
+                {
+                    title: 'Create Fee',
+                    href: '/admin/fees/fees/create',
+                    icon: DollarSign,
+                    color: 'yellow' as const,
+                    requiredPermission: 'manage-fees',
+                    description: 'Add new fee type',
+                },
+                {
+                    title: 'Upload Form',
+                    href: '/admin/forms/create',
+                    icon: FileText,
+                    color: 'indigo' as const,
+                    requiredPermission: 'manage-forms',
+                    description: 'Upload new form',
+                },
+                {
+                    title: 'New Announcement',
+                    href: '/admin/announcements/create',
+                    icon: Megaphone,
+                    color: 'pink' as const,
+                    requiredPermission: 'manage-announcements',
+                    description: 'Create announcement',
+                },
+            ],
+        };
 
-        return actions.filter((action) =>
-            hasPermission(action.requiredPermission),
-        );
+        // Filter each group by permissions
+        return {
+            reports: groups.reports.filter(a => hasPermission(a.requiredPermission)),
+            residents: groups.residents.filter(a => hasPermission(a.requiredPermission)),
+            services: groups.services.filter(a => hasPermission(a.requiredPermission)),
+        };
     }, [userPermissions, userRoleName]);
+
+    // Grouped Quick Actions for Settings tab (UPDATED WITH /admin PREFIX)
+    const settingsQuickActionGroups = useMemo(() => {
+        const groups = {
+            personal: [
+                {
+                    title: 'Edit Profile',
+                    href: '/admin/settings/profile',
+                    icon: User,
+                    color: 'blue' as const,
+                    requiredPermission: undefined,
+                    description: 'Update personal info',
+                },
+                {
+                    title: 'Change Password',
+                    href: '/admin/settings/password',
+                    icon: Lock,
+                    color: 'red' as const,
+                    requiredPermission: undefined,
+                    description: 'Update password',
+                },
+                {
+                    title: 'Customize Theme',
+                    href: '/admin/settings/appearance',
+                    icon: Palette,
+                    color: 'purple' as const,
+                    requiredPermission: undefined,
+                    description: 'Change appearance',
+                },
+            ],
+            barangay: [
+                {
+                    title: 'Add Purok',
+                    href: '/admin/puroks/create',
+                    icon: Briefcase,
+                    color: 'violet' as const,
+                    requiredPermission: 'manage-puroks',
+                    description: 'Create new purok',
+                },
+                {
+                    title: 'Add Position',
+                    href: '/admin/positions/create',
+                    icon: Briefcase,
+                    color: 'teal' as const,
+                    requiredPermission: 'manage-positions',
+                    description: 'Create new position',
+                },
+                {
+                    title: 'New Committee',
+                    href: '/admin/committees/create',
+                    icon: Users2,
+                    color: 'lime' as const,
+                    requiredPermission: 'manage-committees',
+                    description: 'Create committee',
+                },
+                {
+                    title: 'Add Official',
+                    href: '/admin/officials/create',
+                    icon: Award,
+                    color: 'amber' as const,
+                    requiredPermission: 'manage-officials',
+                    description: 'Add barangay official',
+                },
+            ],
+            users: [
+                {
+                    title: 'Add User',
+                    href: '/admin/users/create',
+                    icon: Users,
+                    color: 'indigo' as const,
+                    requiredPermission: 'manage-users',
+                    description: 'Create new user',
+                },
+                {
+                    title: 'Add Role',
+                    href: '/admin/roles/create',
+                    icon: Shield,
+                    color: 'purple' as const,
+                    requiredPermission: 'manage-roles',
+                    description: 'Create new role',
+                },
+                {
+                    title: 'Add Permission',
+                    href: '/admin/permissions/create',
+                    icon: Key,
+                    color: 'red' as const,
+                    requiredPermission: 'manage-permissions',
+                    description: 'Create new permission',
+                },
+            ],
+            system: [
+                {
+                    title: 'Run Backup',
+                    href: '/admin/backup',
+                    icon: Database,
+                    color: 'blue' as const,
+                    requiredPermission: 'manage-backups',
+                    description: 'Create system backup',
+                },
+                {
+                    title: 'Add Clearance Type',
+                    href: '/admin/clearance-types/create',
+                    icon: FileType,
+                    color: 'emerald' as const,
+                    requiredPermission: 'manage-clearance-types',
+                    description: 'Create clearance type',
+                },
+                {
+                    title: 'Add Fee Type',
+                    href: '/admin/fee-types/create',
+                    icon: Tag,
+                    color: 'yellow' as const,
+                    requiredPermission: 'manage-fee-types',
+                    description: 'Create fee type',
+                },
+                {
+                    title: 'Add Report Type',
+                    href: '/admin/report-types/create',
+                    icon: FileText,
+                    color: 'orange' as const,
+                    requiredPermission: 'manage-report-types',
+                    description: 'Create report type',
+                    isNew: true,
+                },
+                {
+                    title: 'Add Document Type',
+                    href: '/admin/document-types/create',
+                    icon: FileBox,
+                    color: 'indigo' as const,
+                    requiredPermission: 'manage-document-types',
+                    description: 'Create document type',
+                    isNew: true,
+                },
+            ],
+            security: [
+                {
+                    title: 'View Audit Logs',
+                    href: '/admin/reports/audit-logs',
+                    icon: History,
+                    color: 'purple' as const,
+                    requiredPermission: 'view-reports',
+                    description: 'Check audit trail',
+                },
+                {
+                    title: 'View Activity Logs',
+                    href: '/admin/reports/activity-logs',
+                    icon: Activity,
+                    color: 'orange' as const,
+                    requiredPermission: 'view-reports',
+                    description: 'Monitor activities',
+                },
+                {
+                    title: 'View Sessions',
+                    href: '/admin/security/sessions',
+                    icon: Monitor,
+                    color: 'cyan' as const,
+                    requiredPermission: 'view-security-logs',
+                    description: 'Active sessions',
+                },
+            ],
+        };
+
+        // Filter each group by permissions
+        return {
+            personal: groups.personal.filter(a => hasPermission(a.requiredPermission)),
+            barangay: groups.barangay.filter(a => hasPermission(a.requiredPermission)),
+            users: groups.users.filter(a => hasPermission(a.requiredPermission)),
+            system: groups.system.filter(a => hasPermission(a.requiredPermission)),
+            security: groups.security.filter(a => hasPermission(a.requiredPermission)),
+        };
+    }, [userPermissions, userRoleName]);
+
+    // Flatten for main display in Operations tab (take 1 from each category, max 5)
+    const mainOperationsQuickActions = useMemo(() => {
+        const allActions = [
+            ...operationsQuickActionGroups.reports.slice(0, 1),
+            ...operationsQuickActionGroups.residents.slice(0, 1),
+            ...operationsQuickActionGroups.services.slice(0, 2),
+        ].slice(0, 5);
+
+        return allActions;
+    }, [operationsQuickActionGroups]);
+
+    // Flatten for main display in Settings tab (take 1 from each category, max 5)
+    const mainSettingsQuickActions = useMemo(() => {
+        const allActions = [
+            ...settingsQuickActionGroups.personal.slice(0, 1),
+            ...settingsQuickActionGroups.barangay.slice(0, 1),
+            ...settingsQuickActionGroups.users.slice(0, 1),
+            ...settingsQuickActionGroups.system.slice(0, 1),
+            ...settingsQuickActionGroups.security.slice(0, 1),
+        ].slice(0, 5);
+
+        return allActions;
+    }, [settingsQuickActionGroups]);
+
+    // Get all remaining actions for Settings "More Settings" dropdown (exclude those in main quick actions)
+    const remainingSettingsActions = useMemo(() => {
+        const mainActionHrefs = new Set(mainSettingsQuickActions.map(a => a.href));
+        
+        const allSettingsActions = [
+            ...settingsQuickActionGroups.personal,
+            ...settingsQuickActionGroups.barangay,
+            ...settingsQuickActionGroups.users,
+            ...settingsQuickActionGroups.system,
+            ...settingsQuickActionGroups.security,
+        ];
+        
+        // Filter out actions that are already in main quick actions
+        return allSettingsActions.filter(action => !mainActionHrefs.has(action.href));
+    }, [settingsQuickActionGroups, mainSettingsQuickActions]);
+
+    // Get all remaining actions for Operations "More Actions" dropdown (exclude those in main quick actions)
+    const remainingOperationsActions = useMemo(() => {
+        const mainActionHrefs = new Set(mainOperationsQuickActions.map(a => a.href));
+        
+        const allOperationsActions = [
+            ...operationsQuickActionGroups.reports,
+            ...operationsQuickActionGroups.residents,
+            ...operationsQuickActionGroups.services,
+        ];
+        
+        // Filter out actions that are already in main quick actions
+        return allOperationsActions.filter(action => !mainActionHrefs.has(action.href));
+    }, [operationsQuickActionGroups, mainOperationsQuickActions]);
+
+    // Group remaining operations actions by category for better organization
+    const remainingOperationsByCategory = useMemo(() => {
+        const grouped = {
+            reports: remainingOperationsActions.filter(action => 
+                operationsQuickActionGroups.reports.some(r => r.href === action.href)
+            ),
+            residents: remainingOperationsActions.filter(action => 
+                operationsQuickActionGroups.residents.some(r => r.href === action.href)
+            ),
+            services: remainingOperationsActions.filter(action => 
+                operationsQuickActionGroups.services.some(s => s.href === action.href)
+            ),
+        };
+        
+        return Object.entries(grouped).filter(([_, items]) => items.length > 0);
+    }, [remainingOperationsActions, operationsQuickActionGroups]);
+
+    // Group remaining settings actions by category for better organization
+    const remainingSettingsByCategory = useMemo(() => {
+        const grouped = {
+            personal: remainingSettingsActions.filter(action => 
+                settingsQuickActionGroups.personal.some(p => p.href === action.href)
+            ),
+            barangay: remainingSettingsActions.filter(action => 
+                settingsQuickActionGroups.barangay.some(b => b.href === action.href)
+            ),
+            users: remainingSettingsActions.filter(action => 
+                settingsQuickActionGroups.users.some(u => u.href === action.href)
+            ),
+            system: remainingSettingsActions.filter(action => 
+                settingsQuickActionGroups.system.some(s => s.href === action.href)
+            ),
+            security: remainingSettingsActions.filter(action => 
+                settingsQuickActionGroups.security.some(s => s.href === action.href)
+            ),
+        };
+        
+        return Object.entries(grouped).filter(([_, items]) => items.length > 0);
+    }, [remainingSettingsActions, settingsQuickActionGroups]);
 
     // Today's Activity Stats
     const renderTodayStats = () => {
@@ -1550,7 +1841,7 @@ export function AppSidebar({ className }: { className?: string }) {
             {renderCollapsedStats()}
 
             {/* Quick Actions Section */}
-            {quickActions.length > 0 && (
+            {mainOperationsQuickActions.length > 0 && (
                 <SidebarGroup className="mb-2">
                     {!isCollapsed && (
                         <SidebarGroupLabel className="mb-1 flex items-center gap-1 px-1">
@@ -1560,14 +1851,51 @@ export function AppSidebar({ className }: { className?: string }) {
                             </span>
                         </SidebarGroupLabel>
                     )}
+                    
                     <SidebarMenu className="space-y-0.5">
-                        {quickActions.map((action) => (
+                        {mainOperationsQuickActions.map((action) => (
                             <QuickActionItem
                                 key={`${action.title}-${action.href}`}
                                 action={action}
                                 isCollapsed={isCollapsed}
                             />
                         ))}
+                        
+                        {/* More Actions Dropdown - Only show if there are remaining actions */}
+                        {!isCollapsed && remainingOperationsByCategory.length > 0 && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="mt-1 w-full justify-start gap-2 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                    >
+                                        <PlusCircle className="h-3.5 w-3.5" />
+                                        More Actions ({remainingOperationsActions.length})
+                                        <ChevronDown className="ml-auto h-3 w-3" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="w-64 max-h-[400px] overflow-y-auto">
+                                    {remainingOperationsByCategory.map(([category, items], index, array) => 
+                                        items.length > 0 && (
+                                            <div key={category}>
+                                                <DropdownMenuLabel className="text-xs capitalize text-gray-500">
+                                                    {category}
+                                                </DropdownMenuLabel>
+                                                {items.map(action => (
+                                                    <CompactMenuItem 
+                                                        key={`${action.title}-${action.href}`} 
+                                                        item={action} 
+                                                        type="operations" 
+                                                    />
+                                                ))}
+                                                {index < array.length - 1 && <DropdownMenuSeparator />}
+                                            </div>
+                                        )
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                     </SidebarMenu>
                 </SidebarGroup>
             )}
@@ -1598,28 +1926,92 @@ export function AppSidebar({ className }: { className?: string }) {
     );
 
     // Render settings content
-    const renderSettingsContent = () =>
-        settingsCategories.length > 0 && (
-            <SidebarGroup>
-                {!isCollapsed && (
-                    <SidebarGroupLabel className="mb-1 px-1">
-                        <span className="truncate text-[10px] font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400">
-                            Settings
-                        </span>
-                    </SidebarGroupLabel>
-                )}
-                <SidebarMenu className="space-y-0.5">
-                    {settingsCategories.map((category) => (
-                        <CategoryItem
-                            key={`settings-${category.title}`}
-                            category={category}
-                            type="settings"
-                            isCollapsed={isCollapsed}
-                        />
-                    ))}
-                </SidebarMenu>
-            </SidebarGroup>
-        );
+    const renderSettingsContent = () => (
+        <>
+            {/* Settings Quick Actions */}
+            {mainSettingsQuickActions.length > 0 && (
+                <SidebarGroup className="mb-2">
+                    {!isCollapsed && (
+                        <SidebarGroupLabel className="mb-1 flex items-center gap-1 px-1">
+                            <Zap className="h-2.5 w-2.5 text-purple-500" />
+                            <span className="truncate text-[10px] font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                                Settings Quick Actions
+                            </span>
+                        </SidebarGroupLabel>
+                    )}
+                    
+                    <SidebarMenu className="space-y-0.5">
+                        {mainSettingsQuickActions.map((action) => (
+                            <QuickActionItem
+                                key={`${action.title}-${action.href}`}
+                                action={action}
+                                isCollapsed={isCollapsed}
+                            />
+                        ))}
+                        
+                        {/* More Settings Actions Dropdown - Only show if there are remaining actions */}
+                        {!isCollapsed && remainingSettingsByCategory.length > 0 && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="mt-1 w-full justify-start gap-2 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                    >
+                                        <PlusCircle className="h-3.5 w-3.5" />
+                                        More Settings ({remainingSettingsActions.length})
+                                        <ChevronDown className="ml-auto h-3 w-3" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="w-64 max-h-[400px] overflow-y-auto">
+                                    {remainingSettingsByCategory.map(([category, items], index, array) => 
+                                        items.length > 0 && (
+                                            <div key={category}>
+                                                <DropdownMenuLabel className="text-xs capitalize text-gray-500">
+                                                    {category}
+                                                </DropdownMenuLabel>
+                                                {items.map(action => (
+                                                    <CompactMenuItem 
+                                                        key={`${action.title}-${action.href}`} 
+                                                        item={action} 
+                                                        type="settings" 
+                                                    />
+                                                ))}
+                                                {index < array.length - 1 && <DropdownMenuSeparator />}
+                                            </div>
+                                        )
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                    </SidebarMenu>
+                </SidebarGroup>
+            )}
+
+            {/* Settings Categories */}
+            {settingsCategories.length > 0 && (
+                <SidebarGroup>
+                    {!isCollapsed && (
+                        <SidebarGroupLabel className="mb-1 px-1">
+                            <span className="truncate text-[10px] font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                                Settings
+                            </span>
+                        </SidebarGroupLabel>
+                    )}
+                    <SidebarMenu className="space-y-0.5">
+                        {settingsCategories.map((category) => (
+                            <CategoryItem
+                                key={`settings-${category.title}`}
+                                category={category}
+                                type="settings"
+                                isCollapsed={isCollapsed}
+                            />
+                        ))}
+                    </SidebarMenu>
+                </SidebarGroup>
+            )}
+        </>
+    );
 
     // Don't show sidebar if user has no permissions at all
     const hasAnyAccess =

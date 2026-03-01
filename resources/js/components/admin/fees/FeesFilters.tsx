@@ -105,7 +105,7 @@ export default function FeesFilters({
                                 variant="outline"
                                 className="h-9"
                                 onClick={() => {
-                                    const exportUrl = new URL('/fees/export', window.location.origin);
+                                    const exportUrl = new URL('/admin/fees/export', window.location.origin);
                                     if (search) exportUrl.searchParams.append('search', search);
                                     if (filtersState.status !== 'all') exportUrl.searchParams.append('status', filtersState.status);
                                     if (filtersState.category !== 'all') exportUrl.searchParams.append('category', filtersState.category);

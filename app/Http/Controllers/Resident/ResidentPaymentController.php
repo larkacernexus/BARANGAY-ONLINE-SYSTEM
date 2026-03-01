@@ -9,7 +9,10 @@ use App\Models\Household;
 use App\Models\Resident;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Str;
 
 class ResidentPaymentController extends Controller
 {
@@ -144,189 +147,355 @@ class ResidentPaymentController extends Controller
         ]);
     }
     
-    private function formatPaymentForFrontend(Payment $payment)
+    /**
+     * Display the specified payment with all details
+     */
+    public function show(Payment $payment)
     {
-        // Get payer details based on payer_type
-        $payerDetails = [];
+        $user = auth()->user();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
+        
+        if (!$household) {
+            abort(403, 'You are not authorized to view this payment.');
+        }
+        
+        // Check if payment belongs to this household or its residents
+        $authorized = $this->checkPaymentAuthorization($payment, $household);
+        
+        if (!$authorized) {
+            abort(403, 'You are not authorized to view this payment.');
+        }
+        
+        // Load only existing relationships
+        $payment->load([
+            'items', 
+            'resident', 
+            'household'
+        ]);
+        
+        // Get related payments (same payer)
+        $relatedPayments = Payment::where(function($query) use ($payment) {
+                $query->where('payer_type', $payment->payer_type)
+                      ->where('payer_id', $payment->payer_id);
+            })
+            ->where('id', '!=', $payment->id)
+            ->latest('payment_date')
+            ->limit(5)
+            ->get();
+            
+        $payment->setRelation('related_payments', $relatedPayments);
+        
+        // Format payment for frontend
+        $formattedPayment = $this->formatPaymentForFrontend($payment);
+        
+        // Determine permissions
+        $canEdit = $payment->status === 'pending';
+        $canDelete = $payment->status === 'pending';
+        $canPrint = in_array($payment->status, ['completed', 'paid']);
+        $canDownload = in_array($payment->status, ['completed', 'paid']);
+        $canVerify = false; // Residents cannot verify payments
+        $canRefund = false; // Residents cannot refund payments
+        $canAddNote = false; // Disabled since notes relationship doesn't exist
+        $canUploadAttachment = false; // Disabled
+        
+        // Determine if payment can be paid online
+        $canPayOnline = in_array($payment->payment_method, ['gcash', 'maya', 'online', 'bank']) 
+            && $payment->status === 'pending';
+        
+        return Inertia::render('resident/Payments/Show', [
+            'payment' => $formattedPayment,
+            'canEdit' => $canEdit,
+            'canDelete' => $canDelete,
+            'canPrint' => $canPrint,
+            'canDownload' => $canDownload,
+            'canVerify' => $canVerify,
+            'canRefund' => $canRefund,
+            'canAddNote' => $canAddNote,
+            'canUploadAttachment' => $canUploadAttachment,
+            'canPayOnline' => $canPayOnline,
+            'paymentMethods' => [
+                'cash' => 'Cash',
+                'gcash' => 'GCash',
+                'maya' => 'Maya',
+                'bank' => 'Bank Transfer',
+                'check' => 'Check',
+                'online' => 'Online Payment',
+            ],
+        ]);
+    }
+    
+    /**
+     * Generate and download PDF receipt
+     */
+    public function downloadReceipt(Payment $payment)
+    {
+        $user = auth()->user();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
+        
+        // Check authorization
+        $authorized = $this->checkPaymentAuthorization($payment, $household);
+        
+        if (!$authorized) {
+            abort(403, 'You are not authorized to download this receipt.');
+        }
+        
+        // Check if payment is completed or paid
+        if (!in_array($payment->status, ['completed', 'paid'])) {
+            return back()->with('error', 'Receipt is only available for completed payments.');
+        }
+        
+        // Load relationships
+        $payment->load(['items', 'resident', 'household']);
+        
+        // Format data for receipt
+        $receiptData = $this->generateReceiptData($payment);
+        
+        // Generate PDF
+        $pdf = Pdf::loadView('pdfs.payment-receipt', [
+            'receipt' => $receiptData,
+            'payment' => $payment,
+            'barangay' => [
+                'name' => 'Barangay San Vicente',
+                'address' => 'San Vicente, City of San Fernando, La Union',
+                'contact' => '(072) 123-4567',
+                'email' => 'info@barangay.gov.ph',
+                'logo' => public_path('images/barangay-logo.png'),
+            ]
+        ]);
+        
+        // Set paper size and orientation
+        $pdf->setPaper('A4', 'portrait');
+        
+        // Download PDF
+        return $pdf->download('receipt-' . $payment->or_number . '.pdf');
+    }
+    
+    /**
+     * Generate and stream PDF receipt for viewing
+     */
+    public function viewReceipt(Payment $payment)
+    {
+        $user = auth()->user();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
+        
+        // Check authorization
+        $authorized = $this->checkPaymentAuthorization($payment, $household);
+        
+        if (!$authorized) {
+            abort(403, 'You are not authorized to view this receipt.');
+        }
+        
+        // Check if payment is completed or paid
+        if (!in_array($payment->status, ['completed', 'paid'])) {
+            return back()->with('error', 'Receipt is only available for completed payments.');
+        }
+        
+        // Load relationships
+        $payment->load(['items', 'resident', 'household']);
+        
+        // Format data for receipt
+        $receiptData = $this->generateReceiptData($payment);
+        
+        // Generate PDF
+        $pdf = Pdf::loadView('pdfs.payment-receipt', [
+            'receipt' => $receiptData,
+            'payment' => $payment,
+            'barangay' => [
+                'name' => 'Barangay San Vicente',
+                'address' => 'San Vicente, City of San Fernando, La Union',
+                'contact' => '(072) 123-4567',
+                'email' => 'info@barangay.gov.ph',
+                'logo' => public_path('images/barangay-logo.png'),
+            ]
+        ]);
+        
+        // Set paper size and orientation
+        $pdf->setPaper('A4', 'portrait');
+        
+        // Stream PDF in browser
+        return $pdf->stream('receipt-' . $payment->or_number . '.pdf');
+    }
+    
+    /**
+     * Save receipt to user's downloads/records
+     */
+    public function saveReceipt(Request $request, Payment $payment)
+    {
+        $user = auth()->user();
+        $household = $user->household_id ? Household::find($user->household_id) : null;
+        
+        // Check authorization
+        $authorized = $this->checkPaymentAuthorization($payment, $household);
+        
+        if (!$authorized) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access.',
+            ], 403);
+        }
+        
+        // Validate request
+        $validated = $request->validate([
+            'receipt_number' => 'required|string',
+            'or_number' => 'required|string',
+            'receipt_type' => 'required|string',
+            'payer_name' => 'required|string',
+            'payer_address' => 'nullable|string',
+            'subtotal' => 'required|numeric',
+            'surcharge' => 'required|numeric',
+            'penalty' => 'required|numeric',
+            'discount' => 'required|numeric',
+            'total_amount' => 'required|numeric',
+            'amount_paid' => 'required|numeric',
+            'change_due' => 'required|numeric',
+            'payment_method' => 'required|string',
+            'reference_number' => 'nullable|string',
+            'payment_date' => 'required|string',
+            'issued_date' => 'required|string',
+            'issued_by' => 'required|string',
+            'fee_breakdown' => 'required|array',
+            'notes' => 'nullable|string',
+        ]);
+        
+        // Generate PDF and save to storage
+        $pdf = Pdf::loadView('pdfs.payment-receipt', [
+            'receipt' => $validated,
+            'payment' => $payment,
+            'barangay' => [
+                'name' => 'Barangay San Vicente',
+                'address' => 'San Vicente, City of San Fernando, La Union',
+                'contact' => '(072) 123-4567',
+                'email' => 'info@barangay.gov.ph',
+            ]
+        ]);
+        
+        $filename = 'receipts/' . $payment->or_number . '_' . time() . '.pdf';
+        Storage::disk('public')->put($filename, $pdf->output());
+        
+        // Update payment with receipt path (make sure this column exists)
+        $payment->update([
+            'receipt_path' => $filename,
+            'receipt_generated_at' => now(),
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Receipt saved successfully!',
+            'receipt_url' => Storage::url($filename),
+        ]);
+    }
+    
+    /**
+     * Generate receipt data from payment
+     */
+    private function generateReceiptData(Payment $payment)
+    {
+        $subtotal = (float) $payment->subtotal;
+        $surcharge = (float) $payment->surcharge;
+        $penalty = (float) $payment->penalty;
+        $discount = (float) $payment->discount;
+        $totalAmount = (float) $payment->total_amount;
+        $amountPaid = in_array($payment->status, ['completed', 'paid']) ? $totalAmount : 0;
+        $changeDue = $amountPaid - $totalAmount;
+        
+        // Generate fee breakdown from payment items
+        $feeBreakdown = $payment->items->map(function ($item) {
+            return [
+                'fee_name' => $item->fee_name ?? $item->item_name ?? 'Payment Item',
+                'fee_code' => $item->fee_code ?? null,
+                'base_amount' => (float) ($item->base_amount ?? $item->unit_price ?? 0),
+                'total_amount' => (float) ($item->total_amount ?? $item->total ?? 0),
+            ];
+        })->toArray();
+        
+        // If no items, create a single item from the payment purpose
+        if (empty($feeBreakdown)) {
+            $feeBreakdown[] = [
+                'fee_name' => $payment->purpose ?? 'Payment',
+                'fee_code' => $payment->certificate_type,
+                'base_amount' => $subtotal,
+                'total_amount' => $subtotal,
+            ];
+        }
+        
+        // Get payer details
+        $payerName = $payment->payer_name;
+        $payerAddress = $payment->address;
         
         if ($payment->payer_type === 'resident' && $payment->resident) {
-            $payerDetails = [
-                'name' => $payment->resident->full_name ?? $payment->resident->name ?? 'N/A',
-                'contact_number' => $payment->resident->contact_number ?? 'N/A',
-                'address' => $payment->resident->address ?? 'N/A',
-                'household_number' => $payment->resident->household_number ?? 'N/A',
-                'purok' => $payment->resident->purok ?? 'N/A',
-            ];
+            $payerName = $payment->resident->full_name ?? $payment->resident->name ?? $payerName;
+            $payerAddress = $payment->resident->address ?? $payerAddress;
         } elseif ($payment->payer_type === 'household' && $payment->household) {
-            $payerDetails = [
-                'name' => $payment->household->head_of_family ?? $payment->household->name ?? 'N/A',
-                'contact_number' => $payment->household->contact_number ?? 'N/A',
-                'address' => $payment->household->address ?? 'N/A',
-                'household_number' => $payment->household->household_number ?? 'N/A',
-                'purok' => $payment->household->purok->name ?? 'N/A',
-            ];
+            $payerName = $payment->household->head_of_family ?? $payment->household->name ?? $payerName;
+            $payerAddress = $payment->household->address ?? $payerAddress;
         }
-        
-        // Get certificate type display name
-        $certificateTypeDisplay = null;
-        if ($payment->certificate_type) {
-            $certificateTypes = [
-                'residency' => 'Certificate of Residency',
-                'indigency' => 'Certificate of Indigency',
-                'clearance' => 'Barangay Clearance',
-                'cedula' => 'Cedula',
-                'business' => 'Business Permit',
-            ];
-            $certificateTypeDisplay = $certificateTypes[$payment->certificate_type] ?? ucfirst($payment->certificate_type);
-        }
-        
-        // Get payment method display name
-        $paymentMethodDisplay = ucfirst($payment->payment_method ?? 'Unknown');
-        if ($payment->payment_method === 'gcash') {
-            $paymentMethodDisplay = 'GCash';
-        } elseif ($payment->payment_method === 'maya') {
-            $paymentMethodDisplay = 'Maya';
-        }
-        
-        // Get collection type display name
-        $collectionTypeDisplay = ucfirst($payment->collection_type ?? 'regular');
-        
-        // Format amounts
-        $formatAmount = function($amount) {
-            return number_format($amount, 2);
-        };
         
         return [
             'id' => $payment->id,
+            'receipt_number' => 'RCP-' . $payment->or_number . '-' . now()->format('Y'),
             'or_number' => $payment->or_number,
-            'reference_number' => $payment->reference_number,
-            'purpose' => $payment->purpose,
-            'subtotal' => (float) $payment->subtotal,
-            'surcharge' => (float) $payment->surcharge,
-            'penalty' => (float) $payment->penalty,
-            'discount' => (float) $payment->discount,
-            'total_amount' => (float) $payment->total_amount,
-            'payment_date' => $payment->payment_date ? $payment->payment_date->toDateString() : null,
-            'due_date' => $payment->due_date ? $payment->due_date->toDateString() : null,
-            'status' => $payment->status,
+            'receipt_type' => $payment->collection_type ?? 'payment',
+            'receipt_type_label' => $this->getReceiptTypeLabel($payment->collection_type),
+            'payer_name' => $payerName,
+            'payer_address' => $payerAddress,
+            'subtotal' => $subtotal,
+            'surcharge' => $surcharge,
+            'penalty' => $penalty,
+            'discount' => $discount,
+            'total_amount' => $totalAmount,
+            'amount_paid' => $amountPaid,
+            'change_due' => $changeDue,
+            'formatted_subtotal' => '₱' . number_format($subtotal, 2),
+            'formatted_surcharge' => '₱' . number_format($surcharge, 2),
+            'formatted_penalty' => '₱' . number_format($penalty, 2),
+            'formatted_discount' => '₱' . number_format($discount, 2),
+            'formatted_total' => '₱' . number_format($totalAmount, 2),
+            'formatted_amount_paid' => '₱' . number_format($amountPaid, 2),
+            'formatted_change' => '₱' . number_format($changeDue, 2),
             'payment_method' => $payment->payment_method,
-            'payment_method_display' => $paymentMethodDisplay,
-            'is_cleared' => (bool) $payment->is_cleared,
-            'certificate_type' => $payment->certificate_type,
-            'certificate_type_display' => $certificateTypeDisplay,
-            'collection_type' => $payment->collection_type,
-            'collection_type_display' => $collectionTypeDisplay,
-            'remarks' => $payment->remarks,
-            'payer_type' => $payment->payer_type,
-            'payer_id' => $payment->payer_id,
-            'formatted_total' => '₱' . $formatAmount($payment->total_amount),
-            'formatted_date' => $payment->payment_date ? $payment->payment_date->format('M d, Y') : 'N/A',
-            'formatted_subtotal' => '₱' . $formatAmount($payment->subtotal),
-            'formatted_surcharge' => '₱' . $formatAmount($payment->surcharge),
-            'formatted_penalty' => '₱' . $formatAmount($payment->penalty),
-            'formatted_discount' => '₱' . $formatAmount($payment->discount),
-            'payer_details' => $payerDetails,
-            'items' => $payment->items->map(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'item_name' => $item->item_name ?? $item->fee_name ?? 'N/A',
-                    'description' => $item->description ?? 'N/A',
-                    'quantity' => (int) ($item->quantity ?? 1),
-                    'unit_price' => (float) ($item->unit_price ?? $item->base_amount ?? 0),
-                    'total' => (float) ($item->total ?? $item->total_amount ?? 0),
-                ];
-            })->toArray(),
+            'payment_method_label' => $this->getPaymentMethodLabel($payment->payment_method),
+            'reference_number' => $payment->reference_number,
+            'formatted_payment_date' => $payment->payment_date ? $payment->payment_date->format('F d, Y h:i A') : now()->format('F d, Y h:i A'),
+            'formatted_issued_date' => now()->format('F d, Y h:i A'),
+            'issued_by' => auth()->user()->name ?? 'System',
+            'fee_breakdown' => $feeBreakdown,
+            'notes' => $payment->remarks ?? null,
+            'payment_id' => $payment->id,
         ];
     }
     
-    private function emptyPagination()
+    /**
+     * Get receipt type label
+     */
+    private function getReceiptTypeLabel($type)
     {
-        return [
-            'data' => [],
-            'current_page' => 1,
-            'last_page' => 1,
-            'per_page' => 10,
-            'total' => 0,
-            'from' => 0,
-            'to' => 0,
+        $labels = [
+            'regular' => 'OFFICIAL RECEIPT',
+            'clearance' => 'CLEARANCE RECEIPT',
+            'certificate' => 'CERTIFICATE RECEIPT',
+            'business' => 'BUSINESS PERMIT RECEIPT',
+            'online' => 'ONLINE PAYMENT RECEIPT',
         ];
-    }
-    
-    private function emptyStats()
-    {
-        return [
-            'total_payments' => 0,
-            'pending_payments' => 0,
-            'total_paid' => 0,
-            'balance_due' => 0,
-        ];
-    }
-    
-    private function calculateStats($residentIds, $household)
-    {
-        // Combined query for all payments
-        $allPayments = Payment::where(function($q) use ($residentIds, $household) {
-            $q->where('payer_type', 'resident')
-              ->whereIn('payer_id', $residentIds);
-            
-            $q->orWhere('payer_type', 'household')
-              ->where('payer_id', $household->id);
-        });
         
-        return [
-            'total_payments' => $allPayments->count(),
-            'total_amount' => $allPayments->sum('total_amount'),
-            'resident_payments' => Payment::where('payer_type', 'resident')
-                ->whereIn('payer_id', $residentIds)->count(),
-            'household_payments' => Payment::where('payer_type', 'household')
-                ->where('payer_id', $household->id)->count(),
-            'resident_amount' => Payment::where('payer_type', 'resident')
-                ->whereIn('payer_id', $residentIds)->sum('total_amount'),
-            'household_amount' => Payment::where('payer_type', 'household')
-                ->where('payer_id', $household->id)->sum('total_amount'),
-            'completed_payments' => $allPayments->where('status', 'completed')->count(),
-            'pending_payments' => $allPayments->where('status', 'pending')->count(),
-            'cancelled_payments' => $allPayments->where('status', 'cancelled')->count(),
+        return $labels[$type] ?? 'OFFICIAL RECEIPT';
+    }
+    
+    /**
+     * Get payment method label
+     */
+    private function getPaymentMethodLabel($method)
+    {
+        $labels = [
+            'cash' => 'Cash',
+            'gcash' => 'GCash',
+            'maya' => 'Maya',
+            'bank' => 'Bank Transfer',
+            'check' => 'Check',
+            'online' => 'Online Payment',
+            'card' => 'Credit/Debit Card',
         ];
-    }
-    
-    private function getPaymentMethods($residentIds, $household)
-    {
-        $query = Payment::where(function($q) use ($residentIds, $household) {
-            $q->where('payer_type', 'resident')
-              ->whereIn('payer_id', $residentIds);
-            
-            $q->orWhere('payer_type', 'household')
-              ->where('payer_id', $household->id);
-        });
         
-        return $query->select('payment_method')
-            ->distinct()
-            ->pluck('payment_method')
-            ->filter()
-            ->map(function($method) {
-                $displayNames = [
-                    'cash' => 'Cash',
-                    'gcash' => 'GCash',
-                    'maya' => 'Maya',
-                    'bank' => 'Bank Transfer',
-                    'check' => 'Check',
-                    'online' => 'Online Payment',
-                ];
-                return [
-                    'value' => $method,
-                    'label' => $displayNames[$method] ?? ucfirst($method)
-                ];
-            })
-            ->values();
-    }
-    
-    private function exportPayments($payments)
-    {
-        // Export logic here
-        return response()->json([
-            'message' => 'Export feature not yet implemented'
-        ]);
+        return $labels[$method] ?? ucfirst($method);
     }
     
     public function create()
@@ -479,59 +648,13 @@ class ResidentPaymentController extends Controller
                 'quantity' => 1,
                 'unit_price' => $subtotal,
                 'total' => $subtotal,
+                'fee_code' => $paymentType->code ?? null,
+                'fee_name' => $paymentType->name,
             ]);
         }
         
         return redirect()->route('resident.payments.show', $payment)
             ->with('success', 'Payment request created successfully. Please complete the payment process.');
-    }
-    
-    public function show(Payment $payment)
-    {
-        $user = auth()->user();
-        $household = $user->household_id ? Household::find($user->household_id) : null;
-        
-        if (!$household) {
-            abort(403, 'You are not authorized to view this payment.');
-        }
-        
-        // Check if payment belongs to this household or its residents
-        $authorized = false;
-        
-        if ($payment->payer_type === 'household' && $payment->payer_id === $household->id) {
-            $authorized = true;
-        } elseif ($payment->payer_type === 'resident') {
-            $resident = Resident::where('id', $payment->payer_id)
-                ->where('household_id', $household->id)
-                ->exists();
-            $authorized = $resident;
-        }
-        
-        if (!$authorized) {
-            abort(403, 'You are not authorized to view this payment.');
-        }
-        
-        $payment->load(['items', 'resident', 'household']);
-        
-        // Format payment for frontend
-        $formattedPayment = $this->formatPaymentForFrontend($payment);
-        
-        // Determine if payment can be paid online
-        $canPayOnline = in_array($payment->payment_method, ['gcash', 'maya', 'online', 'bank']) 
-            && $payment->status === 'pending';
-        
-        return Inertia::render('Resident/Payments/Show', [
-            'payment' => $formattedPayment,
-            'canPayOnline' => $canPayOnline,
-            'paymentMethods' => [
-                'cash' => 'Cash',
-                'gcash' => 'GCash',
-                'maya' => 'Maya',
-                'bank' => 'Bank Transfer',
-                'check' => 'Check',
-                'online' => 'Online Payment',
-            ],
-        ]);
     }
     
     public function updatePaymentMethod(Request $request, Payment $payment)
@@ -556,12 +679,15 @@ class ResidentPaymentController extends Controller
             'reference_number' => 'nullable|string|max:100',
         ]);
         
+        $oldMethod = $payment->payment_method;
+        
         $payment->update([
             'payment_method' => $validated['payment_method'],
             'reference_number' => $validated['reference_number'] ?? null,
             'method_details' => array_merge($payment->method_details ?? [], [
                 'reference' => $validated['reference_number'] ?? null,
                 'method_updated_at' => now()->toISOString(),
+                'old_method' => $oldMethod,
             ])
         ]);
         
@@ -585,9 +711,11 @@ class ResidentPaymentController extends Controller
             return back()->with('error', 'Cannot cancel payment. Payment is already ' . $payment->status . '.');
         }
         
+        $reason = $request->input('reason', 'Cancelled by household head');
+        
         $payment->update([
             'status' => 'cancelled',
-            'remarks' => $request->input('reason', 'Cancelled by household head') . '. ' . ($payment->remarks ?? ''),
+            'remarks' => $reason . '. ' . ($payment->remarks ?? ''),
         ]);
         
         return redirect()->route('resident.payments.index')
@@ -610,6 +738,7 @@ class ResidentPaymentController extends Controller
             return back()->with('error', 'Receipt is only available for completed payments.');
         }
         
+        $payment->load(['items', 'resident', 'household']);
         $formattedPayment = $this->formatPaymentForFrontend($payment);
         
         return Inertia::render('Resident/Payments/Receipt', [
@@ -687,12 +816,37 @@ class ResidentPaymentController extends Controller
             ]);
         }
         
+        // Generate payment link based on method
         $paymentLink = '#';
+        $instructions = '';
         
+        switch ($payment->payment_method) {
+            case 'gcash':
+                $paymentLink = 'https://gcash.com/pay/' . $payment->or_number;
+                $instructions = 'Open GCash app and scan the QR code or send payment to GCash number: 0917-123-4567';
+                break;
+            case 'maya':
+                $paymentLink = 'https://maya.ph/pay/' . $payment->or_number;
+                $instructions = 'Open Maya app and scan the QR code or send payment to Maya number: 0917-123-4567';
+                break;
+            case 'bank':
+                $paymentLink = '#';
+                $instructions = 'Bank: BPI, Account Name: Barangay San Vicente, Account Number: 1234-5678-90';
+                break;
+            default:
+                $instructions = 'Please proceed with your selected payment method.';
+        }
+        
+        // Generate QR code (simplified - in production use a proper QR code library)
         $qrCode = 'data:image/svg+xml;base64,' . base64_encode('
             <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
                 <rect width="200" height="200" fill="#fff"/>
-                <text x="100" y="100" text-anchor="middle">Payment QR Code</text>
+                <text x="100" y="100" text-anchor="middle" font-family="Arial" font-size="12">
+                    Payment QR Code
+                </text>
+                <text x="100" y="120" text-anchor="middle" font-family="Arial" font-size="10">
+                    OR #' . $payment->or_number . '
+                </text>
             </svg>
         ');
         
@@ -700,11 +854,224 @@ class ResidentPaymentController extends Controller
             'success' => true,
             'payment_link' => $paymentLink,
             'qr_code' => $qrCode,
-            'instructions' => [
-                'gcash' => 'Send payment to GCash number: 0917-XXX-XXXX',
-                'maya' => 'Send payment to Maya number: 0917-XXX-XXXX',
-                'bank' => 'Bank: BPI, Account: 1234-5678-90',
-            ][$payment->payment_method] ?? 'Please proceed with your selected payment method.',
+            'instructions' => $instructions,
+        ]);
+    }
+    
+    /**
+     * Format payment for frontend
+     */
+    private function formatPaymentForFrontend(Payment $payment)
+    {
+        // Get payer details based on payer_type
+        $payerDetails = [];
+        
+        if ($payment->payer_type === 'resident' && $payment->resident) {
+            $payerDetails = [
+                'id' => $payment->resident->id,
+                'name' => $payment->resident->full_name ?? $payment->resident->name ?? 'N/A',
+                'first_name' => $payment->resident->first_name,
+                'last_name' => $payment->resident->last_name,
+                'middle_name' => $payment->resident->middle_name,
+                'suffix' => $payment->resident->suffix,
+                'contact_number' => $payment->resident->contact_number,
+                'email' => $payment->resident->email,
+                'address' => $payment->resident->address,
+                'household_number' => $payment->resident->household_number,
+                'purok' => $payment->resident->purok,
+                'profile_photo' => $payment->resident->profile_photo,
+            ];
+        } elseif ($payment->payer_type === 'household' && $payment->household) {
+            $payerDetails = [
+                'id' => $payment->household->id,
+                'name' => $payment->household->head_of_family ?? $payment->household->name ?? 'N/A',
+                'contact_number' => $payment->household->contact_number,
+                'address' => $payment->household->address,
+                'household_number' => $payment->household->household_number,
+                'purok' => $payment->household->purok,
+            ];
+        }
+        
+        // Get certificate type display name
+        $certificateTypeDisplay = null;
+        if ($payment->certificate_type) {
+            $certificateTypes = [
+                'residency' => 'Certificate of Residency',
+                'indigency' => 'Certificate of Indigency',
+                'clearance' => 'Barangay Clearance',
+                'cedula' => 'Cedula',
+                'business' => 'Business Permit',
+            ];
+            $certificateTypeDisplay = $certificateTypes[$payment->certificate_type] ?? ucfirst($payment->certificate_type);
+        }
+        
+        // Get payment method display name
+        $paymentMethodDisplay = $this->getPaymentMethodLabel($payment->payment_method);
+        
+        // Get collection type display name
+        $collectionTypeDisplay = $this->getReceiptTypeLabel($payment->collection_type);
+        
+        // Format amounts
+        $formatAmount = function($amount) {
+            return '₱' . number_format($amount, 2);
+        };
+        
+        // Format items
+        $items = $payment->items->map(function ($item) use ($formatAmount) {
+            return [
+                'id' => $item->id,
+                'item_name' => $item->item_name ?? $item->fee_name ?? 'N/A',
+                'description' => $item->description,
+                'quantity' => (int) ($item->quantity ?? 1),
+                'unit_price' => (float) ($item->unit_price ?? $item->base_amount ?? 0),
+                'total' => (float) ($item->total ?? $item->total_amount ?? 0),
+                'formatted_unit_price' => $formatAmount($item->unit_price ?? $item->base_amount ?? 0),
+                'formatted_total' => $formatAmount($item->total ?? $item->total_amount ?? 0),
+                'fee_code' => $item->fee_code,
+                'fee_name' => $item->fee_name,
+                'category' => $item->category,
+                'period_covered' => $item->period_covered,
+            ];
+        })->toArray();
+        
+        // Format related payments
+        $relatedPayments = $payment->related_payments ? $payment->related_payments->map(function ($related) use ($formatAmount) {
+            return [
+                'id' => $related->id,
+                'or_number' => $related->or_number,
+                'purpose' => $related->purpose,
+                'total_amount' => (float) $related->total_amount,
+                'formatted_total' => $formatAmount($related->total_amount),
+                'payment_date' => $related->payment_date ? $related->payment_date->toISOString() : null,
+                'formatted_date' => $related->payment_date ? $related->payment_date->format('M d, Y') : 'N/A',
+                'status' => $related->status,
+                'payment_method' => $related->payment_method,
+            ];
+        })->toArray() : [];
+        
+        return [
+            'id' => $payment->id,
+            'or_number' => $payment->or_number,
+            'reference_number' => $payment->reference_number,
+            'purpose' => $payment->purpose,
+            'subtotal' => (float) $payment->subtotal,
+            'surcharge' => (float) $payment->surcharge,
+            'penalty' => (float) $payment->penalty,
+            'discount' => (float) $payment->discount,
+            'total_amount' => (float) $payment->total_amount,
+            'payment_date' => $payment->payment_date ? $payment->payment_date->toISOString() : null,
+            'due_date' => $payment->due_date ? $payment->due_date->toISOString() : null,
+            'status' => $payment->status,
+            'payment_method' => $payment->payment_method,
+            'payment_method_display' => $paymentMethodDisplay,
+            'is_cleared' => (bool) $payment->is_cleared,
+            'certificate_type' => $payment->certificate_type,
+            'certificate_type_display' => $certificateTypeDisplay,
+            'collection_type' => $payment->collection_type,
+            'collection_type_display' => $collectionTypeDisplay,
+            'remarks' => $payment->remarks,
+            'payer_type' => $payment->payer_type,
+            'payer_id' => $payment->payer_id,
+            'formatted_total' => $formatAmount($payment->total_amount),
+            'formatted_date' => $payment->payment_date ? $payment->payment_date->format('M d, Y') : 'N/A',
+            'formatted_subtotal' => $formatAmount($payment->subtotal),
+            'formatted_surcharge' => $formatAmount($payment->surcharge),
+            'formatted_penalty' => $formatAmount($payment->penalty),
+            'formatted_discount' => $formatAmount($payment->discount),
+            'payer_details' => $payerDetails,
+            'items' => $items,
+            'related_payments' => $relatedPayments,
+            'metadata' => $payment->method_details,
+            'tags' => $payment->tags ? explode(',', $payment->tags) : [],
+            'created_at' => $payment->created_at ? $payment->created_at->toISOString() : null,
+            'updated_at' => $payment->updated_at ? $payment->updated_at->toISOString() : null,
+            'created_by' => $payment->recorded_by ? [
+                'id' => $payment->recorded_by,
+                'name' => $payment->recorded_by_name ?? 'System',
+                'role' => 'system',
+            ] : null,
+        ];
+    }
+    
+    private function emptyPagination()
+    {
+        return [
+            'data' => [],
+            'current_page' => 1,
+            'last_page' => 1,
+            'per_page' => 10,
+            'total' => 0,
+            'from' => 0,
+            'to' => 0,
+        ];
+    }
+    
+    private function emptyStats()
+    {
+        return [
+            'total_payments' => 0,
+            'pending_payments' => 0,
+            'total_paid' => 0,
+            'balance_due' => 0,
+        ];
+    }
+    
+    private function calculateStats($residentIds, $household)
+    {
+        // Combined query for all payments
+        $allPayments = Payment::where(function($q) use ($residentIds, $household) {
+            $q->where('payer_type', 'resident')
+              ->whereIn('payer_id', $residentIds);
+            
+            $q->orWhere('payer_type', 'household')
+              ->where('payer_id', $household->id);
+        });
+        
+        return [
+            'total_payments' => $allPayments->count(),
+            'total_amount' => $allPayments->sum('total_amount'),
+            'resident_payments' => Payment::where('payer_type', 'resident')
+                ->whereIn('payer_id', $residentIds)->count(),
+            'household_payments' => Payment::where('payer_type', 'household')
+                ->where('payer_id', $household->id)->count(),
+            'resident_amount' => Payment::where('payer_type', 'resident')
+                ->whereIn('payer_id', $residentIds)->sum('total_amount'),
+            'household_amount' => Payment::where('payer_type', 'household')
+                ->where('payer_id', $household->id)->sum('total_amount'),
+            'completed_payments' => $allPayments->where('status', 'completed')->count(),
+            'pending_payments' => $allPayments->where('status', 'pending')->count(),
+            'cancelled_payments' => $allPayments->where('status', 'cancelled')->count(),
+        ];
+    }
+    
+    private function getPaymentMethods($residentIds, $household)
+    {
+        $query = Payment::where(function($q) use ($residentIds, $household) {
+            $q->where('payer_type', 'resident')
+              ->whereIn('payer_id', $residentIds);
+            
+            $q->orWhere('payer_type', 'household')
+              ->where('payer_id', $household->id);
+        });
+        
+        return $query->select('payment_method')
+            ->distinct()
+            ->pluck('payment_method')
+            ->filter()
+            ->map(function($method) {
+                return [
+                    'value' => $method,
+                    'label' => $this->getPaymentMethodLabel($method)
+                ];
+            })
+            ->values();
+    }
+    
+    private function exportPayments($payments)
+    {
+        // Export logic here
+        return response()->json([
+            'message' => 'Export feature not yet implemented'
         ]);
     }
     

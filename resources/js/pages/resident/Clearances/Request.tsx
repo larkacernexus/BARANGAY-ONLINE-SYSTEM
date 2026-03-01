@@ -693,7 +693,7 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
             });
         }
 
-        const routeUrl = route('resident.clearances.store');
+        const routeUrl = route('portal.my.clearances.store');
         
         post(routeUrl, formData, {
             preserveScroll: true,

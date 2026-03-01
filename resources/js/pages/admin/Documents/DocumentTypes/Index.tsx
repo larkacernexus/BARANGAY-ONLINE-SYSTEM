@@ -1,4 +1,3 @@
-// app/pages/admin/document-types/index.tsx
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -152,7 +151,7 @@ export default function DocumentTypesIndex() {
                 }
             });
             
-            router.get(route('document-types.index'), params, {
+            router.get(route('admin.document-types.index'), params, {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
@@ -506,7 +505,7 @@ export default function DocumentTypesIndex() {
             }
         });
         
-        router.get(route('document-types.index'), params, {
+        router.get(route('admin.document-types.index'), params, {
             preserveState: true,
             replace: true,
             preserveScroll: true,
@@ -522,7 +521,7 @@ export default function DocumentTypesIndex() {
             required: 'all'
         });
         
-        router.get(route('document-types.index'), {}, {
+        router.get(route('admin.document-types.index'), {}, {
             preserveState: true,
             preserveScroll: true,
         });

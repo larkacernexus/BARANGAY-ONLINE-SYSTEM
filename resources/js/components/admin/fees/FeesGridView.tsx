@@ -106,7 +106,7 @@ export default function FeesGridView({
             icon={<DollarSign className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
             hasFilters={hasActiveFilters}
             onClearFilters={onClearFilters}
-            onCreateNew={() => window.location.href = '/fees/create'}
+            onCreateNew={() => window.location.href = '/admin/fees/create'}
             createLabel="Create Fee"
         />
     );
@@ -115,7 +115,7 @@ export default function FeesGridView({
         if (onViewDetails) {
             onViewDetails(fee);
         } else {
-            router.get(route('fees.show', fee.id));
+            router.get(route('admin.fees.show', fee.id));
         }
     };
 
@@ -215,7 +215,7 @@ export default function FeesGridView({
                                         
                                         <ActionDropdownItem
                                             icon={<FileText className="h-4 w-4" />}
-                                            href={`/fees/${fee.id}/print`}
+                                            href={`/admin/fees/${fee.id}/print`}
                                         >
                                             Print Invoice
                                         </ActionDropdownItem>
@@ -223,7 +223,7 @@ export default function FeesGridView({
                                         {fee.status !== 'paid' && fee.balance > 0 && (
                                             <ActionDropdownItem
                                                 icon={<CreditCard className="h-4 w-4" />}
-                                                href={route('payments.create', { 
+                                                href={route('admin.payments.create', { 
                                                     fee_id: fee.id,
                                                     payer_type: fee.payer_type,
                                                     payer_id: fee.payer_type === 'resident' ? fee.resident_id : fee.household_id,
@@ -284,24 +284,43 @@ export default function FeesGridView({
                                     </div>
                                 </div>
 
-                                {/* Amounts */}
+                               {/* Amounts */}
                                 <div className="space-y-2 pt-2 border-t">
                                     <div className="flex justify-between items-center">
-                                        <div className="text-sm font-medium text-gray-700">Total</div>
-                                        <div className="font-bold text-lg">
+                                        <span className="text-sm font-medium text-gray-700">Total</span>
+                                        <span className="font-bold text-lg">
                                             {formatCurrency(fee.total_amount)}
-                                        </div>
+                                        </span>
                                     </div>
                                     
-                                    <div className="grid grid-cols-2 gap-2 text-sm">
-                                        <div className="text-green-600">
-                                            <div className="font-medium">Paid</div>
-                                            <div>{formatCurrency(fee.amount_paid || 0)}</div>
-                                        </div>
-                                        <div className="text-red-600">
-                                            <div className="font-medium">Balance</div>
-                                            <div>{formatCurrency(fee.balance || fee.total_amount)}</div>
-                                        </div>
+                                    <div className="space-y-1 pt-1">
+                                        {fee.amount_paid > 0 && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <div className="flex items-center gap-1 text-green-600">
+                                                    <CheckCircle className="h-3.5 w-3.5" />
+                                                    <span className="font-medium">Paid</span>
+                                                </div>
+                                                <span className="text-green-600 font-medium">
+                                                    {formatCurrency(fee.amount_paid)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        
+                                        {fee.balance > 0 && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-red-600 font-medium">Balance</span>
+                                                <span className="text-red-600 font-medium">
+                                                    {formatCurrency(fee.balance)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        
+                                        {fee.amount_paid === 0 && fee.balance === fee.total_amount && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-gray-500">No payments yet</span>
+                                                <span className="text-gray-500">—</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 

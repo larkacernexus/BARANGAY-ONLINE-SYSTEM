@@ -115,7 +115,7 @@ export default function UsersGridView({
       icon={<UserIcon className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
       hasFilters={hasActiveFilters}
       onClearFilters={onClearFilters}
-      onCreateNew={() => window.location.href = '/users/create'}
+      onCreateNew={() => window.location.href = '/admin/users/create'}
       createLabel="Create User"
     />
   );
@@ -179,14 +179,14 @@ export default function UsersGridView({
                   <ActionDropdown>
                     <ActionDropdownItem
                       icon={<Eye className="h-4 w-4" />}
-                      href={`/users/${user.id}`}
+                      href={`/admin/users/${user.id}`}
                     >
                       View Profile
                     </ActionDropdownItem>
                     
                     <ActionDropdownItem
                       icon={<Edit className="h-4 w-4" />}
-                      href={`/users/${user.id}/edit`}
+                      href={`/admin/users/${user.id}/edit`}
                     >
                       Edit User
                     </ActionDropdownItem>

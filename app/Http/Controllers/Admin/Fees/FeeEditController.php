@@ -34,7 +34,7 @@ class FeeEditController extends Controller
                     'allowed_statuses' => ['pending', 'issued']
                 ]);
 
-                return redirect()->route('fees.show', $fee)
+                return redirect()->route('admin.fees.show', $fee)
                     ->with('error', 'Only pending or issued fees can be edited.');
             }
 
@@ -197,7 +197,7 @@ class FeeEditController extends Controller
                 'new_status' => $fee->status
             ]);
 
-            return redirect()->route('fees.show', $fee)
+            return redirect()->route('admin.fees.show', $fee)
                 ->with('success', 'Fee updated successfully.');
 
         } catch (\Exception $e) {

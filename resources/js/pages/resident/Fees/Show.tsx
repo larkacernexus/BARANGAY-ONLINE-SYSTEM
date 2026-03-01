@@ -1,8 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import ResidentLayout from '@/layouts/resident-app-layout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
     Table,
     TableBody,
@@ -29,9 +27,20 @@ import {
     Tag,
     Shield,
     Home,
-    Briefcase
+    Briefcase,
+    Inbox
 } from 'lucide-react';
 import { Link, usePage, Head } from '@inertiajs/react';
+import { cn } from '@/lib/utils';
+
+// Import from reusable UI library
+import { formatCurrency, formatDate } from '@/components/residentui/lib/resident-ui-utils';
+import { useMobileDetect } from '@/components/residentui/hooks/useResidentUI';
+import { ModernCard } from '@/components/residentui/modern-card';
+import { ModernTabs } from '@/components/residentui/modern-tabs';
+import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
+import { ModernStatusBadge } from '@/components/residentui/modern-status-badge';
+import { FEE_STATUS_CONFIG } from '@/components/residentui/constants/fee-ui';
 
 interface Fee {
     id: number;
@@ -110,43 +119,15 @@ interface PageProps {
     fee: Fee;
     paymentHistory: Payment[];
     canPayOnline: boolean;
-    [key: string]: any; // Add index signature to satisfy Inertia's PageProps constraint
+    [key: string]: any;
 }
 
 type TabType = 'details' | 'payments';
 
-// Status configuration for better maintainability
-const STATUS_CONFIG = {
-    paid: {
-        label: 'Paid',
-        icon: CheckCircle,
-        className: 'bg-green-100 text-green-800 hover:bg-green-100',
-    },
-    pending: {
-        label: 'Pending',
-        icon: Clock,
-        className: 'bg-amber-100 text-amber-800 hover:bg-amber-100',
-    },
-    partially_paid: {
-        label: 'Partially Paid',
-        icon: CreditCard,
-        className: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-    },
-    issued: {
-        label: 'Issued',
-        icon: FileText,
-        className: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
-    },
-    overdue: {
-        label: 'Overdue',
-        icon: AlertCircle,
-        className: 'bg-red-100 text-red-800 hover:bg-red-100',
-    },
-} as const;
-
 export default function FeeDetails() {
     const { fee, paymentHistory, canPayOnline } = usePage<PageProps>().props;
     const [activeTab, setActiveTab] = useState<TabType>('details');
+    const { isMobile } = useMobileDetect();
     
     // Memoized calculations
     const requirements = useMemo(() => {
@@ -181,104 +162,57 @@ export default function FeeDetails() {
         }
     }, [fee, requirements]);
     
-    // Status badge component
-    const StatusBadge = useMemo(() => {
-        const config = fee.is_overdue ? STATUS_CONFIG.overdue : STATUS_CONFIG[fee.status.toLowerCase() as keyof typeof STATUS_CONFIG];
-        
-        if (!config) {
-            return <Badge variant="outline">{fee.status}</Badge>;
-        }
-        
-        const Icon = config.icon;
-        
-        return (
-            <Badge className={config.className}>
-                <Icon className="h-3 w-3 mr-1" />
-                {config.label}
-            </Badge>
-        );
-    }, [fee.status, fee.is_overdue]);
-    
-    // Helper functions
-    const formatCurrency = (amount: number): string => {
-        return new Intl.NumberFormat('en-PH', {
-            style: 'currency',
-            currency: 'PHP',
-            minimumFractionDigits: 2,
-        }).format(amount);
-    };
-    
-    const formatDate = (dateString?: string): string => {
-        if (!dateString) return 'N/A';
-        try {
-            const date = new Date(dateString);
-            return date.toLocaleDateString('en-PH', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-            });
-        } catch {
-            return 'Invalid Date';
-        }
+    const getStatusKey = (): string => {
+        if (fee.is_overdue) return 'overdue';
+        return fee.status.toLowerCase();
     };
     
     const handleDownloadReceipt = () => {
-        // Implement receipt download logic
         console.log('Downloading receipt for OR:', fee.or_number);
-        // Add actual download implementation here
     };
     
     // Tab configuration
-    const tabs = [
-        {
-            id: 'details',
-            label: 'Details',
-            icon: Info,
-            enabled: true,
-        },
-        {
-            id: 'payments',
-            label: 'Payment History',
-            icon: Receipt,
-            enabled: paymentHistory.length > 0,
-        },
-    ] as const;
-    
+    const tabsConfig = [
+        { id: 'details', label: 'Details', icon: Info },
+        { id: 'payments', label: 'Payment History', icon: Receipt },
+    ];
+
+    const getTabCount = (tabId: string) => {
+        if (tabId === 'payments') return paymentHistory.length;
+        return 0;
+    };
+
     return (
         <ResidentLayout
-            // Remove title prop from Layout since it doesn't accept it
             breadcrumbs={[
-                { title: 'Dashboard', href: '/resident/dashboard' },
-                { title: 'My Fees', href: '/residentfees' },
-                { title: `Fee: ${fee.fee_code}`, href: `/residentfees/${fee.id}` }
+                { title: 'Dashboard', href: '/portal/dashboard' },
+                { title: 'My Fees', href: '/portal/fees' },
+                { title: `Fee: ${fee.fee_code}`, href: `/portal/fees/${fee.id}` }
             ]}
         >
             <Head title={`Fee: ${fee.fee_code}`} />
             
-            <div className="space-y-6">
+            <div className="space-y-6 px-4 md:px-6 pb-6">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <Link href="/residentfees">
-                                <Button variant="ghost" size="sm" className="h-8 px-2 gap-1">
-                                    <ArrowLeft className="h-4 w-4" />
-                                    Back
-                                </Button>
-                            </Link>
-                        </div>
+                    <div className="flex items-center gap-4">
+                        <Link href="/portal/fees">
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-xl">
+                                <ArrowLeft className="h-4 w-4" />
+                            </Button>
+                        </Link>
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <FileText className="h-6 w-6 text-blue-600" />
+                            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                                <FileText className="h-6 w-6 text-white" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold tracking-tight">
-                                    {fee.fee_code} - {fee.purpose}
+                                <h1 className="text-xl md:text-2xl font-bold">
+                                    {fee.fee_code}
                                 </h1>
-                                <p className="text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                    {fee.fee_type?.category_display || 'Fee Assessment'}
+                                <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                    {fee.purpose}
                                     {!fee.is_own_fee && fee.resident_info && (
-                                        <span className="ml-2 text-sm flex items-center gap-1">
+                                        <span className="ml-2 text-xs flex items-center gap-1">
                                             <Shield className="h-3 w-3" />
                                             For: {fee.resident_info.full_name}
                                         </span>
@@ -289,17 +223,19 @@ export default function FeeDetails() {
                     </div>
                     
                     <div className="flex flex-wrap gap-2">
-                        {StatusBadge}
+                        <ModernStatusBadge status={getStatusKey()} config={FEE_STATUS_CONFIG} />
+{/*                         
                         {fee.balance > 0 && canPayOnline && (
-                            <Link href={`/resident/payments/create?fee_id=${fee.id}`}>
-                                <Button className="gap-2">
+                            <Link href={`/portal/payments/create?fee_id=${fee.id}`}>
+                                <Button className="gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600">
                                     <CreditCard className="h-4 w-4" />
                                     Pay Now
                                 </Button>
                             </Link>
-                        )}
+                        )} */}
+                        
                         {fee.balance === 0 && fee.or_number && (
-                            <Button variant="outline" onClick={handleDownloadReceipt} className="gap-2">
+                            <Button variant="outline" onClick={handleDownloadReceipt} className="gap-2 rounded-xl">
                                 <Download className="h-4 w-4" />
                                 Download Receipt
                             </Button>
@@ -308,21 +244,12 @@ export default function FeeDetails() {
                 </div>
                 
                 {/* Tabs */}
-                <div className="border-b">
-                    <nav className="flex space-x-4">
-                        {tabs.map((tab) => (
-                            <button
-                                key={tab.id}
-                                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed'}`}
-                                onClick={() => setActiveTab(tab.id)}
-                                disabled={!tab.enabled}
-                            >
-                                <tab.icon className="h-4 w-4" />
-                                {tab.label}
-                            </button>
-                        ))}
-                    </nav>
-                </div>
+                <ModernTabs
+                    tabs={tabsConfig}
+                    activeTab={activeTab}
+                    onTabChange={(tabId) => setActiveTab(tabId as TabType)}
+                    getTabCount={getTabCount}
+                />
                 
                 {/* Details Tab */}
                 {activeTab === 'details' && (
@@ -330,20 +257,220 @@ export default function FeeDetails() {
                         {/* Left Column */}
                         <div className="space-y-6">
                             {/* Fee Information */}
-                            <FeeInfoCard fee={fee} />
+                            <ModernCard
+                                title="Fee Information"
+                                icon={FileText}
+                                iconColor="from-blue-500 to-blue-600"
+                            >
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                        <p className="text-xs text-gray-500">Fee Code</p>
+                                        <p className="font-medium text-sm mt-1">{fee.fee_code}</p>
+                                    </div>
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                        <p className="text-xs text-gray-500">Type</p>
+                                        <p className="font-medium text-sm mt-1">{fee.fee_type?.name || 'N/A'}</p>
+                                    </div>
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                        <p className="text-xs text-gray-500">Issue Date</p>
+                                        <p className="font-medium text-sm mt-1">{fee.formatted_issue_date}</p>
+                                    </div>
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                        <p className="text-xs text-gray-500">Due Date</p>
+                                        <div className="font-medium text-sm mt-1">
+                                            {fee.formatted_due_date}
+                                            {fee.is_overdue && fee.days_overdue > 0 && (
+                                                <span className="text-xs text-red-500 block">
+                                                    {fee.days_overdue} day{fee.days_overdue > 1 ? 's' : ''} overdue
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {fee.billing_period && (
+                                        <div className="col-span-1 sm:col-span-2">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500">Billing Period</p>
+                                                <p className="font-medium text-sm mt-1">{fee.billing_period}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {fee.remarks && (
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 mt-2">
+                                        <p className="text-xs text-gray-500 mb-1">Remarks</p>
+                                        <p className="text-sm">{fee.remarks}</p>
+                                    </div>
+                                )}
+                            </ModernCard>
                             
                             {/* Payer Information */}
-                            <PayerInfoCard fee={fee} />
+                            <ModernCard
+                                title="Payer Information"
+                                icon={User}
+                                iconColor="from-green-500 to-green-600"
+                            >
+                                <div className="space-y-3">
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                        <p className="text-xs text-gray-500 mb-1">Name</p>
+                                        <p className="font-medium">{fee.payer_name}</p>
+                                        {fee.payer_type === 'resident' && fee.is_own_fee && (
+                                            <span className="text-xs text-blue-600 mt-1 block">(You)</span>
+                                        )}
+                                    </div>
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                        <p className="text-xs text-gray-500 mb-1">Address</p>
+                                        <p className="font-medium">{fee.address}</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {fee.purok && (
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500">Purok</p>
+                                                <p className="font-medium text-sm mt-1">{fee.purok}</p>
+                                            </div>
+                                        )}
+                                        {fee.zone && (
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500">Zone</p>
+                                                <p className="font-medium text-sm mt-1">{fee.zone}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </ModernCard>
                         </div>
                         
                         {/* Right Column */}
                         <div className="space-y-6">
                             {/* Amount Breakdown */}
-                            <AmountBreakdownCard fee={fee} />
+                            <ModernCard
+                                title="Amount Breakdown"
+                                icon={DollarSign}
+                                iconColor="from-purple-500 to-purple-600"
+                            >
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                        <span className="text-sm text-gray-600">Base Amount</span>
+                                        <span className="font-medium">{fee.formatted_base_amount}</span>
+                                    </div>
+                                    
+                                    {fee.surcharge_amount > 0 && (
+                                        <div className="flex justify-between items-center p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+                                            <span className="text-sm text-amber-600">Surcharge</span>
+                                            <span className="font-medium text-amber-600">{fee.formatted_surcharge}</span>
+                                        </div>
+                                    )}
+                                    
+                                    {fee.penalty_amount > 0 && (
+                                        <div className="flex justify-between items-center p-3 rounded-lg bg-red-50 dark:bg-red-900/20">
+                                            <span className="text-sm text-red-600">Penalty</span>
+                                            <span className="font-medium text-red-600">{fee.formatted_penalty}</span>
+                                        </div>
+                                    )}
+                                    
+                                    {fee.discount_amount > 0 && (
+                                        <div className="flex justify-between items-center p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
+                                            <span className="text-sm text-green-600">Discount</span>
+                                            <span className="font-medium text-green-600">-{fee.formatted_discount}</span>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="border-t pt-3 mt-3">
+                                        <div className="flex justify-between items-center p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
+                                            <span className="font-semibold">Total Amount</span>
+                                            <span className="text-xl font-bold">{fee.formatted_total}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="border-t pt-3 mt-3">
+                                        <div className="flex justify-between items-center p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                                            <span className="text-sm text-blue-600">Amount Paid</span>
+                                            <span className="font-medium text-blue-600">{fee.formatted_amount_paid}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center mt-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20">
+                                            <span className="text-sm text-red-600">Balance Due</span>
+                                            <span className={`text-lg font-bold ${fee.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                {fee.formatted_balance}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </ModernCard>
                             
                             {/* Additional Information */}
                             {hasAdditionalInfo && (
-                                <AdditionalInfoCard fee={fee} requirements={requirements} />
+                                <ModernCard
+                                    title="Additional Information"
+                                    icon={Info}
+                                    iconColor="from-orange-500 to-orange-600"
+                                >
+                                    <div className="space-y-3">
+                                        {fee.business_name && (
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500">Business Name</p>
+                                                <p className="font-medium text-sm mt-1">{fee.business_name}</p>
+                                            </div>
+                                        )}
+                                        
+                                        {fee.business_type && (
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500">Business Type</p>
+                                                <p className="font-medium text-sm mt-1">{fee.business_type}</p>
+                                            </div>
+                                        )}
+                                        
+                                        {fee.property_description && (
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500">Property Description</p>
+                                                <p className="font-medium text-sm mt-1">{fee.property_description}</p>
+                                            </div>
+                                        )}
+                                        
+                                        {fee.area && (
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500">Area</p>
+                                                <p className="font-medium text-sm mt-1">{fee.area.toLocaleString()} sq.m.</p>
+                                            </div>
+                                        )}
+                                        
+                                        {fee.valid_from && fee.valid_until && (
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500">Validity Period</p>
+                                                <p className="font-medium text-sm mt-1">
+                                                    {fee.formatted_valid_from} to {fee.formatted_valid_until}
+                                                </p>
+                                            </div>
+                                        )}
+                                        
+                                        {fee.certificate_number && (
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500">Certificate Number</p>
+                                                <p className="font-medium font-mono text-sm mt-1">{fee.certificate_number}</p>
+                                            </div>
+                                        )}
+                                        
+                                        {fee.or_number && (
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500">Official Receipt</p>
+                                                <p className="font-medium font-mono text-sm mt-1">{fee.or_number}</p>
+                                            </div>
+                                        )}
+                                        
+                                        {requirements.length > 0 && (
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <p className="text-xs text-gray-500 mb-2">Requirements Submitted</p>
+                                                <ul className="space-y-1">
+                                                    {requirements.map((req, index) => (
+                                                        <li key={index} className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                                                            <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                                            <span>{typeof req === 'string' ? req : JSON.stringify(req)}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                </ModernCard>
                             )}
                         </div>
                     </div>
@@ -351,370 +478,79 @@ export default function FeeDetails() {
                 
                 {/* Payments Tab */}
                 {activeTab === 'payments' && (
-                    <PaymentHistoryCard paymentHistory={paymentHistory} />
+                    <ModernCard
+                        title="Payment History"
+                        description="All payments made towards this fee"
+                        icon={Receipt}
+                        iconColor="from-indigo-500 to-indigo-600"
+                    >
+                        {paymentHistory.length === 0 ? (
+                            <ModernEmptyState
+                                status="empty"
+                                title="No payment history"
+                                description="No payments have been made for this fee yet."
+                                icon={Inbox}
+                                className="py-12"
+                            />
+                        ) : (
+                            <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="bg-gray-50 dark:bg-gray-800/50">
+                                                <TableHead className="font-semibold">Date</TableHead>
+                                                <TableHead className="font-semibold">OR Number</TableHead>
+                                                <TableHead className="font-semibold">Amount</TableHead>
+                                                <TableHead className="font-semibold">Payment Method</TableHead>
+                                                <TableHead className="font-semibold">Status</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {paymentHistory.map((payment, index) => (
+                                                <TableRow key={`${payment.or_number}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                                    <TableCell className="font-medium">
+                                                        {formatDate(payment.date)}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <Receipt className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                                            <span className="font-mono text-sm">{payment.or_number}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium">
+                                                            {formatCurrency(payment.amount)}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <CreditCard className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                                            <span className="capitalize">{payment.method.replace('_', ' ')}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {payment.status === 'completed' ? (
+                                                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                                                <CheckCircle className="h-3 w-3" />
+                                                                Completed
+                                                            </div>
+                                                        ) : (
+                                                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                                                <Clock className="h-3 w-3" />
+                                                                Pending
+                                                            </div>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        )}
+                    </ModernCard>
                 )}
             </div>
         </ResidentLayout>
     );
 }
-
-// Sub-components for better organization
-interface FeeInfoCardProps {
-    fee: Fee;
-}
-
-const FeeInfoCard: React.FC<FeeInfoCardProps> = ({ fee }) => (
-    <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Fee Information
-            </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <p className="text-sm text-gray-500">Fee Code</p>
-                    <p className="font-medium">{fee.fee_code}</p>
-                </div>
-                <div>
-                    <p className="text-sm text-gray-500">Type</p>
-                    <p className="font-medium">{fee.fee_type?.name || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-sm text-gray-500">Issue Date</p>
-                    <p className="font-medium">{fee.formatted_issue_date}</p>
-                </div>
-                <div>
-                    <p className="text-sm text-gray-500">Due Date</p>
-                    <div className={`font-medium ${fee.is_overdue ? 'text-red-600' : ''}`}>
-                        {fee.formatted_due_date}
-                        {fee.is_overdue && fee.days_overdue > 0 && (
-                            <span className="text-xs text-red-500 block mt-1">
-                                {fee.days_overdue} day{fee.days_overdue > 1 ? 's' : ''} overdue
-                            </span>
-                        )}
-                    </div>
-                </div>
-                {fee.billing_period && (
-                    <div className="col-span-1 sm:col-span-2">
-                        <p className="text-sm text-gray-500">Billing Period</p>
-                        <p className="font-medium">{fee.billing_period}</p>
-                    </div>
-                )}
-                {fee.period_start && fee.period_end && (
-                    <div className="col-span-1 sm:col-span-2">
-                        <p className="text-sm text-gray-500">Coverage Period</p>
-                        <p className="font-medium">
-                            {fee.formatted_issue_date} to {fee.formatted_due_date}
-                        </p>
-                    </div>
-                )}
-            </div>
-            
-            {fee.remarks && (
-                <div>
-                    <p className="text-sm text-gray-500">Remarks</p>
-                    <p className="font-medium text-sm">{fee.remarks}</p>
-                </div>
-            )}
-        </CardContent>
-    </Card>
-);
-
-interface PayerInfoCardProps {
-    fee: Fee;
-}
-
-const PayerInfoCard: React.FC<PayerInfoCardProps> = ({ fee }) => (
-    <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Payer Information
-            </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            <div>
-                <p className="text-sm text-gray-500">Name</p>
-                <p className="font-medium">{fee.payer_name}</p>
-                {fee.payer_type === 'resident' && fee.is_own_fee && (
-                    <span className="text-xs text-blue-600">(You)</span>
-                )}
-            </div>
-            <div>
-                <p className="text-sm text-gray-500">Address</p>
-                <p className="font-medium">{fee.address}</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {fee.purok && (
-                    <div>
-                        <p className="text-sm text-gray-500">Purok</p>
-                        <p className="font-medium">{fee.purok}</p>
-                    </div>
-                )}
-                {fee.zone && (
-                    <div>
-                        <p className="text-sm text-gray-500">Zone</p>
-                        <p className="font-medium">{fee.zone}</p>
-                    </div>
-                )}
-            </div>
-        </CardContent>
-    </Card>
-);
-
-interface AmountBreakdownCardProps {
-    fee: Fee;
-}
-
-const AmountBreakdownCard: React.FC<AmountBreakdownCardProps> = ({ fee }) => (
-    <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Amount Breakdown
-            </CardTitle>
-        </CardHeader>
-        <CardContent>
-            <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Base Amount</span>
-                    <span className="font-medium">{fee.formatted_base_amount}</span>
-                </div>
-                
-                {fee.surcharge_amount > 0 && (
-                    <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Surcharge</span>
-                        <span className="font-medium text-amber-600">{fee.formatted_surcharge}</span>
-                    </div>
-                )}
-                
-                {fee.penalty_amount > 0 && (
-                    <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Penalty</span>
-                        <span className="font-medium text-red-600">{fee.formatted_penalty}</span>
-                    </div>
-                )}
-                
-                {fee.discount_amount > 0 && (
-                    <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Discount</span>
-                        <span className="font-medium text-green-600">-{fee.formatted_discount}</span>
-                    </div>
-                )}
-                
-                <div className="border-t pt-3 mt-3">
-                    <div className="flex justify-between items-center">
-                        <span className="font-semibold">Total Amount</span>
-                        <span className="text-xl font-bold">{fee.formatted_total}</span>
-                    </div>
-                </div>
-                
-                <div className="border-t pt-3 mt-3">
-                    <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Amount Paid</span>
-                        <span className="font-medium text-green-600">{fee.formatted_amount_paid}</span>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                        <span className="text-gray-600">Balance Due</span>
-                        <span className={`text-lg font-bold ${fee.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {fee.formatted_balance}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </CardContent>
-    </Card>
-);
-
-interface AdditionalInfoCardProps {
-    fee: Fee;
-    requirements: string[];
-}
-
-const AdditionalInfoCard: React.FC<AdditionalInfoCardProps> = ({ fee, requirements }) => (
-    <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <Info className="h-5 w-5" />
-                Additional Information
-            </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            {fee.business_name && (
-                <div>
-                    <p className="text-sm text-gray-500">Business Name</p>
-                    <p className="font-medium">{fee.business_name}</p>
-                </div>
-            )}
-            
-            {fee.business_type && (
-                <div>
-                    <p className="text-sm text-gray-500">Business Type</p>
-                    <p className="font-medium">{fee.business_type}</p>
-                </div>
-            )}
-            
-            {fee.property_description && (
-                <div>
-                    <p className="text-sm text-gray-500">Property Description</p>
-                    <p className="font-medium">{fee.property_description}</p>
-                </div>
-            )}
-            
-            {fee.area && (
-                <div>
-                    <p className="text-sm text-gray-500">Area</p>
-                    <p className="font-medium">{fee.area.toLocaleString()} sq.m.</p>
-                </div>
-            )}
-            
-            {fee.valid_from && fee.valid_until && (
-                <div>
-                    <p className="text-sm text-gray-500">Validity Period</p>
-                    <p className="font-medium">
-                        {fee.formatted_valid_from} to {fee.formatted_valid_until}
-                    </p>
-                </div>
-            )}
-            
-            {fee.certificate_number && (
-                <div>
-                    <p className="text-sm text-gray-500">Certificate Number</p>
-                    <p className="font-medium">{fee.certificate_number}</p>
-                </div>
-            )}
-            
-            {fee.or_number && (
-                <div>
-                    <p className="text-sm text-gray-500">Official Receipt</p>
-                    <p className="font-medium font-mono">{fee.or_number}</p>
-                </div>
-            )}
-            
-            {requirements.length > 0 && (
-                <div>
-                    <p className="text-sm text-gray-500">Requirements Submitted</p>
-                    <ul className="space-y-1 mt-2">
-                        {requirements.map((req, index) => (
-                            <li key={index} className="text-sm text-gray-700 flex items-start gap-2">
-                                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                                <span>{typeof req === 'string' ? req : JSON.stringify(req)}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-        </CardContent>
-    </Card>
-);
-
-interface PaymentHistoryCardProps {
-    paymentHistory: Payment[];
-}
-
-const PaymentHistoryCard: React.FC<PaymentHistoryCardProps> = ({ paymentHistory }) => (
-    <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5" />
-                Payment History
-            </CardTitle>
-            <CardDescription>
-                All payments made towards this fee
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-            {paymentHistory.length === 0 ? (
-                <EmptyState />
-            ) : (
-                <PaymentHistoryTable paymentHistory={paymentHistory} />
-            )}
-        </CardContent>
-    </Card>
-);
-
-const EmptyState: React.FC = () => (
-    <div className="text-center py-12">
-        <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <Receipt className="h-8 w-8 text-gray-400" />
-        </div>
-        <h3 className="text-lg font-semibold mb-2">No payment history</h3>
-        <p className="text-gray-500 dark:text-gray-400">
-            No payments have been made for this fee yet.
-        </p>
-    </div>
-);
-
-interface PaymentHistoryTableProps {
-    paymentHistory: Payment[];
-}
-
-const PaymentHistoryTable: React.FC<PaymentHistoryTableProps> = ({ paymentHistory }) => {
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-PH', {
-            style: 'currency',
-            currency: 'PHP',
-        }).format(amount);
-    };
-
-    return (
-        <div className="rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>OR Number</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Payment Method</TableHead>
-                        <TableHead>Status</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {paymentHistory.map((payment, index) => (
-                        <TableRow key={`${payment.or_number}-${index}`}>
-                            <TableCell className="font-medium">
-                                {new Date(payment.date).toLocaleDateString('en-PH', {
-                                    year: 'numeric',
-                                    month: 'short',
-                                    day: 'numeric',
-                                })}
-                            </TableCell>
-                            <TableCell>
-                                <div className="flex items-center gap-2">
-                                    <Receipt className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                    <span className="font-mono text-sm">{payment.or_number}</span>
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                <div className="font-medium">
-                                    {formatCurrency(payment.amount)}
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                <div className="flex items-center gap-2">
-                                    <CreditCard className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                    <span className="capitalize">{payment.method.replace('_', ' ')}</span>
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                {payment.status === 'completed' ? (
-                                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100 gap-1">
-                                        <CheckCircle className="h-3 w-3" />
-                                        Completed
-                                    </Badge>
-                                ) : (
-                                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        Pending
-                                    </Badge>
-                                )}
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
-    );
-};

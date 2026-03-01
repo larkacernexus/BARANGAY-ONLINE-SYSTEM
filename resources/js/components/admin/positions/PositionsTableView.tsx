@@ -352,21 +352,21 @@ export default function PositionsTableView({
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-48">
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/positions/${position.id}`} className="flex items-center cursor-pointer">
+                                                        <Link href={`/admin/positions/${position.id}`} className="flex items-center cursor-pointer">
                                                             <Eye className="mr-2 h-4 w-4" />
                                                             <span>View Details</span>
                                                         </Link>
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/positions/${position.id}/edit`} className="flex items-center cursor-pointer">
+                                                        <Link href={`/admin/positions/${position.id}/edit`} className="flex items-center cursor-pointer">
                                                             <Edit className="mr-2 h-4 w-4" />
                                                             <span>Edit Position</span>
                                                         </Link>
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/officials?position_id=${position.id}`} className="flex items-center cursor-pointer">
+                                                        <Link href={`/admin/officials?position_id=${position.id}`} className="flex items-center cursor-pointer">
                                                             <Users className="mr-2 h-4 w-4" />
                                                             <span>View Officials</span>
                                                         </Link>
@@ -413,7 +413,7 @@ export default function PositionsTableView({
                                                     )}
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/positions/${position.id}/print`} className="flex items-center cursor-pointer">
+                                                        <Link href={`/admin/positions/${position.id}/print`} className="flex items-center cursor-pointer">
                                                             <Printer className="mr-2 h-4 w-4" />
                                                             <span>Print Details</span>
                                                         </Link>

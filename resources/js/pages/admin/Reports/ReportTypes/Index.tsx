@@ -141,7 +141,7 @@ export default function ReportTypesIndex() {
                 }
             });
             
-            router.get(route('report-types.index'), params, {
+            router.get(route('admin.report-types.index'), params, {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
@@ -496,7 +496,7 @@ export default function ReportTypesIndex() {
             }
         });
         
-        router.get(route('report-types.index'), params, {
+        router.get(route('admin.report-types.index'), params, {
             preserveState: true,
             replace: true,
             preserveScroll: true,
@@ -512,7 +512,7 @@ export default function ReportTypesIndex() {
             requires_action: 'all'
         });
         
-        router.get(route('report-types.index'), {}, {
+        router.get(route('admin.report-types.index'), {}, {
             preserveState: true,
             preserveScroll: true,
         });
@@ -545,8 +545,8 @@ export default function ReportTypesIndex() {
             <AppLayout
                 title="Report Types"
                 breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Report Types', href: '/report-types' }
+                    { title: 'Dashboard', href: '/admin/dashboard' },
+                    { title: 'Report Types', href: '/admin/report-types' }
                 ]}
             >
                 <div className="flex items-center justify-center h-64">
@@ -570,8 +570,8 @@ export default function ReportTypesIndex() {
         <AppLayout
             title="Report Types"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Report Types', href: '/report-types' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Report Types', href: '/admin/report-types' }
             ]}
         >
             <TooltipProvider>

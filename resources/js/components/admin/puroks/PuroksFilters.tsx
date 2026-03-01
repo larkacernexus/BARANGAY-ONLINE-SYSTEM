@@ -145,7 +145,7 @@ export default function PuroksFilters({
                                     variant="outline"
                                     className="h-9"
                                     onClick={() => {
-                                        const exportUrl = new URL('/puroks/export', window.location.origin);
+                                        const exportUrl = new URL('/admin/puroks/export', window.location.origin);
                                         if (search) exportUrl.searchParams.append('search', search);
                                         if (filtersState.status !== 'all') exportUrl.searchParams.append('status', filtersState.status);
                                         window.open(exportUrl.toString(), '_blank');

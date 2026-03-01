@@ -1,5 +1,4 @@
-// resources/js/Pages/Clearances/Show.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, JSX } from 'react';
 import { router } from '@inertiajs/react';
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -47,7 +46,11 @@ import {
     Download as DownloadIcon,
     Upload,
     Check,
-    AlertTriangle
+    AlertTriangle,
+    CreditCard,
+    Receipt,
+    Banknote,
+    Wallet
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { 
@@ -61,6 +64,30 @@ import {
     Payment as PaymentInterface,
     DocumentStats
 } from '@/types/clearance';
+import { toast } from 'sonner';
+
+// Payment Status Badge Component
+const PaymentStatusBadge = ({ status }: { status: string }) => {
+    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline', icon: JSX.Element }> = {
+        'paid': { variant: 'default', icon: <CheckCircle className="h-3 w-3 mr-1" /> },
+        'partially_paid': { variant: 'secondary', icon: <Clock className="h-3 w-3 mr-1" /> },
+        'unpaid': { variant: 'outline', icon: <AlertCircle className="h-3 w-3 mr-1" /> }
+    };
+
+    const config = variants[status] || variants.unpaid;
+    const labels: Record<string, string> = {
+        'paid': 'Paid',
+        'partially_paid': 'Partially Paid',
+        'unpaid': 'Unpaid'
+    };
+
+    return (
+        <Badge variant={config.variant} className="flex items-center">
+            {config.icon}
+            {labels[status] || status}
+        </Badge>
+    );
+};
 
 // Document viewer component - updated with proper Document type
 interface DocumentViewerProps {
@@ -753,19 +780,19 @@ export default function ShowClearance({
     // Handle actions
     const handlePrint = () => {
         setIsPrinting(true);
-        router.get(`/clearances/${clearance.id}/print`, {}, {
+        router.get(`/admin/clearances/${clearance.id}/print`, {}, {
             onFinish: () => setIsPrinting(false)
         });
     };
 
     const handleDownload = () => {
-        router.get(`/clearances/${clearance.id}/download`);
+        router.get(`/admin/clearances/${clearance.id}/download`);
     };
 
     const handleMarkAsProcessing = () => {
         if (confirm('Mark this request as "Under Processing"?')) {
             setIsProcessing(true);
-            router.post(`/clearances/${clearance.id}/process`, {}, {
+            router.post(`/admin/clearances/${clearance.id}/process`, {}, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -775,7 +802,7 @@ export default function ShowClearance({
     const handleApprove = () => {
         if (confirm('Approve this clearance request?')) {
             setIsProcessing(true);
-            router.post(`/clearances/${clearance.id}/approve`, {}, {
+            router.post(`/admin/clearances/${clearance.id}/approve`, {}, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -785,7 +812,7 @@ export default function ShowClearance({
     const handleIssue = () => {
         if (confirm('Issue this clearance certificate?')) {
             setIsProcessing(true);
-            router.post(`/clearances/${clearance.id}/issue`, {}, {
+            router.post(`/admin/clearances/${clearance.id}/issue`, {}, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -796,7 +823,7 @@ export default function ShowClearance({
         const reason = prompt('Please enter the reason for rejection:');
         if (reason) {
             setIsProcessing(true);
-            router.post(`/clearances/${clearance.id}/reject`, { reason }, {
+            router.post(`/admin/clearances/${clearance.id}/reject`, { reason }, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -807,7 +834,7 @@ export default function ShowClearance({
         const reason = prompt('Please enter the reason for cancellation:');
         if (reason !== null) {
             setIsProcessing(true);
-            router.post(`/clearances/${clearance.id}/cancel`, { reason }, {
+            router.post(`/admin/clearances/${clearance.id}/cancel`, { reason }, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -816,18 +843,58 @@ export default function ShowClearance({
 
     const handleDelete = () => {
         if (confirm('Are you sure you want to delete this clearance request? This action cannot be undone.')) {
-            router.delete(`/clearances/${clearance.id}`);
+            router.delete(`/admin/clearances/${clearance.id}`);
         }
     };
 
     const handleEdit = () => {
-        router.visit(`/clearances/${clearance.id}/edit`);
+        router.visit(`/admin/clearances/${clearance.id}/edit`);
+    };
+
+    // Handle payment verification
+    const handleVerifyPayment = () => {
+        if (confirm('Mark this payment as verified? This will update the payment status to paid.')) {
+            router.post(`/admin/clearances/${clearance.id}/verify-payment`, {}, {
+                onSuccess: () => {
+                    toast.success('Payment verified successfully');
+                },
+                onError: () => {
+                    toast.error('Failed to verify payment');
+                }
+            });
+        }
+    };
+
+    const handleRequestPayment = () => {
+        if (confirm('Send payment request to the resident?')) {
+            router.post(`/admin/clearances/${clearance.id}/request-payment`, {}, {
+                onSuccess: () => {
+                    toast.success('Payment request sent');
+                },
+                onError: () => {
+                    toast.error('Failed to send payment request');
+                }
+            });
+        }
+    };
+
+    const handleSendReminder = () => {
+        if (confirm('Send payment reminder to the resident?')) {
+            router.post(`/admin/clearances/${clearance.id}/send-payment-reminder`, {}, {
+                onSuccess: () => {
+                    toast.success('Payment reminder sent');
+                },
+                onError: () => {
+                    toast.error('Failed to send reminder');
+                }
+            });
+        }
     };
 
     // Copy reference number to clipboard
     const copyReferenceNumber = () => {
         navigator.clipboard.writeText(clearance.reference_number);
-        alert('Reference number copied to clipboard!');
+        toast.success('Reference number copied to clipboard!');
     };
 
     // Calculate remaining validity
@@ -869,16 +936,16 @@ export default function ShowClearance({
         <AppLayout
             title={`Clearance Request: ${clearance.reference_number}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Clearances', href: '/clearances' },
-                { title: clearance.reference_number, href: `/clearances/${clearance.id}` }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Clearances', href: '/admin/clearances' },
+                { title: clearance.reference_number, href: `/admin/clearances/${clearance.id}` }
             ]}
         >
             <div className="space-y-6">
                 {/* Header with Actions */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/clearances">
+                        <Link href="/admin/clearances">
                             <Button variant="outline" size="sm">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to List
@@ -911,13 +978,15 @@ export default function ShowClearance({
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button 
-                            variant="outline"
-                            onClick={handleEdit}
-                        >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
+                        {canEdit && (
+                            <Button 
+                                variant="outline"
+                                onClick={handleEdit}
+                            >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                            </Button>
+                        )}
 
                         {canPrint && clearance.status === 'issued' && (
                             <Button onClick={handlePrint} disabled={isPrinting}>
@@ -926,7 +995,7 @@ export default function ShowClearance({
                             </Button>
                         )}
                         
-                        {canDelete && ['pending', 'pending_payment', 'processing'].includes(clearance.status) && (
+                        {canDelete && ['pending', 'pending_payment'].includes(clearance.status) && (
                             <Button variant="outline" onClick={handleDelete} className="text-red-600">
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
@@ -996,6 +1065,14 @@ export default function ShowClearance({
                                     }`}
                                 >
                                     Payment
+                                    {clearance.payment_status && clearance.payment_status !== 'paid' && (
+                                        <span className={`ml-2 inline-flex items-center justify-center h-5 w-5 text-xs font-semibold rounded-full ${
+                                            clearance.payment_status === 'unpaid' ? 'bg-amber-100 text-amber-600' :
+                                            clearance.payment_status === 'partially_paid' ? 'bg-blue-100 text-blue-600' : ''
+                                        }`}>
+                                            !
+                                        </span>
+                                    )}
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('history')}
@@ -1056,14 +1133,19 @@ export default function ShowClearance({
                                                                 Free
                                                             </Badge>
                                                         )}
-                                                        {clearanceType?.requires_payment === true && clearance.status !== 'pending_payment' && payment?.status === 'completed' && (
+                                                        {clearanceType?.requires_payment === true && clearance.payment_status === 'paid' && (
                                                             <Badge variant="outline" className="text-xs text-green-600">
                                                                 Paid
                                                             </Badge>
                                                         )}
-                                                        {clearanceType?.requires_payment === true && clearance.status === 'pending_payment' && (
+                                                        {clearanceType?.requires_payment === true && clearance.payment_status === 'unpaid' && (
                                                             <Badge variant="outline" className="text-xs text-amber-600">
-                                                                Payment Pending
+                                                                Unpaid
+                                                            </Badge>
+                                                        )}
+                                                        {clearanceType?.requires_payment === true && clearance.payment_status === 'partially_paid' && (
+                                                            <Badge variant="outline" className="text-xs text-blue-600">
+                                                                Partially Paid
                                                             </Badge>
                                                         )}
                                                     </div>
@@ -1353,7 +1435,7 @@ export default function ShowClearance({
                                                                         variant="outline"
                                                                         onClick={() => {
                                                                             if (confirm('Verify all pending documents?')) {
-                                                                                router.post(`/clearances/${clearance.id}/verify-all-documents`);
+                                                                                router.post(`/admin/clearances/${clearance.id}/verify-all-documents`);
                                                                             }
                                                                         }}
                                                                         disabled={documentStats.pending === 0}
@@ -1366,7 +1448,7 @@ export default function ShowClearance({
                                                                         onClick={() => {
                                                                             const reason = prompt('Enter reason for requesting more documents:');
                                                                             if (reason) {
-                                                                                router.post(`/clearances/${clearance.id}/request-more-documents`, { reason });
+                                                                                router.post(`/admin/clearances/${clearance.id}/request-more-documents`, { reason });
                                                                             }
                                                                         }}
                                                                     >
@@ -1392,7 +1474,7 @@ export default function ShowClearance({
                                                         <div className="flex flex-col sm:flex-row gap-3 justify-center">
                                                             <Button
                                                                 onClick={() => {
-                                                                    router.post(`/clearances/${clearance.id}/request-documents`);
+                                                                    router.post(`/admin/clearances/${clearance.id}/request-documents`);
                                                                 }}
                                                             >
                                                                 <Upload className="h-4 w-4 mr-2" />
@@ -1401,7 +1483,7 @@ export default function ShowClearance({
                                                             <Button
                                                                 variant="outline"
                                                                 onClick={() => {
-                                                                    router.visit(`/clearances/${clearance.id}/upload`);
+                                                                    router.visit(`/admin/clearances/${clearance.id}/upload`);
                                                                 }}
                                                             >
                                                                 <Upload className="h-4 w-4 mr-2" />
@@ -1425,8 +1507,44 @@ export default function ShowClearance({
                                                 <DollarSign className="h-5 w-5" />
                                                 Payment Information
                                             </CardTitle>
+                                            <CardDescription>
+                                                Payment status and details for this clearance request
+                                            </CardDescription>
                                         </CardHeader>
                                         <CardContent>
+                                            {/* Payment Status Summary */}
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                                    <p className="text-sm font-medium text-blue-600">Fee Amount</p>
+                                                    <p className="text-2xl font-bold text-blue-700">{formatCurrency(clearance.fee_amount)}</p>
+                                                </div>
+                                                <div className={`p-4 rounded-lg border ${
+                                                    clearance.payment_status === 'paid' ? 'bg-green-50 border-green-100' :
+                                                    clearance.payment_status === 'partially_paid' ? 'bg-amber-50 border-amber-100' :
+                                                    'bg-gray-50 border-gray-200'
+                                                }`}>
+                                                    <p className={`text-sm font-medium ${
+                                                        clearance.payment_status === 'paid' ? 'text-green-600' :
+                                                        clearance.payment_status === 'partially_paid' ? 'text-amber-600' :
+                                                        'text-gray-600'
+                                                    }`}>
+                                                        Payment Status
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <PaymentStatusBadge status={clearance.payment_status || 'unpaid'} />
+                                                    </div>
+                                                </div>
+                                                <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                                                    <p className="text-sm font-medium text-purple-600">Amount Paid</p>
+                                                    <p className="text-2xl font-bold text-purple-700">{formatCurrency(clearance.amount_paid || 0)}</p>
+                                                    {clearance.balance !== undefined && clearance.balance > 0 && (
+                                                        <p className="text-xs text-purple-500 mt-1">
+                                                            Balance: {formatCurrency(clearance.balance)}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+
                                             {/* Check if payment is actually required based on clearance type */}
                                             {clearanceType?.requires_payment === true ? (
                                                 payment ? (
@@ -1434,7 +1552,7 @@ export default function ShowClearance({
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                             <div className="space-y-2">
                                                                 <p className="text-sm font-medium text-gray-500">Amount</p>
-                                                                <p className="text-2xl font-bold">{payment.formatted_amount}</p>
+                                                                <p className="text-2xl font-bold">{formatCurrency(payment.amount)}</p>
                                                             </div>
                                                             <div className="space-y-2">
                                                                 <p className="text-sm font-medium text-gray-500">Status</p>
@@ -1456,37 +1574,58 @@ export default function ShowClearance({
                                                                     <p className="text-sm font-mono">{payment.reference_number}</p>
                                                                 </div>
                                                             )}
-                                                            {payment.paid_at && (
-                                                                <div className="space-y-2 md:col-span-2">
-                                                                    <p className="text-sm font-medium text-gray-500">Paid At</p>
-                                                                    <p className="text-sm">{formatDateTime(payment.paid_at)}</p>
+                                                            {payment.payment_date && (
+                                                                <div className="space-y-2">
+                                                                    <p className="text-sm font-medium text-gray-500">Payment Date</p>
+                                                                    <p className="text-sm">{formatDateTime(payment.payment_date)}</p>
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        {/* Show payment actions if applicable */}
-                                                        {payment.status === 'pending' && canProcess && (
-                                                            <div className="mt-6 pt-6 border-t">
-                                                                <Button onClick={() => router.post(`/clearances/${clearance.id}/verify-payment`)}>
-                                                                    <CheckCircle className="h-4 w-4 mr-2" />
-                                                                    Mark as Paid
-                                                                </Button>
+                                                        
+                                                        {/* Payment Actions */}
+                                                        <div className="mt-6 pt-6 border-t">
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <h4 className="font-medium text-gray-900">Payment Actions</h4>
+                                                                    <p className="text-sm text-gray-500">Manage payment for this clearance</p>
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    {canProcess && clearance.payment_status !== 'paid' && (
+                                                                        <Button onClick={handleVerifyPayment}>
+                                                                            <CheckCircle className="h-4 w-4 mr-2" />
+                                                                            Verify Payment
+                                                                        </Button>
+                                                                    )}
+                                                                    <Button variant="outline" onClick={() => window.open(`/payments/${payment.id}`, '_blank')}>
+                                                                        <ExternalLink className="h-4 w-4 mr-2" />
+                                                                        View Payment Details
+                                                                    </Button>
+                                                                    {payment.or_number && (
+                                                                        <Button variant="outline" onClick={() => window.open(`/payments/${payment.id}/receipt`, '_blank')}>
+                                                                            <Receipt className="h-4 w-4 mr-2" />
+                                                                            View Receipt
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        )}
+                                                        </div>
                                                     </div>
                                                 ) : clearance.status === 'pending_payment' ? (
                                                     <div className="text-center py-8">
-                                                        <DollarSign className="h-12 w-12 mx-auto text-gray-400" />
-                                                        <h3 className="mt-4 text-lg font-semibold">Pending Payment</h3>
-                                                        <p className="text-gray-500 mt-1">
+                                                        <div className="w-24 h-24 mx-auto rounded-full bg-amber-100 flex items-center justify-center mb-6">
+                                                            <DollarSign className="h-12 w-12 text-amber-600" />
+                                                        </div>
+                                                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Pending Payment</h3>
+                                                        <p className="text-gray-600 max-w-md mx-auto mb-6">
                                                             Waiting for the resident to complete the payment of {formatCurrency(clearance.fee_amount)}.
                                                         </p>
                                                         {canProcess && (
-                                                            <div className="flex flex-col sm:flex-row gap-3 justify-center mt-4">
-                                                                <Button onClick={() => router.post(`/clearances/${clearance.id}/verify-payment`)}>
+                                                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                                                <Button onClick={handleVerifyPayment}>
                                                                     <CheckCircle className="h-4 w-4 mr-2" />
                                                                     Mark as Paid
                                                                 </Button>
-                                                                <Button variant="outline" onClick={() => router.post(`/clearances/${clearance.id}/send-payment-reminder`)}>
+                                                                <Button variant="outline" onClick={handleSendReminder}>
                                                                     <Mail className="h-4 w-4 mr-2" />
                                                                     Send Reminder
                                                                 </Button>
@@ -1495,13 +1634,15 @@ export default function ShowClearance({
                                                     </div>
                                                 ) : (
                                                     <div className="text-center py-8">
-                                                        <AlertCircle className="h-12 w-12 mx-auto text-gray-400" />
-                                                        <h3 className="mt-4 text-lg font-semibold">Payment Not Submitted</h3>
-                                                        <p className="text-gray-500 mt-1">
+                                                        <div className="w-24 h-24 mx-auto rounded-full bg-gray-100 flex items-center justify-center mb-6">
+                                                            <AlertCircle className="h-12 w-12 text-gray-400" />
+                                                        </div>
+                                                        <h3 className="text-xl font-semibold text-gray-900 mb-2">Payment Not Submitted</h3>
+                                                        <p className="text-gray-600 max-w-md mx-auto mb-6">
                                                             Payment is required but not yet submitted. Required amount: {formatCurrency(clearance.fee_amount)}
                                                         </p>
                                                         {canProcess && clearance.status !== 'cancelled' && clearance.status !== 'rejected' && (
-                                                            <Button className="mt-4" onClick={() => router.post(`/clearances/${clearance.id}/request-payment`)}>
+                                                            <Button onClick={handleRequestPayment}>
                                                                 <Mail className="h-4 w-4 mr-2" />
                                                                 Request Payment
                                                             </Button>
@@ -1522,7 +1663,7 @@ export default function ShowClearance({
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         <div className="space-y-2">
                                                             <p className="text-sm font-medium text-gray-500">Amount</p>
-                                                            <p className="text-2xl font-bold">{payment.formatted_amount}</p>
+                                                            <p className="text-2xl font-bold">{formatCurrency(payment.amount)}</p>
                                                         </div>
                                                         <div className="space-y-2">
                                                             <p className="text-sm font-medium text-gray-500">Status</p>
@@ -1538,10 +1679,10 @@ export default function ShowClearance({
                                                             <p className="text-sm font-medium text-gray-500">Official Receipt (OR)</p>
                                                             <p className="text-sm font-mono">{payment.or_number || 'N/A'}</p>
                                                         </div>
-                                                        {payment.paid_at && (
+                                                        {payment.payment_date && (
                                                             <div className="space-y-2 md:col-span-2">
                                                                 <p className="text-sm font-medium text-gray-500">Paid At</p>
-                                                                <p className="text-sm">{formatDateTime(payment.paid_at)}</p>
+                                                                <p className="text-sm">{formatDateTime(payment.payment_date)}</p>
                                                             </div>
                                                         )}
                                                     </div>
@@ -1549,9 +1690,11 @@ export default function ShowClearance({
                                             ) : (
                                                 // No payment required and no payment exists
                                                 <div className="text-center py-8">
-                                                    <CheckCircle className="h-12 w-12 mx-auto text-gray-400" />
-                                                    <h3 className="mt-4 text-lg font-semibold">No Payment Required</h3>
-                                                    <p className="text-gray-500 mt-1">
+                                                    <div className="w-24 h-24 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-6">
+                                                        <CheckCircle className="h-12 w-12 text-green-600" />
+                                                    </div>
+                                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No Payment Required</h3>
+                                                    <p className="text-gray-600 max-w-md mx-auto">
                                                         This clearance type does not require payment.
                                                         {clearance.fee_amount && clearance.fee_amount > 0 && (
                                                             <span className="block mt-2 text-sm">
@@ -1632,10 +1775,27 @@ export default function ShowClearance({
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
                                     <p className="text-sm font-medium text-gray-500">Current Status</p>
-                                    <Badge variant={getStatusVariant(clearance.status)} className="flex items-center gap-1 w-fit">
-                                        {getStatusIcon(clearance.status)}
-                                        {clearance.status_display || clearance.status}
-                                    </Badge>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant={getStatusVariant(clearance.status)} className="flex items-center gap-1">
+                                            {getStatusIcon(clearance.status)}
+                                            {clearance.status_display || clearance.status}
+                                        </Badge>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <p className="text-sm font-medium text-gray-500">Payment Status</p>
+                                    <PaymentStatusBadge status={clearance.payment_status || 'unpaid'} />
+                                    {clearance.payment_status === 'partially_paid' && (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Paid: {formatCurrency(clearance.amount_paid || 0)} of {formatCurrency(clearance.fee_amount)}
+                                        </p>
+                                    )}
+                                    {clearance.payment_status === 'paid' && clearance.or_number && (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            OR #: {clearance.or_number}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {clearance.estimated_completion_date && (
@@ -1696,11 +1856,33 @@ export default function ShowClearance({
                                         </Button>
                                     )}
 
+                                    {clearance.status === 'pending_payment' && (
+                                        <>
+                                            <Button 
+                                                className="w-full justify-start" 
+                                                onClick={handleVerifyPayment}
+                                                disabled={isProcessing}
+                                            >
+                                                <CheckCircle className="h-4 w-4 mr-2" />
+                                                Verify Payment
+                                            </Button>
+                                            <Button 
+                                                variant="outline"
+                                                className="w-full justify-start" 
+                                                onClick={handleSendReminder}
+                                                disabled={isProcessing}
+                                            >
+                                                <Mail className="h-4 w-4 mr-2" />
+                                                Send Payment Reminder
+                                            </Button>
+                                        </>
+                                    )}
+
                                     {clearance.status === 'processing' && canApprove && (
                                         <Button 
                                             className="w-full justify-start" 
                                             onClick={handleApprove}
-                                            disabled={isProcessing}
+                                            disabled={isProcessing || (clearanceType?.requires_payment && clearance.payment_status !== 'paid')}
                                         >
                                             <CheckCircle className="h-4 w-4 mr-2" />
                                             Approve Request
@@ -1718,28 +1900,28 @@ export default function ShowClearance({
                                         </Button>
                                     )}
 
-                                    {['pending', 'processing'].includes(clearance.status) && (
-                                        <Button 
-                                            variant="outline" 
-                                            className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                                            onClick={handleReject}
-                                            disabled={isProcessing}
-                                        >
-                                            <XCircle className="h-4 w-4 mr-2" />
-                                            Reject Request
-                                        </Button>
-                                    )}
-
                                     {['pending', 'pending_payment', 'processing'].includes(clearance.status) && (
-                                        <Button 
-                                            variant="outline" 
-                                            className="w-full justify-start text-gray-600 hover:text-gray-700"
-                                            onClick={handleCancel}
-                                            disabled={isProcessing}
-                                        >
-                                            <XCircle className="h-4 w-4 mr-2" />
-                                            Cancel Request
-                                        </Button>
+                                        <>
+                                            <Separator />
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                onClick={handleReject}
+                                                disabled={isProcessing}
+                                            >
+                                                <XCircle className="h-4 w-4 mr-2" />
+                                                Reject Request
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full justify-start text-gray-600 hover:text-gray-700"
+                                                onClick={handleCancel}
+                                                disabled={isProcessing}
+                                            >
+                                                <XCircle className="h-4 w-4 mr-2" />
+                                                Cancel Request
+                                            </Button>
+                                        </>
                                     )}
 
                                     <Separator />
@@ -1776,6 +1958,18 @@ export default function ShowClearance({
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Valid Until</span>
                                         <span>{formatDate(clearance.valid_until)}</span>
+                                    </div>
+                                )}
+                                {clearance.payment_date && (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Payment Date</span>
+                                        <span>{formatDate(clearance.payment_date)}</span>
+                                    </div>
+                                )}
+                                {clearance.or_number && (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">OR Number</span>
+                                        <span className="font-mono text-xs">{clearance.or_number}</span>
                                     </div>
                                 )}
                             </CardContent>

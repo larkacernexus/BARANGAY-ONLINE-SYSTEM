@@ -83,7 +83,7 @@ export default function RolePermissions() {
                 }
             });
             
-            router.get('/role-permissions', params, {
+            router.get('/admin/role-permissions', params, {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
@@ -263,7 +263,7 @@ export default function RolePermissions() {
                     break;
 
                 case 'bulk_revoke':
-                    await router.post('/role-permissions/bulk-revoke', {
+                    await router.post('/admin/role-permissions/bulk-revoke', {
                         permission_ids: selectedPermissions,
                     }, {
                         preserveScroll: true,
@@ -280,7 +280,7 @@ export default function RolePermissions() {
 
                 case 'generate_report':
                     const idsParam = selectedPermissions.join(',');
-                    window.open(`/role-permissions/generate-bulk-report?ids=${idsParam}`, '_blank');
+                    window.open(`/admin/role-permissions/generate-bulk-report?ids=${idsParam}`, '_blank');
                     toast.success(`Generating report for ${selectedPermissions.length} permission(s)`);
                     break;
 
@@ -319,7 +319,7 @@ export default function RolePermissions() {
     const confirmRevoke = () => {
         if (!showRevokeDialog) return;
 
-        router.delete(`/role-permissions/${showRevokeDialog.id}`, {
+        router.delete(`/admin/role-permissions/${showRevokeDialog.id}`, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Permission revoked successfully');
@@ -358,7 +358,7 @@ export default function RolePermissions() {
             sort: 'granted_at',
             order: 'desc'
         });
-        router.get('/role-permissions');
+        router.get('/admin/role-permissions');
     };
 
     const handleClearSelection = () => {
@@ -372,7 +372,7 @@ export default function RolePermissions() {
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
-        router.get(`/role-permissions?page=${page}`, {
+        router.get(`/admin/role-permissions?page=${page}`, {
             preserveState: true,
             preserveScroll: true,
         });
@@ -384,7 +384,7 @@ export default function RolePermissions() {
         if (filtersState.role !== 'all') queryParams.append('role', filtersState.role);
         if (filtersState.module !== 'all') queryParams.append('module', filtersState.module);
         if (filtersState.granter !== 'all') queryParams.append('granter', filtersState.granter);
-        window.location.href = `/role-permissions/export?${queryParams.toString()}`;
+        window.location.href = `/admin/role-permissions/export?${queryParams.toString()}`;
     };
 
     const hasActiveFilters = 
@@ -406,7 +406,7 @@ export default function RolePermissions() {
             title="Role Permissions Management"
             breadcrumbs={[
                 { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Role Permissions', href: '/role-permissions' }
+                { title: 'Role Permissions', href: '/admin/role-permissions' }
             ]}
         >
             <TooltipProvider>

@@ -550,7 +550,7 @@ const handlePrint = () => {
 };
 
     const handleDownload = () => {
-        window.location.href = `/payments/${payment.id}/receipt/pdf`;
+        window.location.href = `/admin/payments/${payment.id}/receipt/pdf`;
     };
 
     const getMethodIcon = (method: string) => {
@@ -655,9 +655,9 @@ const handlePrint = () => {
             <AppLayout
                 title={`Official Receipt - ${payment.or_number}`}
                 breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Payments', href: '/payments' },
-                    { title: `Payment #${payment.or_number}`, href: `/payments/${payment.id}` },
+                    { title: 'Dashboard', href: '/admin/dashboard' },
+                    { title: 'Payments', href: '/admin/payments' },
+                    { title: `Payment #${payment.or_number}`, href: `/admin/payments/${payment.id}` },
                     { title: 'Receipt', href: '#' }
                 ]}
             >
@@ -666,7 +666,7 @@ const handlePrint = () => {
                         {/* Header with Actions */}
                         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8 no-print">
                             <div className="flex items-center gap-4">
-                                <Link href={`/payments/${payment.id}`}>
+                                <Link href={`/admin/payments/${payment.id}`}>
                                     <Button variant="outline" className="border-gray-300 hover:bg-gray-50">
                                         <ArrowLeft className="h-4 w-4 mr-2" />
                                         Back to Payment

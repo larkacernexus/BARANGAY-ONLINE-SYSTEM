@@ -158,7 +158,7 @@ export default function PurokShow({
 
     const handleDelete = () => {
         if (confirm(`Are you sure you want to delete purok "${purok.name}"? This action cannot be undone.`)) {
-            router.delete(`/puroks/${purok.id}`);
+            router.delete(`/admin/puroks/${purok.id}`);
         }
     };
 
@@ -200,16 +200,16 @@ export default function PurokShow({
         <AppLayout
             title={`Purok: ${purok.name}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Puroks', href: '/puroks' },
-                { title: purok.name, href: `/puroks/${purok.id}` }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Puroks', href: '/admin/puroks' },
+                { title: purok.name, href: `/admin/puroks/${purok.id}` }
             ]}
         >
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/puroks">
+                        <Link href="/admin/puroks">
                             <Button variant="ghost" size="sm">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to Puroks
@@ -255,7 +255,7 @@ export default function PurokShow({
                             <Download className="h-4 w-4 mr-2" />
                             Export
                         </Button>
-                        <Link href={`/puroks/${purok.id}/edit`}>
+                        <Link href={`/admin/puroks/${purok.id}/edit`}>
                             <Button size="sm">
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Purok
@@ -398,7 +398,7 @@ export default function PurokShow({
         <div className="border rounded-lg p-6 bg-gray-50 dark:bg-gray-800 text-center">
             <Globe className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 mb-3">No Google Maps location set</p>
-            <Link href={`/puroks/${purok.id}/edit`}>
+            <Link href={`/admin/puroks/${purok.id}/edit`}>
                 <Button size="sm">
                     <Edit className="h-3 w-3 mr-1" />
                     Add Map Location
@@ -447,7 +447,7 @@ export default function PurokShow({
                                     <div className="text-center py-6">
                                         <UserPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                                         <p className="text-gray-500">No leader assigned</p>
-                                        <Link href={`/puroks/${purok.id}/edit`}>
+                                        <Link href={`/admin/puroks/${purok.id}/edit`}>
                                             <Button variant="outline" size="sm" className="mt-2">
                                                 Assign Leader
                                             </Button>
@@ -541,7 +541,7 @@ export default function PurokShow({
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => router.get(households.current_page > 1 ? `/puroks/${purok.id}?household_page=${households.current_page - 1}` : '#')}
+                                                onClick={() => router.get(households.current_page > 1 ? `/admin/puroks/${purok.id}?household_page=${households.current_page - 1}` : '#')}
                                                 disabled={households.current_page === 1}
                                             >
                                                 Previous
@@ -549,7 +549,7 @@ export default function PurokShow({
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => router.get(households.current_page < households.last_page ? `/puroks/${purok.id}?household_page=${households.current_page + 1}` : '#')}
+                                                onClick={() => router.get(households.current_page < households.last_page ? `/admin/puroks/${purok.id}?household_page=${households.current_page + 1}` : '#')}
                                                 disabled={households.current_page === households.last_page}
                                             >
                                                 Next

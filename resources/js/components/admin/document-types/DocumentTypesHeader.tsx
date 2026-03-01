@@ -48,7 +48,7 @@ export default function DocumentTypesHeader({
                         <p className="text-xs text-gray-500">Select multiple document types for batch operations</p>
                     </TooltipContent>
                 </Tooltip>
-                <Link href={route('document-types.create')}>
+                <Link href={route('admin.document-types.create')}>
                     <Button className="h-9">
                         <Plus className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">New Document Type</span>

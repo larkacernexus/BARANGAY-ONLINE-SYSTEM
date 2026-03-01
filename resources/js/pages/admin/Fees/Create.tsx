@@ -651,7 +651,7 @@ export default function FeesCreate({
             if (!confirmed) return;
         }
 
-        post('/fees');
+        post('/admin/fees');
     };
 
     const feeFormDataForChild = useMemo(() => {

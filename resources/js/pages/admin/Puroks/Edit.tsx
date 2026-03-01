@@ -57,14 +57,14 @@ export default function EditPurok({ purok }: EditPurokProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(`/puroks/${purok.id}`);
+        put(`/admin/puroks/${purok.id}`);
     };
 
     const handleDelete = () => {
         if (confirm(`Are you sure you want to delete purok "${purok.name}"? This action cannot be undone.`)) {
-            deletePurok(`/puroks/${purok.id}`, {
+            deletePurok(`/admin/puroks/${purok.id}`, {
                 onSuccess: () => {
-                    window.location.href = '/puroks';
+                    window.location.href = '/admin/puroks';
                 }
             });
         }
@@ -86,9 +86,9 @@ export default function EditPurok({ purok }: EditPurokProps) {
             title={`Edit Purok: ${purok.name}`}
             breadcrumbs={[
                 { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Puroks', href: '/puroks' },
-                { title: purok.name, href: `/puroks/${purok.id}` },
-                { title: 'Edit Purok', href: `/puroks/${purok.id}/edit` }
+                { title: 'Puroks', href: '/admin/puroks' },
+                { title: purok.name, href: `/admin/puroks/${purok.id}` },
+                { title: 'Edit Purok', href: `/admin/puroks/${purok.id}/edit` }
             ]}
         >
             <form onSubmit={handleSubmit}>
@@ -96,7 +96,7 @@ export default function EditPurok({ purok }: EditPurokProps) {
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href={`/puroks/${purok.id}`}>
+                            <Link href={`/admin/puroks/${purok.id}`}>
                                 <Button variant="ghost" size="sm" type="button">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
@@ -455,7 +455,7 @@ export default function EditPurok({ purok }: EditPurokProps) {
                     {/* Form Actions */}
                     <div className="flex items-center justify-between pt-6 border-t">
                         <div className="flex items-center gap-2">
-                            <Link href={`/puroks/${purok.id}`}>
+                            <Link href={`/admin/puroks/${purok.id}`}>
                                 <Button variant="ghost" type="button">
                                     Cancel
                                 </Button>

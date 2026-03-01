@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import { route } from 'ziggy-js';
 
 interface Permission {
     id: number;
@@ -135,7 +136,7 @@ export default function RoleCreate({ permissions = {}, validation_errors, module
         
         setIsSubmitting(true);
         
-        post(route('roles.store'), {
+        post(route('admin.roles.store'), {
             preserveScroll: true,
             onSuccess: () => {
                 setIsSubmitting(false);
@@ -216,8 +217,8 @@ export default function RoleCreate({ permissions = {}, validation_errors, module
         <AdminLayout
             title="Create New Role"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Roles', href: route('roles.index') },
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Roles', href: route('admin.roles.index') },
                 { title: 'Create', href: '#' }
             ]}
         >
@@ -231,7 +232,7 @@ export default function RoleCreate({ permissions = {}, validation_errors, module
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => router.visit(route('roles.index'))}
+                                onClick={() => router.visit(route('admin.roles.index'))}
                                 className="h-8 w-8 p-0"
                             >
                                 <ArrowLeft className="h-4 w-4" />
@@ -462,7 +463,7 @@ export default function RoleCreate({ permissions = {}, validation_errors, module
                                             {allPermissions.length === 0 && (
                                                 <Button
                                                     variant="outline"
-                                                    onClick={() => router.visit(route('permissions.index'))}
+                                                    onClick={() => router.visit(route('admin.permissions.index'))}
                                                 >
                                                     <PlusCircle className="mr-2 h-4 w-4" />
                                                     Create Permissions First
@@ -775,7 +776,7 @@ export default function RoleCreate({ permissions = {}, validation_errors, module
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => router.visit(route('roles.index'))}
+                                        onClick={() => router.visit(route('admin.roles.index'))}
                                         disabled={processing}
                                         className="w-full"
                                     >
@@ -785,7 +786,7 @@ export default function RoleCreate({ permissions = {}, validation_errors, module
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => router.visit(route('permissions.index'))}
+                                        onClick={() => router.visit(route('admin.permissions.index'))}
                                         className="w-full"
                                     >
                                         <Key className="mr-2 h-4 w-4" />

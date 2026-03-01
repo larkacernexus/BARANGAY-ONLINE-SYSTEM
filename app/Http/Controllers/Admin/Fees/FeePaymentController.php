@@ -132,7 +132,7 @@ class FeePaymentController extends Controller
                 'new_status' => $fee->status
             ]);
 
-            return redirect()->route('fees.show', $fee)
+            return redirect()->route('admin.fees.show', $fee)
                 ->with('success', 'Payment of ₱' . number_format($validated['payment_amount'], 2) . ' recorded successfully. OR#: ' . $payment->or_number);
 
         } catch (\Exception $e) {

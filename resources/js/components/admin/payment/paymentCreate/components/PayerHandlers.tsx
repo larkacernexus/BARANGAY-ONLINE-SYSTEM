@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { 
     Resident, 
     Household, 
+    Business, // ADDED
     ClearanceRequest, 
     BackendFee, 
     OutstandingFee, 
@@ -23,7 +24,7 @@ interface PayerHandlersProps {
     data: PaymentFormData;
     setData: (data: any) => void;
     setSelectedPayer: (payer: any) => void;
-    setPayerSource: (source: 'residents' | 'households' | 'clearance' | 'fees') => void;
+    setPayerSource: (source: 'residents' | 'households' | 'businesses' | 'clearance' | 'fees') => void; // UPDATED
     setPayerOutstandingFees: (fees: OutstandingFee[]) => void;
     outstandingFeesForTab: OutstandingFee[];
     clearanceTypes: Record<string, string>;
@@ -134,9 +135,17 @@ export function usePayerHandlers({
         }
         
         setData(updatedData);
-    }, [data, setData, outstandingFeesForTab, clearance_requests, clearance_request, clearanceTypes, clearanceTypesDetails, checkDiscountEligibilityForFees]);
+        setSelectedPayer(resident);
+        setPayerSource('residents');
+    }, [data, setData, setSelectedPayer, setPayerSource, outstandingFeesForTab, clearance_requests, clearance_request, clearanceTypes, clearanceTypesDetails, checkDiscountEligibilityForFees]);
 
     const handleHouseholdPayer = useCallback((household: Household) => {
+        console.log('🏠 Handling household payer:', {
+            householdId: household.id,
+            householdNumber: household.household_number,
+            headName: household.head_name
+        });
+        
         // Get outstanding fees for this household
         const householdOutstandingFees = outstandingFeesForTab.filter(fee => 
             fee.payer_type === 'household' && 
@@ -161,7 +170,47 @@ export function usePayerHandlers({
         };
         
         setData(updatedData);
-    }, [data, setData, outstandingFeesForTab]);
+        setSelectedPayer(household);
+        setPayerSource('households');
+    }, [data, setData, setSelectedPayer, setPayerSource, outstandingFeesForTab]);
+
+    // ========== ADDED: Business Payer Handler ==========
+    const handleBusinessPayer = useCallback((business: Business) => {
+        console.log('🏢 Handling business payer:', {
+            businessId: business.id,
+            businessName: business.business_name,
+            ownerName: business.owner_name
+        });
+        
+        // Get outstanding fees for this business
+        const businessOutstandingFees = outstandingFeesForTab.filter(fee => 
+            fee.payer_type === 'business' && 
+            fee.payer_id == business.id
+        );
+        
+        setPayerOutstandingFees(businessOutstandingFees);
+        
+        const updatedData = {
+            ...data,
+            payer_type: 'business',
+            payer_id: business.id,
+            payer_name: business.business_name,
+            contact_number: business.contact_number || '',
+            address: business.address || '',
+            household_number: '',
+            purok: business.purok || '',
+            items: [],
+            subtotal: 0,
+            total_amount: 0,
+            clearance_request_id: undefined,
+        };
+        
+        setData(updatedData);
+        setSelectedPayer(business);
+        setPayerSource('businesses');
+        
+        console.log('✅ Business payer processed');
+    }, [data, setData, setSelectedPayer, setPayerSource, outstandingFeesForTab]);
 
     const handleClearanceTabPayer = useCallback((clearancePayer: ClearanceRequest, residents?: Resident[]) => {
         console.log('📋 Handling clearance tab payer:', {
@@ -245,6 +294,8 @@ export function usePayerHandlers({
         console.log('✅ Clearance tab payer processed');
         
         setData(updatedData);
+        setSelectedPayer(clearancePayer);
+        setPayerSource('clearance');
         
         // Get outstanding fees for this resident with discount info
         const residentOutstandingFees = outstandingFeesForTab.filter(fee => 
@@ -254,7 +305,7 @@ export function usePayerHandlers({
         
         const feesWithDiscountInfo = checkDiscountEligibilityForFees(residentOutstandingFees, residentPayer);
         setPayerOutstandingFees(feesWithDiscountInfo);
-    }, [data, setData, clearanceTypes, clearanceTypesDetails, outstandingFeesForTab, checkDiscountEligibilityForFees]);
+    }, [data, setData, setSelectedPayer, setPayerSource, clearanceTypes, clearanceTypesDetails, outstandingFeesForTab, checkDiscountEligibilityForFees]);
 
     const handleBackendFeePayer = useCallback((backendFee: BackendFee) => {
         console.log('💰 Handling backend fee payer:', {
@@ -292,6 +343,7 @@ export function usePayerHandlers({
                 payer_type: backendFee.payer_type || 'resident',
                 payer_id: backendFee.payer_type === 'resident' ? backendFee.resident_id : 
                          backendFee.payer_type === 'household' ? backendFee.household_id : 
+                         backendFee.payer_type === 'business' ? backendFee.business_id : // ADDED
                          backendFee.id,
                 original_fee_data: {
                     base_amount: baseAmount,
@@ -306,9 +358,10 @@ export function usePayerHandlers({
         };
         
         const payerType = backendFee.payer_type || 'resident';
-        const payerId = backendFee.payer_type === 'resident' ? backendFee.resident_id : 
-                       backendFee.payer_type === 'household' ? backendFee.household_id : 
-                       backendFee.id;
+        let payerId = backendFee.payer_type === 'resident' ? backendFee.resident_id : 
+                     backendFee.payer_type === 'household' ? backendFee.household_id : 
+                     backendFee.payer_type === 'business' ? backendFee.business_id : // ADDED
+                     backendFee.id;
         
         const updatedData = {
             ...data,
@@ -327,10 +380,12 @@ export function usePayerHandlers({
         };
         
         setData(updatedData);
+        setSelectedPayer(backendFee);
+        setPayerSource('fees');
         setPayerOutstandingFees([]);
         
         console.log('✅ Backend fee payer processed');
-    }, [data, setData]);
+    }, [data, setData, setSelectedPayer, setPayerSource]);
 
     const handleOutstandingFeePayer = useCallback((outstandingFee: OutstandingFee) => {
         console.log('💰 Handling outstanding fee payer:', {
@@ -401,12 +456,16 @@ export function usePayerHandlers({
         };
         
         setData(updatedData);
+        setSelectedPayer(outstandingFee);
+        setPayerSource('fees');
         setPayerOutstandingFees([]);
         
         console.log('✅ Outstanding fee payer processed');
-    }, [data, setData]);
+    }, [data, setData, setSelectedPayer, setPayerSource]);
 
     const handleManualPayer = useCallback((): void => {
+        console.log('👤 Handling manual payer');
+        
         const updatedData = {
             ...data,
             payer_type: 'other',
@@ -431,6 +490,7 @@ export function usePayerHandlers({
     return {
         handleResidentPayer,
         handleHouseholdPayer,
+        handleBusinessPayer, // ADDED
         handleClearanceTabPayer,
         handleBackendFeePayer,
         handleOutstandingFeePayer,

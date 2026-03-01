@@ -113,14 +113,14 @@ export function ResidentCard({
                         <ActionDropdown>
                             <ActionDropdownItem
                                 icon={<Eye className="h-4 w-4" />}
-                                href={`/residents/${resident.id}`}
+                                href={`/admin/residents/${resident.id}`}
                             >
                                 View Details
                             </ActionDropdownItem>
                             
                             <ActionDropdownItem
                                 icon={<Edit className="h-4 w-4" />}
-                                href={`/residents/${resident.id}/edit`}
+                                href={`/admin/residents/${resident.id}/edit`}
                             >
                                 Edit Profile
                             </ActionDropdownItem>
@@ -138,7 +138,7 @@ export function ResidentCard({
                             
                             <ActionDropdownItem
                                 icon={<QrCode className="h-4 w-4" />}
-                                href={`/residents/${resident.id}/generate-id`}
+                                href={`/admin/residents/${resident.id}/generate-id`}
                             >
                                 Generate ID
                             </ActionDropdownItem>

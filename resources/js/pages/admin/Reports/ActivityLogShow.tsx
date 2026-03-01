@@ -348,8 +348,8 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
             title="Activity Log Details"
             breadcrumbs={[
                 { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Activity Logs', href: '/reports/activity-logs' },
-                { title: 'Log Details', href: `/reports/activity-logs/${log.id}` }
+                { title: 'Activity Logs', href: '/admin/reports/activity-logs' },
+                { title: 'Log Details', href: `/admin/reports/activity-logs/${log.id}` }
             ]}
         >
             <Head title="Activity Log Details" />
@@ -359,7 +359,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link
-                            href="/reports/activity-logs"
+                            href="/admin/reports/activity-logs"
                             className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
                         >
                             <ChevronLeft className="h-4 w-4" />
@@ -598,7 +598,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                             
                             <div className="space-y-3">
                                 <Link
-                                    href={`/reports/activity-logs?search=${log.id}`}
+                                    href={`/admin/reports/activity-logs?search=${log.id}`}
                                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 font-medium rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
                                 >
                                     <Activity className="h-4 w-4" />
@@ -616,7 +616,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                                 )}
                                 
                                 <Link
-                                    href="/reports/activity-logs"
+                                    href="/admin/reports/activity-logs"
                                     className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                                 >
                                     <ArrowLeft className="h-4 w-4" />

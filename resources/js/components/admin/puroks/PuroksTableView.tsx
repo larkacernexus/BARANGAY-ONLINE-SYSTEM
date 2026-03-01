@@ -364,14 +364,14 @@ export default function PuroksTableView({
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-48">
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/puroks/${purok.id}`} className="flex items-center cursor-pointer">
+                                                        <Link href={`/admin/puroks/${purok.id}`} className="flex items-center cursor-pointer">
                                                             <Eye className="mr-2 h-4 w-4" />
                                                             <span>View Details</span>
                                                         </Link>
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/puroks/${purok.id}/edit`} className="flex items-center cursor-pointer">
+                                                        <Link href={`/admin/puroks/${purok.id}/edit`} className="flex items-center cursor-pointer">
                                                             <Edit className="mr-2 h-4 w-4" />
                                                             <span>Edit Purok</span>
                                                         </Link>
@@ -444,7 +444,7 @@ export default function PuroksTableView({
                                                     )}
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/puroks/${purok.id}/print`} className="flex items-center cursor-pointer">
+                                                        <Link href={`/admin/puroks/${purok.id}/print`} className="flex items-center cursor-pointer">
                                                             <Printer className="mr-2 h-4 w-4" />
                                                             <span>Print Details</span>
                                                         </Link>

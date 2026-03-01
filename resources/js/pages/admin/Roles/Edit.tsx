@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import { route } from 'ziggy-js';
 
 interface Permission {
     id: number;
@@ -140,7 +141,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
         
         setIsSubmitting(true);
         
-        put(route('roles.update', role.id), {
+        put(route('admin.roles.update', role.id), {
             preserveScroll: true,
             onSuccess: () => {
                 setIsSubmitting(false);
@@ -234,8 +235,8 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
             <AdminLayout
                 title="Role Not Found"
                 breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Roles', href: route('roles.index') },
+                    { title: 'Dashboard', href: '/admin/dashboard' },
+                    { title: 'Roles', href: route('admin.roles.index') },
                     { title: 'Edit', href: '#' }
                 ]}
             >
@@ -247,7 +248,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                     <p className="text-gray-600 dark:text-gray-400 mb-6">
                         The role you're trying to edit doesn't exist or has been deleted.
                     </p>
-                    <Button onClick={() => router.visit(route('roles.index'))}>
+                    <Button onClick={() => router.visit(route('admin.roles.index'))}>
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Back to Roles
                     </Button>
@@ -263,9 +264,9 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
         <AdminLayout
             title={`Edit Role: ${roleName}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Roles', href: route('roles.index') },
-                { title: roleName, href: route('roles.show', role.id) },
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Roles', href: route('admin.roles.index') },
+                { title: roleName, href: route('admin.roles.show', role.id) },
                 { title: 'Edit', href: '#' }
             ]}
         >
@@ -279,7 +280,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => router.visit(route('roles.index'))}
+                                onClick={() => router.visit(route('admin.roles.index'))}
                                 className="h-8 w-8 p-0"
                             >
                                 <ArrowLeft className="h-4 w-4" />
@@ -295,7 +296,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                     <div className="flex items-center gap-2">
                         <Button
                             variant="outline"
-                            onClick={() => router.visit(route('roles.show', role.id))}
+                            onClick={() => router.visit(route('admin.roles.show', role.id))}
                             className="h-9"
                         >
                             <Eye className="h-4 w-4 mr-2" />
@@ -714,7 +715,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => router.visit(route('roles.index'))}
+                                        onClick={() => router.visit(route('admin.roles.index'))}
                                         disabled={processing}
                                         className="w-full"
                                     >
@@ -723,7 +724,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => router.visit(route('roles.show', role.id))}
+                                        onClick={() => router.visit(route('admin.roles.show', role.id))}
                                         className="w-full"
                                     >
                                         <Eye className="mr-2 h-4 w-4" />
@@ -748,10 +749,10 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                             className="w-full"
                                             onClick={() => {
                                                 if (confirm(`Are you sure you want to delete "${roleName}"? This action cannot be undone.`)) {
-                                                    router.delete(route('roles.destroy', role.id), {
+                                                    router.delete(route('admin.roles.destroy', role.id), {
                                                         preserveScroll: true,
                                                         onFinish: () => {
-                                                            router.visit(route('roles.index'));
+                                                            router.visit(route('admin.roles.index'));
                                                         },
                                                     });
                                                 }

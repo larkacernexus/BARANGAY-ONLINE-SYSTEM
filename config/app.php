@@ -108,6 +108,10 @@ return [
         ),
     ],
 
+
+    'barangay_name' => env('BARANGAY_NAME', 'Barangay Kibawe'),
+    'version' => env('APP_VERSION', '2.0'),
+
     /*
     |--------------------------------------------------------------------------
     | Maintenance Mode Driver

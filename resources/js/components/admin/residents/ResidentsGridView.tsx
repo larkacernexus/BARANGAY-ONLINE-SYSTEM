@@ -46,7 +46,7 @@ export default function ResidentsGridView({
             icon={<User className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
             hasFilters={hasActiveFilters}
             onClearFilters={onClearFilters}
-            onCreateNew={() => router.get('/residents/create')}
+            onCreateNew={() => router.get('/admin/residents/create')}
             createLabel="Add Resident"
         />
     );

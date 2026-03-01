@@ -168,14 +168,14 @@ export default function ClearanceTypesGridView({
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-48">
                                         <DropdownMenuItem asChild>
-                                            <Link href={route('clearance-types.show', type.id)} className="flex items-center cursor-pointer">
+                                            <Link href={route('admin.clearance-types.show', type.id)} className="flex items-center cursor-pointer">
                                                 <Eye className="mr-2 h-4 w-4" />
                                                 <span>View Details</span>
                                             </Link>
                                         </DropdownMenuItem>
                                         
                                         <DropdownMenuItem asChild>
-                                            <Link href={route('clearance-types.edit', type.id)} className="flex items-center cursor-pointer">
+                                            <Link href={route('admin.clearance-types.edit', type.id)} className="flex items-center cursor-pointer">
                                                 <Edit className="mr-2 h-4 w-4" />
                                                 <span>Edit Type</span>
                                             </Link>
@@ -323,7 +323,7 @@ export default function ClearanceTypesGridView({
                                 </span>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Link href={route('clearances.create', { type: type.id })}>
+                                        <Link href={route('admin.clearances.create', { type: type.id })}>
                                             <Button size="sm" variant="outline">
                                                 <FileSpreadsheet className="h-3 w-3 mr-1" />
                                                 Issue

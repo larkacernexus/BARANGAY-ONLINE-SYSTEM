@@ -296,14 +296,14 @@ export default function ResidentsTableView({
                     <ActionDropdown>
                         <ActionDropdownItem
                             icon={<Eye className="h-4 w-4" />}
-                            href={`/residents/${resident.id}`}
+                            href={`/admin/residents/${resident.id}`}
                         >
                             View Details
                         </ActionDropdownItem>
                         
                         <ActionDropdownItem
                             icon={<Edit className="h-4 w-4" />}
-                            href={`/residents/${resident.id}/edit`}
+                            href={`/admin/residents/${resident.id}/edit`}
                         >
                             Edit Profile
                         </ActionDropdownItem>
@@ -337,14 +337,14 @@ export default function ResidentsTableView({
                         
                         <ActionDropdownItem
                             icon={<QrCode className="h-4 w-4" />}
-                            href={`/residents/${resident.id}/generate-id`}
+                            href={`/admin/residents/${resident.id}/generate-id`}
                         >
                             Generate ID
                         </ActionDropdownItem>
                         
                         <ActionDropdownItem
                             icon={<FileText className="h-4 w-4" />}
-                            href={`/clearances/create?resident_id=${resident.id}`}
+                            href={`/admin/clearances/create?resident_id=${resident.id}`}
                         >
                             Create Clearance
                         </ActionDropdownItem>
@@ -472,7 +472,7 @@ export default function ResidentsTableView({
                                             icon={<User className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
                                             hasFilters={hasActiveFilters}
                                             onClearFilters={onClearFilters}
-                                            onCreateNew={() => window.location.href = '/residents/create'}
+                                            onCreateNew={() => window.location.href = '/admin/residents/create'}
                                             createLabel="Add Resident"
                                         />
                                     </TableCell>

@@ -45,7 +45,7 @@ interface User {
     email: string;
 }
 
-interface ActivityLog {
+interface AuditLog {
     id: number;
     log_name: string;
     description: string | null;
@@ -64,8 +64,8 @@ interface ActivityLog {
     subject?: any;
 }
 
-interface PaginatedActivityLogs {
-    data: ActivityLog[];
+interface PaginatedAuditLogs {
+    data: AuditLog[];
     current_page: number;
     first_page_url: string;
     from: number;
@@ -84,7 +84,7 @@ interface PaginatedActivityLogs {
     total: number;
 }
 
-interface ActivitySummary {
+interface AuditSummary {
     log_name: string;
     count: number;
 }
@@ -104,8 +104,8 @@ interface HourlyActivity {
     count: number;
 }
 
-interface ActivityLogsPageProps extends PageProps {
-    logs: PaginatedActivityLogs;
+interface AuditLogsPageProps extends PageProps {
+    logs: PaginatedAuditLogs;
     filters: {
         search?: string;
         event_type?: string;
@@ -126,8 +126,8 @@ interface ActivityLogsPageProps extends PageProps {
         system_logs: number;
         user_activities: number;
     };
-    recent_activities: ActivityLog[];
-    activity_summary: ActivitySummary[];
+    recent_activities: AuditLog[];
+    audit_summary: AuditSummary[];
     event_summary: EventSummary[];
     top_users: TopUser[];
     hourly_activity: HourlyActivity[];
@@ -480,8 +480,8 @@ const getLogTypeIcon = (logName: string) => {
     return icons[logName] || <Activity className="h-4 w-4" />;
 };
 
-export default function ActivityLogs() {
-    const { props } = usePage<ActivityLogsPageProps>();
+export default function AuditLogs() {
+    const { props } = usePage<AuditLogsPageProps>();
     const {
         logs,
         filters,
@@ -490,7 +490,7 @@ export default function ActivityLogs() {
         users,
         stats,
         recent_activities,
-        activity_summary,
+        audit_summary,
         event_summary,
         top_users,
         hourly_activity,
@@ -531,8 +531,7 @@ export default function ActivityLogs() {
         () =>
             debounce(() => {
                 const params = buildFilterParams();
-                router.get('/reports/activity-logs', params, {
-                    // FIXED: Changed from '/reports/audit-logs' to '/reports/activity-logs'
+                router.get('/admin/reports/audit-logs', params, {
                     preserveScroll: true,
                     preserveState: true,
                     onStart: () => setIsLoading(true),
@@ -557,8 +556,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             event_type: value.trim() || undefined,
         });
-        router.get('/reports/activity-logs', params, {
-            // FIXED: Changed from '/reports/audit-logs' to '/reports/activity-logs'
+        router.get('/admin/reports/audit-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -572,8 +570,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             log_name: value.trim() || undefined,
         });
-        router.get('/reports/activity-logs', params, {
-            // FIXED: Changed from '/reports/audit-logs' to '/reports/activity-logs'
+        router.get('/admin/reports/audit-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -587,8 +584,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             user_id: value.trim() || undefined,
         });
-        router.get('/reports/activity-logs', params, {
-            // FIXED: Changed from '/reports/audit-logs' to '/reports/activity-logs'
+        router.get('/admin/reports/audit-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -602,8 +598,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             date_from: value.trim() || undefined,
         });
-        router.get('/reports/activity-logs', params, {
-            // FIXED: Changed from '/reports/audit-logs' to '/reports/activity-logs'
+        router.get('/admin/reports/audit-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -617,8 +612,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             date_to: value.trim() || undefined,
         });
-        router.get('/reports/activity-logs', params, {
-            // FIXED: Changed from '/reports/audit-logs' to '/reports/activity-logs'
+        router.get('/admin/reports/audit-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -633,8 +627,7 @@ export default function ActivityLogs() {
             ...buildFilterParams(),
             per_page: numValue !== 25 ? numValue : undefined,
         });
-        router.get('/reports/activity-logs', params, {
-            // FIXED: Changed from '/reports/audit-logs' to '/reports/activity-logs'
+        router.get('/admin/reports/audit-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -654,10 +647,9 @@ export default function ActivityLogs() {
         setShowFilters(false);
 
         router.get(
-            '/reports/activity-logs',
+            '/admin/reports/audit-logs',
             {},
             {
-                // FIXED: Changed from '/reports/audit-logs' to '/reports/activity-logs'
                 preserveScroll: true,
                 preserveState: true,
                 onStart: () => setIsLoading(true),
@@ -669,8 +661,7 @@ export default function ActivityLogs() {
     // Refresh current filters
     const handleRefresh = () => {
         const params = buildFilterParams();
-        router.get('/reports/activity-logs', params, {
-            // FIXED: Changed from '/reports/audit-logs' to '/reports/activity-logs'
+        router.get('/admin/reports/audit-logs', params, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setIsLoading(true),
@@ -689,8 +680,7 @@ export default function ActivityLogs() {
             exportParams[key] = value;
         });
 
-        router.get('/reports/activity-logs/export', exportParams, {
-            // FIXED: Changed from '/reports/audit-logs/export' to '/reports/activity-logs/export'
+        router.get('/admin/reports/audit-logs/export', exportParams, {
             preserveScroll: true,
             onSuccess: () => {
                 setIsLoading(false);
@@ -728,20 +718,20 @@ export default function ActivityLogs() {
 
     return (
         <AppLayout
-            title="Activity Logs"
+            title="Audit Logs"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Activity Logs', href: '/reports/activity-logs' }, // FIXED: Changed from 'Audit Logs' to 'Activity Logs'
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Audit Logs', href: '/admin/reports/audit-logs' },
             ]}
         >
-            <Head title="Activity Logs" />
+            <Head title="Audit Logs" />
 
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl dark:text-gray-100">
-                            System Activity Logs
+                            System Audit Logs
                         </h1>
                         <p className="mt-1 text-gray-600 dark:text-gray-400">
                             Monitor all system activities, user actions, and
@@ -1085,13 +1075,13 @@ export default function ActivityLogs() {
 
                 {/* Main Content */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    {/* Activity Logs List */}
+                    {/* Audit Logs List */}
                     <div className="space-y-6 lg:col-span-2">
                         {/* Header with actions */}
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                    Activity Log Entries
+                                    Audit Log Entries
                                 </h2>
                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                     Showing {logs.data.length} of {logs.total}{' '}
@@ -1106,7 +1096,7 @@ export default function ActivityLogs() {
                             </div>
                         </div>
 
-                        {/* Activity Logs Table/Grid */}
+                        {/* Audit Logs Table/Grid */}
                         {viewMode === 'list' ? (
                             <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
                                 {isLoading ? (
@@ -1368,7 +1358,7 @@ export default function ActivityLogs() {
                                                                                     </span>
                                                                                     <span className="truncate text-xs text-gray-900 dark:text-white">
                                                                                         {(() => {
-                                                                                            // Simplify user agent display for admins
+                                                                                            // Simplify user agent display
                                                                                             const ua =
                                                                                                 log.user_agent.toLowerCase();
                                                                                             if (
@@ -1449,30 +1439,6 @@ export default function ActivityLogs() {
                                                                                         ),
                                                                                     )}
                                                                                 </div>
-
-                                                                                {/* Recorded by information */}
-                                                                                {log
-                                                                                    .properties
-                                                                                    ?.attributes
-                                                                                    ?.recorded_by && (
-                                                                                    <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <UserIcon className="h-4 w-4 text-gray-500" />
-                                                                                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                                                                                                Recorded
-                                                                                                by
-                                                                                                User
-                                                                                                ID:{' '}
-                                                                                                {
-                                                                                                    log
-                                                                                                        .properties
-                                                                                                        .attributes
-                                                                                                        .recorded_by
-                                                                                                }
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                     )}
@@ -1559,9 +1525,7 @@ export default function ActivityLogs() {
                                                                                                         :
                                                                                                     </span>
                                                                                                     <span className="text-right font-medium text-gray-900 dark:text-white">
-                                                                                                        {
-                                                                                                            formattedValue as string
-                                                                                                        }
+                                                                                                        {formattedValue as string}
                                                                                                     </span>
                                                                                                 </div>
                                                                                             );
@@ -1574,7 +1538,7 @@ export default function ActivityLogs() {
 
                                                                 <div className="flex justify-end gap-2 pt-2">
                                                                     <Link
-                                                                        href={`/reports/activity-logs/${log.id}`}
+                                                                        href={`/admin/reports/audit-logs/${log.id}`}
                                                                         className="text-primary-600 hover:text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/10 inline-flex items-center gap-1 rounded px-3 py-1 text-sm font-medium"
                                                                     >
                                                                         <Eye className="h-3 w-3" />
@@ -1605,7 +1569,7 @@ export default function ActivityLogs() {
                                     <div className="flex h-64 flex-col items-center justify-center p-6">
                                         <Activity className="mb-3 h-12 w-12 text-gray-300 dark:text-gray-700" />
                                         <p className="text-center text-gray-500 dark:text-gray-400">
-                                            No activity logs found
+                                            No audit logs found
                                         </p>
                                         <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">
                                             Try adjusting your filters or check
@@ -1673,7 +1637,7 @@ export default function ActivityLogs() {
                                                                     );
 
                                                                     router.get(
-                                                                        '/reports/activity-logs',
+                                                                        '/admin/reports/audit-logs',
                                                                         params,
                                                                         {
                                                                             preserveScroll: true,
@@ -1981,7 +1945,7 @@ export default function ActivityLogs() {
                             </div>
 
                             <Link
-                                href="/reports/activity-logs"
+                                href="/admin/reports/audit-logs"
                                 className="text-primary-600 hover:text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/10 mt-4 block w-full rounded-lg px-4 py-2 text-center text-sm font-medium"
                             >
                                 View all activities
@@ -2005,7 +1969,7 @@ export default function ActivityLogs() {
                             </div>
 
                             <div className="space-y-3">
-                                {activity_summary?.map((item) => (
+                                {audit_summary?.map((item) => (
                                     <div
                                         key={item.log_name}
                                         className="space-y-1"
@@ -2033,15 +1997,15 @@ export default function ActivityLogs() {
                                             <div
                                                 className={`h-full rounded-full ${getLogTypeClass(item.log_name).split(' ')[0]}`}
                                                 style={{
-                                                    width: `${Math.max(5, (item.count / Math.max(...activity_summary.map((a) => a.count))) * 100)}%`,
+                                                    width: `${Math.max(5, (item.count / Math.max(...audit_summary.map((a) => a.count))) * 100)}%`,
                                                 }}
                                             ></div>
                                         </div>
                                     </div>
                                 ))}
 
-                                {(!activity_summary ||
-                                    activity_summary.length === 0) && (
+                                {(!audit_summary ||
+                                    audit_summary.length === 0) && (
                                     <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                                         No activity data
                                     </p>

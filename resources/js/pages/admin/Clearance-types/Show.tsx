@@ -1,3 +1,4 @@
+// app/pages/admin/clearance-types/show.tsx
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,11 +23,14 @@ import {
     Shield,
     Globe,
     CreditCard,
-    AlertCircle
+    AlertCircle,
+    Tag
 } from 'lucide-react';
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
+import { route } from 'ziggy-js';
 
 interface DocumentType {
     id: number;
@@ -43,6 +47,7 @@ interface ClearanceType {
     code: string;
     description: string;
     fee: number | string;
+    is_discountable: boolean;
     processing_days: number | string;
     validity_days: number | string;
     is_active: boolean;
@@ -50,7 +55,7 @@ interface ClearanceType {
     requires_approval: boolean;
     is_online_only: boolean;
     purpose_options: string;
-    eligibility_criteria: any; // Changed to any to handle both string and array
+    eligibility_criteria: any;
     created_at: string;
     updated_at: string;
     clearances_count: number;
@@ -229,6 +234,74 @@ export default function ShowClearanceType({ clearanceType, recentClearances = []
         (clearanceType.document_types || []) : 
         (clearanceType.document_types || []).slice(0, 3);
 
+    const handleToggleDiscountable = () => {
+        if (confirm(`Are you sure you want to mark "${clearanceType.name}" as ${clearanceType.is_discountable ? 'non-discountable' : 'discountable'}?`)) {
+            router.post(route('clearance-types.toggle-discountable', clearanceType.id), {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(`Clearance type marked as ${clearanceType.is_discountable ? 'non-discountable' : 'discountable'} successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to toggle discountable status');
+                },
+            });
+        }
+    };
+
+    const handleToggleStatus = () => {
+        if (confirm(`Are you sure you want to ${clearanceType.is_active ? 'deactivate' : 'activate'} "${clearanceType.name}"?`)) {
+            router.post(route('clearance-types.toggle-status', clearanceType.id), {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(`Clearance type ${clearanceType.is_active ? 'deactivated' : 'activated'} successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to toggle status');
+                },
+            });
+        }
+    };
+
+    const handleDuplicate = () => {
+        if (confirm(`Duplicate "${clearanceType.name}" clearance type?`)) {
+            router.post(route('clearance-types.duplicate', clearanceType.id), {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Clearance type duplicated successfully');
+                },
+                onError: () => {
+                    toast.error('Failed to duplicate clearance type');
+                },
+            });
+        }
+    };
+
+    const handleDelete = () => {
+        if (clearanceType.clearances_count > 0) {
+            toast.error('Cannot delete clearance type with existing clearances');
+            return;
+        }
+        
+        if (confirm(`Are you sure you want to delete "${clearanceType.name}"? This action cannot be undone.`)) {
+            router.delete(route('clearance-types.destroy', clearanceType.id), {
+                onSuccess: () => {
+                    toast.success('Clearance type deleted successfully');
+                },
+                onError: () => {
+                    toast.error('Failed to delete clearance type');
+                },
+            });
+        }
+    };
+
+    const handleCopyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text).then(() => {
+            toast.success(`${label} copied to clipboard`);
+        }).catch(() => {
+            toast.error('Failed to copy to clipboard');
+        });
+    };
+
     return (
         <AppLayout
             title={clearanceType.name}
@@ -256,6 +329,12 @@ export default function ShowClearanceType({ clearanceType, recentClearances = []
                                 <Badge variant={clearanceType.is_active ? "default" : "secondary"} className="ml-2">
                                     {clearanceType.is_active ? 'Active' : 'Inactive'}
                                 </Badge>
+                                {clearanceType.is_discountable && (
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                        <Tag className="h-3 w-3 mr-1" />
+                                        Discountable
+                                    </Badge>
+                                )}
                             </div>
                             <div className="flex items-center gap-3 mt-1">
                                 <code className="text-sm text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
@@ -268,7 +347,11 @@ export default function ShowClearanceType({ clearanceType, recentClearances = []
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleCopyToClipboard(JSON.stringify(clearanceType, null, 2), 'Clearance type data')}
+                        >
                             <Copy className="h-4 w-4 mr-2" />
                             Copy
                         </Button>
@@ -475,6 +558,22 @@ export default function ShowClearanceType({ clearanceType, recentClearances = []
                                     </Badge>
                                 </div>
                                 <div className="flex items-center justify-between">
+                                    <span className="text-gray-600">Discountable</span>
+                                    {clearanceType.is_discountable ? (
+                                        <div className="flex items-center gap-1 text-green-600">
+                                            <Tag className="h-4 w-4" />
+                                            <span>Yes</span>
+                                            <Badge variant="outline" className="text-xs bg-green-50 ml-1">
+                                                Eligible for discounts
+                                            </Badge>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1 text-gray-500">
+                                            <span>No</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex items-center justify-between">
                                     <span className="text-gray-600">Payment Required</span>
                                     {clearanceType.requires_payment ? (
                                         <div className="flex items-center gap-1 text-emerald-600">
@@ -522,11 +621,23 @@ export default function ShowClearanceType({ clearanceType, recentClearances = []
                                         Edit Clearance Type
                                     </Button>
                                 </Link>
+                                <Button 
+                                    variant="outline" 
+                                    className="w-full justify-start"
+                                    onClick={handleToggleDiscountable}
+                                >
+                                    <Tag className="h-4 w-4 mr-2" />
+                                    {clearanceType.is_discountable ? 'Mark as Non-Discountable' : 'Mark as Discountable'}
+                                </Button>
                                 <Button variant="outline" className="w-full justify-start">
                                     <Printer className="h-4 w-4 mr-2" />
                                     Print Details
                                 </Button>
-                                <Button variant="outline" className="w-full justify-start">
+                                <Button 
+                                    variant="outline" 
+                                    className="w-full justify-start"
+                                    onClick={handleDuplicate}
+                                >
                                     <Copy className="h-4 w-4 mr-2" />
                                     Duplicate Type
                                 </Button>
@@ -641,12 +752,17 @@ export default function ShowClearanceType({ clearanceType, recentClearances = []
                     <CardContent>
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="font-medium">Deactivate Clearance Type</p>
+                                <p className="font-medium">Toggle Active Status</p>
                                 <p className="text-sm text-gray-500">
-                                    This will make the clearance type unavailable for new applications
+                                    This will make the clearance type {clearanceType.is_active ? 'unavailable' : 'available'} for new applications
                                 </p>
                             </div>
-                            <Button variant="outline" size="sm" className="border-red-300 text-red-600 hover:bg-red-50">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="border-red-300 text-red-600 hover:bg-red-50"
+                                onClick={handleToggleStatus}
+                            >
                                 {clearanceType.is_active ? 'Deactivate' : 'Activate'}
                             </Button>
                         </div>
@@ -668,6 +784,7 @@ export default function ShowClearanceType({ clearanceType, recentClearances = []
                                 variant="destructive" 
                                 size="sm"
                                 disabled={clearanceType.clearances_count > 0}
+                                onClick={handleDelete}
                             >
                                 Delete
                             </Button>

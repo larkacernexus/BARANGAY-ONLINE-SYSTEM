@@ -279,7 +279,7 @@ export default function UsersContent({
                 onClick: handleClearFilters
               } : {
                 label: "Create User",
-                onClick: () => window.location.href = '/users/create'
+                onClick: () => window.location.href = '/admin/users/create'
               }}
               className="py-12 sm:py-16"
             />

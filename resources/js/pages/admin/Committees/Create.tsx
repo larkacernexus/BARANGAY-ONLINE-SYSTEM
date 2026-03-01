@@ -34,7 +34,7 @@ export default function CreateCommittee({ nextOrder }: CreateCommitteeProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post('/committees'); // Make sure this is the correct route
+        post('/admin/committees'); // Make sure this is the correct route
     };
 
     // Function to generate code from name
@@ -81,9 +81,9 @@ export default function CreateCommittee({ nextOrder }: CreateCommitteeProps) {
         <AppLayout
             title="Create Committee"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Committees', href: '/committees' },
-                { title: 'Create Committee', href: '/committees/create' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Committees', href: '/admin/committees' },
+                { title: 'Create Committee', href: '/admin/committees/create' }
             ]}
         >
             <form onSubmit={handleSubmit}>
@@ -91,7 +91,7 @@ export default function CreateCommittee({ nextOrder }: CreateCommitteeProps) {
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <Link href="/committees">
+                            <Link href="/admin/committees">
                                 <Button variant="ghost" size="sm" type="button">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
@@ -348,7 +348,7 @@ export default function CreateCommittee({ nextOrder }: CreateCommitteeProps) {
 
                     {/* Form Actions */}
                     <div className="flex items-center justify-between pt-6 border-t">
-                        <Link href="/committees">
+                        <Link href="/admin/committees">
                             <Button variant="outline" type="button">
                                 Cancel
                             </Button>

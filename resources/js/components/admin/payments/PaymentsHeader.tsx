@@ -59,7 +59,7 @@ export default function PaymentsHeader({
                     <Download className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline">Export</span>
                 </Button>
-             <Link href={route('payments.create')}>
+             <Link href={route('admin.payments.create')}>
                 <Button className="h-9">
                     <Plus className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline">Record Payment</span>

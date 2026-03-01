@@ -9,7 +9,6 @@ import {
     Shield,
     Users,
     Key,
-    Edit,
     Eye,
     Trash2,
     RefreshCw,
@@ -55,6 +54,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import DeveloperContactModal from '@/components/developer-contact-modal';
+import { route } from 'ziggy-js';
 
 interface PermissionsIndexProps {
     permissions: Paginated<Permission>;
@@ -168,7 +168,7 @@ export default function PermissionsIndex({
 
     const handleApplyFilters = () => {
         setIsSearching(true);
-        router.get(route('permissions.index'), filters, {
+        router.get(route('admin.permissions.index'), filters, {
             preserveState: true,
             replace: true,
             onFinish: () => setIsSearching(false),
@@ -177,7 +177,7 @@ export default function PermissionsIndex({
 
     const handleSearch = () => {
         setIsSearching(true);
-        router.get(route('permissions.index'), filters, {
+        router.get(route('admin.permissions.index'), filters, {
             preserveState: true,
             replace: true,
             onFinish: () => setIsSearching(false),
@@ -187,7 +187,7 @@ export default function PermissionsIndex({
     const handleClearSearch = () => {
         setFilters(prev => ({ ...prev, search: '' }));
         setLocalSearch('');
-        router.get(route('permissions.index'), { ...filters, search: '' }, {
+        router.get(route('admin.permissions.index'), { ...filters, search: '' }, {
             preserveState: true,
             replace: true,
         });
@@ -206,7 +206,7 @@ export default function PermissionsIndex({
         setFilters(newFilters);
         setLocalSearch('');
         setIsSearching(true);
-        router.get(route('permissions.index'), newFilters, {
+        router.get(route('admin.permissions.index'), newFilters, {
             preserveState: true,
             replace: true,
             onFinish: () => setIsSearching(false),
@@ -215,7 +215,7 @@ export default function PermissionsIndex({
 
     const togglePermissionStatus = (permission: Permission) => {
         if (confirm(`Are you sure you want to ${permission.is_active ? 'deactivate' : 'activate'} permission "${permission.display_name}"?`)) {
-            router.put(route('permissions.toggle-status', permission.id), {}, {
+            router.put(route('admin.permissions.toggle-status', permission.id), {}, {
                 preserveScroll: true,
                 onSuccess: () => {
                     router.reload({ only: ['permissions'] });
@@ -226,7 +226,7 @@ export default function PermissionsIndex({
 
     const handleDelete = (permission: Permission) => {
         if (confirm(`Are you sure you want to delete permission "${permission.display_name}"? This action cannot be undone.`)) {
-            router.delete(route('permissions.destroy', permission.id));
+            router.delete(route('admin.permissions.destroy', permission.id));
         }
     };
 
@@ -237,7 +237,7 @@ export default function PermissionsIndex({
     };
 
     const handleExport = () => {
-        const exportUrl = new URL(route('permissions.export'), window.location.origin);
+        const exportUrl = new URL(route('admin.permissions.export'), window.location.origin);
         if (filters.search) exportUrl.searchParams.append('search', filters.search);
         if (filters.module !== 'all') exportUrl.searchParams.append('module', filters.module);
         if (filters.status !== 'all') exportUrl.searchParams.append('status', filters.status);
@@ -284,7 +284,7 @@ export default function PermissionsIndex({
             title="Permissions Management"
             breadcrumbs={[
                 { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Permissions', href: route('permissions.index') }
+                { title: 'Permissions', href: route('admin.permissions.index') }
             ]}
         >
             <Head title="Permissions Management" />
@@ -317,7 +317,7 @@ export default function PermissionsIndex({
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Link href={route('roles.index')}>
+                        <Link href={route('admin.roles.index')}>
                             <Button variant="outline" className="h-9">
                                 <Users className="h-4 w-4 mr-2" />
                                 <span className="hidden sm:inline">Manage Roles</span>
@@ -676,18 +676,12 @@ export default function PermissionsIndex({
                                                                     </DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end" className="w-48">
                                                                         <DropdownMenuItem asChild>
-                                                                            <Link href={route('permissions.show', permission.id)} className="flex items-center cursor-pointer">
+                                                                            <Link href={route('admin.permissions.show', permission.id)} className="flex items-center cursor-pointer">
                                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                                 <span>View Details</span>
                                                                             </Link>
                                                                         </DropdownMenuItem>
                                                                         
-                                                                        <DropdownMenuItem asChild>
-                                                                            <Link href={route('permissions.edit', permission.id)} className="flex items-center cursor-pointer">
-                                                                                <Edit className="mr-2 h-4 w-4" />
-                                                                                <span>Edit Permission</span>
-                                                                            </Link>
-                                                                        </DropdownMenuItem>
                                                                         
                                                                         <DropdownMenuSeparator />
                                                                         
@@ -742,7 +736,7 @@ export default function PermissionsIndex({
                                         onClick={() => {
                                             const prevPage = Math.max(1, (permissions.meta?.current_page || 1) - 1);
                                             setIsSearching(true);
-                                            router.get(route('permissions.index'), { ...filters, page: prevPage }, {
+                                            router.get(route('admin.permissions.index'), { ...filters, page: prevPage }, {
                                                 preserveState: true,
                                                 replace: true,
                                                 onFinish: () => setIsSearching(false),
@@ -775,7 +769,7 @@ export default function PermissionsIndex({
                                                     size="sm"
                                                     onClick={() => {
                                                         setIsSearching(true);
-                                                        router.get(route('permissions.index'), { ...filters, page: pageNum }, {
+                                                        router.get(route('admin.permissions.index'), { ...filters, page: pageNum }, {
                                                             preserveState: true,
                                                             replace: true,
                                                             onFinish: () => setIsSearching(false),
@@ -795,7 +789,7 @@ export default function PermissionsIndex({
                                         onClick={() => {
                                             const nextPage = Math.min(totalPages, (permissions.meta?.current_page || 1) + 1);
                                             setIsSearching(true);
-                                            router.get(route('permissions.index'), { ...filters, page: nextPage }, {
+                                            router.get(route('admin.permissions.index'), { ...filters, page: nextPage }, {
                                                 preserveState: true,
                                                 replace: true,
                                                 onFinish: () => setIsSearching(false),
@@ -821,7 +815,7 @@ export default function PermissionsIndex({
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 gap-3">
-                                <Link href={route('roles.index')}>
+                                <Link href={route('admin.roles.index')}>
                                     <Button variant="outline" size="sm" className="w-full justify-start h-8" disabled={isSearching}>
                                         <Users className="h-3 w-3 mr-2" />
                                         <span className="truncate">Manage Roles</span>

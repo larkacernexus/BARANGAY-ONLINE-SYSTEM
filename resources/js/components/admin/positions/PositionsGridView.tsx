@@ -66,7 +66,7 @@ export default function PositionsGridView({
             icon={<Shield className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
             hasFilters={hasActiveFilters}
             onClearFilters={onClearFilters}
-            onCreateNew={() => window.location.href = '/positions/create'}
+            onCreateNew={() => window.location.href = '/admin/positions/create'}
             createLabel="Create Position"
         />
     );
@@ -133,14 +133,14 @@ export default function PositionsGridView({
                                     <ActionDropdown>
                                         <ActionDropdownItem
                                             icon={<Eye className="h-4 w-4" />}
-                                            href={`/positions/${position.id}`}
+                                            href={`/admin/positions/${position.id}`}
                                         >
                                             View Details
                                         </ActionDropdownItem>
                                         
                                         <ActionDropdownItem
                                             icon={<Edit className="h-4 w-4" />}
-                                            href={`/positions/${position.id}/edit`}
+                                            href={`/admin/positions/${position.id}/edit`}
                                         >
                                             Edit Position
                                         </ActionDropdownItem>

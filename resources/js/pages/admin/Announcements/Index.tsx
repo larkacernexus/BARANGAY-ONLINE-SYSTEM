@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
-import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
 import { 
     Announcement, 
@@ -107,38 +106,29 @@ export default function AnnouncementsIndex({
         }
     }, [flash]);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/announcements', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== filters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, filters.search]);
+    // Handle search change - immediate navigation without debounce
+    const handleSearchChange = (value: string) => {
+        setSearch(value);
+        
+        const params = {
+            ...filtersState,
+            search: value
+        };
+        
+        // Clean up empty values
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/announcements', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
 
     // Filter announcements
     const filteredAnnouncements = useMemo(() => {
@@ -286,7 +276,7 @@ export default function AnnouncementsIndex({
             switch (operation) {
                 case 'delete':
                     if (confirm(`Are you sure you want to delete ${selectedAnnouncements.length} selected announcement(s)?`)) {
-                        await router.post('/announcements/bulk-action', {
+                        await router.post('/admin/announcements/bulk-action', {
                             action: 'delete',
                             announcement_ids: selectedAnnouncements,
                         }, {
@@ -304,7 +294,7 @@ export default function AnnouncementsIndex({
                     break;
 
                 case 'activate':
-                    await router.post('/announcements/bulk-action', {
+                    await router.post('/admin/announcements/bulk-action', {
                         action: 'activate',
                         announcement_ids: selectedAnnouncements,
                     }, {
@@ -320,7 +310,7 @@ export default function AnnouncementsIndex({
                     break;
 
                 case 'deactivate':
-                    await router.post('/announcements/bulk-action', {
+                    await router.post('/admin/announcements/bulk-action', {
                         action: 'deactivate',
                         announcement_ids: selectedAnnouncements,
                     }, {
@@ -399,7 +389,7 @@ export default function AnnouncementsIndex({
     // Individual announcement operations
     const handleDelete = (announcement: Announcement) => {
         if (confirm(`Are you sure you want to delete announcement "${announcement.title || 'Untitled'}"?`)) {
-            router.delete(`/announcements/${announcement.id}`, {
+            router.delete(`/admin/announcements/${announcement.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedAnnouncements(selectedAnnouncements.filter(id => id !== announcement.id));
@@ -413,7 +403,7 @@ export default function AnnouncementsIndex({
     };
 
     const handleToggleStatus = (announcement: Announcement) => {
-        router.post(`/announcements/${announcement.id}/toggle-status`, {}, {
+        router.post(`/admin/announcements/${announcement.id}/toggle-status`, {}, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Announcement status updated');
@@ -469,7 +459,7 @@ export default function AnnouncementsIndex({
             title="Announcements Management"
             breadcrumbs={[
                 { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Announcements', href: '/announcements' }
+                { title: 'Announcements', href: '/admin/announcements' }
             ]}
         >
             <TooltipProvider>
@@ -483,7 +473,7 @@ export default function AnnouncementsIndex({
                     <AnnouncementsFilters
                         stats={stats}
                         search={search}
-                        setSearch={setSearch}
+                        setSearch={handleSearchChange}
                         filtersState={filtersState}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}

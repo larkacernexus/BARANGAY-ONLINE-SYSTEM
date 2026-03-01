@@ -4,9 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Building, Home, Phone, MapPin, FileText, Info } from 'lucide-react';
+import { User, Building, Home, Phone, MapPin, FileText, Info, Search } from 'lucide-react';
 import { FeeFormData, Resident, Household } from '@/types/fees';
 import { getEligibilityBadges } from '@/admin-utils/fees/discount-display-utils';
+import { useState, useMemo, useEffect, useRef } from 'react';
 
 interface RightColumnProps {
     data: FeeFormData;
@@ -43,6 +44,17 @@ export default function RightColumn({
     handleHouseholdSelect,
     hideIndividualSelection = false
 }: RightColumnProps) {
+    const [residentSearch, setResidentSearch] = useState('');
+    const [householdSearch, setHouseholdSearch] = useState('');
+    const [showResidentDropdown, setShowResidentDropdown] = useState(false);
+    const [showHouseholdDropdown, setShowHouseholdDropdown] = useState(false);
+    
+    // Refs for detecting clicks outside
+    const residentDropdownRef = useRef<HTMLDivElement>(null);
+    const householdDropdownRef = useRef<HTMLDivElement>(null);
+    const residentInputRef = useRef<HTMLInputElement>(null);
+    const householdInputRef = useRef<HTMLInputElement>(null);
+
     const safeString = (value: any): string => {
         if (value === null || value === undefined || value === 'null') return '';
         return String(value);
@@ -54,9 +66,165 @@ export default function RightColumn({
         return isNaN(num) ? 0 : num;
     };
 
+    // Filter residents based on search
+    const filteredResidents = useMemo(() => {
+        if (!residentSearch.trim()) return residents;
+        
+        const searchLower = residentSearch.toLowerCase();
+        return residents.filter(resident => 
+            resident.full_name.toLowerCase().includes(searchLower) ||
+            (resident.purok && resident.purok.toLowerCase().includes(searchLower)) ||
+            (resident.address && resident.address.toLowerCase().includes(searchLower))
+        );
+    }, [residents, residentSearch]);
+
+    // Filter households based on search
+    const filteredHouseholds = useMemo(() => {
+        if (!householdSearch.trim()) return households;
+        
+        const searchLower = householdSearch.toLowerCase();
+        return households.filter(household => 
+            household.name.toLowerCase().includes(searchLower) ||
+            (household.purok && household.purok.toLowerCase().includes(searchLower)) ||
+            (household.address && household.address.toLowerCase().includes(searchLower))
+        );
+    }, [households, householdSearch]);
+
+    // Handle click outside to close dropdowns
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (residentDropdownRef.current && !residentDropdownRef.current.contains(event.target as Node) &&
+                residentInputRef.current && !residentInputRef.current.contains(event.target as Node)) {
+                setShowResidentDropdown(false);
+            }
+            if (householdDropdownRef.current && !householdDropdownRef.current.contains(event.target as Node) &&
+                householdInputRef.current && !householdInputRef.current.contains(event.target as Node)) {
+                setShowHouseholdDropdown(false);
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
     const residentBadges = selectedPayer && 'is_senior' in selectedPayer 
         ? getEligibilityBadges(selectedPayer as Resident)
         : [];
+
+    // Handle resident selection
+    const handleResidentSelectWithSearch = (residentId: string) => {
+        console.log('Selected resident ID:', residentId); // For debugging
+        
+        // Find the selected resident
+        const selected = residents.find(r => r.id === residentId);
+        if (selected) {
+            // Update search input
+            setResidentSearch(selected.full_name);
+            
+            // Directly set all the data
+            setData('resident_id', residentId);
+            setData('payer_name', selected.full_name);
+            setData('contact_number', selected.contact_number || '');
+            setData('purok', selected.purok || '');
+            setData('payer_type', 'resident'); // Ensure payer type is set
+            
+            // Also call the parent handler for consistency
+            handleResidentSelect(residentId);
+            
+            console.log('Set resident data:', {
+                resident_id: residentId,
+                payer_name: selected.full_name
+            });
+        } else {
+            // Clear selection
+            setData('resident_id', '');
+            setData('payer_name', '');
+            setData('contact_number', '');
+            setData('purok', '');
+            handleResidentSelect(residentId);
+        }
+        
+        setShowResidentDropdown(false);
+    };
+
+    // Handle household selection
+    const handleHouseholdSelectWithSearch = (householdId: string) => {
+        console.log('Selected household ID:', householdId); // For debugging
+        
+        // Find the selected household
+        const selected = households.find(h => h.id === householdId);
+        if (selected) {
+            // Update search input
+            setHouseholdSearch(selected.name);
+            
+            // Directly set all the data
+            setData('household_id', householdId);
+            setData('payer_name', selected.name);
+            setData('contact_number', selected.contact_number || '');
+            setData('purok', selected.purok || '');
+            setData('payer_type', 'household'); // Ensure payer type is set
+            
+            // Also call the parent handler for consistency
+            handleHouseholdSelect(householdId);
+            
+            console.log('Set household data:', {
+                household_id: householdId,
+                payer_name: selected.name
+            });
+        } else {
+            // Clear selection
+            setData('household_id', '');
+            setData('payer_name', '');
+            setData('contact_number', '');
+            setData('purok', '');
+            handleHouseholdSelect(householdId);
+        }
+        
+        setShowHouseholdDropdown(false);
+    };
+
+    // Handle clearing resident selection
+    const handleClearResident = () => {
+        setResidentSearch('');
+        setShowResidentDropdown(false);
+        // Clear selection properly
+        setData('resident_id', '');
+        setData('payer_name', '');
+        setData('contact_number', '');
+        setData('purok', '');
+        handleResidentSelect('');
+    };
+
+    // Handle clearing household selection
+    const handleClearHousehold = () => {
+        setHouseholdSearch('');
+        setShowHouseholdDropdown(false);
+        // Clear selection properly
+        setData('household_id', '');
+        setData('payer_name', '');
+        setData('contact_number', '');
+        setData('purok', '');
+        handleHouseholdSelect('');
+    };
+
+    // Update search input when selectedPayer changes
+    useEffect(() => {
+        if (data.payer_type === 'resident' && selectedPayer && 'full_name' in selectedPayer) {
+            setResidentSearch(selectedPayer.full_name);
+        } else if (data.payer_type === 'resident' && !selectedPayer) {
+            setResidentSearch('');
+        }
+    }, [selectedPayer, data.payer_type]);
+
+    useEffect(() => {
+        if (data.payer_type === 'household' && selectedPayer && 'name' in selectedPayer) {
+            setHouseholdSearch(selectedPayer.name);
+        } else if (data.payer_type === 'household' && !selectedPayer) {
+            setHouseholdSearch('');
+        }
+    }, [selectedPayer, data.payer_type]);
 
     return (
         <div className="space-y-6">
@@ -98,7 +266,16 @@ export default function RightColumn({
                                                 <button
                                                     key={type.value}
                                                     type="button"
-                                                    onClick={() => handlePayerTypeChange(type.value)}
+                                                    onClick={() => {
+                                                        handlePayerTypeChange(type.value);
+                                                        // Clear any previous selections
+                                                        if (type.value !== 'resident') {
+                                                            handleClearResident();
+                                                        }
+                                                        if (type.value !== 'household') {
+                                                            handleClearHousehold();
+                                                        }
+                                                    }}
                                                     className={`flex flex-col items-center justify-center rounded-md border p-3 transition-colors ${
                                                         data.payer_type === type.value
                                                             ? 'border-primary bg-primary/10 text-primary'
@@ -120,55 +297,237 @@ export default function RightColumn({
                                     )}
                                 </div>
 
-                                {/* Resident/Household Selection - SIMPLIFIED CONDITION */}
-                                {(data.payer_type === 'resident' || data.payer_type === 'household') && (
+                                {/* Resident Selection with Search */}
+                                {data.payer_type === 'resident' && (
                                     <div className="space-y-2">
-                                        <Label htmlFor={`${data.payer_type}_id`}>
-                                            Select {data.payer_type === 'resident' ? 'Resident' : 'Household'} *
+                                        <Label htmlFor="resident_search">
+                                            Select Resident *
                                         </Label>
-                                        <select
-                                            id={`${data.payer_type}_id`}
-                                            required
-                                            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
-                                            value={safeString(
-                                                data.payer_type === 'resident' ? data.resident_id : data.household_id
+                                        
+                                        {/* Search input */}
+                                        <div className="relative">
+                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                                            <Input
+                                                ref={residentInputRef}
+                                                id="resident_search"
+                                                type="text"
+                                                placeholder="Search residents by name or purok..."
+                                                value={residentSearch}
+                                                onChange={(e) => {
+                                                    setResidentSearch(e.target.value);
+                                                    setShowResidentDropdown(true);
+                                                }}
+                                                onFocus={() => setShowResidentDropdown(true)}
+                                                className="pl-8"
+                                                autoComplete="off"
+                                            />
+                                            {residentSearch && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleClearResident}
+                                                    className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    ×
+                                                </button>
                                             )}
-                                            onChange={(e) => {
-                                                if (data.payer_type === 'resident') {
-                                                    handleResidentSelect(e.target.value);
-                                                } else {
-                                                    handleHouseholdSelect(e.target.value);
-                                                }
-                                            }}
+                                        </div>
+
+                                        {/* Search results dropdown */}
+                                        {showResidentDropdown && (
+                                            <div 
+                                                ref={residentDropdownRef}
+                                                className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg"
+                                                style={{ width: 'calc(100% - 2rem)' }}
+                                            >
+                                                {filteredResidents.length > 0 ? (
+                                                    filteredResidents.map((resident) => (
+                                                        <button
+                                                            key={resident.id}
+                                                            type="button"
+                                                            onClick={() => handleResidentSelectWithSearch(resident.id)}
+                                                            className="w-full px-4 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b last:border-b-0"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <span className="font-medium">{resident.full_name}</span>
+                                                                    {resident.purok && (
+                                                                        <span className="ml-2 text-sm text-gray-500">
+                                                                            (Purok {resident.purok})
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex gap-1">
+                                                                    {resident.is_senior && <span className="text-sm" title="Senior Citizen">👵</span>}
+                                                                    {resident.is_pwd && <span className="text-sm" title="PWD">♿</span>}
+                                                                    {resident.is_solo_parent && <span className="text-sm" title="Solo Parent">👨‍👧‍👦</span>}
+                                                                    {resident.is_indigent && <span className="text-sm" title="Indigent">🏠</span>}
+                                                                </div>
+                                                            </div>
+                                                            {resident.address && (
+                                                                <div className="text-xs text-gray-500 mt-1">
+                                                                    {resident.address}
+                                                                </div>
+                                                            )}
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="px-4 py-3 text-sm text-gray-500">
+                                                        No residents found matching "{residentSearch}"
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Hidden select for form submission */}
+                                        <select
+                                            id="resident_id"
+                                            name="resident_id"
+                                            required={data.payer_type === 'resident'}
+                                            className="sr-only"
+                                            value={safeString(data.resident_id)}
+                                            onChange={(e) => handleResidentSelectWithSearch(e.target.value)}
+                                            tabIndex={-1}
+                                            aria-hidden="true"
                                         >
-                                            <option value="">
-                                                Select {data.payer_type === 'resident' ? 'Resident' : 'Household'}
-                                            </option>
-                                            {data.payer_type === 'resident'
-                                                ? residents.map((resident) => (
-                                                    <option
-                                                        key={resident.id}
-                                                        value={resident.id}
-                                                    >
-                                                        {resident.full_name} 
-                                                        {resident.purok ? ` (Purok ${resident.purok})` : ''}
-                                                        {resident.is_senior && ' 👵'}
-                                                        {resident.is_pwd && ' ♿'}
-                                                        {resident.is_solo_parent && ' 👨‍👧‍👦'}
-                                                        {resident.is_indigent && ' 🏠'}
-                                                    </option>
-                                                ))
-                                                : households.map((household) => (
-                                                    <option
-                                                        key={household.id}
-                                                        value={household.id}
-                                                    >
-                                                        {household.name} 
-                                                        {household.purok ? ` (Purok ${household.purok})` : ''}
-                                                        {household.member_count && ` - ${household.member_count} members`}
-                                                    </option>
-                                                ))}
+                                            <option value="">Select Resident</option>
+                                            {residents.map((resident) => (
+                                                <option key={resident.id} value={resident.id}>
+                                                    {resident.full_name}
+                                                </option>
+                                            ))}
                                         </select>
+
+                                        {/* Selected resident details */}
+                                        {selectedPayer && 'full_name' in selectedPayer && data.resident_id && (
+                                            <div className="mt-2 rounded-md bg-green-50 border border-green-200 p-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                                    <span className="text-sm font-medium text-green-700">Selected:</span>
+                                                </div>
+                                                <div className="mt-1 font-medium">{selectedPayer.full_name}</div>
+                                                <div className="text-sm text-gray-600 mt-1">
+                                                    {selectedPayer.purok && `Purok ${selectedPayer.purok}`}
+                                                    {selectedPayer.address && ` • ${selectedPayer.address}`}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Household Selection with Search */}
+                                {data.payer_type === 'household' && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="household_search">
+                                            Select Household *
+                                        </Label>
+                                        
+                                        {/* Search input */}
+                                        <div className="relative">
+                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                                            <Input
+                                                ref={householdInputRef}
+                                                id="household_search"
+                                                type="text"
+                                                placeholder="Search households by name or purok..."
+                                                value={householdSearch}
+                                                onChange={(e) => {
+                                                    setHouseholdSearch(e.target.value);
+                                                    setShowHouseholdDropdown(true);
+                                                }}
+                                                onFocus={() => setShowHouseholdDropdown(true)}
+                                                className="pl-8"
+                                                autoComplete="off"
+                                            />
+                                            {householdSearch && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleClearHousehold}
+                                                    className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+                                                >
+                                                    ×
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Search results dropdown */}
+                                        {showHouseholdDropdown && (
+                                            <div 
+                                                ref={householdDropdownRef}
+                                                className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg"
+                                                style={{ width: 'calc(100% - 2rem)' }}
+                                            >
+                                                {filteredHouseholds.length > 0 ? (
+                                                    filteredHouseholds.map((household) => (
+                                                        <button
+                                                            key={household.id}
+                                                            type="button"
+                                                            onClick={() => handleHouseholdSelectWithSearch(household.id)}
+                                                            className="w-full px-4 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b last:border-b-0"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <span className="font-medium">{household.name}</span>
+                                                                    {household.purok && (
+                                                                        <span className="ml-2 text-sm text-gray-500">
+                                                                            (Purok {household.purok})
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {household.member_count && (
+                                                                    <span className="text-xs text-gray-500">
+                                                                        {household.member_count} members
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {household.address && (
+                                                                <div className="text-xs text-gray-500 mt-1">
+                                                                    {household.address}
+                                                                </div>
+                                                            )}
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="px-4 py-3 text-sm text-gray-500">
+                                                        No households found matching "{householdSearch}"
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Hidden select for form submission */}
+                                        <select
+                                            id="household_id"
+                                            name="household_id"
+                                            required={data.payer_type === 'household'}
+                                            className="sr-only"
+                                            value={safeString(data.household_id)}
+                                            onChange={(e) => handleHouseholdSelectWithSearch(e.target.value)}
+                                            tabIndex={-1}
+                                            aria-hidden="true"
+                                        >
+                                            <option value="">Select Household</option>
+                                            {households.map((household) => (
+                                                <option key={household.id} value={household.id}>
+                                                    {household.name}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        {/* Selected household details */}
+                                        {selectedPayer && 'name' in selectedPayer && data.household_id && (
+                                            <div className="mt-2 rounded-md bg-green-50 border border-green-200 p-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                                    <span className="text-sm font-medium text-green-700">Selected:</span>
+                                                </div>
+                                                <div className="mt-1 font-medium">{selectedPayer.name}</div>
+                                                <div className="text-sm text-gray-600 mt-1">
+                                                    {selectedPayer.purok && `Purok ${selectedPayer.purok}`}
+                                                    {selectedPayer.address && ` • ${selectedPayer.address}`}
+                                                    {selectedPayer.member_count && ` • ${selectedPayer.member_count} members`}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 

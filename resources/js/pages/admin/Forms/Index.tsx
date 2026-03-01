@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
-import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
 import { 
     Form, 
@@ -90,6 +89,8 @@ export default function FormsIndex({
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
     // Handle window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -117,38 +118,30 @@ export default function FormsIndex({
         }
     }, [flash]);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/forms', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== safeFilters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, safeFilters.search]);
+    // Immediate search handler
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearch(value);
+        
+        const params = {
+            ...filtersState,
+            search: value
+        };
+        
+        // Clean up empty values
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/forms', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
 
     // Filter forms client-side
     const filteredForms = useMemo(() => {
@@ -207,6 +200,11 @@ export default function FormsIndex({
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
                 e.preventDefault();
                 setIsBulkMode(!isBulkMode);
+            }
+            // Ctrl/Cmd + F to focus search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
             }
             // Delete key for bulk delete
             if (e.key === 'Delete' && isBulkMode && selectedForms.length > 0) {
@@ -291,7 +289,7 @@ export default function FormsIndex({
             switch (operation) {
                 case 'delete':
                     if (confirm(`Are you sure you want to delete ${selectedForms.length} selected form(s)?`)) {
-                        await router.post('/forms/bulk-action', {
+                        await router.post('/admin/forms/bulk-action', {
                             action: 'delete',
                             form_ids: selectedForms,
                         }, {
@@ -309,7 +307,7 @@ export default function FormsIndex({
                     break;
 
                 case 'activate':
-                    await router.post('/forms/bulk-action', {
+                    await router.post('/admin/forms/bulk-action', {
                         action: 'activate',
                         form_ids: selectedForms,
                     }, {
@@ -325,7 +323,7 @@ export default function FormsIndex({
                     break;
 
                 case 'deactivate':
-                    await router.post('/forms/bulk-action', {
+                    await router.post('/admin/forms/bulk-action', {
                         action: 'deactivate',
                         form_ids: selectedForms,
                     }, {
@@ -341,12 +339,10 @@ export default function FormsIndex({
                     break;
 
                 case 'export':
-                    // Export logic here
                     toast.info('Export functionality to be implemented');
                     break;
 
                 case 'download':
-                    // Download logic here
                     toast.info('Bulk download functionality to be implemented');
                     break;
 
@@ -401,7 +397,7 @@ export default function FormsIndex({
     // Individual form operations
     const handleDelete = (form: Form) => {
         if (confirm(`Are you sure you want to delete form "${form.title || 'Untitled'}"?`)) {
-            router.delete(`/forms/${form.id}`, {
+            router.delete(`/admin/forms/${form.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedForms(selectedForms.filter(id => id !== form.id));
@@ -415,7 +411,7 @@ export default function FormsIndex({
     };
 
     const handleToggleStatus = (form: Form) => {
-        router.post(`/forms/${form.id}/toggle-status`, {}, {
+        router.post(`/admin/forms/${form.id}/toggle-status`, {}, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Form status updated');
@@ -436,6 +432,28 @@ export default function FormsIndex({
             sort_by: column,
             sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc'
         }));
+        
+        // Trigger server-side sort update
+        const params = {
+            ...filtersState,
+            sort_by: column,
+            sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc',
+            search: search
+        };
+        
+        // Clean up empty values
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/forms', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearFilters = () => {
@@ -449,6 +467,22 @@ export default function FormsIndex({
             sort_by: 'created_at',
             sort_order: 'desc'
         });
+        
+        // Trigger server-side filter clear
+        router.get('/admin/forms', {
+            search: '',
+            category: 'all',
+            agency: 'all',
+            status: 'all',
+            from_date: '',
+            to_date: '',
+            sort_by: 'created_at',
+            sort_order: 'desc'
+        }, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearSelection = () => {
@@ -458,6 +492,27 @@ export default function FormsIndex({
 
     const updateFilter = (key: keyof Filters, value: string) => {
         setFiltersState(prev => ({ ...prev, [key]: value }));
+        
+        // Trigger server-side filter update
+        const params = {
+            ...filtersState,
+            [key]: value,
+            search: search
+        };
+        
+        // Clean up empty values
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/forms', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const hasActiveFilters = 
@@ -489,6 +544,7 @@ export default function FormsIndex({
                     <FormsFilters
                         search={search}
                         setSearch={setSearch}
+                        onSearchChange={handleSearchChange}
                         filtersState={filtersState}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
@@ -500,6 +556,7 @@ export default function FormsIndex({
                         startIndex={startIndex}
                         endIndex={endIndex}
                         totalItems={totalItems}
+                        searchInputRef={searchInputRef}
                     />
 
                     <FormsContent

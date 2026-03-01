@@ -110,7 +110,7 @@ export default function CreateForm() {
             return;
         }
 
-        post('/forms', {
+        post('/admin/forms', {
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -170,16 +170,16 @@ export default function CreateForm() {
         <AppLayout
             title="Upload New Form"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Forms', href: '/forms' },
-                { title: 'Upload New Form', href: '/forms/create' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Forms', href: '/admin/forms' },
+                { title: 'Upload New Form', href: '/admin/forms/create' }
             ]}
         >
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/forms">
+                        <Link href="/admin/forms">
                             <Button variant="ghost" size="sm">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to Forms

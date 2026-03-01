@@ -50,14 +50,14 @@ export default function RolesHeader({
                         <p className="text-xs text-gray-500">Select multiple roles for batch operations</p>
                     </TooltipContent>
                 </Tooltip>
-                <Link href="/permissions">
+                <Link href="/admin/permissions">
                     <Button variant="outline" className="h-9">
                         <Key className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">Permissions</span>
                         <span className="sm:hidden">Perms</span>
                     </Button>
                 </Link>
-                <Link href="/roles/create">
+                <Link href="/admin/roles/create">
                     <Button className="h-9">
                         <Plus className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">Create Role</span>

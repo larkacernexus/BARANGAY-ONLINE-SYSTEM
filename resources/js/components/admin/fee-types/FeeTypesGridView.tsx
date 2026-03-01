@@ -152,14 +152,14 @@ export default function FeeTypesGridView({
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-48">
                                         <DropdownMenuItem asChild>
-                                            <Link href={route('fee-types.show', feeType.id)} className="flex items-center cursor-pointer">
+                                            <Link href={route('admin.fee-types.show', feeType.id)} className="flex items-center cursor-pointer">
                                                 <Eye className="mr-2 h-4 w-4" />
                                                 <span>View Details</span>
                                             </Link>
                                         </DropdownMenuItem>
                                         
                                         <DropdownMenuItem asChild>
-                                            <Link href={route('fee-types.edit', feeType.id)} className="flex items-center cursor-pointer">
+                                            <Link href={route('admin.fee-types.edit', feeType.id)} className="flex items-center cursor-pointer">
                                                 <Edit className="mr-2 h-4 w-4" />
                                                 <span>Edit Fee Type</span>
                                             </Link>
@@ -306,7 +306,7 @@ export default function FeeTypesGridView({
                                 </span>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Link href={route('fees.index', { fee_type: feeType.id })}>
+                                        <Link href={route('admin.fees.index', { fee_type: feeType.id })}>
                                             <Button size="sm" variant="outline">
                                                 <DollarSign className="h-3 w-3 mr-1" />
                                                 View Fees

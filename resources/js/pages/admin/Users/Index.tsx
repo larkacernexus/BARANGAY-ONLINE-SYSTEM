@@ -103,7 +103,7 @@ export default function Users() {
   // Handle filters change
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.get('/users', {
+      router.get('/admin/users', {
         search: search || undefined,
         role_id: roleFilter !== 'all' ? roleFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
@@ -215,11 +215,11 @@ export default function Users() {
     setSearch('');
     setRoleFilter('all');
     setStatusFilter('all');
-    router.get('/users', {}, { preserveState: true, replace: true });
+    router.get('/admin/users', {}, { preserveState: true, replace: true });
   };
 
   const handlePageChange = (page: number) => {
-    router.get('/users', {
+    router.get('/admin/users', {
       ...filters,
       page,
     }, {
@@ -312,7 +312,7 @@ export default function Users() {
       breadcrumbs={[
         { title: 'Dashboard', href: '/dashboard' },
         { title: 'Administration', href: '/administration' },
-        { title: 'Users', href: '/users' }
+        { title: 'Users', href: '/admin/users' }
       ]}
     >
       <TooltipProvider>

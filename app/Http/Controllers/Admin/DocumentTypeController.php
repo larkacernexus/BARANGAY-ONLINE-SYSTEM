@@ -5,14 +5,16 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DocumentType;
 use App\Models\DocumentCategory;
+use App\Models\ClearanceType;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class DocumentTypeController extends Controller
 {
-    // Common document types template (keep as is)
+    // Common document types template
     const COMMON_DOCUMENT_TYPES = [
         'barangay_clearance' => [
             'code' => 'BARANGAY_CLEARANCE',
@@ -24,16 +26,70 @@ class DocumentTypeController extends Controller
             'is_required' => true,
             'category_id' => 1, // Legal/Administrative
         ],
-        // ... rest of your common types
+        'certificate_of_indigency' => [
+            'code' => 'CERT_INDIGENCY',
+            'name' => 'Certificate of Indigency',
+            'description' => 'Certification of indigent status',
+            'accepted_formats' => ['pdf', 'jpeg', 'jpg', 'png'],
+            'max_file_size' => 2048,
+            'sort_order' => 2,
+            'is_required' => false,
+            'category_id' => 1,
+        ],
+        'business_clearance' => [
+            'code' => 'BUSINESS_CLEARANCE',
+            'name' => 'Business Clearance',
+            'description' => 'Clearance for business operations',
+            'accepted_formats' => ['pdf'],
+            'max_file_size' => 3072, // 3MB
+            'sort_order' => 3,
+            'is_required' => true,
+            'category_id' => 2, // Business
+        ],
+        'cedula' => [
+            'code' => 'CEDULA',
+            'name' => 'Community Tax Certificate (Cedula)',
+            'description' => 'Community tax certificate',
+            'accepted_formats' => ['pdf', 'jpeg', 'jpg', 'png'],
+            'max_file_size' => 2048,
+            'sort_order' => 4,
+            'is_required' => true,
+            'category_id' => 1,
+        ],
+        'voters_certificate' => [
+            'code' => 'VOTERS_CERT',
+            'name' => "Voter's Certificate",
+            'description' => 'Certification of voter registration',
+            'accepted_formats' => ['pdf'],
+            'max_file_size' => 2048,
+            'sort_order' => 5,
+            'is_required' => false,
+            'category_id' => 3, // Electoral
+        ],
+        'residency_certificate' => [
+            'code' => 'RESIDENCY_CERT',
+            'name' => 'Certificate of Residency',
+            'description' => 'Proof of barangay residency',
+            'accepted_formats' => ['pdf', 'jpeg', 'jpg', 'png'],
+            'max_file_size' => 2048,
+            'sort_order' => 6,
+            'is_required' => true,
+            'category_id' => 1,
+        ],
     ];
 
+    /**
+     * Display a listing of document types.
+     */
     public function index(Request $request)
     {
         $query = DocumentType::with('category')
             ->when($request->search, function ($query, $search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
+                });
             })
             ->when($request->status && $request->status !== 'all', function ($query) use ($request) {
                 $isActive = $request->status === 'active';
@@ -51,15 +107,16 @@ class DocumentTypeController extends Controller
 
         $documentTypes = $query->get();
 
-        // Get categories for filter - REMOVE sort_order from here
+        // Get categories for filter
         $categories = DocumentCategory::where('is_active', true)
-            ->orderBy('name') // Only order by name, DocumentCategory doesn't have sort_order
+            ->orderBy('name')
             ->get(['id', 'name', 'slug']);
 
         // Calculate stats
         $stats = [
             'total' => DocumentType::count(),
             'active' => DocumentType::where('is_active', true)->count(),
+            'inactive' => DocumentType::where('is_active', false)->count(),
             'required' => DocumentType::where('is_required', true)->count(),
             'optional' => DocumentType::where('is_required', false)->count(),
             'max_file_size_mb' => DocumentType::max('max_file_size') ?
@@ -77,20 +134,23 @@ class DocumentTypeController extends Controller
         ]);
     }
 
+    /**
+     * Show the form for creating a new document type.
+     */
     public function create()
     {
-        // Get active categories for dropdown - REMOVE sort_order from here
+        // Get active categories for dropdown
         $categories = DocumentCategory::where('is_active', true)
-            ->orderBy('name') // Only order by name
-            ->get();
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'description']);
 
         // Common file formats for selection
         $commonFormats = [
             'pdf' => 'PDF Document',
-            'doc' => 'Microsoft Word',
-            'docx' => 'Microsoft Word',
-            'xls' => 'Microsoft Excel',
-            'xlsx' => 'Microsoft Excel',
+            'doc' => 'Microsoft Word (DOC)',
+            'docx' => 'Microsoft Word (DOCX)',
+            'xls' => 'Microsoft Excel (XLS)',
+            'xlsx' => 'Microsoft Excel (XLSX)',
             'jpeg' => 'JPEG Image',
             'jpg' => 'JPG Image',
             'png' => 'PNG Image',
@@ -99,6 +159,7 @@ class DocumentTypeController extends Controller
             'csv' => 'CSV File',
             'zip' => 'ZIP Archive',
             'rar' => 'RAR Archive',
+            '7z' => '7-Zip Archive',
         ];
 
         // Common document types for quick selection
@@ -111,46 +172,28 @@ class DocumentTypeController extends Controller
         ]);
     }
 
+    /**
+     * Store a newly created document type in storage.
+     */
     public function store(Request $request)
     {
         Log::info('Document Type Store Request Received', [
-            'request_data' => $request->all(),
+            'request_data' => $request->except(['_token']),
             'ip' => $request->ip(),
         ]);
 
         try {
-            $validated = $request->validate([
-                'code' => 'required|string|max:50|unique:document_types,code',
-                'name' => 'required|string|max:255',
-                'description' => 'nullable|string',
-                'document_category_id' => 'required|exists:document_categories,id',
-
-                // Boolean flags
-                'is_required' => 'boolean',
-                'is_active' => 'boolean',
-
-                // File specifications
-                'accepted_formats' => 'nullable|array',
-                'accepted_formats.*' => 'string|in:pdf,doc,docx,xls,xlsx,jpeg,jpg,png,gif,txt,csv,zip,rar',
-                'max_file_size' => 'required|integer|min:1|max:10240', // Max 10MB in KB
-                'sort_order' => 'required|integer|min:0',
-            ]);
+            $validated = $this->validateDocumentType($request);
 
             // Set default values
             $validated['is_required'] = $validated['is_required'] ?? false;
             $validated['is_active'] = $validated['is_active'] ?? true;
 
-            // Convert file size from MB to KB if needed
-            if ($validated['max_file_size'] < 100) { // Assuming if less than 100, it's in MB
-                $validated['max_file_size'] = $validated['max_file_size'] * 1024; // Convert MB to KB
-            }
+            // Handle file size conversion
+            $validated = $this->processFileSize($validated);
 
-            // Encode accepted formats to JSON
-            if (isset($validated['accepted_formats'])) {
-                $validated['accepted_formats'] = json_encode($validated['accepted_formats']);
-            } else {
-                $validated['accepted_formats'] = json_encode([]);
-            }
+            // Handle accepted formats
+            $validated = $this->processAcceptedFormats($validated);
 
             Log::info('Creating DocumentType with data:', ['document_type_data' => $validated]);
 
@@ -163,83 +206,130 @@ class DocumentTypeController extends Controller
                 'document_type_name' => $documentType->name,
             ]);
 
-            return redirect()->route('document-types.index')
+            return redirect()->route('admin.document-types.show', $documentType)
                 ->with('success', 'Document type created successfully.');
 
         } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Validation failed:', [
+            Log::warning('Validation failed in store:', [
                 'errors' => $e->errors(),
-                'request_data' => $request->all(),
+                'request_data' => $request->except(['_token']),
             ]);
             throw $e;
         } catch (\Exception $e) {
             Log::error('Error in document type store method:', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all(),
+                'request_data' => $request->except(['_token']),
             ]);
 
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'An error occurred while creating the document type: ' . $e->getMessage());
+                ->with('error', 'An error occurred while creating the document type. Please try again.');
         }
     }
 
-    public function show(DocumentType $documentType)
-    {
-        $documentType->load(['category', 'clearanceRequirements.clearanceType']);
+    /**
+     * Display the specified document type.
+     */
+public function show(DocumentType $documentType)
+{
+    $documentType->load(['category', 'clearanceRequirements.clearanceType']);
 
-        // Get clearance types that require this document
-        $requiredClearanceTypes = $documentType->requiredByClearanceTypes()
-            ->withCount([
-                'documentRequirements' => function ($query) use ($documentType) {
-                    $query->where('document_type_id', $documentType->id);
-                }
-            ])
-            ->get();
+    // Get clearance types that require this document
+    $requiredClearanceTypes = $documentType->requiredByClearanceTypes()
+        ->with(['documentRequirements' => function ($query) use ($documentType) {
+            $query->where('document_type_id', $documentType->id);
+        }])
+        ->get()
+        ->map(function ($clearanceType) use ($documentType) {
+            $requirement = $clearanceType->documentRequirements->first();
+            return [
+                'id' => $clearanceType->id,
+                'name' => $clearanceType->name,
+                'code' => $clearanceType->code,
+                'description' => $clearanceType->description,
+                'is_active' => $clearanceType->is_active,
+                'pivot' => [
+                    'is_required' => $requirement->is_required ?? false,
+                    'sort_order' => $requirement->sort_order ?? 0,
+                ],
+            ];
+        });
 
-        // Get recent applications using this document type
-        $recentApplications = $documentType->clearanceRequirements()
-            ->with(['clearanceType', 'documentType'])
+    // Since there's no direct relationship to applications,
+    // we'll either skip this or create a placeholder
+    $recentApplications = [];
+
+    // If you want to show applications that use this document type,
+    // you'll need to query through your applications model
+    // Uncomment and adjust this based on your actual application model structure:
+    /*
+    if (class_exists('App\Models\ClearanceApplication')) {
+        $recentApplications = ClearanceApplication::whereHas('requirements', function($query) use ($documentType) {
+                $query->where('document_type_id', $documentType->id);
+            })
+            ->with(['applicant', 'clearanceType'])
             ->orderBy('created_at', 'desc')
             ->limit(10)
-            ->get();
-
-        // Decode accepted formats for display
-        $documentType->accepted_formats = json_decode($documentType->accepted_formats, true) ?: [];
-
-        return Inertia::render('admin/Documents/DocumentTypes/Show', [
-            'documentType' => $documentType,
-            'requiredClearanceTypes' => $requiredClearanceTypes,
-            'recentApplications' => $recentApplications,
-            'max_file_size_mb' => $documentType->max_file_size ?
-                round($documentType->max_file_size / 1024, 2) : 0,
-        ]);
+            ->get()
+            ->map(function ($application) {
+                return [
+                    'id' => $application->id,
+                    'clearance_type' => [
+                        'id' => $application->clearanceType->id ?? null,
+                        'name' => $application->clearanceType->name ?? null,
+                        'code' => $application->clearanceType->code ?? null,
+                    ],
+                    'applicant' => $application->applicant ? [
+                        'id' => $application->applicant->id,
+                        'name' => $application->applicant->name,
+                    ] : null,
+                    'status' => $application->status,
+                    'created_at' => $application->created_at,
+                    'reference_number' => $application->reference_number ?? null,
+                ];
+            });
     }
+    */
 
+    // Decode accepted formats for display
+    $documentType->accepted_formats = $this->decodeAcceptedFormats($documentType->accepted_formats);
+
+    return Inertia::render('admin/Documents/DocumentTypes/Show', [
+        'documentType' => $documentType,
+        'requiredClearanceTypes' => $requiredClearanceTypes,
+        'recentApplications' => $recentApplications, // Empty array for now
+        'max_file_size_mb' => $documentType->max_file_size ?
+            round($documentType->max_file_size / 1024, 2) : 0,
+    ]);
+}
+
+    /**
+     * Show the form for editing the specified document type.
+     */
     public function edit(DocumentType $documentType)
     {
         $documentType->load('category');
 
         // Decode accepted formats for editing
-        $documentType->accepted_formats = json_decode($documentType->accepted_formats, true) ?: [];
+        $documentType->accepted_formats = $this->decodeAcceptedFormats($documentType->accepted_formats);
 
         // Convert file size to MB for display
         $documentType->max_file_size_mb = $documentType->max_file_size ?
             round($documentType->max_file_size / 1024, 2) : 0;
 
-        // Get active categories for dropdown - REMOVE sort_order from here
+        // Get active categories for dropdown
         $categories = DocumentCategory::where('is_active', true)
-            ->orderBy('name') // Only order by name
-            ->get();
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'description']);
 
         // Common file formats for selection
         $commonFormats = [
             'pdf' => 'PDF Document',
-            'doc' => 'Microsoft Word',
-            'docx' => 'Microsoft Word',
-            'xls' => 'Microsoft Excel',
-            'xlsx' => 'Microsoft Excel',
+            'doc' => 'Microsoft Word (DOC)',
+            'docx' => 'Microsoft Word (DOCX)',
+            'xls' => 'Microsoft Excel (XLS)',
+            'xlsx' => 'Microsoft Excel (XLSX)',
             'jpeg' => 'JPEG Image',
             'jpg' => 'JPG Image',
             'png' => 'PNG Image',
@@ -248,6 +338,7 @@ class DocumentTypeController extends Controller
             'csv' => 'CSV File',
             'zip' => 'ZIP Archive',
             'rar' => 'RAR Archive',
+            '7z' => '7-Zip Archive',
         ];
 
         return Inertia::render('admin/Documents/DocumentTypes/Edit', [
@@ -257,47 +348,29 @@ class DocumentTypeController extends Controller
         ]);
     }
 
+    /**
+     * Update the specified document type in storage.
+     */
     public function update(Request $request, DocumentType $documentType)
     {
         Log::info('Document Type Update Request Received', [
             'document_type_id' => $documentType->id,
-            'request_data' => $request->all(),
+            'request_data' => $request->except(['_token', '_method']),
             'ip' => $request->ip(),
         ]);
 
         try {
-            $validated = $request->validate([
-                'code' => 'required|string|max:50|unique:document_types,code,' . $documentType->id,
-                'name' => 'required|string|max:255',
-                'description' => 'nullable|string',
-                'document_category_id' => 'required|exists:document_categories,id',
-
-                // Boolean flags
-                'is_required' => 'boolean',
-                'is_active' => 'boolean',
-
-                // File specifications
-                'accepted_formats' => 'nullable|array',
-                'accepted_formats.*' => 'string|in:pdf,doc,docx,xls,xlsx,jpeg,jpg,png,gif,txt,csv,zip,rar',
-                'max_file_size' => 'required|integer|min:1|max:10240', // Max 10MB in KB
-                'sort_order' => 'required|integer|min:0',
-            ]);
+            $validated = $this->validateDocumentType($request, $documentType->id);
 
             // Set default values for booleans
             $validated['is_required'] = $validated['is_required'] ?? $documentType->is_required;
             $validated['is_active'] = $validated['is_active'] ?? $documentType->is_active;
 
-            // Convert file size from MB to KB if needed
-            if ($validated['max_file_size'] < 100) { // Assuming if less than 100, it's in MB
-                $validated['max_file_size'] = $validated['max_file_size'] * 1024; // Convert MB to KB
-            }
+            // Handle file size conversion
+            $validated = $this->processFileSize($validated);
 
-            // Encode accepted formats to JSON
-            if (isset($validated['accepted_formats'])) {
-                $validated['accepted_formats'] = json_encode($validated['accepted_formats']);
-            } else {
-                $validated['accepted_formats'] = json_encode([]);
-            }
+            // Handle accepted formats
+            $validated = $this->processAcceptedFormats($validated);
 
             // Update the document type
             $documentType->update($validated);
@@ -308,121 +381,211 @@ class DocumentTypeController extends Controller
                 'document_type_name' => $documentType->name,
             ]);
 
-            return redirect()->route('document-types.index')
+            return redirect()->route('admin.document-types.show', $documentType)
                 ->with('success', 'Document type updated successfully.');
 
         } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Validation failed:', [
+            Log::warning('Validation failed in update:', [
                 'errors' => $e->errors(),
-                'request_data' => $request->all(),
                 'document_type_id' => $documentType->id,
+                'request_data' => $request->except(['_token', '_method']),
             ]);
             throw $e;
         } catch (\Exception $e) {
             Log::error('Error in document type update method:', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all(),
                 'document_type_id' => $documentType->id,
+                'request_data' => $request->except(['_token', '_method']),
             ]);
 
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'An error occurred while updating the document type: ' . $e->getMessage());
+                ->with('error', 'An error occurred while updating the document type. Please try again.');
         }
     }
 
+    /**
+     * Remove the specified document type from storage.
+     */
     public function destroy(DocumentType $documentType)
     {
-        // Check if document type is in use
-        if ($documentType->clearanceRequirements()->exists()) {
-            return back()->with('error', 'Cannot delete document type that is in use. There are existing clearance requirements using this type.');
+        try {
+            // Check if document type is in use
+            if ($documentType->clearanceRequirements()->exists()) {
+                $count = $documentType->clearanceRequirements()->count();
+                return back()->with('error', "Cannot delete document type that is in use. It is used in {$count} clearance requirement(s).");
+            }
+
+            $documentType->delete();
+
+            Log::info('DocumentType deleted successfully', [
+                'document_type_id' => $documentType->id,
+                'document_type_code' => $documentType->code,
+                'document_type_name' => $documentType->name,
+            ]);
+
+            return redirect()->route('admin.document-types.index')
+                ->with('success', 'Document type deleted successfully.');
+
+        } catch (\Exception $e) {
+            Log::error('Error deleting document type:', [
+                'error' => $e->getMessage(),
+                'document_type_id' => $documentType->id,
+            ]);
+
+            return back()->with('error', 'Failed to delete document type. Please try again.');
         }
-
-        $documentType->delete();
-
-        return redirect()->route('document-types.index')
-            ->with('success', 'Document type deleted successfully.');
     }
 
+    /**
+     * Toggle the active status of a document type.
+     */
     public function toggleStatus(DocumentType $documentType)
     {
-        $documentType->update(['is_active' => !$documentType->is_active]);
+        try {
+            $documentType->update(['is_active' => !$documentType->is_active]);
 
-        $status = $documentType->is_active ? 'activated' : 'deactivated';
+            $status = $documentType->is_active ? 'activated' : 'deactivated';
 
-        return back()->with('success', "Document type {$status} successfully.");
+            Log::info('DocumentType status toggled', [
+                'document_type_id' => $documentType->id,
+                'new_status' => $documentType->is_active,
+            ]);
+
+            return back()->with('success', "Document type {$status} successfully.");
+        } catch (\Exception $e) {
+            Log::error('Error toggling document type status:', [
+                'error' => $e->getMessage(),
+                'document_type_id' => $documentType->id,
+            ]);
+
+            return back()->with('error', 'Failed to toggle status. Please try again.');
+        }
     }
 
+    /**
+     * Toggle the required status of a document type.
+     */
     public function toggleRequired(DocumentType $documentType)
     {
-        $documentType->update(['is_required' => !$documentType->is_required]);
+        try {
+            $documentType->update(['is_required' => !$documentType->is_required]);
 
-        $status = $documentType->is_required ? 'marked as required' : 'marked as optional';
+            $status = $documentType->is_required ? 'marked as required' : 'marked as optional';
 
-        return back()->with('success', "Document type {$status} successfully.");
+            Log::info('DocumentType required status toggled', [
+                'document_type_id' => $documentType->id,
+                'new_status' => $documentType->is_required,
+            ]);
+
+            return back()->with('success', "Document type {$status} successfully.");
+        } catch (\Exception $e) {
+            Log::error('Error toggling document type required status:', [
+                'error' => $e->getMessage(),
+                'document_type_id' => $documentType->id,
+            ]);
+
+            return back()->with('error', 'Failed to toggle required status. Please try again.');
+        }
     }
 
+    /**
+     * Perform bulk actions on document types.
+     */
     public function bulkAction(Request $request)
     {
-        $request->validate([
-            'action' => 'required|in:activate,deactivate,delete,toggle_required',
-            'document_type_ids' => 'required|array',
-            'document_type_ids.*' => 'exists:document_types,id',
-        ]);
+        try {
+            $validated = $request->validate([
+                'action' => 'required|in:activate,deactivate,delete,toggle_required',
+                'document_type_ids' => 'required|array',
+                'document_type_ids.*' => 'exists:document_types,id',
+            ]);
 
-        $count = 0;
+            $count = 0;
+            $skipped = 0;
 
-        foreach ($request->document_type_ids as $documentTypeId) {
-            $documentType = DocumentType::find($documentTypeId);
+            DB::beginTransaction();
 
-            switch ($request->action) {
-                case 'activate':
-                    $documentType->update(['is_active' => true]);
-                    $count++;
-                    break;
+            foreach ($validated['document_type_ids'] as $documentTypeId) {
+                $documentType = DocumentType::find($documentTypeId);
 
-                case 'deactivate':
-                    $documentType->update(['is_active' => false]);
-                    $count++;
-                    break;
-
-                case 'toggle_required':
-                    $documentType->update(['is_required' => !$documentType->is_required]);
-                    $count++;
-                    break;
-
-                case 'delete':
-                    // Check if document type is in use
-                    if (!$documentType->clearanceRequirements()->exists()) {
-                        $documentType->delete();
+                switch ($validated['action']) {
+                    case 'activate':
+                        $documentType->update(['is_active' => true]);
                         $count++;
-                    }
-                    break;
-            }
-        }
+                        break;
 
-        return back()->with('success', "{$count} document types updated successfully.");
+                    case 'deactivate':
+                        $documentType->update(['is_active' => false]);
+                        $count++;
+                        break;
+
+                    case 'toggle_required':
+                        $documentType->update(['is_required' => !$documentType->is_required]);
+                        $count++;
+                        break;
+
+                    case 'delete':
+                        // Check if document type is in use
+                        if (!$documentType->clearanceRequirements()->exists()) {
+                            $documentType->delete();
+                            $count++;
+                        } else {
+                            $skipped++;
+                        }
+                        break;
+                }
+            }
+
+            DB::commit();
+
+            $message = "{$count} document types updated successfully.";
+            if ($skipped > 0) {
+                $message .= " {$skipped} document types were skipped (in use).";
+            }
+
+            Log::info('Bulk action performed on document types', [
+                'action' => $validated['action'],
+                'count' => $count,
+                'skipped' => $skipped,
+            ]);
+
+            return back()->with('success', $message);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()->with('error', 'Invalid request data.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error in bulk action:', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Failed to perform bulk action. Please try again.');
+        }
     }
 
+    /**
+     * Duplicate multiple document types.
+     */
     public function bulkDuplicate(Request $request)
     {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'exists:document_types,id',
-        ]);
-
-        $count = 0;
-
-        DB::beginTransaction();
         try {
-            foreach ($request->ids as $documentTypeId) {
+            $validated = $request->validate([
+                'ids' => 'required|array',
+                'ids.*' => 'exists:document_types,id',
+            ]);
+
+            $count = 0;
+            $timestamp = time();
+
+            DB::beginTransaction();
+
+            foreach ($validated['ids'] as $documentTypeId) {
                 $original = DocumentType::find($documentTypeId);
 
                 // Create duplicate
                 $duplicate = $original->replicate();
-                $duplicate->code = $original->code . '_COPY_' . time();
-                $duplicate->name = $original->name . ' (Copy)';
+                $duplicate->code = $original->code . '_COPY_' . $timestamp . '_' . $count;
+                $duplicate->name = $original->name . ' (Copy ' . ($count + 1) . ')';
+                $duplicate->is_active = false; // Deactivate by default
                 $duplicate->save();
 
                 $count++;
@@ -430,150 +593,259 @@ class DocumentTypeController extends Controller
 
             DB::commit();
 
+            Log::info('Bulk duplicate completed', ['count' => $count]);
+
             return back()->with('success', "{$count} document types duplicated successfully.");
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Error in bulk duplicate:', ['error' => $e->getMessage()]);
-            return back()->with('error', 'Failed to duplicate document types: ' . $e->getMessage());
+            return back()->with('error', 'Failed to duplicate document types. Please try again.');
         }
     }
 
+    /**
+     * Duplicate a single document type.
+     */
     public function duplicate(DocumentType $documentType)
     {
-        DB::beginTransaction();
         try {
+            DB::beginTransaction();
+
             $duplicate = $documentType->replicate();
             $duplicate->code = $documentType->code . '_COPY_' . time();
             $duplicate->name = $documentType->name . ' (Copy)';
+            $duplicate->is_active = false; // Deactivate by default
             $duplicate->save();
 
             DB::commit();
 
-            return back()->with('success', 'Document type duplicated successfully.');
+            Log::info('DocumentType duplicated', [
+                'original_id' => $documentType->id,
+                'new_id' => $duplicate->id,
+            ]);
+
+            return redirect()->route('admin.document-types.edit', $duplicate)
+                ->with('success', 'Document type duplicated successfully. You can now customize it.');
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Error in duplicate:', ['error' => $e->getMessage()]);
-            return back()->with('error', 'Failed to duplicate document type: ' . $e->getMessage());
+            return back()->with('error', 'Failed to duplicate document type. Please try again.');
         }
-    }
-
-    public function export(Request $request)
-    {
-        $query = DocumentType::with('category')
-            ->when($request->search, function ($query, $search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
-            })
-            ->when($request->status && $request->status !== 'all', function ($query) use ($request) {
-                $isActive = $request->status === 'active';
-                $query->where('is_active', $isActive);
-            })
-            ->when($request->category && $request->category !== 'all', function ($query) use ($request) {
-                $query->where('document_category_id', $request->category);
-            })
-            ->when($request->required && $request->required !== 'all', function ($query) use ($request) {
-                $isRequired = $request->required === 'required';
-                $query->where('is_required', $isRequired);
-            })
-            ->orderBy('sort_order')
-            ->orderBy('name');
-
-        $documentTypes = $query->get();
-
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename=document_types_export_' . date('Y-m-d') . '.csv',
-        ];
-
-        $callback = function () use ($documentTypes) {
-            $file = fopen('php://output', 'w');
-
-            // Add BOM for UTF-8
-            fwrite($file, "\xEF\xBB\xBF");
-
-            // Headers
-            fputcsv($file, [
-                'ID',
-                'Code',
-                'Name',
-                'Description',
-                'Category',
-                'Required',
-                'Active',
-                'Accepted Formats',
-                'Max File Size (MB)',
-                'Sort Order',
-                'Created At',
-                'Updated At'
-            ]);
-
-            // Data
-            foreach ($documentTypes as $type) {
-                $acceptedFormats = json_decode($type->accepted_formats, true) ?: [];
-                $maxFileSizeMB = $type->max_file_size ? round($type->max_file_size / 1024, 2) : 0;
-
-                fputcsv($file, [
-                    $type->id,
-                    $type->code,
-                    $type->name,
-                    $type->description ?? '',
-                    $type->category ? $type->category->name : 'Uncategorized',
-                    $type->is_required ? 'Yes' : 'No',
-                    $type->is_active ? 'Yes' : 'No',
-                    implode(', ', $acceptedFormats),
-                    $maxFileSizeMB,
-                    $type->sort_order,
-                    $type->created_at->format('Y-m-d H:i:s'),
-                    $type->updated_at->format('Y-m-d H:i:s'),
-                ]);
-            }
-
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
     }
 
     /**
-     * Quick create from common type
+     * Export document types to CSV.
+     */
+    public function export(Request $request)
+    {
+        try {
+            $query = DocumentType::with('category')
+                ->when($request->search, function ($query, $search) {
+                    $query->where(function($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
+                })
+                ->when($request->status && $request->status !== 'all', function ($query) use ($request) {
+                    $isActive = $request->status === 'active';
+                    $query->where('is_active', $isActive);
+                })
+                ->when($request->category && $request->category !== 'all', function ($query) use ($request) {
+                    $query->where('document_category_id', $request->category);
+                })
+                ->when($request->required && $request->required !== 'all', function ($query) use ($request) {
+                    $isRequired = $request->required === 'required';
+                    $query->where('is_required', $isRequired);
+                })
+                ->orderBy('sort_order')
+                ->orderBy('name');
+
+            $documentTypes = $query->get();
+
+            $headers = [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => 'attachment; filename=document_types_export_' . date('Y-m-d_His') . '.csv',
+            ];
+
+            $callback = function () use ($documentTypes) {
+                $file = fopen('php://output', 'w');
+
+                // Add BOM for UTF-8
+                fwrite($file, "\xEF\xBB\xBF");
+
+                // Headers
+                fputcsv($file, [
+                    'ID',
+                    'Code',
+                    'Name',
+                    'Description',
+                    'Category',
+                    'Required',
+                    'Active',
+                    'Accepted Formats',
+                    'Max File Size (MB)',
+                    'Sort Order',
+                    'Created At',
+                    'Updated At'
+                ]);
+
+                // Data
+                foreach ($documentTypes as $type) {
+                    $acceptedFormats = $this->decodeAcceptedFormats($type->accepted_formats);
+                    $maxFileSizeMB = $type->max_file_size ? round($type->max_file_size / 1024, 2) : 0;
+
+                    fputcsv($file, [
+                        $type->id,
+                        $type->code,
+                        $type->name,
+                        $type->description ?? '',
+                        $type->category ? $type->category->name : 'Uncategorized',
+                        $type->is_required ? 'Yes' : 'No',
+                        $type->is_active ? 'Yes' : 'No',
+                        implode(', ', $acceptedFormats),
+                        $maxFileSizeMB,
+                        $type->sort_order,
+                        $type->created_at ? $type->created_at->format('Y-m-d H:i:s') : '',
+                        $type->updated_at ? $type->updated_at->format('Y-m-d H:i:s') : '',
+                    ]);
+                }
+
+                fclose($file);
+            };
+
+            return response()->stream($callback, 200, $headers);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting document types:', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Failed to export document types. Please try again.');
+        }
+    }
+
+    /**
+     * Quick create from common type.
      */
     public function createFromCommonType(Request $request)
     {
-        $typeCode = $request->input('type_code');
+        try {
+            $typeCode = $request->input('type_code');
 
-        if (!isset(self::COMMON_DOCUMENT_TYPES[$typeCode])) {
-            return back()->with('error', 'Invalid document type selected.');
+            if (!isset(self::COMMON_DOCUMENT_TYPES[$typeCode])) {
+                return back()->with('error', 'Invalid document type selected.');
+            }
+
+            $commonType = self::COMMON_DOCUMENT_TYPES[$typeCode];
+
+            // Check if category exists
+            $category = DocumentCategory::find($commonType['category_id']);
+            if (!$category) {
+                return back()->with('error', 'Category not found. Please create categories first.');
+            }
+
+            // Check if already exists
+            if (DocumentType::where('code', $commonType['code'])->exists()) {
+                return back()->with('error', 'This document type already exists.');
+            }
+
+            // Create the document type
+            $documentType = DocumentType::create([
+                'code' => $commonType['code'],
+                'name' => $commonType['name'],
+                'description' => $commonType['description'],
+                'document_category_id' => $commonType['category_id'],
+                'accepted_formats' => json_encode($commonType['accepted_formats']),
+                'max_file_size' => $commonType['max_file_size'],
+                'sort_order' => $commonType['sort_order'],
+                'is_required' => $commonType['is_required'],
+                'is_active' => true,
+            ]);
+
+            Log::info('Document type created from template', [
+                'template' => $typeCode,
+                'new_id' => $documentType->id,
+            ]);
+
+            return redirect()->route('admin.document-types.edit', $documentType)
+                ->with('success', 'Document type created from template. You can now customize it.');
+
+        } catch (\Exception $e) {
+            Log::error('Error creating from common type:', ['error' => $e->getMessage()]);
+            return back()->with('error', 'Failed to create document type from template.');
+        }
+    }
+
+    /**
+     * Validate document type request.
+     */
+    private function validateDocumentType(Request $request, $ignoreId = null)
+    {
+        $rules = [
+            'code' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('document_types', 'code')->ignore($ignoreId),
+                'regex:/^[A-Z0-9_]+$/',
+            ],
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:1000',
+            'document_category_id' => 'required|exists:document_categories,id',
+            'is_required' => 'sometimes|boolean',
+            'is_active' => 'sometimes|boolean',
+            'accepted_formats' => 'nullable|array',
+            'accepted_formats.*' => 'string|max:10',
+            'max_file_size' => 'required|integer|min:1|max:10240',
+            'sort_order' => 'required|integer|min:0|max:9999',
+        ];
+
+        return $request->validate($rules);
+    }
+
+    /**
+     * Process file size conversion.
+     */
+    private function processFileSize(array $data): array
+    {
+        // Convert file size from MB to KB if needed
+        if (isset($data['max_file_size']) && $data['max_file_size'] < 100) {
+            $data['max_file_size'] = $data['max_file_size'] * 1024;
         }
 
-        $commonType = self::COMMON_DOCUMENT_TYPES[$typeCode];
+        return $data;
+    }
 
-        // Check if category exists
-        $category = DocumentCategory::find($commonType['category_id']);
-        if (!$category) {
-            return back()->with('error', 'Category not found. Please create categories first.');
+    /**
+     * Process accepted formats.
+     */
+    private function processAcceptedFormats(array $data): array
+    {
+        if (isset($data['accepted_formats']) && is_array($data['accepted_formats'])) {
+            // Clean up formats
+            $data['accepted_formats'] = array_map('strtolower', $data['accepted_formats']);
+            $data['accepted_formats'] = array_unique($data['accepted_formats']);
+            $data['accepted_formats'] = json_encode(array_values($data['accepted_formats']));
+        } else {
+            $data['accepted_formats'] = json_encode([]);
         }
 
-        // Check if already exists
-        if (DocumentType::where('code', $commonType['code'])->exists()) {
-            return back()->with('error', 'This document type already exists.');
+        return $data;
+    }
+
+    /**
+     * Decode accepted formats safely.
+     */
+    private function decodeAcceptedFormats($formats): array
+    {
+        if (is_array($formats)) {
+            return $formats;
         }
 
-        // Create the document type
-        $documentType = DocumentType::create([
-            'code' => $commonType['code'],
-            'name' => $commonType['name'],
-            'description' => $commonType['description'],
-            'document_category_id' => $commonType['category_id'],
-            'accepted_formats' => json_encode($commonType['accepted_formats']),
-            'max_file_size' => $commonType['max_file_size'],
-            'sort_order' => $commonType['sort_order'],
-            'is_required' => $commonType['is_required'],
-            'is_active' => true,
-        ]);
+        if (is_string($formats)) {
+            $decoded = json_decode($formats, true);
+            return is_array($decoded) ? $decoded : [];
+        }
 
-        return redirect()->route('document-types.edit', $documentType)
-            ->with('success', 'Document type created from template. You can now customize it.');
+        return [];
     }
 }

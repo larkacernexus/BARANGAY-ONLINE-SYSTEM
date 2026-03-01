@@ -1,15 +1,16 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
-import { Bell, HelpCircle, Search, User, Settings, LogOut, Home, SwitchCamera } from 'lucide-react';
+import { Bell, HelpCircle, Search, User, Settings, LogOut, Home } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { type ReactNode, useState, useEffect } from 'react';
-import { usePage, router } from '@inertiajs/react';
+import { type ReactNode, useState } from 'react';
+import { usePage, router, PageProps as InertiaPageProps } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { route } from 'ziggy-js';
-import InstructionsModal from '@/components/InstructionsModal';
+import InstructionsModal from '@/components/InstructionsModal/InstructionsModal';
+import { QuickSearch } from '@/components/QuickSearch';
 
 // Types for search functionality
 interface Notification {
@@ -31,13 +32,12 @@ interface UserType {
   is_admin?: boolean;
   permissions?: string[];
   avatar?: string;
-  original_role?: string; // To track original role when switching
-  is_household_head?: boolean; // From your backend
-  resident_id?: number; // From your backend
+  is_household_head?: boolean;
+  resident_id?: number;
 }
 
 // Fix: PageProps should extend from Inertia's PageProps
-interface PageProps extends Inertia.PageProps {
+interface PageProps extends InertiaPageProps {
   auth?: {
     user?: UserType;
   };
@@ -54,7 +54,7 @@ interface AppSidebarHeaderProps {
   description?: string;
   headerActions?: ReactNode;
   user?: UserType;
-  // New props for functionality
+  // Props for functionality
   showInstructionsButton?: boolean;
   instructionsContent?: ReactNode;
   onLogout?: () => void;
@@ -64,9 +64,6 @@ interface AppSidebarHeaderProps {
   customInstructionsContent?: ReactNode;
   showQuickGuide?: boolean;
   userRole?: 'admin' | 'staff' | 'resident' | 'kagawad';
-  // New props for role switching
-  showRoleSwitcher?: boolean;
-  onRoleSwitch?: (role: 'resident') => void;
 }
 
 // Default fallback user
@@ -94,9 +91,6 @@ export function AppSidebarHeader({
   customInstructionsContent,
   showQuickGuide = true,
   userRole = 'staff',
-  // Role switching props
-  showRoleSwitcher = true,
-  onRoleSwitch,
 }: AppSidebarHeaderProps) {
   const { props } = usePage<PageProps>();
   
@@ -109,22 +103,11 @@ export function AppSidebarHeader({
   const unreadCount = props?.unreadNotifications || notifications.filter(n => !n.read).length;
   const currentModule = props?.currentModule || instructionsModule || 'general';
 
-  // State for search
-  const [searchQuery, setSearchQuery] = useState('');
-
   // State for instructions modal
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
 
   // State for notifications
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('=== APP SIDEBAR HEADER ===');
-    console.log('User role:', user?.role);
-    console.log('User role_id:', user?.role_id);
-    console.log('Is Barangay Kagawad:', isBarangayKagawad());
-  }, [user]);
 
   const handleNotificationClick = (notification: Notification) => {
     if (route().has('notifications.markAsRead')) {
@@ -167,10 +150,6 @@ export function AppSidebarHeader({
   };
 
   const getUserRole = () => {
-    // If user has original_role (meaning they switched roles), show that in parentheses
-    if (user?.original_role) {
-      return `${user.role} (${user.original_role})`;
-    }
     return user?.role || 'User';
   };
 
@@ -184,69 +163,10 @@ export function AppSidebarHeader({
     }
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.visit(route('search', { query: searchQuery }));
-      setSearchQuery('');
-    }
+  // Handle mobile search click
+  const handleMobileSearchClick = () => {
+    router.visit(route('search'));
   };
-
-  // Check if user is BARANGAY KAGAWAD (role_id: 5)
-  const isBarangayKagawad = () => {
-    const roleId = user?.role_id;
-    const roleName = user?.role?.toLowerCase() || '';
-    
-    // ONLY Barangay Kagawad can switch (role_id: 5)
-    const isKagawadById = roleId === 5;
-    
-    // Also check by role name for safety
-    const isKagawadByName = roleName.includes('kagawad') || 
-                           roleName.includes('councillor') ||
-                           roleName.includes('barangay kagawad');
-    
-    return isKagawadById || isKagawadByName;
-  };
-
-  // Function to switch directly to residentdashboard
-  const switchToResidentPanel = () => {
-    console.log('Redirecting to /residentdashboard');
-    
-    // Option 1: If you have role switching backend
-    if (route().has('switch-to-resident')) {
-      router.post(route('switch-to-resident'), {}, {
-        preserveScroll: true,
-        onSuccess: () => {
-          router.visit(route('residentdashboard'));
-        }
-      });
-    } 
-    // Option 2: Direct redirect (simplest)
-    else {
-      router.visit(route('residentdashboard'));
-    }
-  };
-
-  // Function to return to original role
-  const returnToOriginalRole = () => {
-    if (route().has('switch-back')) {
-      router.post(route('switch-back'), {}, {
-        preserveScroll: true,
-      });
-    } else {
-      // Fallback: Redirect to home
-      router.visit(route('dashboard'));
-    }
-  };
-
-  // Check if user can switch roles
-  // ONLY Barangay Kagawad can switch
-  const canSwitchRoles = isBarangayKagawad() && 
-                        !user?.original_role && 
-                        showRoleSwitcher;
-
-  // Check if user is currently in a switched role
-  const isSwitchedRole = !!user?.original_role;
 
   return (
     <>
@@ -282,53 +202,15 @@ export function AppSidebarHeader({
 
         {/* Right side: Search, Help, Notifications, User menu */}
         <div className="flex items-center gap-2 md:gap-3">
-          {/* Role switcher button - ONLY for Barangay Kagawad */}
-          {canSwitchRoles && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={switchToResidentPanel}
-              className="hidden md:flex items-center gap-2 px-3 py-2 h-9 text-sm"
-              aria-label="View Resident Dashboard"
-              title="Go to resident dashboard"
-            >
-              <SwitchCamera className="h-3.5 w-3.5" />
-              <span>Resident Dashboard</span>
-            </Button>
-          )}
+          {/* Desktop Search - QuickSearch component */}
+          <div className="hidden md:block">
+            <QuickSearch />
+          </div>
 
-          {/* Return to original role button - show if user has switched roles */}
-          {isSwitchedRole && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={returnToOriginalRole}
-              className="hidden md:flex items-center gap-2 px-3 py-2 h-9 text-sm"
-              title="Switch back to your original role"
-            >
-              <SwitchCamera className="h-3.5 w-3.5" />
-              <span>Back to {user.original_role}</span>
-            </Button>
-          )}
-
-          {/* Simple Search Bar */}
-          <form onSubmit={handleSearch} className="hidden md:block">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="pl-10 pr-4 py-2 w-40 lg:w-48 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-          </form>
-
-          {/* Mobile search button */}
+          {/* Mobile search button - navigates to search page */}
           <button 
             className="md:hidden p-2.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-colors"
-            onClick={() => router.visit(route('search'))}
+            onClick={handleMobileSearchClick}
             aria-label="Search"
           >
             <Search className="h-5 w-5" />
@@ -462,43 +344,11 @@ export function AppSidebarHeader({
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               
-              {/* Role switcher in dropdown (for mobile) - ONLY for Barangay Kagawad */}
-              {canSwitchRoles && (
-                <>
-                  <DropdownMenuLabel className="font-semibold text-xs uppercase tracking-wider text-muted-foreground pt-0">
-                    Dashboard
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem 
-                    onClick={switchToResidentPanel}
-                    className="cursor-pointer py-2.5"
-                  >
-                    <Home className="mr-2.5 h-4.5 w-4.5 text-green-600" />
-                    <div className="flex flex-col">
-                      <span className="font-medium">Resident Dashboard</span>
-                      <span className="text-xs text-muted-foreground">View resident interface</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-
-              {/* Return to original role in dropdown (for mobile) */}
-              {isSwitchedRole && (
-                <>
-                  <DropdownMenuItem 
-                    onClick={returnToOriginalRole}
-                    className="cursor-pointer py-2.5 bg-blue-50 hover:bg-blue-100"
-                  >
-                    <SwitchCamera className="mr-2.5 h-4.5 w-4.5 text-blue-600" />
-                    <div className="flex flex-col">
-                      <span className="font-medium text-blue-700">Back to {user.original_role}</span>
-                      <span className="text-xs text-muted-foreground">Return to Kagawad view</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-
+              <DropdownMenuItem onClick={() => router.visit(route('dashboard'))} className="cursor-pointer py-2.5">
+                <Home className="mr-2.5 h-4.5 w-4.5" />
+                <span className="font-medium">Dashboard</span>
+              </DropdownMenuItem>
+              
               <DropdownMenuItem onClick={() => router.visit(route('profile.edit'))} className="cursor-pointer py-2.5">
                 <User className="mr-2.5 h-4.5 w-4.5" />
                 <span className="font-medium">Profile</span>

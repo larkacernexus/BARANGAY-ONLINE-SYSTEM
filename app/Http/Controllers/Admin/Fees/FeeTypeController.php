@@ -235,13 +235,16 @@ class FeeTypeController extends Controller
     {
         $feeType->load(['documentCategory'])->loadCount('fees');
         
+        // Get recent fees with their polymorphic payer relationship
+        $recentFees = $feeType->fees()
+            ->with(['payer']) // Use polymorphic 'payer' instead of specific 'resident' and 'household'
+            ->latest()
+            ->limit(10)
+            ->get();
+        
         return Inertia::render('admin/Fees/FeeTypes/Show', [
             'feeType' => $feeType,
-            'recentFees' => $feeType->fees()
-                ->with(['resident', 'household'])
-                ->latest()
-                ->limit(10)
-                ->get(),
+            'recentFees' => $recentFees,
         ]);
     }
     

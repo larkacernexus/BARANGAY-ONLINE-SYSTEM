@@ -63,7 +63,7 @@ export default function RolePermissionsHeader({
                         <span className="hidden sm:inline">Roles</span>
                     </Button>
                 </Link>
-                <Link href="/role-permissions/create">
+                <Link href="/admin/role-permissions/create">
                     <Button className="h-9">
                         <Plus className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">Assign Permissions</span>

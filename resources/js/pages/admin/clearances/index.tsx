@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
-import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
 import { 
     ClearanceRequest, 
@@ -29,6 +28,7 @@ interface ClearancesPageProps {
     filters?: Filters;
     clearanceTypes?: ClearanceType[];
     statusOptions?: StatusOption[];
+    paymentStatusOptions?: StatusOption[];
     stats?: Stats;
 }
 
@@ -52,14 +52,19 @@ const defaultStats: Stats = {
     issuedThisMonth: 0,
     pendingToday: 0,
     expressRequests: 0,
-    rushRequests: 0
+    rushRequests: 0,
+    unpaid: 0,
+    partially_paid: 0,
+    paid: 0,
+    pending_payment: 0
 };
 
 export default function ClearancesIndex({ 
     clearances, 
     filters, 
     clearanceTypes, 
-    statusOptions, 
+    statusOptions,
+    paymentStatusOptions,
     stats 
 }: ClearancesPageProps) {
     const { flash } = usePage().props as any;
@@ -69,6 +74,7 @@ export default function ClearancesIndex({
     const safeFilters = filters || {};
     const safeClearanceTypes = clearanceTypes || [];
     const safeStatusOptions = statusOptions || [];
+    const safePaymentStatusOptions = paymentStatusOptions || [];
     const safeStats = stats || defaultStats;
     
     // State management
@@ -77,6 +83,7 @@ export default function ClearancesIndex({
         status: safeFilters.status || '',
         type: safeFilters.type || '',
         urgency: safeFilters.urgency || '',
+        payment_status: safeFilters.payment_status || '',
         sort: safeFilters.sort || 'created_at',
         direction: safeFilters.direction || 'desc'
     });
@@ -129,37 +136,28 @@ export default function ClearancesIndex({
         }
     }, [flash]);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                if (!params[key as keyof typeof params]) {
-                    delete params[key as keyof typeof params];
-                }
-            });
-            
-            router.get('/clearances', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== safeFilters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, safeFilters.search]);
+    // Handle search change - immediate navigation without debounce
+    const handleSearchChange = (value: string) => {
+        setSearch(value);
+        
+        const params = {
+            ...filtersState,
+            search: value
+        };
+        
+        // Clean up empty values
+        Object.keys(params).forEach(key => {
+            if (!params[key as keyof typeof params]) {
+                delete params[key as keyof typeof params];
+            }
+        });
+        
+        router.get('/admin/clearances', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
 
     // Filter clearances client-side
     const filteredClearances = useMemo(() => {
@@ -168,10 +166,14 @@ export default function ClearancesIndex({
             const searchMatch = !search || 
                 clearance.reference_number?.toLowerCase().includes(search.toLowerCase()) ||
                 clearance.clearance_number?.toLowerCase().includes(search.toLowerCase()) ||
-                clearance.resident?.full_name?.toLowerCase().includes(search.toLowerCase());
+                clearance.resident?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+                clearance.or_number?.toLowerCase().includes(search.toLowerCase());
             
             // Status filter
             const statusMatch = !filtersState.status || clearance.status === filtersState.status;
+            
+            // Payment status filter
+            const paymentStatusMatch = !filtersState.payment_status || clearance.payment_status === filtersState.payment_status;
             
             // Type filter
             const typeMatch = !filtersState.type || clearance.clearance_type_id?.toString() === filtersState.type;
@@ -179,7 +181,7 @@ export default function ClearancesIndex({
             // Urgency filter
             const urgencyMatch = !filtersState.urgency || clearance.urgency === filtersState.urgency;
             
-            return searchMatch && statusMatch && typeMatch && urgencyMatch;
+            return searchMatch && statusMatch && paymentStatusMatch && typeMatch && urgencyMatch;
         });
     }, [safeClearances.data, search, filtersState]);
 
@@ -205,9 +207,17 @@ export default function ClearancesIndex({
                     aValue = a.status;
                     bValue = b.status;
                     break;
+                case 'payment_status':
+                    aValue = a.payment_status || 'unpaid';
+                    bValue = b.payment_status || 'unpaid';
+                    break;
                 case 'fee_amount':
                     aValue = Number(a.fee_amount) || 0;
                     bValue = Number(b.fee_amount) || 0;
+                    break;
+                case 'amount_paid':
+                    aValue = Number(a.amount_paid) || 0;
+                    bValue = Number(b.amount_paid) || 0;
                     break;
                 case 'created_at':
                     aValue = new Date(a.created_at).getTime();
@@ -353,7 +363,11 @@ export default function ClearancesIndex({
             pending: selectedClearancesData.filter(c => c.status === 'pending' || c.status === 'pending_payment').length,
             processing: selectedClearancesData.filter(c => c.status === 'processing').length,
             approved: selectedClearancesData.filter(c => c.status === 'approved' || c.status === 'issued').length,
-            totalValue: selectedClearancesData.reduce((sum, c) => sum + (Number(c.fee_amount) || 0), 0)
+            unpaid: selectedClearancesData.filter(c => c.payment_status === 'unpaid').length,
+            partially_paid: selectedClearancesData.filter(c => c.payment_status === 'partially_paid').length,
+            paid: selectedClearancesData.filter(c => c.payment_status === 'paid').length,
+            totalValue: selectedClearancesData.reduce((sum, c) => sum + (Number(c.fee_amount) || 0), 0),
+            totalPaid: selectedClearancesData.reduce((sum, c) => sum + (Number(c.amount_paid) || 0), 0)
         };
     }, [selectedClearancesData]);
 
@@ -369,7 +383,7 @@ export default function ClearancesIndex({
         try {
             switch (operation) {
                 case 'process':
-                    await router.post('/clearances/bulk-process', {
+                    await router.post('/admin/clearances/bulk-process', {
                         ids: selectedClearances
                     }, {
                         preserveScroll: true,
@@ -385,7 +399,7 @@ export default function ClearancesIndex({
                     break;
 
                 case 'approve':
-                    await router.post('/clearances/bulk-approve', {
+                    await router.post('/admin/clearances/bulk-approve', {
                         ids: selectedClearances
                     }, {
                         preserveScroll: true,
@@ -400,7 +414,7 @@ export default function ClearancesIndex({
                     break;
 
                 case 'issue':
-                    await router.post('/clearances/bulk-issue', {
+                    await router.post('/admin/clearances/bulk-issue', {
                         ids: selectedClearances
                     }, {
                         preserveScroll: true,
@@ -416,7 +430,7 @@ export default function ClearancesIndex({
 
                 case 'delete':
                     if (confirm(`Are you sure you want to delete ${selectedClearances.length} selected clearance request(s)?`)) {
-                        await router.post('/clearances/bulk-delete', {
+                        await router.post('/admin/clearances/bulk-delete', {
                             ids: selectedClearances
                         }, {
                             preserveScroll: true,
@@ -441,6 +455,9 @@ export default function ClearancesIndex({
                         'Clearance Type': clearance.clearance_type?.name || '',
                         'Purpose': clearance.purpose,
                         'Fee Amount': clearance.fee_amount,
+                        'Amount Paid': clearance.amount_paid || 0,
+                        'Balance': clearance.balance || clearance.fee_amount,
+                        'Payment Status': clearance.payment_status || 'unpaid',
                         'Urgency': clearance.urgency,
                         'Status': clearance.status,
                         'Issue Date': clearance.issue_date || '',
@@ -482,14 +499,14 @@ export default function ClearancesIndex({
 
                 case 'print':
                     selectedClearances.forEach(id => {
-                        window.open(`/clearances/${id}/print`, '_blank');
+                        window.open(`/admin/clearances/${id}/print`, '_blank');
                     });
                     toast.success(`${selectedClearances.length} clearance(s) opened for printing`);
                     break;
 
                 case 'update_status':
                     if (bulkEditValue) {
-                        await router.post('/clearances/bulk-update-status', {
+                        await router.post('/admin/clearances/bulk-update-status', {
                             ids: selectedClearances,
                             status: bulkEditValue
                         }, {
@@ -514,7 +531,9 @@ export default function ClearancesIndex({
                         'Name': clearance.resident?.full_name || 'N/A',
                         'Type': clearance.clearance_type?.name || 'N/A',
                         'Status': clearance.status,
+                        'Payment': clearance.payment_status || 'unpaid',
                         'Amount': clearance.fee_amount,
+                        'Paid': clearance.amount_paid || 0,
                         'Purpose': clearance.purpose,
                         'Urgency': clearance.urgency
                     }));
@@ -536,14 +555,6 @@ export default function ClearancesIndex({
                     });
                     break;
 
-                case 'export_csv':
-                    toast.info('Export CSV functionality to be implemented');
-                    break;
-
-                case 'mark_processing':
-                    toast.info('Mark as processing functionality to be implemented');
-                    break;
-
                 default:
                     toast.error('Operation not supported');
             }
@@ -558,7 +569,7 @@ export default function ClearancesIndex({
     // Individual clearance operations
     const handleDelete = (clearance: ClearanceRequest) => {
         if (confirm(`Are you sure you want to cancel request ${clearance.reference_number}?`)) {
-            router.delete(`/clearances/${clearance.id}`, {
+            router.delete(`/admin/clearances/${clearance.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedClearances(selectedClearances.filter(id => id !== clearance.id));
@@ -589,6 +600,7 @@ export default function ClearancesIndex({
             status: '',
             type: '',
             urgency: '',
+            payment_status: '',
             sort: 'created_at',
             direction: 'desc'
         });
@@ -611,33 +623,191 @@ export default function ClearancesIndex({
         search || 
         filtersState.status || 
         filtersState.type || 
-        filtersState.urgency;
+        filtersState.urgency ||
+        filtersState.payment_status;
 
-    // Handle Record Payment Click
+    // ===== REVISED: Handle Record Payment Click with enhanced debugging =====
     const handleRecordPayment = (clearance: ClearanceRequest) => {
-        const clearanceData = {
-            clearance_request_id: clearance.id,
-            resident_id: clearance.resident_id,
-            amount: clearance.fee_amount,
-            type: 'clearance',
+        console.log('=== RECORD PAYMENT CLICKED ===');
+        console.log('Clearance:', {
+            id: clearance.id,
             reference: clearance.reference_number,
-            clearance_type_id: clearance.clearance_type_id,
-            purpose: clearance.purpose,
-            specific_purpose: clearance.specific_purpose || '',
-            resident_name: clearance.resident?.full_name || '',
-            clearance_type_name: clearance.clearance_type?.name
+            fee_amount: clearance.fee_amount,
+            status: clearance.status,
+            payment_status: clearance.payment_status,
+            payer_type: clearance.payer_type,
+            resident: clearance.resident?.full_name
+        });
+
+        // Helper function to safely get string values
+        const safeString = (value: any): string => {
+            if (value === null || value === undefined) return '';
+            if (typeof value === 'boolean') return '';
+            if (typeof value === 'object') return '';
+            return String(value);
         };
+
+        // Helper to get contact number safely
+        const getContactNumber = (): string => {
+            if (clearance.contact_number && typeof clearance.contact_number === 'string') {
+                return clearance.contact_number;
+            }
+            if (clearance.resident?.contact_number && typeof clearance.resident.contact_number === 'string') {
+                return clearance.resident.contact_number;
+            }
+            return '';
+        };
+
+        // Helper to get address safely
+        const getAddress = (): string => {
+            if (clearance.contact_address && typeof clearance.contact_address === 'string') {
+                return clearance.contact_address;
+            }
+            if (clearance.resident?.address && typeof clearance.resident.address === 'string') {
+                return clearance.resident.address;
+            }
+            return '';
+        };
+
+        // Helper to get purok safely
+        const getPurok = (): string => {
+            if (clearance.contact_purok && typeof clearance.contact_purok === 'string') {
+                return clearance.contact_purok;
+            }
+            if (clearance.resident?.purok && typeof clearance.resident.purok === 'string') {
+                return clearance.resident.purok;
+            }
+            return '';
+        };
+
+        // Helper to get business name safely
+        const getBusinessName = (): string => {
+            if (clearance.business && typeof clearance.business === 'object') {
+                const business = clearance.business as any;
+                if (business && business.business_name && typeof business.business_name === 'string') {
+                    return business.business_name;
+                }
+            }
+            return '';
+        };
+
+        // Helper to get household name safely
+        const getHouseholdName = (): string => {
+            if (clearance.household && typeof clearance.household === 'object') {
+                const household = clearance.household as any;
+                if (household && household.head_name && typeof household.head_name === 'string') {
+                    return household.head_name;
+                }
+                if (household && household.household_number) {
+                    return `Household ${household.household_number}`;
+                }
+            }
+            return '';
+        };
+
+        // Helper to get payer name
+        const getPayerName = (): string => {
+            if (clearance.payer_name && typeof clearance.payer_name === 'string') {
+                return clearance.payer_name;
+            }
+            
+            if (clearance.payer_type === 'resident' && clearance.resident) {
+                if (clearance.resident.full_name && typeof clearance.resident.full_name === 'string') {
+                    return clearance.resident.full_name;
+                }
+                if (clearance.resident.first_name || clearance.resident.last_name) {
+                    const firstName = typeof clearance.resident.first_name === 'string' ? clearance.resident.first_name : '';
+                    const lastName = typeof clearance.resident.last_name === 'string' ? clearance.resident.last_name : '';
+                    return `${firstName} ${lastName}`.trim();
+                }
+            }
+            
+            if (clearance.payer_type === 'household') {
+                const householdName = getHouseholdName();
+                if (householdName) return householdName;
+            }
+            
+            if (clearance.payer_type === 'business') {
+                const businessName = getBusinessName();
+                if (businessName) return businessName;
+            }
+            
+            return clearance.resident?.full_name || 'Unknown';
+        };
+
+        // Build parameters - FOCUS ON CLEARANCE_REQUEST_ID
+        const params: Record<string, string> = {
+            // PRIMARY IDENTIFIER - use this to load the clearance
+            clearance_request_id: clearance.id.toString(),
+            
+            // Payer info (for display)
+            payer_type: clearance.payer_type || 'resident',
+            payer_id: safeString(clearance.payer_id || clearance.resident_id || ''),
+            payer_name: getPayerName(),
+            
+            // Contact info
+            contact_number: getContactNumber(),
+            address: getAddress(),
+            purok: getPurok(),
+            
+            // Clearance details
+            clearance_type: clearance.clearance_type?.name || 'Clearance',
+            clearance_type_id: clearance.clearance_type_id?.toString() || '',
+            purpose: clearance.purpose || '',
+            fee_amount: (clearance.fee_amount || 0).toString(),
+            balance: ((clearance.balance ?? clearance.fee_amount) || 0).toString(),
+            
+            // Explicitly set source to avoid confusion with garbage fees
+            source: 'clearance',
+            from_clearance: 'true',
+            
+            // Optional: include fee_code but as a descriptive field only
+            fee_code: clearance.clearance_type?.code || `CLR-${clearance.id}`,
+            
+            // Timestamp to prevent caching
+            _t: Date.now().toString()
+        };
+
+        // Filter out empty values
+        const filteredParams = Object.fromEntries(
+            Object.entries(params).filter(([_, value]) => value !== '')
+        );
+
+        // Use the correct URL path: /payments/payments/create
+        const url = `/payments/payments/create?${new URLSearchParams(filteredParams).toString()}`;
         
-        sessionStorage.setItem('pending_clearance_payment', JSON.stringify(clearanceData));
-        window.location.href = '/payments/create';
+        console.log('Final Payment URL:', url);
+        console.log('Navigating to:', url);
+        
+        // Show loading toast
+        toast.info('Redirecting to payment page...');
+        
+        // Try both methods to ensure navigation
+        try {
+            // Method 1: Direct window.location
+            window.location.href = url;
+            
+            // Method 2: Fallback with setTimeout
+            setTimeout(() => {
+                console.log('Fallback navigation...');
+                if (window.location.href === url) {
+                    console.log('Already at target URL');
+                } else {
+                    window.location.replace(url);
+                }
+            }, 500);
+        } catch (error) {
+            console.error('Navigation error:', error);
+            toast.error('Failed to navigate to payment page');
+        }
     };
 
     return (
         <AppLayout
             title="Clearance Requests"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Clearances', href: '/clearances' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Clearances', href: '/admin/clearances' }
             ]}
         >
             <TooltipProvider>
@@ -652,13 +822,14 @@ export default function ClearancesIndex({
 
                     <ClearancesFilters
                         search={search}
-                        setSearch={setSearch}
+                        setSearch={handleSearchChange}
                         filtersState={filtersState}
                         updateFilter={updateFilter}
                         handleClearFilters={handleClearFilters}
                         hasActiveFilters={hasActiveFilters}
                         clearanceTypes={safeClearanceTypes}
                         statusOptions={safeStatusOptions}
+                        paymentStatusOptions={safePaymentStatusOptions}
                         startIndex={startIndex}
                         endIndex={endIndex}
                         totalItems={totalItems}

@@ -1,3 +1,5 @@
+// resources/js/pages/admin/Payments/Show.tsx
+
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -99,7 +101,9 @@ import {
     FolderOpenDot
 } from 'lucide-react';
 import { Link, usePage, Head } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { useReactToPrint } from 'react-to-print';
+import PrintableReceipt from '@/components/admin/receipts/PrintableReceipt';
 
 // ========== INTERFACES ==========
 interface PaymentItem {
@@ -298,6 +302,18 @@ interface FeeDetails {
     cancelled_at?: string;
 }
 
+interface DiscountDetail {
+    id: number | null;
+    type: string;
+    code?: string | null;
+    amount: number;
+    formatted_amount: string;
+    id_number?: string | null;
+    verified_by?: string | null;
+    verified_at?: string | null;
+    id_presented?: boolean;
+}
+
 interface Payment {
     id: number;
     or_number: string;
@@ -328,6 +344,7 @@ interface Payment {
     discount: number;
     formatted_discount: string;
     discount_type?: string;
+    discount_code?: string;
     total_amount: number;
     formatted_total: string;
     purpose?: string;
@@ -358,6 +375,8 @@ interface Payment {
     has_surcharge: boolean;
     has_penalty: boolean;
     has_discount: boolean;
+    corrected_total?: number;
+    formatted_corrected_total?: string;
 }
 
 interface PageProps {
@@ -378,6 +397,7 @@ interface PageProps {
         total: number;
         formatted_total: string;
     };
+    discountDetails?: DiscountDetail[];
     isClearancePayment: boolean;
     isFeePayment: boolean;
     hasClearanceRequests: boolean;
@@ -395,13 +415,12 @@ const getRoute = (name: string, params?: any) => {
     }
     
     const fallbacks: Record<string, any> = {
-        'payments.index': '/payments',
-        'payments.edit': (id: number) => `/payments/${id}/edit`,
-        'payments.receipt': (id: number) => `/payments/${id}/receipt`,
-        'residents.show': (id: number) => `/residents/${id}`,
-        'households.show': (id: number) => `/households/${id}`,
-        'clearance-requests.show': (id: number) => `/clearances/${id}`,
-        'fees.show': (id: number) => `/fees/${id}`,
+        'payments.index': '/admin/payments',
+        'payments.edit': (id: number) => `/admin/payments/${id}/edit`,
+        'residents.show': (id: number) => `/admin/residents/${id}`,
+        'households.show': (id: number) => `/admin/households/${id}`,
+        'clearance-requests.show': (id: number) => `/admin/clearances/${id}`,
+        'admin.fees.show': (id: number) => `/admin/fees/${id}`,
         'dashboard': '/dashboard',
     };
     
@@ -468,6 +487,7 @@ export default function PaymentShow() {
         payer, 
         relatedPayments, 
         paymentBreakdown,
+        discountDetails = [],
         hasClearanceRequests,
         hasFees
     } = usePage<PageProps>().props;
@@ -475,6 +495,98 @@ export default function PaymentShow() {
     const [copied, setCopied] = useState(false);
     const [expandedClearanceRequests, setExpandedClearanceRequests] = useState<number[]>([]);
     const [expandedFees, setExpandedFees] = useState<number[]>([]);
+    const [showPrintPreview, setShowPrintPreview] = useState(false);
+    
+    const printRef = useRef<HTMLDivElement>(null);
+
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,
+        documentTitle: `receipt-${payment.or_number}`,
+        onAfterPrint: () => {
+            setShowPrintPreview(false);
+        },
+    });
+
+    // ========== CRITICAL FIX: Filter discount details to show only valid discounts ==========
+    const validDiscountDetails = useMemo(() => {
+        if (!discountDetails || discountDetails.length === 0) return [];
+        
+        // Log what we're getting from the backend
+        console.log('🔍 Raw discount details from backend:', discountDetails);
+        console.log('🔍 Payment discount from payment:', payment.discount);
+        console.log('🔍 Payment discount type:', payment.discount_type);
+        
+        // Calculate total from discount details
+        const totalFromDetails = discountDetails.reduce((sum, d) => sum + (d.amount || 0), 0);
+        const paymentDiscount = payment.discount || 0;
+        
+        // If totals match exactly, return all discounts (they're all valid)
+        if (Math.abs(totalFromDetails - paymentDiscount) < 0.01) {
+            console.log('✅ Discount totals match exactly, showing all discounts');
+            return discountDetails;
+        }
+        
+        // If totals don't match, we need to filter
+        console.warn('⚠️ Discount total mismatch! Filtering discounts...', {
+            totalFromDetails,
+            paymentDiscount,
+            difference: totalFromDetails - paymentDiscount,
+            discountDetails
+        });
+        
+        // Strategy 1: Try to find discounts that match the payment discount type
+        if (payment.discount_type) {
+            const typeMatchDiscounts = discountDetails.filter(d => 
+                d.type?.toLowerCase().includes(payment.discount_type?.toLowerCase() || '') ||
+                d.code?.toLowerCase().includes(payment.discount_type?.toLowerCase() || '')
+            );
+            
+            if (typeMatchDiscounts.length > 0) {
+                const typeMatchTotal = typeMatchDiscounts.reduce((sum, d) => sum + (d.amount || 0), 0);
+                if (Math.abs(typeMatchTotal - paymentDiscount) < 0.01) {
+                    console.log('✅ Found discounts matching type:', typeMatchDiscounts);
+                    return typeMatchDiscounts;
+                }
+            }
+        }
+        
+        // Strategy 2: Take the single largest discount that's <= payment discount
+        const sortedByAmount = [...discountDetails].sort((a, b) => b.amount - a.amount);
+        const largestDiscount = sortedByAmount[0];
+        
+        if (largestDiscount && Math.abs(largestDiscount.amount - paymentDiscount) < 0.01) {
+            console.log('✅ Found single discount matching amount:', largestDiscount);
+            return [largestDiscount];
+        }
+        
+        // Strategy 3: Take all discounts with positive amounts, but cap at payment discount
+        const validDiscounts: DiscountDetail[] = [];
+        let runningTotal = 0;
+        
+        for (const discount of discountDetails) {
+            if (discount.amount <= 0) continue;
+            
+            if (runningTotal + discount.amount <= paymentDiscount + 0.01) {
+                validDiscounts.push(discount);
+                runningTotal += discount.amount;
+            }
+        }
+        
+        if (Math.abs(runningTotal - paymentDiscount) < 0.01 && validDiscounts.length > 0) {
+            console.log('✅ Found combination of discounts:', validDiscounts);
+            return validDiscounts;
+        }
+        
+        // Strategy 4: Last resort - just show the first discount
+        console.log('⚠️ Using first discount as fallback:', discountDetails[0]);
+        return [discountDetails[0]];
+        
+    }, [discountDetails, payment.discount, payment.discount_type]);
+
+    // Calculate total from valid discounts for verification
+    const validDiscountTotal = useMemo(() => {
+        return validDiscountDetails.reduce((sum, d) => sum + (d.amount || 0), 0);
+    }, [validDiscountDetails]);
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
@@ -496,6 +608,14 @@ export default function PaymentShow() {
                 ? prev.filter(feeId => feeId !== id)
                 : [...prev, id]
         );
+    };
+
+    const handlePrintReceipt = () => {
+        setShowPrintPreview(true);
+        // Small delay to ensure the printable component is rendered
+        setTimeout(() => {
+            handlePrint();
+        }, 100);
     };
 
     const getStatusIcon = (status: string) => {
@@ -591,9 +711,59 @@ export default function PaymentShow() {
     const hasLateFees = payment.items?.some(item => item.surcharge > 0 || item.penalty > 0);
     const hasCertificate = payment.certificate_type !== null && payment.certificate_type !== undefined;
 
+    // Prepare receipt data for printing
+    const receiptData = useMemo(() => ({
+        id: payment.id,
+        receipt_number: payment.or_number,
+        or_number: payment.or_number,
+        receipt_type: 'official',
+        receipt_type_label: 'OFFICIAL RECEIPT',
+        payer_name: payment.payer_name,
+        payer_address: payment.address || null,
+        subtotal: payment.subtotal,
+        surcharge: payment.surcharge,
+        penalty: payment.penalty,
+        discount: payment.discount,
+        total_amount: payment.total_amount,
+        amount_paid: payment.amount_paid,
+        change_due: payment.amount_paid - (payment.total_amount - payment.discount),
+        formatted_subtotal: payment.formatted_subtotal,
+        formatted_surcharge: payment.formatted_surcharge,
+        formatted_penalty: payment.formatted_penalty,
+        formatted_discount: payment.formatted_discount,
+        formatted_total: payment.formatted_total,
+        formatted_amount_paid: payment.formatted_amount_paid,
+        formatted_change: formatCurrency(payment.amount_paid - (payment.total_amount - payment.discount)),
+        payment_method: payment.payment_method,
+        payment_method_label: payment.payment_method_display,
+        reference_number: payment.reference_number || null,
+        formatted_payment_date: payment.formatted_date,
+        formatted_issued_date: payment.formatted_date,
+        issued_by: payment.recorder?.name || 'System',
+        fee_breakdown: payment.items.map(item => ({
+            fee_name: item.fee_name,
+            fee_code: item.fee_code,
+            base_amount: item.base_amount,
+            total_amount: item.total_amount
+        })),
+        notes: payment.remarks || null
+    }), [payment]);
+
     return (
         <>
             <Head title={`Payment #${payment.or_number}`} />
+            
+            {/* Hidden Print Preview */}
+            {showPrintPreview && (
+                <div className="fixed top-0 left-0 w-0 h-0 overflow-hidden opacity-0 pointer-events-none">
+                    <PrintableReceipt 
+                        ref={printRef} 
+                        receipt={receiptData}
+                        copyType="original"
+                    />
+                </div>
+            )}
+            
             <AppLayout
                 title={`Payment #${payment.or_number}`}
                 breadcrumbs={[
@@ -647,12 +817,14 @@ export default function PaymentShow() {
                                 <Copy className="h-4 w-4 mr-2" />
                                 {copied ? 'Copied!' : 'Copy OR#'}
                             </Button>
-                            <Link href={getRoute('payments.receipt', payment.id)}>
-                                <Button variant="outline" size="sm">
-                                    <Printer className="h-4 w-4 mr-2" />
-                                    Print Receipt
-                                </Button>
-                            </Link>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handlePrintReceipt}
+                            >
+                                <Printer className="h-4 w-4 mr-2" />
+                                Print Receipt
+                            </Button>
                             <Link href={getRoute('payments.edit', payment.id)}>
                                 <Button size="sm">
                                     <Edit className="h-4 w-4 mr-2" />
@@ -718,53 +890,113 @@ export default function PaymentShow() {
                                                 <p className="font-semibold">{payment.purpose}</p>
                                             </div>
                                         )}
-                                        {payment.discount_type && (
-                                            <div className="space-y-1">
-                                                <p className="text-sm font-medium text-gray-500">Discount Type</p>
-                                                <p className="font-semibold">{payment.discount_type}</p>
-                                            </div>
-                                        )}
                                     </div>
 
-                                    {/* Payment Breakdown */}
+                                    {/* PAYMENT BREAKDOWN - UPDATED WITH FILTERED DISCOUNTS */}
                                     <div className="border rounded-lg p-4 bg-gray-50">
-                                        <h4 className="font-semibold mb-3 text-lg">Payment Breakdown</h4>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h4 className="font-semibold text-lg">Payment Breakdown</h4>
+                                            {Math.abs(validDiscountTotal - (payment.discount || 0)) > 0.01 && (
+                                                <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                                    Discount Adjusted
+                                                </Badge>
+                                            )}
+                                        </div>
                                         <div className="space-y-2">
                                             <div className="flex justify-between">
                                                 <span className="text-gray-600">Subtotal</span>
-                                                <span className="font-medium">{payment.formatted_subtotal || paymentBreakdown.formatted_subtotal}</span>
+                                                <span className="font-medium">{paymentBreakdown.formatted_subtotal}</span>
                                             </div>
-                                            {payment.has_surcharge && (
+                                            
+                                            {paymentBreakdown.surcharge > 0 && (
                                                 <div className="flex justify-between text-amber-600">
                                                     <span className="flex items-center gap-1">
                                                         <Percent className="h-3 w-3" />
                                                         Surcharge
                                                     </span>
-                                                    <span className="font-medium">{payment.formatted_surcharge || paymentBreakdown.formatted_surcharge}</span>
+                                                    <span className="font-medium">{paymentBreakdown.formatted_surcharge}</span>
                                                 </div>
                                             )}
-                                            {payment.has_penalty && (
+                                            
+                                            {paymentBreakdown.penalty > 0 && (
                                                 <div className="flex justify-between text-red-600">
                                                     <span className="flex items-center gap-1">
                                                         <AlertTriangle className="h-3 w-3" />
                                                         Penalty
                                                     </span>
-                                                    <span className="font-medium">{payment.formatted_penalty || paymentBreakdown.formatted_penalty}</span>
+                                                    <span className="font-medium">{paymentBreakdown.formatted_penalty}</span>
                                                 </div>
                                             )}
-                                            {payment.has_discount && (
+                                            
+                                            {/* Show individual discounts with their types - USING FILTERED VERSION */}
+                                            {validDiscountDetails && validDiscountDetails.length > 0 ? (
+                                                <>
+                                                    {validDiscountDetails.map((discount, index) => (
+                                                        <div key={index} className="flex justify-between text-green-600 border-b border-green-100 pb-1 last:border-0">
+                                                            <div className="flex flex-col">
+                                                                <span className="flex items-center gap-1">
+                                                                    <Tag className="h-3 w-3" />
+                                                                    <span>
+                                                                        {discount.type} Discount
+                                                                        {discount.code && (
+                                                                            <span className="text-xs ml-1 text-gray-500">
+                                                                                ({discount.code})
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                </span>
+                                                                {discount.id_number && (
+                                                                    <span className="text-xs text-gray-500 ml-4">
+                                                                        ID: {discount.id_number}
+                                                                    </span>
+                                                                )}
+                                                                {discount.verified_by && (
+                                                                    <span className="text-xs text-gray-500 ml-4">
+                                                                        Verified by: {discount.verified_by}
+                                                                    </span>
+                                                                )}
+                                                                {discount.verified_at && (
+                                                                    <span className="text-xs text-gray-500 ml-4">
+                                                                        {discount.verified_at}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <span className="font-medium text-green-600">
+                                                                - {discount.formatted_amount}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                    
+                                                    {/* Show if filtered total doesn't match payment discount */}
+                                                    {Math.abs(validDiscountTotal - (payment.discount || 0)) > 0.01 && (
+                                                        <div className="flex justify-between text-gray-500 text-sm italic pt-1">
+                                                            <span>Applied Discount</span>
+                                                            <span>- {paymentBreakdown.formatted_discount}</span>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : paymentBreakdown.discount > 0 && (
                                                 <div className="flex justify-between text-green-600">
                                                     <span className="flex items-center gap-1">
                                                         <Tag className="h-3 w-3" />
                                                         Discount
+                                                        {payment.discount_type && (
+                                                            <span className="text-xs ml-1 text-gray-500">
+                                                                ({payment.discount_type})
+                                                            </span>
+                                                        )}
                                                     </span>
-                                                    <span className="font-medium">{payment.formatted_discount || paymentBreakdown.formatted_discount}</span>
+                                                    <span className="font-medium text-green-600">
+                                                        - {paymentBreakdown.formatted_discount}
+                                                    </span>
                                                 </div>
                                             )}
+                                            
                                             <div className="border-t pt-2 mt-2">
                                                 <div className="flex justify-between text-lg font-bold">
                                                     <span>Total Amount</span>
-                                                    <span>{payment.formatted_total || paymentBreakdown.formatted_total}</span>
+                                                    <span>{paymentBreakdown.formatted_total}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -854,7 +1086,7 @@ export default function PaymentShow() {
                                                                     {item.fee && (
                                                                         <div className="mt-1">
                                                                             <Link 
-                                                                                href={getRoute('fees.show', item.fee.id)}
+                                                                                href={getRoute('admin.fees.show', item.fee.id)}
                                                                                 className="text-xs text-green-600 hover:text-green-800 hover:underline inline-flex items-center gap-1"
                                                                             >
                                                                                 <FileBarChart className="h-3 w-3" />
@@ -1299,7 +1531,7 @@ export default function PaymentShow() {
                                                             {/* Action Button */}
                                                             <div className="border-t pt-4">
                                                                 <Link 
-                                                                    href={getRoute('fees.show', fee.id)}
+                                                                    href={getRoute('admin.fees.show', fee.id)}
                                                                     className="inline-flex items-center gap-2 text-green-600 hover:text-green-800"
                                                                 >
                                                                     <FileBarChart className="h-4 w-4" />
@@ -1464,7 +1696,7 @@ export default function PaymentShow() {
                                             {relatedPayments.map((related) => (
                                                 <Link 
                                                     key={related.id}
-                                                    href={`/payments/${related.id}`}
+                                                    href={`/admin/payments/${related.id}`}
                                                     className="block p-3 border rounded-lg hover:bg-gray-50 transition-colors"
                                                 >
                                                     <div className="flex items-center justify-between">
@@ -1541,6 +1773,62 @@ export default function PaymentShow() {
                                     </div>
                                 </CardContent>
                             </Card>
+
+                            {/* Discount Summary Card (if multiple discounts) */}
+                            {validDiscountDetails && validDiscountDetails.length > 1 && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <Tag className="h-5 w-5 text-green-600" />
+                                            Discount Summary
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Details of all discounts applied
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-3">
+                                            {validDiscountDetails.map((discount, index) => (
+                                                <div key={index} className="border-b border-green-100 last:border-0 pb-2 last:pb-0">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <p className="font-medium text-green-800">{discount.type} Discount</p>
+                                                            <div className="text-xs text-gray-600 space-y-1 mt-1">
+                                                                {discount.code && (
+                                                                    <p>Code: {discount.code}</p>
+                                                                )}
+                                                                {discount.id_number && (
+                                                                    <p>ID Number: {discount.id_number}</p>
+                                                                )}
+                                                                {discount.verified_by && (
+                                                                    <p>Verified by: {discount.verified_by}</p>
+                                                                )}
+                                                                {discount.verified_at && (
+                                                                    <p>Verified at: {discount.verified_at}</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="font-bold text-green-700">{discount.formatted_amount}</p>
+                                                            {discount.id_presented && (
+                                                                <Badge variant="outline" className="mt-1 bg-green-100 text-green-700 border-green-200 text-xs">
+                                                                    ID Presented
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <div className="pt-2 border-t border-green-200">
+                                                <div className="flex justify-between font-semibold">
+                                                    <span>Total Discount</span>
+                                                    <span className="text-green-700">{paymentBreakdown.formatted_discount}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
                         </div>
                     </div>
                 </div>

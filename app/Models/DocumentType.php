@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Log;
 
 class DocumentType extends Model
 {
@@ -33,7 +34,9 @@ class DocumentType extends Model
 
     protected $appends = [
         'accepted_formats_list',
-        'max_file_size_mb'
+        'max_file_size_mb',
+        'category_name',
+        'category_slug'
     ];
 
     /**
@@ -76,13 +79,11 @@ class DocumentType extends Model
         return $this->clearanceRequirements()->where('is_required', false);
     }
 
-    // Changed from ByCategory to ByCategoryId
     public function scopeByCategoryId($query, $categoryId)
     {
         return $query->where('document_category_id', $categoryId);
     }
 
-    // Helper method for backward compatibility
     public function scopeByCategorySlug($query, $categorySlug)
     {
         return $query->whereHas('category', function($q) use ($categorySlug) {
@@ -90,32 +91,93 @@ class DocumentType extends Model
         });
     }
 
+    /**
+     * Get accepted formats as a formatted string
+     */
     public function getAcceptedFormatsListAttribute()
     {
-        return $this->accepted_formats ? implode(', ', $this->accepted_formats) : 'All formats';
+        try {
+            $formats = $this->accepted_formats;
+            
+            // Case 1: It's already an array (from cast)
+            if (is_array($formats)) {
+                return !empty($formats) ? implode(', ', $formats) : 'All formats';
+            }
+            
+            // Case 2: It's null or empty
+            if (empty($formats)) {
+                return 'All formats';
+            }
+            
+            // Case 3: It's a string (legacy data or double-encoded)
+            if (is_string($formats)) {
+                // Try to decode JSON
+                $decoded = json_decode($formats, true);
+                
+                if (is_array($decoded)) {
+                    // Valid JSON array
+                    return !empty($decoded) ? implode(', ', $decoded) : 'All formats';
+                }
+                
+                // Check if it's a comma-separated string
+                if (str_contains($formats, ',')) {
+                    $parts = array_map('trim', explode(',', $formats));
+                    return implode(', ', $parts);
+                }
+                
+                // Single format string
+                return $formats;
+            }
+            
+            return 'All formats';
+            
+        } catch (\Exception $e) {
+            // Log error for debugging
+            Log::error('Error in accepted_formats_list accessor', [
+                'document_type_id' => $this->id ?? null,
+                'error' => $e->getMessage()
+            ]);
+            
+            return 'All formats';
+        }
     }
 
     public function getMaxFileSizeMbAttribute()
     {
-        return round($this->max_file_size / 1024, 2);
+        try {
+            if (empty($this->max_file_size)) {
+                return 0;
+            }
+            return round($this->max_file_size / 1024, 2);
+        } catch (\Exception $e) {
+            return 0;
+        }
     }
 
     public function isRequiredForClearanceType($clearanceTypeId): bool
     {
-        $requirement = DocumentRequirement::where('document_type_id', $this->id)
-            ->where('clearance_type_id', $clearanceTypeId)
-            ->first();
-            
-        return $requirement ? $requirement->is_required : false;
+        try {
+            $requirement = DocumentRequirement::where('document_type_id', $this->id)
+                ->where('clearance_type_id', $clearanceTypeId)
+                ->first();
+                
+            return $requirement ? $requirement->is_required : false;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     public function getSortOrderForClearanceType($clearanceTypeId): int
     {
-        $requirement = DocumentRequirement::where('document_type_id', $this->id)
-            ->where('clearance_type_id', $clearanceTypeId)
-            ->first();
-            
-        return $requirement ? $requirement->sort_order : 0;
+        try {
+            $requirement = DocumentRequirement::where('document_type_id', $this->id)
+                ->where('clearance_type_id', $clearanceTypeId)
+                ->first();
+                
+            return $requirement ? $requirement->sort_order : 0;
+        } catch (\Exception $e) {
+            return 0;
+        }
     }
 
     public function getClearanceTypeRequirement($clearanceTypeId)
@@ -139,5 +201,43 @@ class DocumentType extends Model
     public function getCategorySlugAttribute()
     {
         return $this->category ? $this->category->slug : null;
+    }
+
+    /**
+     * Boot the model
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Clean up accepted_formats before saving
+        static::saving(function ($model) {
+            if (isset($model->attributes['accepted_formats'])) {
+                $formats = $model->attributes['accepted_formats'];
+                
+                // If it's a string but not JSON, convert to proper JSON array
+                if (is_string($formats) && !self::isJson($formats)) {
+                    if (str_contains($formats, ',')) {
+                        $parts = array_map('trim', explode(',', $formats));
+                        $model->attributes['accepted_formats'] = json_encode($parts);
+                    } else {
+                        $model->attributes['accepted_formats'] = json_encode([$formats]);
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Check if string is valid JSON
+     */
+    private static function isJson($string)
+    {
+        if (!is_string($string)) {
+            return false;
+        }
+        
+        json_decode($string);
+        return json_last_error() === JSON_ERROR_NONE;
     }
 }

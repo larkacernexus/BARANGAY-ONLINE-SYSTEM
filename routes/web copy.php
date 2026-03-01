@@ -13,7 +13,12 @@ use App\Http\Controllers\Admin\CommitteeController;
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\HouseholdController;
 use App\Http\Controllers\Admin\FeeController;
-use App\Http\Controllers\Admin\FeeTypeController;
+use App\Http\Controllers\Admin\Fees\FeeCreateController;
+use App\Http\Controllers\Admin\Fees\FeeStoreController;
+use App\Http\Controllers\Admin\Fees\FeeShowController;
+use App\Http\Controllers\Admin\Fees\FeeEditController;
+use App\Http\Controllers\Admin\Fees\FeePaymentController;
+use App\Http\Controllers\Admin\Fees\FeeTypeController;
 use App\Http\Controllers\Admin\ReportTypeController;
 use App\Http\Controllers\Admin\DocumentTypeController;
 use App\Http\Controllers\Admin\RoleController;
@@ -36,10 +41,8 @@ use App\Http\Controllers\Resident\ResidentIncidentController;
 use App\Http\Controllers\Resident\ResidentPaymentController;
 use App\Http\Controllers\Resident\ResidentFeeController;
 use App\Http\Controllers\Resident\ResidentClearanceController;
-use App\Http\Controllers\Resident\ComplaintController;
 use App\Http\Controllers\Resident\CommunityReportController;
 use App\Http\Controllers\Resident\RecordController;
-use App\Http\Controllers\Resident\EventController;
 use App\Http\Controllers\Resident\ResidentFormController;
 use App\Http\Controllers\Resident\ResidentAnnouncementController;
 use App\Http\Controllers\Auth\LoginController;
@@ -55,6 +58,19 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
+
+Route::get('/test-access', function () {
+    return response()->json([
+        'is_authenticated' => auth()->check(),
+        'user_id' => auth()->id(),
+        'user_email' => auth()->user()?->email,
+        'is_admin' => auth()->user()?->is_admin,
+        'email_verified' => !is_null(auth()->user()?->email_verified_at),
+        'permissions' => auth()->user()?->getAllPermissions()->pluck('name') ?? [],
+        'has_manage_fees' => auth()->user()?->hasPermissionTo('manage-fees'),
+        'middleware_passed' => 'Direct access without middleware'
+    ]);
+});
 // Guest routes (not logged in)
 Route::middleware('guest')->group(function () {
     Route::get('login', [LoginController::class, 'create'])->name('login');
@@ -165,8 +181,8 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     });
 
     // ====================
-// INCIDENT MANAGEMENT (NEW FEATURE)
-// ====================
+    // INCIDENT MANAGEMENT (NEW FEATURE)
+    // ====================
 
     // View incidents (for kagawads, secretary, etc.)
     Route::middleware('permission:view-incidents')->group(function () {
@@ -351,21 +367,22 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     Route::middleware('permission:view-payments')->group(function () {
         Route::prefix('payments')->group(function () {
             Route::get('/', [PaymentController::class, 'index'])->name('payments.index');
-            Route::get('/{payment}', [PaymentController::class, 'show'])->name('payments.show');
+            Route::get('/{payment}', [PaymentController::class, 'show'])->name('admin.payments.show');
         });
     });
 
-    // Full payment management (for treasurer, admin, captain)
-    Route::middleware('permission:manage-payments')->group(function () {
-        Route::prefix('payments')->group(function () {
-            Route::get('/create', [PaymentController::class, 'create'])->name('payments.create');
-            Route::post('/', [PaymentController::class, 'store'])->name('payments.store');
-            Route::get('/{payment}/edit', [PaymentController::class, 'edit'])->name('payments.edit');
-            Route::put('/{payment}', [PaymentController::class, 'update'])->name('payments.update');
-            Route::delete('/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
-            Route::get('/payments/{payment}/receipt', [PaymentController::class, 'printReceipt'])->name('payments.receipt');
-        });
+Route::middleware('permission:manage-payments')->group(function () {
+    Route::prefix('payments')->group(function () {
+    Route::get('/payments/create', [PaymentController::class, 'create'])->name('payments.create');
+        Route::post('/', [PaymentController::class, 'store'])->name('payments.store');
+        Route::get('/{payment}/edit', [PaymentController::class, 'edit'])->name('payments.edit');
+        Route::put('/{payment}', [PaymentController::class, 'update'])->name('payments.update');
+        Route::delete('/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+        // FIX THIS LINE - remove the extra /payments
+        Route::get('/{payment}/receipt', [PaymentController::class, 'printReceipt'])->name('payments.receipt');
     });
+});
+
 
     // ====================
     // FEES MANAGEMENT
@@ -374,26 +391,45 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     Route::middleware('permission:view-fees')->group(function () {
         Route::prefix('fees')->group(function () {
             Route::get('/', [FeeController::class, 'index'])->name('fees.index');
-            Route::get('/{fee}', [FeeController::class, 'show'])->name('fees.show');
+            Route::get('/{fee}', [FeeShowController::class, 'show'])->name('admin.fees.show');
         });
     });
 
     // Full fee management (for treasurer, admin, captain)
     Route::middleware('permission:manage-fees')->group(function () {
         Route::prefix('fees')->group(function () {
-            Route::get('/fees/create', [FeeController::class, 'create'])->name('fees.create');
-            Route::post('/', [FeeController::class, 'store'])->name('fees.store');
-            Route::get('/{fee}/edit', [FeeController::class, 'edit'])->name('fees.edit');
-            Route::put('/{fee}', [FeeController::class, 'update'])->name('fees.update');
-            Route::delete('/{fee}', [FeeController::class, 'destroy'])->name('fees.destroy');
-            Route::get('/payments/create/with-fee/{fee}', [FeeController::class, 'createWithFee'])->name('payments.create-with-fee');
-            Route::post('/{fee}/record-payment', [FeeController::class, 'recordPayment'])->name('record-payment');
-            Route::post('/{fee}/cancel', [FeeController::class, 'cancel'])->name('cancel');
-            Route::post('/{fee}/waive', [FeeController::class, 'waive'])->name('waive');
-            Route::get('/fees/outstanding', [FeeController::class, 'outstanding'])->name('fees.outstanding');
-            Route::get('/{fee}/print/{type?}', [FeeController::class, 'print'])->name('fees.print');
+            // Create
+            Route::get('/fees/create', [FeeCreateController::class, 'create'])->name('fees.create');
+            Route::post('/', [FeeStoreController::class, 'store'])->name('fees.store');
+            
+            // Edit and update
+            Route::get('/{fee}/edit', [FeeEditController::class, 'edit'])->name('fees.edit');
+            Route::put('/{fee}', [FeeEditController::class, 'update'])->name('fees.update');
+            Route::delete('/{fee}', [FeeEditController::class, 'destroy'])->name('fees.destroy');
+            
+            // Show and print
+            Route::get('/{fee}', [FeeShowController::class, 'show'])->name('admin.fees.show');
+            Route::get('/{fee}/print/{type?}', [FeeShowController::class, 'print'])->name('fees.print');
+            
+            // Payment actions
+            Route::post('/{fee}/record-payment', [FeePaymentController::class, 'recordPayment'])->name('record-payment');
+            Route::post('/{fee}/waive', [FeePaymentController::class, 'waive'])->name('waive');
+            
+            // Cancel
+            Route::post('/{fee}/cancel', [FeeEditController::class, 'cancel'])->name('cancel');
+            
+            // Other fee routes from main controller
+            Route::get('/outstanding', [FeeController::class, 'outstanding'])->name('fees.outstanding');
             Route::get('/export', [FeeController::class, 'export'])->name('export');
-            Route::post('/bulk-action', [FeeController::class, 'bulkAction'])->name('bulk-action');
+            Route::post('/bulk-action', [FeePaymentController::class, 'bulkAction'])->name('bulk-action');
+        });
+        
+        // Statistics and charts (from main controller)
+        Route::prefix('fees')->group(function () {
+            Route::get('/quick-stats', [FeeController::class, 'quickStats'])->name('fees.quickStats');
+            Route::get('/status-chart', [FeeController::class, 'statusChartData'])->name('fees.statusChart');
+            Route::get('/monthly-collection-chart', [FeeController::class, 'monthlyCollectionChart'])->name('fees.monthlyCollectionChart');
+            Route::get('/dashboard', [FeeController::class, 'dashboard'])->name('fees.dashboard');
         });
     });
 
@@ -445,9 +481,9 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
 
 
     // ====================
-// REPORT TYPES MANAGEMENT
-// ====================
-// View report types (for kagawads, secretary, etc.)
+    // REPORT TYPES MANAGEMENT
+    // ====================
+    // View report types (for kagawads, secretary, etc.)
     Route::middleware('permission:view-report-types')->group(function () {
         Route::prefix('report-types')->group(function () {
             Route::get('/', [ReportTypeController::class, 'index'])->name('report-types.index');
@@ -458,7 +494,7 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     // Full report type management (for admin, captain)
     Route::middleware('permission:manage-report-types')->group(function () {
         Route::prefix('report-types')->group(function () {
-            Route::get('/create', [ReportTypeController::class, 'create'])->name('report-types.create');
+            Route::get('/report-types/create', [ReportTypeController::class, 'create'])->name('report-types.create');
             Route::post('/', [ReportTypeController::class, 'store'])->name('report-types.store');
             Route::get('/{reportType}/edit', [ReportTypeController::class, 'edit'])->name('report-types.edit');
             Route::put('/{reportType}', [ReportTypeController::class, 'update'])->name('report-types.update');
@@ -471,9 +507,9 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
 
 
     // ====================
-// DOCUMENT TYPES MANAGEMENT
-// ====================
-// View document types (for kagawads, secretary, etc.)
+    // DOCUMENT TYPES MANAGEMENT
+    // ====================
+    // View document types (for kagawads, secretary, etc.)
     Route::middleware('permission:view-document-types')->group(function () {
         Route::prefix('document-types')->group(function () {
             Route::get('/', [DocumentTypeController::class, 'index'])->name('document-types.index');
@@ -557,18 +593,18 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
         });
     });
 
-    // Full fee type management (for treasurer, admin, captain)
-    Route::middleware('permission:manage-fee-types')->group(function () {
-        Route::prefix('fee-types')->group(function () {
-            Route::get('/create', [FeeTypeController::class, 'create'])->name('fee-types.create');
-            Route::post('/', [FeeTypeController::class, 'store'])->name('fee-types.store');
-            Route::get('/{feeType}/edit', [FeeTypeController::class, 'edit'])->name('fee-types.edit');
-            Route::put('/{feeType}', [FeeTypeController::class, 'update'])->name('fee-types.update');
-            Route::delete('/{feeType}', [FeeTypeController::class, 'destroy'])->name('fee-types.destroy');
-            Route::post('/{feeType}/toggle-status', [FeeTypeController::class, 'toggleStatus'])->name('fee-types.toggle-status');
-            Route::post('/bulk-action', [FeeTypeController::class, 'bulkAction'])->name('fee-types.bulk-action');
+        // Fee Types routes with permission check
+        Route::middleware('permission:manage-fee-types')->group(function () {
+            Route::prefix('fee-types')->name('fee-types.')->group(function () {
+                Route::get('/fee-types/create', [FeeTypeController::class, 'create'])->name('create');
+                Route::post('/', [FeeTypeController::class, 'store'])->name('store');
+                Route::get('/{feeType}/edit', [FeeTypeController::class, 'edit'])->name('edit');
+                Route::put('/{feeType}', [FeeTypeController::class, 'update'])->name('update');
+                Route::delete('/{feeType}', [FeeTypeController::class, 'destroy'])->name('destroy');
+                Route::post('/{feeType}/toggle-status', [FeeTypeController::class, 'toggleStatus'])->name('toggle-status');
+                Route::post('/bulk-action', [FeeTypeController::class, 'bulkAction'])->name('bulk-action');
+            });
         });
-    });
 
     // ====================
     // CLEARANCES MANAGEMENT
@@ -587,7 +623,7 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     // Full clearance management (for secretary, admin, captain)
     Route::middleware('permission:manage-clearances')->group(function () {
         Route::prefix('clearances')->name('clearances.')->group(function () {
-            Route::get('/create', [ClearanceController::class, 'create'])->name('create');
+            Route::get('/clearances/create', [ClearanceController::class, 'create'])->name('create');
             Route::post('/', [ClearanceController::class, 'store'])->name('store');
             Route::get('/{clearance}/edit', [ClearanceController::class, 'edit'])->name('edit');
             Route::put('/{clearance}', [ClearanceController::class, 'update'])->name('update');
@@ -628,7 +664,7 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     // Full clearance type management (for secretary, admin, captain)
     Route::middleware('permission:manage-clearance-types')->group(function () {
         Route::prefix('clearance-types')->name('clearance-types.')->group(function () {
-            Route::get('/create', [ClearanceTypeController::class, 'create'])->name('create');
+            Route::get('/clearance-types/create', [ClearanceTypeController::class, 'create'])->name('create');
             Route::post('/', [ClearanceTypeController::class, 'store'])->name('store');
 
             Route::post('/bulk-action', [ClearanceTypeController::class, 'bulkAction'])->name('bulk-action');
@@ -683,7 +719,7 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     Route::middleware('permission:view-reports')->group(function () {
         Route::get('/reports/collections', [ReportsController::class, 'collections'])->name('reports.collections');
         Route::get('/reports/revenue', [ReportsController::class, 'revenue'])->name('reports.revenue');
-        Route::get('/audit-logs', [ReportsController::class, 'auditLogs'])->name('reports.auditLogs');
+        Route::get('/reports/audit-logs', [ReportsController::class, 'auditLogs'])->name('reports.auditLogs');
         Route::get('/reports/activity-logs', [ReportsController::class, 'activityLogs'])->name('reports.activity-logs');
         Route::get('/reports/activity-logs/export', [ReportsController::class, 'activityLogsExport'])->name('reports.activity-logs.export');
         Route::get('/reports/activity-logs/{id}', [ReportsController::class, 'activityLogShow'])->name('reports.activity-logs.show');
@@ -742,23 +778,6 @@ Route::middleware(['auth', 'verified', 'resident'])->group(function () {
         Route::put('/{clearance}/cancel', [ResidentClearanceController::class, 'cancel'])->name('cancel');
     });
 
-    // ====================
-    // RESIDENT COMPLAINTS
-    // ====================
-    Route::prefix('my-complaints')->name('my.complaints.')->group(function () {
-        Route::get('/', [ComplaintController::class, 'index'])->name('index');
-        Route::get('/create', [ComplaintController::class, 'create'])->name('create');
-        Route::post('/', [ComplaintController::class, 'store'])->name('store');
-        Route::get('/{complaint}', [ComplaintController::class, 'show'])->name('show');
-        Route::put('/{complaint}', [ComplaintController::class, 'update'])->name('update');
-        Route::delete('/{complaint}', [ComplaintController::class, 'destroy'])->name('destroy');
-
-        // Evidence management
-        Route::post('/{complaint}/evidence', [ComplaintController::class, 'addEvidence'])->name('evidence.add');
-        Route::delete('/{complaint}/evidence/{evidence}', [ComplaintController::class, 'deleteEvidence'])->name('evidence.delete');
-        Route::get('/{complaint}/evidence/{evidence}/download', [ComplaintController::class, 'downloadEvidence'])->name('evidence.download');
-    });
-
 
     Route::prefix('community-reports')->name('resident.community-reports.')->group(function () {
         Route::get('/', [CommunityReportController::class, 'index'])->name('index');
@@ -785,8 +804,8 @@ Route::middleware(['auth', 'verified', 'resident'])->group(function () {
 
 
     // ====================
-// RESIDENT INCIDENT REPORTS (NEW FEATURE)
-// ====================
+    // RESIDENT INCIDENT REPORTS (NEW FEATURE)
+    // ====================
     Route::prefix('my-incidents')->name('my.incidents.')->group(function () {
         // List incidents filed by resident
         Route::get('/', [ResidentIncidentController::class, 'index'])

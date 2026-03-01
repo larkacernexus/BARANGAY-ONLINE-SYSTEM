@@ -297,8 +297,8 @@ export default function BackupIndex() {
       <AppLayout
         title="Backup Management"
         breadcrumbs={[
-          { title: 'Dashboard', href: route('dashboard') },
-          { title: 'Backups', href: route('backup.index') }
+          { title: 'Dashboard', href: route('admin.dashboard') },
+          { title: 'Backups', href: route('admin.backup.index') }
         ]}
       >
         <div className="flex items-center justify-center min-h-[400px]">
@@ -315,8 +315,8 @@ export default function BackupIndex() {
     <AppLayout
       title="Backup Management"
       breadcrumbs={[
-        { title: 'Dashboard', href: route('dashboard') },
-        { title: 'Backups', href: route('backup.index') }
+        { title: 'Dashboard', href: route('admin.dashboard') },
+        { title: 'Backups', href: route('admin.backup.index') }
       ]}
     >
       <TooltipProvider>

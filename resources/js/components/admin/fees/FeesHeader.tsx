@@ -46,7 +46,7 @@ export default function FeesHeader({ isBulkMode, setIsBulkMode, isMobile = false
                         <p className="text-xs text-gray-500">Select multiple fees for batch operations</p>
                     </TooltipContent>
                 </Tooltip>
-                <Link href={route('fees.create')}>
+                <Link href={route('admin.fees.create')}>
                     <Button className="h-9">
                         <Plus className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">New Fee</span>

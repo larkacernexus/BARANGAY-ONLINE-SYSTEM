@@ -21,6 +21,12 @@ class PaymentItem extends Model
         'surcharge',
         'penalty',
         'total_amount',
+
+        // ✅ Discount fields
+        'discount_amount',
+        'discount_type',
+        'discount_breakdown',
+
         'category',
         'period_covered',
         'months_late',
@@ -32,6 +38,11 @@ class PaymentItem extends Model
         'surcharge' => 'decimal:2',
         'penalty' => 'decimal:2',
         'total_amount' => 'decimal:2',
+
+        // ✅ Discount casting
+        'discount_amount' => 'decimal:2',
+        'discount_breakdown' => 'array',
+
         'months_late' => 'integer',
         'fee_metadata' => 'array',
         'clearance_request_id' => 'integer',
@@ -80,6 +91,23 @@ class PaymentItem extends Model
         return '₱' . number_format($this->total_amount, 2);
     }
 
+    // ✅ NEW: Formatted discount
+    public function getFormattedDiscountAttribute()
+    {
+        return '₱' . number_format($this->discount_amount, 2);
+    }
+
+    // ✅ NEW: Net total after discount
+    public function getNetTotalAttribute()
+    {
+        return $this->total_amount - $this->discount_amount;
+    }
+
+    public function getFormattedNetTotalAttribute()
+    {
+        return '₱' . number_format($this->net_total, 2);
+    }
+
     /* =====================
      |  Helpers
      ===================== */
@@ -111,5 +139,25 @@ class PaymentItem extends Model
         }
 
         return $details;
+    }
+
+    // ✅ NEW: Check if item has discount
+    public function hasDiscount()
+    {
+        return $this->discount_amount > 0;
+    }
+
+    // ✅ NEW: Get discount details
+    public function getDiscountDetails()
+    {
+        if (! $this->hasDiscount()) {
+            return null;
+        }
+
+        return [
+            'type' => $this->discount_type,
+            'amount' => $this->discount_amount,
+            'breakdown' => $this->discount_breakdown,
+        ];
     }
 }

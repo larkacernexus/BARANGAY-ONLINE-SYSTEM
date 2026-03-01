@@ -65,6 +65,7 @@ export interface BackendFee {
     payer_type: 'resident' | 'household' | 'business';
     resident_id: string | number | null;
     household_id: string | number | null;
+    business_id: string | number | null; // ADDED
     business_name: string | null;
     payer_name: string;
     contact_number: string | null;
@@ -88,6 +89,17 @@ export interface BackendFee {
     purpose: string | null;
     fee_type_name?: string;
     fee_type_category?: string;
+    // Business specific fields
+    business_type?: string;
+    business_type_label?: string;
+    dti_sec_number?: string;
+    tin_number?: string;
+    mayors_permit_number?: string;
+    employee_count?: number;
+    capital_amount?: number;
+    monthly_gross?: number;
+    formatted_capital?: string;
+    formatted_monthly_gross?: string;
     [key: string]: any;
 }
 
@@ -115,6 +127,13 @@ export interface OutstandingFee {
     period_start?: string;
     period_end?: string;
     category?: string;
+    // Business specific fields
+    business_name?: string;
+    business_type?: string;
+    contact_number?: string;
+    address?: string;
+    purok?: string;
+    // Discount related fields
     applicableDiscounts?: Array<{
         type: string;
         label: string;
@@ -195,6 +214,9 @@ export interface Resident {
     is_indigent?: boolean;
     is_veteran?: boolean;
     is_government_employee?: boolean;
+    // Business ownership
+    businesses?: Business[];
+    is_business_owner?: boolean;
 }
 
 export interface Household {
@@ -208,6 +230,43 @@ export interface Household {
     has_outstanding_fees?: boolean;
     outstanding_fee_count?: number;
     total_outstanding_balance?: string;
+    // Household members
+    members?: any[];
+    member_count?: number;
+    head_of_household?: any;
+}
+
+// ADDED: Business interface
+export interface Business {
+    id: string | number;
+    business_name: string;
+    owner_name: string;
+    owner_id?: string | number;
+    contact_number?: string;
+    email?: string;
+    address: string;
+    purok?: string;
+    purok_id?: string | number;
+    business_type?: string;
+    business_type_label?: string;
+    status?: 'active' | 'closed' | 'pending';
+    permit_expiry_date?: string;
+    is_permit_valid?: boolean;
+    dti_sec_number?: string;
+    tin_number?: string;
+    mayors_permit_number?: string;
+    employee_count?: number;
+    capital_amount?: number;
+    monthly_gross?: number;
+    formatted_capital?: string;
+    formatted_monthly_gross?: string;
+    // Outstanding fees
+    outstanding_fees?: OutstandingFee[];
+    has_outstanding_fees?: boolean;
+    outstanding_fee_count?: number;
+    total_outstanding_balance?: string;
+    // Owner details
+    owner?: Resident;
 }
 
 export interface PaymentItem {
@@ -233,6 +292,11 @@ export interface PaymentItem {
         original_fee_id?: string | number;
         payer_type?: string;
         payer_id?: string | number;
+        // Business specific metadata
+        is_business_fee?: boolean;
+        business_id?: string | number;
+        business_name?: string;
+        // Original fee data for reference
         original_fee_data?: {
             base_amount: number;
             surcharge_amount: number;
@@ -290,6 +354,7 @@ export interface PaymentFormData {
     // Verification fields for discounts that require it
     verification_id_number?: string;
     verification_remarks?: string;
+    amount_paid?: number;
 }
 
 export interface PreFilledFeeData {
@@ -310,6 +375,9 @@ export interface PreFilledFeeData {
     clearance_type_id?: string | number;
     clearance_type?: string;
     clearance_code?: string;
+    // Business specific
+    business_name?: string;
+    business_id?: string | number;
 }
 
 export interface SelectedFeeDetails {
@@ -335,6 +403,9 @@ export interface SelectedFeeDetails {
     due_date: string;
     purpose: string;
     remarks: string;
+    // Business specific
+    business_name?: string;
+    business_type?: string;
     // New discount fields
     applicable_discounts?: Array<{
         type: string;
@@ -363,11 +434,15 @@ export interface SelectedFeeDetails {
     fee_type_solo_parent_discount_percentage?: number;
     fee_type_has_indigent_discount?: boolean;
     fee_type_indigent_discount_percentage?: number;
+    // Household info
+    household_info?: any;
+    is_household_head?: boolean;
 }
 
 export interface PageProps {
     residents: Resident[];
     households: Household[];
+    businesses?: Business[]; // ADDED
     fees: BackendFee[];
     feeTypes?: FeeType[];
     discountRules?: DiscountRule[]; // Added: Full discount rule data
@@ -382,6 +457,13 @@ export interface PageProps {
     // New properties for discount eligibility
     selected_fee_details?: SelectedFeeDetails | null;
     selected_fee_type_id?: string | number;
+    // Summary counts
+    payer_counts?: {
+        residents: number;
+        households: number;
+        businesses: number;
+        total: number;
+    };
 }
 
 // Utility type for discount application
@@ -401,4 +483,27 @@ export interface DiscountCalculationResult {
     surcharge: number;
     penalty: number;
     total: number;
+}
+
+// ADDED: Business payment summary interface
+export interface BusinessPaymentSummary {
+    business_id: string | number;
+    business_name: string;
+    owner_name: string;
+    contact_number?: string;
+    address?: string;
+    purok?: string;
+    permit_status?: string;
+    permit_expiry_date?: string;
+    total_fees: number;
+    fee_count: number;
+}
+
+// ADDED: Payment method details interface
+export interface PaymentMethodDetails {
+    id: string;
+    name: string;
+    icon: string;
+    color: string;
+    description?: string;
 }

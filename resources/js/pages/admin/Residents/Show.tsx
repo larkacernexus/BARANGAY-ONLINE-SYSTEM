@@ -281,9 +281,9 @@ export default function ShowResident({
 
     const handleDelete = () => {
         if (confirm(`Are you sure you want to delete resident ${resident.first_name} ${resident.last_name}? This action cannot be undone.`)) {
-            router.delete(`/residents/${resident.id}`, {
+            router.delete(`/admin/residents/${resident.id}`, {
                 onSuccess: () => {
-                    router.visit('/residents');
+                    router.visit('/admin/residents');
                 }
             });
         }
@@ -354,16 +354,16 @@ export default function ShowResident({
         <AppLayout
             title={`Resident: ${resident.first_name} ${resident.last_name}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Residents', href: '/residents' },
-                { title: `${resident.first_name} ${resident.last_name}`, href: `/residents/${resident.id}` }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Residents', href: '/admin/residents' },
+                { title: `${resident.first_name} ${resident.last_name}`, href: `/admin/residents/${resident.id}` }
             ]}
         >
             <div className="space-y-6">
                 {/* Header with Actions */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/residents">
+                        <Link href="/admin/residents">
                             <Button variant="ghost" size="sm">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to List
@@ -400,7 +400,7 @@ export default function ShowResident({
                             <Copy className="h-4 w-4 mr-2" />
                             Copy ID
                         </Button>
-                        <Link href={`/residents/${resident.id}/edit`}>
+                        <Link href={`/admin/residents/${resident.id}/edit`}>
                             <Button size="sm">
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Resident
@@ -635,7 +635,7 @@ export default function ShowResident({
                                             return (
                                                 <Link 
                                                     key={member.id} 
-                                                    href={`/residents/${memberResident.id}`}
+                                                    href={`/admin/residents/${memberResident.id}`}
                                                     className="block hover:no-underline"
                                                 >
                                                     <div className={`flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors cursor-pointer group ${
@@ -953,7 +953,7 @@ export default function ShowResident({
                                 <CardTitle>Quick Actions</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
-                                <Link href={`/residents/${resident.id}/edit`} className="w-full">
+                                <Link href={`/admin/residents/${resident.id}/edit`} className="w-full">
                                     <Button variant="outline" className="w-full justify-start">
                                         <Edit className="h-4 w-4 mr-2" />
                                         Edit Resident
@@ -978,7 +978,7 @@ export default function ShowResident({
                                     </Button>
                                 )}
                                 {!hasHousehold && (
-                                    <Link href={`/residents/${resident.id}/edit`} className="w-full">
+                                    <Link href={`/admin/residents/${resident.id}/edit`} className="w-full">
                                         <Button variant="outline" className="w-full justify-start">
                                             <UserPlus className="h-4 w-4 mr-2" />
                                             Add to Household
@@ -986,7 +986,7 @@ export default function ShowResident({
                                     </Link>
                                 )}
                                 {hasHousehold && !isHeadOfHousehold && actualHousehold && (
-                                    <Link href={`/households/${actualHousehold.id}`} className="w-full">
+                                    <Link href={`/admin/households/${actualHousehold.id}`} className="w-full">
                                         <Button variant="outline" className="w-full justify-start">
                                             <Users className="h-4 w-4 mr-2" />
                                             View Household
@@ -994,7 +994,7 @@ export default function ShowResident({
                                     </Link>
                                 )}
                                 {hasRelatedMembers && actualHousehold && (
-                                    <Link href={`/households/${actualHousehold.id}`} className="w-full">
+                                    <Link href={`/admin/households/${actualHousehold.id}`} className="w-full">
                                         <Button variant="outline" className="w-full justify-start">
                                             <UserCog className="h-4 w-4 mr-2" />
                                             Manage Household

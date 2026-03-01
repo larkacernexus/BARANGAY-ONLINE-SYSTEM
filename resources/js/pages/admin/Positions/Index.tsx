@@ -123,7 +123,7 @@ export default function PositionsIndex({
                 }
             });
             
-            router.get('/positions', params, {
+            router.get('/admin/positions', params, {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
@@ -286,7 +286,7 @@ export default function PositionsIndex({
             switch (operation) {
                 case 'delete':
                     if (confirm(`Are you sure you want to delete ${selectedPositions.length} selected position(s)?`)) {
-                        await router.post('/positions/bulk-action', {
+                        await router.post('/admin/positions/bulk-action', {
                             action: 'delete',
                             position_ids: selectedPositions,
                         }, {
@@ -304,7 +304,7 @@ export default function PositionsIndex({
                     break;
 
                 case 'activate':
-                    await router.post('/positions/bulk-action', {
+                    await router.post('/admin/positions/bulk-action', {
                         action: 'activate',
                         position_ids: selectedPositions,
                     }, {
@@ -320,7 +320,7 @@ export default function PositionsIndex({
                     break;
 
                 case 'deactivate':
-                    await router.post('/positions/bulk-action', {
+                    await router.post('/admin/positions/bulk-action', {
                         action: 'deactivate',
                         position_ids: selectedPositions,
                     }, {
@@ -337,7 +337,7 @@ export default function PositionsIndex({
 
                 case 'toggle_account':
                     const requiresAccount = bulkEditValue === 'enable';
-                    await router.post('/positions/bulk-action', {
+                    await router.post('/admin/positions/bulk-action', {
                         action: 'toggle_account',
                         position_ids: selectedPositions,
                         requires_account: requiresAccount
@@ -400,14 +400,14 @@ export default function PositionsIndex({
                 case 'print':
                     // Open print preview for each selected position
                     selectedPositions.forEach(id => {
-                        window.open(`/positions/${id}/print`, '_blank');
+                        window.open(`/admin/positions/${id}/print`, '_blank');
                     });
                     toast.success(`${selectedPositions.length} position(s) opened for printing`);
                     break;
 
                 case 'generate_report':
                     const idsParam = selectedPositions.join(',');
-                    window.open(`/positions/report?ids=${idsParam}`, '_blank');
+                    window.open(`/admin/positions/report?ids=${idsParam}`, '_blank');
                     toast.success(`Generating report for ${selectedPositions.length} position(s)`);
                     break;
 
@@ -455,7 +455,7 @@ export default function PositionsIndex({
     // Individual position operations
     const handleDelete = (position: Position) => {
         if (confirm(`Are you sure you want to delete position "${position.name || 'Untitled'}"?`)) {
-            router.delete(`/positions/${position.id}`, {
+            router.delete(`/admin/positions/${position.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedPositions(selectedPositions.filter(id => id !== position.id));
@@ -509,8 +509,8 @@ export default function PositionsIndex({
         <AppLayout
             title="Position Management"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Positions', href: '/positions' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Positions', href: '/admin/positions' }
             ]}
         >
             <TooltipProvider>

@@ -68,7 +68,7 @@ export default function ClearancesFilters({
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                            const exportUrl = new URL('/clearances/export', window.location.origin);
+                            const exportUrl = new URL('/admin/clearances/export', window.location.origin);
                             if (search) exportUrl.searchParams.append('search', search);
                             if (filtersState.status) exportUrl.searchParams.append('status', filtersState.status);
                             if (filtersState.type) exportUrl.searchParams.append('type', filtersState.type);

@@ -303,14 +303,14 @@ export default function ReportTypesTableView({
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-48">
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={route('report-types.show', reportType.id)} className="flex items-center cursor-pointer">
+                                                        <Link href={route('admin.report-types.show', reportType.id)} className="flex items-center cursor-pointer">
                                                             <Eye className="mr-2 h-4 w-4" />
                                                             <span>View Details</span>
                                                         </Link>
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={route('report-types.edit', reportType.id)} className="flex items-center cursor-pointer">
+                                                        <Link href={route('admin.report-types.edit', reportType.id)} className="flex items-center cursor-pointer">
                                                             <Edit className="mr-2 h-4 w-4" />
                                                             <span>Edit Report Type</span>
                                                         </Link>
@@ -337,7 +337,8 @@ export default function ReportTypesTableView({
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={route('my.complaints.index', { type: reportType.id })} className="flex items-center cursor-pointer">
+                                                    <Link href={route('admin.community-reports.index', { report_type: reportType.id })}
+                                                        className="flex items-center cursor-pointer">
                                                             <FileText className="mr-2 h-4 w-4" />
                                                             <span>View Reports</span>
                                                         </Link>

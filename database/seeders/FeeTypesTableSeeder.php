@@ -16,14 +16,14 @@ class FeeTypesTableSeeder extends Seeder
     {
         $now = Carbon::now();
         
-        // First, get or create document categories
-        $categories = $this->getDocumentCategories();
+        // Get existing document categories
+        $categories = $this->getExistingDocumentCategories();
         
         $feeTypes = [
-            // =========== TAXATION & FEES ===========
+            // =========== TAXATION & FEES (ID: 9) ===========
             [
                 'code' => 'TAX-RP-001',
-                'document_category_id' => $categories['Taxation & Fees'],
+                'document_category_id' => $categories['Taxation & Fees'], // ID: 9
                 'name' => 'Real Property Tax',
                 'short_name' => 'RPT',
                 'base_amount' => 500.00,
@@ -39,7 +39,7 @@ class FeeTypesTableSeeder extends Seeder
                 'penalty_fixed' => 25.00,
                 'frequency' => 'annual',
                 'validity_days' => 365,
-                'applicable_to' => 'property_owners', // Changed from property_owners to property_owners
+                'applicable_to' => 'property_owners',
                 'applicable_puroks' => json_encode([]),
                 'requirements' => json_encode(["Tax Declaration", "Latest Receipt"]),
                 'effective_date' => '2026-01-01',
@@ -56,7 +56,7 @@ class FeeTypesTableSeeder extends Seeder
             ],
             [
                 'code' => 'TAX-BUS-002',
-                'document_category_id' => $categories['Taxation & Fees'],
+                'document_category_id' => $categories['Taxation & Fees'], // ID: 9
                 'name' => 'Business Permit Fee',
                 'short_name' => 'BP Fee',
                 'base_amount' => 1000.00,
@@ -89,7 +89,7 @@ class FeeTypesTableSeeder extends Seeder
             ],
             [
                 'code' => 'TAX-MK-003',
-                'document_category_id' => $categories['Taxation & Fees'],
+                'document_category_id' => $categories['Taxation & Fees'], // ID: 9
                 'name' => 'Market Stall Fee',
                 'short_name' => 'Market Fee',
                 'base_amount' => 300.00,
@@ -105,7 +105,7 @@ class FeeTypesTableSeeder extends Seeder
                 'penalty_fixed' => 30.00,
                 'frequency' => 'monthly',
                 'validity_days' => 30,
-                'applicable_to' => 'business_owners', // Changed from market_vendors to business_owners
+                'applicable_to' => 'business_owners',
                 'applicable_puroks' => json_encode([]),
                 'requirements' => json_encode(["Market Stall Contract"]),
                 'effective_date' => '2026-01-01',
@@ -121,10 +121,10 @@ class FeeTypesTableSeeder extends Seeder
                 'updated_at' => $now,
             ],
             
-            // =========== LICENSES & PERMITS ===========
+            // =========== LICENSES & PERMITS (ID: 10) ===========
             [
                 'code' => 'LP-CN-004',
-                'document_category_id' => $categories['Licenses & Permits'],
+                'document_category_id' => $categories['Licenses & Permits'], // ID: 10
                 'name' => 'Construction Permit Fee',
                 'short_name' => 'Building Permit',
                 'base_amount' => 1500.00,
@@ -157,7 +157,7 @@ class FeeTypesTableSeeder extends Seeder
             ],
             [
                 'code' => 'LP-SG-005',
-                'document_category_id' => $categories['Licenses & Permits'],
+                'document_category_id' => $categories['Licenses & Permits'], // ID: 10
                 'name' => 'Sidewalk/Special Event Permit',
                 'short_name' => 'Event Permit',
                 'base_amount' => 500.00,
@@ -189,10 +189,10 @@ class FeeTypesTableSeeder extends Seeder
                 'updated_at' => $now,
             ],
             
-            // =========== BUSINESS ===========
+            // =========== BUSINESS (ID: 6) ===========
             [
                 'code' => 'BUS-CL-006',
-                'document_category_id' => $categories['Business'],
+                'document_category_id' => $categories['Business'], // ID: 6
                 'name' => 'Barangay Clearance for Business',
                 'short_name' => 'Business Clearance',
                 'base_amount' => 200.00,
@@ -225,7 +225,7 @@ class FeeTypesTableSeeder extends Seeder
             ],
             [
                 'code' => 'BUS-RN-007',
-                'document_category_id' => $categories['Business'],
+                'document_category_id' => $categories['Business'], // ID: 6
                 'name' => 'Business Permit Renewal',
                 'short_name' => 'Business Renewal',
                 'base_amount' => 150.00,
@@ -257,10 +257,10 @@ class FeeTypesTableSeeder extends Seeder
                 'updated_at' => $now,
             ],
             
-            // =========== COMMUNITY CERTIFICATES ===========
+            // =========== CERTIFICATES (ID: 7) ===========
             [
                 'code' => 'CC-RS-008',
-                'document_category_id' => $categories['Community Certificates'],
+                'document_category_id' => $categories['Certificates'], // ID: 7
                 'name' => 'Community Tax Certificate (Cedula)',
                 'short_name' => 'Cedula',
                 'base_amount' => 50.00,
@@ -291,44 +291,11 @@ class FeeTypesTableSeeder extends Seeder
                 'created_at' => $now,
                 'updated_at' => $now,
             ],
-            [
-                'code' => 'CC-ID-009',
-                'document_category_id' => $categories['Community Certificates'],
-                'name' => 'Certificate of Indigency',
-                'short_name' => 'Indigency Cert',
-                'base_amount' => 20.00,
-                'amount_type' => 'fixed',
-                'computation_formula' => null,
-                'unit' => 'per_certificate',
-                'is_discountable' => true,
-                'has_surcharge' => false,
-                'surcharge_percentage' => null,
-                'surcharge_fixed' => null,
-                'has_penalty' => false,
-                'penalty_percentage' => null,
-                'penalty_fixed' => null,
-                'frequency' => 'one_time',
-                'validity_days' => 90,
-                'applicable_to' => 'all_residents',
-                'applicable_puroks' => json_encode([]),
-                'requirements' => json_encode(["Proof of Income", "Household Survey"]),
-                'effective_date' => '2026-01-01',
-                'expiry_date' => null,
-                'is_active' => true,
-                'is_mandatory' => false,
-                'auto_generate' => false,
-                'due_day' => null,
-                'sort_order' => 9,
-                'description' => 'Certificate for indigent individuals',
-                'notes' => 'Free for qualified individuals (via discount rules)',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
             
-            // =========== IDENTIFICATION ===========
+            // =========== IDENTIFICATION (ID: 1) ===========
             [
                 'code' => 'ID-BC-010',
-                'document_category_id' => $categories['Identification'],
+                'document_category_id' => $categories['Identification'], // ID: 1
                 'name' => 'Barangay ID Card',
                 'short_name' => 'Barangay ID',
                 'base_amount' => 100.00,
@@ -360,10 +327,10 @@ class FeeTypesTableSeeder extends Seeder
                 'updated_at' => $now,
             ],
             
-            // =========== HEALTH ===========
+            // =========== HEALTH (ID: 4) ===========
             [
                 'code' => 'HL-HC-011',
-                'document_category_id' => $categories['Health'],
+                'document_category_id' => $categories['Health'], // ID: 4
                 'name' => 'Health Certificate',
                 'short_name' => 'Health Cert',
                 'base_amount' => 100.00,
@@ -395,10 +362,10 @@ class FeeTypesTableSeeder extends Seeder
                 'updated_at' => $now,
             ],
             
-            // =========== PROPERTY & REAL ESTATE ===========
+            // =========== PROPERTY & REAL ESTATE (ID: 12) ===========
             [
                 'code' => 'PR-CL-012',
-                'document_category_id' => $categories['Property & Real Estate'],
+                'document_category_id' => $categories['Property & Real Estate'], // ID: 12
                 'name' => 'Property Transfer Clearance',
                 'short_name' => 'Property Transfer',
                 'base_amount' => 300.00,
@@ -430,10 +397,10 @@ class FeeTypesTableSeeder extends Seeder
                 'updated_at' => $now,
             ],
             
-            // =========== TRANSPORTATION & TRAFFIC ===========
+            // =========== TRANSPORTATION & TRAFFIC (ID: 13) ===========
             [
                 'code' => 'TT-TR-013',
-                'document_category_id' => $categories['Transportation & Traffic'],
+                'document_category_id' => $categories['Transportation & Traffic'], // ID: 13
                 'name' => 'Tricycle Franchise Fee',
                 'short_name' => 'Tricycle Fee',
                 'base_amount' => 1200.00,
@@ -449,7 +416,7 @@ class FeeTypesTableSeeder extends Seeder
                 'penalty_fixed' => 200.00,
                 'frequency' => 'annual',
                 'validity_days' => 365,
-                'applicable_to' => 'business_owners', // Changed from tricycle_operators to business_owners
+                'applicable_to' => 'business_owners',
                 'applicable_puroks' => json_encode([]),
                 'requirements' => json_encode(["Driver's License", "OR/CR"]),
                 'effective_date' => '2026-01-01',
@@ -465,10 +432,10 @@ class FeeTypesTableSeeder extends Seeder
                 'updated_at' => $now,
             ],
             
-            // =========== COMMUNITY SERVICES ===========
+            // =========== COMMUNITY SERVICES (ID: 14) ===========
             [
                 'code' => 'CS-BC-014',
-                'document_category_id' => $categories['Community Services'],
+                'document_category_id' => $categories['Community Services'], // ID: 14
                 'name' => 'Barangay Clearance',
                 'short_name' => 'Clearance',
                 'base_amount' => 50.00,
@@ -500,10 +467,10 @@ class FeeTypesTableSeeder extends Seeder
                 'updated_at' => $now,
             ],
             
-            // =========== ENVIRONMENTAL SERVICES ===========
+            // =========== ENVIRONMENTAL SERVICES (ID: 15) ===========
             [
                 'code' => 'ENV-GC-015',
-                'document_category_id' => $categories['Environmental Services'],
+                'document_category_id' => $categories['Environmental Services'], // ID: 15
                 'name' => 'Garbage Collection Fee',
                 'short_name' => 'Garbage Fee',
                 'base_amount' => 50.00,
@@ -535,10 +502,10 @@ class FeeTypesTableSeeder extends Seeder
                 'updated_at' => $now,
             ],
             
-            // =========== UTILITIES ===========
+            // =========== UTILITIES (ID: 16) ===========
             [
                 'code' => 'UTIL-SL-016',
-                'document_category_id' => $categories['Utilities'],
+                'document_category_id' => $categories['Utilities'], // ID: 16
                 'name' => 'Street Lighting Fee',
                 'short_name' => 'Lighting Fee',
                 'base_amount' => 20.00,
@@ -570,10 +537,10 @@ class FeeTypesTableSeeder extends Seeder
                 'updated_at' => $now,
             ],
             
-            // =========== OTHER SERVICES ===========
+            // =========== OTHER SERVICES (ID: 17) ===========
             [
                 'code' => 'SP-URG-017',
-                'document_category_id' => $categories['Other Services'],
+                'document_category_id' => $categories['Other Services'], // ID: 17
                 'name' => 'Urgent Processing Fee',
                 'short_name' => 'Urgent Fee',
                 'base_amount' => 100.00,
@@ -606,7 +573,7 @@ class FeeTypesTableSeeder extends Seeder
             ],
             [
                 'code' => 'SP-CERT-018',
-                'document_category_id' => $categories['Other Services'],
+                'document_category_id' => $categories['Other Services'], // ID: 17
                 'name' => 'Certification Fee (Extra Copy)',
                 'short_name' => 'Extra Copy',
                 'base_amount' => 25.00,
@@ -639,7 +606,7 @@ class FeeTypesTableSeeder extends Seeder
             ],
             [
                 'code' => 'SP-AUTH-019',
-                'document_category_id' => $categories['Other Services'],
+                'document_category_id' => $categories['Other Services'], // ID: 17
                 'name' => 'Document Authentication Fee',
                 'short_name' => 'Auth Fee',
                 'base_amount' => 30.00,
@@ -670,163 +637,118 @@ class FeeTypesTableSeeder extends Seeder
                 'created_at' => $now,
                 'updated_at' => $now,
             ],
+            
+            // Additional Certificates (ID: 7)
+            [
+                'code' => 'CC-IND-020',
+                'document_category_id' => $categories['Certificates'], // ID: 7
+                'name' => 'Certificate of Indigency',
+                'short_name' => 'Indigency Cert',
+                'base_amount' => 20.00,
+                'amount_type' => 'fixed',
+                'computation_formula' => null,
+                'unit' => 'per_certificate',
+                'is_discountable' => true,
+                'has_surcharge' => false,
+                'surcharge_percentage' => null,
+                'surcharge_fixed' => null,
+                'has_penalty' => false,
+                'penalty_percentage' => null,
+                'penalty_fixed' => null,
+                'frequency' => 'one_time',
+                'validity_days' => 90,
+                'applicable_to' => 'all_residents',
+                'applicable_puroks' => json_encode([]),
+                'requirements' => json_encode(["Proof of Income", "Household Survey"]),
+                'effective_date' => '2026-01-01',
+                'expiry_date' => null,
+                'is_active' => true,
+                'is_mandatory' => false,
+                'auto_generate' => false,
+                'due_day' => null,
+                'sort_order' => 20,
+                'description' => 'Certificate for indigent individuals',
+                'notes' => 'Free for qualified individuals (via discount rules)',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
         ];
         
         // Insert fee types
         try {
-            // Clear existing records (optional - be careful!)
+            // Optional: Uncomment if you want to clear existing records
             // DB::table('fee_types')->truncate();
             
             DB::table('fee_types')->insert($feeTypes);
             $this->command->info('Fee types seeded successfully!');
+            
+            // Show summary
+            $this->command->info('Total fee types seeded: ' . count($feeTypes));
+            
+            // Group by category for summary
+            $summary = [];
+            foreach ($feeTypes as $fee) {
+                $categoryName = array_search($fee['document_category_id'], $categories);
+                if ($categoryName) {
+                    if (!isset($summary[$categoryName])) {
+                        $summary[$categoryName] = 0;
+                    }
+                    $summary[$categoryName]++;
+                }
+            }
+            
+            $this->command->info('Summary by category:');
+            foreach ($summary as $category => $count) {
+                $this->command->info("  - {$category}: {$count} fee types");
+            }
+            
         } catch (\Exception $e) {
             $this->command->error('Error seeding fee types: ' . $e->getMessage());
         }
     }
     
     /**
-     * Get document categories or create if they don't exist
+     * Get existing document categories from the database
      */
-    private function getDocumentCategories(): array
+    private function getExistingDocumentCategories(): array
     {
         $categories = [];
         
-        // Define category data matching your model
-        $categoryData = [
-            [
-                'name' => 'Taxation & Fees',
-                'slug' => 'taxation-fees',
-                'icon' => 'fa-solid fa-coins',
-                'color' => 'primary',
-                'description' => 'Taxes and government fees',
-                'is_active' => true,
-                'order' => 1,
-            ],
-            [
-                'name' => 'Licenses & Permits',
-                'slug' => 'licenses-permits',
-                'icon' => 'fa-solid fa-file-signature',
-                'color' => 'success',
-                'description' => 'Business and construction permits',
-                'is_active' => true,
-                'order' => 2,
-            ],
-            [
-                'name' => 'Business',
-                'slug' => 'business',
-                'icon' => 'fa-solid fa-briefcase',
-                'color' => 'info',
-                'description' => 'Business-related documents',
-                'is_active' => true,
-                'order' => 3,
-            ],
-            [
-                'name' => 'Community Certificates',
-                'slug' => 'community-certificates',
-                'icon' => 'fa-solid fa-certificate',
-                'color' => 'warning',
-                'description' => 'Certificates for community members',
-                'is_active' => true,
-                'order' => 4,
-            ],
-            [
-                'name' => 'Identification',
-                'slug' => 'identification',
-                'icon' => 'fa-solid fa-id-card',
-                'color' => 'danger',
-                'description' => 'ID cards and identification documents',
-                'is_active' => true,
-                'order' => 5,
-            ],
-            [
-                'name' => 'Health',
-                'slug' => 'health',
-                'icon' => 'fa-solid fa-heart-pulse',
-                'color' => 'pink',
-                'description' => 'Health certificates and medical documents',
-                'is_active' => true,
-                'order' => 6,
-            ],
-            [
-                'name' => 'Property & Real Estate',
-                'slug' => 'property-real-estate',
-                'icon' => 'fa-solid fa-building',
-                'color' => 'indigo',
-                'description' => 'Property-related documents',
-                'is_active' => true,
-                'order' => 7,
-            ],
-            [
-                'name' => 'Transportation & Traffic',
-                'slug' => 'transportation-traffic',
-                'icon' => 'fa-solid fa-truck',
-                'color' => 'cyan',
-                'description' => 'Transportation permits and fees',
-                'is_active' => true,
-                'order' => 8,
-            ],
-            [
-                'name' => 'Community Services',
-                'slug' => 'community-services',
-                'icon' => 'fa-solid fa-hand-holding-heart',
-                'color' => 'teal',
-                'description' => 'General community services',
-                'is_active' => true,
-                'order' => 9,
-            ],
-            [
-                'name' => 'Environmental Services',
-                'slug' => 'environmental-services',
-                'icon' => 'fa-solid fa-leaf',
-                'color' => 'green',
-                'description' => 'Environmental and sanitation fees',
-                'is_active' => true,
-                'order' => 10,
-            ],
-            [
-                'name' => 'Utilities',
-                'slug' => 'utilities',
-                'icon' => 'fa-solid fa-bolt',
-                'color' => 'yellow',
-                'description' => 'Utility fees and charges',
-                'is_active' => true,
-                'order' => 11,
-            ],
-            [
-                'name' => 'Other Services',
-                'slug' => 'other-services',
-                'icon' => 'fa-solid fa-ellipsis',
-                'color' => 'gray',
-                'description' => 'Miscellaneous services',
-                'is_active' => true,
-                'order' => 12,
-            ],
+        // Fetch all existing categories
+        $existingCategories = DB::table('document_categories')
+            ->select('id', 'name')
+            ->get();
+        
+        foreach ($existingCategories as $category) {
+            $categories[$category->name] = $category->id;
+        }
+        
+        // Log missing categories (if any)
+        $requiredCategories = [
+            'Taxation & Fees',
+            'Licenses & Permits', 
+            'Business',
+            'Certificates',
+            'Identification',
+            'Health',
+            'Property & Real Estate',
+            'Transportation & Traffic',
+            'Community Services',
+            'Environmental Services',
+            'Utilities',
+            'Other Services'
         ];
         
-        foreach ($categoryData as $data) {
-            // Try to find existing category by name
-            $category = DB::table('document_categories')
-                ->where('name', $data['name'])
-                ->first();
-                
-            if ($category) {
-                $categories[$data['name']] = $category->id;
-            } else {
-                // Create new category with all required fields
-                $id = DB::table('document_categories')->insertGetId([
-                    'name' => $data['name'],
-                    'slug' => $data['slug'],
-                    'icon' => $data['icon'],
-                    'color' => $data['color'],
-                    'description' => $data['description'],
-                    'is_active' => $data['is_active'],
-                    'order' => $data['order'],
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-                $categories[$data['name']] = $id;
-                $this->command->info("Created document category: {$data['name']}");
+        $missingCategories = [];
+        foreach ($requiredCategories as $required) {
+            if (!isset($categories[$required])) {
+                $missingCategories[] = $required;
             }
+        }
+        
+        if (!empty($missingCategories)) {
+            $this->command->warn('Missing document categories: ' . implode(', ', $missingCategories));
+            $this->command->warn('Please ensure all required categories exist before running this seeder.');
         }
         
         return $categories;

@@ -112,7 +112,7 @@ export default function CreateAnnouncement({
             end_time: showEndTime ? data.end_time : null,
         };
         
-        post('/announcements/store', {
+        post('/admin/announcements/store', {
             data: submissionData,
             preserveScroll: true,
             onSuccess: () => {
@@ -240,9 +240,9 @@ export default function CreateAnnouncement({
         <AppLayout
             title="Create Announcement"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Announcements', href: '/announcements' },
-                { title: 'Create Announcement', href: '/announcements/create' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Announcements', href: '/admin/announcements' },
+                { title: 'Create Announcement', href: '/admin/announcements/create' }
             ]}
         >
             {/* Use a regular div instead of form for the wrapper */}
@@ -250,7 +250,7 @@ export default function CreateAnnouncement({
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/announcements">
+                        <Link href="/admin/announcements">
                             <Button variant="ghost" size="sm" type="button">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back
@@ -692,7 +692,7 @@ export default function CreateAnnouncement({
                                     <Zap className="h-4 w-4 mr-2" />
                                     Auto-fill Dates & Time
                                 </Button>
-                                <Link href="/announcements">
+                                <Link href="/admin/announcements">
                                     <Button variant="outline" className="w-full justify-start" type="button">
                                         View All Announcements
                                     </Button>
@@ -780,7 +780,7 @@ export default function CreateAnnouncement({
                         </Button>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Link href="/announcements">
+                        <Link href="/admin/announcements">
                             <Button variant="outline" type="button">
                                 Cancel
                             </Button>

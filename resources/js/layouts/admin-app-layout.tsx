@@ -2,6 +2,9 @@ import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
 import { type BreadcrumbItem } from '@/types';
 import { type ReactNode } from 'react';
 import MobileStickyFooter from '@/layouts/mobile-sticky-footer';
+import { usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react'; 
+import { Loader2 } from 'lucide-react';
 
 interface AppLayoutProps {
     children: ReactNode;
@@ -11,7 +14,22 @@ interface AppLayoutProps {
 }
 
 export default ({ children, breadcrumbs, className = '', ...props }: AppLayoutProps) => {
-    // Update mobile footer items to use only icon names that exist in iconMap
+    const { component } = usePage();
+    const [isChangingPage, setIsChangingPage] = useState(false);
+    
+    useEffect(() => {
+        const handleStart = () => setIsChangingPage(true);
+        const handleFinish = () => setIsChangingPage(false);
+        
+        document.addEventListener('inertia:start', handleStart);
+        document.addEventListener('inertia:finish', handleFinish);
+        
+        return () => {
+            document.removeEventListener('inertia:start', handleStart);
+            document.removeEventListener('inertia:finish', handleFinish);
+        };
+    }, []);
+    
     const mobileFooterItems = [
         { 
             icon: 'home', 
@@ -47,21 +65,22 @@ export default ({ children, breadcrumbs, className = '', ...props }: AppLayoutPr
 
     return (
         <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-900">
+            {/* Full-screen centered loading overlay with subtle blur */}
+            {isChangingPage && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50/60 dark:bg-gray-900/60 backdrop-blur-[2px]">
+                    <Loader2 className="h-12 w-12 animate-spin text-indigo-600 dark:text-indigo-400" />
+                </div>
+            )}
+
             {/* Use a flex container for sidebar + main content */}
             <div className="flex flex-1 overflow-hidden">
                 <AppLayoutTemplate breadcrumbs={breadcrumbs} {...props}>
-                    {/* Main content container with consistent spacing */}
                     <div className={`h-full overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 ${className}`}>
-                        {/* Breadcrumb spacing */}
                         {breadcrumbs && breadcrumbs.length > 0 && (
-                            <div className="mb-6">
-                                {/* Breadcrumbs will be rendered by AppLayoutTemplate */}
-                            </div>
+                            <div className="mb-6"></div>
                         )}
                         
-                        {/* Main content with proper margins */}
                         <main className="max-w-full mx-auto">
-                            {/* Add spacing wrapper around children */}
                             <div className="space-y-6">
                                 {children}
                             </div>
@@ -70,7 +89,6 @@ export default ({ children, breadcrumbs, className = '', ...props }: AppLayoutPr
                 </AppLayoutTemplate>
             </div>
             
-            {/* Mobile sticky footer - only visible on small screens */}
             <div className="md:hidden">
                 <MobileStickyFooter items={mobileFooterItems} />
             </div>

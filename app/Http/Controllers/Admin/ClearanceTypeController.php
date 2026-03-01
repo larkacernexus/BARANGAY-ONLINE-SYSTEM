@@ -44,7 +44,7 @@ class ClearanceTypeController extends Controller
             $query->where('requires_payment', $request->requires_payment === 'yes');
         }
 
-        // NEW: Filter by discountable
+        // Filter by discountable
         if ($request->has('discountable')) {
             if ($request->discountable === 'yes') {
                 $query->where('is_discountable', true);
@@ -76,7 +76,7 @@ class ClearanceTypeController extends Controller
                 'description' => $type->description,
                 'fee' => $type->fee,
                 'formatted_fee' => $type->formatted_fee,
-                'is_discountable' => $type->is_discountable, // NEW
+                'is_discountable' => $type->is_discountable,
                 'processing_days' => $type->processing_days,
                 'validity_days' => $type->validity_days,
                 'is_active' => $type->is_active,
@@ -93,7 +93,7 @@ class ClearanceTypeController extends Controller
 
         return Inertia::render('admin/Clearance-types/Index', [
             'clearanceTypes' => $clearanceTypes,
-            'filters' => $request->only(['search', 'status', 'requires_payment', 'discountable', 'sort', 'direction']), // Added discountable
+            'filters' => $request->only(['search', 'status', 'requires_payment', 'discountable', 'sort', 'direction']),
             'stats' => $this->getStats(),
         ]);
     }
@@ -103,10 +103,10 @@ class ClearanceTypeController extends Controller
      */
     public function create()
     {
+        // FIXED: Removed 'category' column reference
         $documentTypes = DocumentType::where('is_active', true)
-            ->orderBy('category')
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'description', 'category', 'is_active']);
+            ->get(['id', 'name', 'description', 'is_active']);
 
         return Inertia::render('admin/Clearance-types/Create', [
             'commonTypes' => ClearanceType::COMMON_TYPES,
@@ -144,7 +144,7 @@ class ClearanceTypeController extends Controller
             'code' => 'required|string|max:50|unique:clearance_types,code|regex:/^[A-Z_]+$/',
             'description' => 'nullable|string',
             'fee' => 'required|numeric|min:0',
-            'is_discountable' => 'boolean', // NEW
+            'is_discountable' => 'boolean',
             'processing_days' => 'required|integer|min:1|max:365',
             'validity_days' => 'required|integer|min:1|max:3650',
             'is_active' => 'boolean',
@@ -170,7 +170,7 @@ class ClearanceTypeController extends Controller
                 'code' => $validated['code'],
                 'description' => $validated['description'] ?? null,
                 'fee' => $validated['fee'],
-                'is_discountable' => $validated['is_discountable'] ?? true, // NEW with default true
+                'is_discountable' => $validated['is_discountable'] ?? true,
                 'processing_days' => $validated['processing_days'],
                 'validity_days' => $validated['validity_days'],
                 'is_active' => $validated['is_active'] ?? true,
@@ -260,7 +260,7 @@ class ClearanceTypeController extends Controller
             'description' => $clearanceType->description,
             'fee' => $clearanceType->fee,
             'formatted_fee' => $clearanceType->formatted_fee,
-            'is_discountable' => $clearanceType->is_discountable, // NEW
+            'is_discountable' => $clearanceType->is_discountable,
             'processing_days' => $clearanceType->processing_days,
             'validity_days' => $clearanceType->validity_days,
             'is_active' => $clearanceType->is_active,
@@ -301,11 +301,10 @@ class ClearanceTypeController extends Controller
             }
         ]);
 
-        // Get available document types
+        // FIXED: Removed 'category' column reference
         $documentTypes = DocumentType::where('is_active', true)
-            ->orderBy('category')
             ->orderBy('sort_order')
-            ->get(['id', 'name', 'description', 'category', 'is_active']);
+            ->get(['id', 'name', 'description', 'is_active']);
 
         // Prepare document requirements for the form
         $documentRequirements = collect();
@@ -327,7 +326,7 @@ class ClearanceTypeController extends Controller
             'code' => $clearanceType->code,
             'description' => $clearanceType->description,
             'fee' => $clearanceType->fee,
-            'is_discountable' => $clearanceType->is_discountable, // NEW
+            'is_discountable' => $clearanceType->is_discountable,
             'processing_days' => $clearanceType->processing_days,
             'validity_days' => $clearanceType->validity_days,
             'is_active' => $clearanceType->is_active,
@@ -382,7 +381,7 @@ class ClearanceTypeController extends Controller
             'code' => 'required|string|max:50|unique:clearance_types,code,' . $clearanceType->id . '|regex:/^[A-Z_]+$/',
             'description' => 'nullable|string',
             'fee' => 'required|numeric|min:0',
-            'is_discountable' => 'boolean', // NEW
+            'is_discountable' => 'boolean',
             'processing_days' => 'required|integer|min:1|max:365',
             'validity_days' => 'required|integer|min:1|max:3650',
             'is_active' => 'boolean',
@@ -408,7 +407,7 @@ class ClearanceTypeController extends Controller
                 'code' => $validated['code'],
                 'description' => $validated['description'] ?? null,
                 'fee' => $validated['fee'],
-                'is_discountable' => $validated['is_discountable'] ?? $clearanceType->is_discountable, // NEW
+                'is_discountable' => $validated['is_discountable'] ?? $clearanceType->is_discountable,
                 'processing_days' => $validated['processing_days'],
                 'validity_days' => $validated['validity_days'],
                 'is_active' => $validated['is_active'] ?? $clearanceType->is_active,
@@ -482,7 +481,7 @@ class ClearanceTypeController extends Controller
     }
 
     /**
-     * Toggle discountable status (NEW)
+     * Toggle discountable status
      */
     public function toggleDiscountable(ClearanceType $clearanceType)
     {
@@ -536,7 +535,7 @@ class ClearanceTypeController extends Controller
     public function bulkAction(Request $request)
     {
         $request->validate([
-            'action' => 'required|in:activate,deactivate,mark_discountable,mark_non_discountable,delete', // Added discountable options
+            'action' => 'required|in:activate,deactivate,mark_discountable,mark_non_discountable,delete',
             'ids' => 'required|array',
             'ids.*' => 'exists:clearance_types,id',
         ]);
@@ -552,12 +551,12 @@ class ClearanceTypeController extends Controller
                 $message = 'Clearance types deactivated successfully.';
                 break;
                 
-            case 'mark_discountable': // NEW
+            case 'mark_discountable':
                 ClearanceType::whereIn('id', $request->ids)->update(['is_discountable' => true]);
                 $message = 'Clearance types marked as discountable successfully.';
                 break;
                 
-            case 'mark_non_discountable': // NEW
+            case 'mark_non_discountable':
                 ClearanceType::whereIn('id', $request->ids)->update(['is_discountable' => false]);
                 $message = 'Clearance types marked as non-discountable successfully.';
                 break;
@@ -582,37 +581,7 @@ class ClearanceTypeController extends Controller
     }
 
     /**
-     * Bulk activate (separate endpoint)
-     */
-    public function bulkActivate(Request $request)
-    {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'exists:clearance_types,id',
-        ]);
-
-        ClearanceType::whereIn('id', $request->ids)->update(['is_active' => true]);
-
-        return response()->json(['message' => 'Selected clearance types activated successfully.']);
-    }
-
-    /**
-     * Bulk deactivate (separate endpoint)
-     */
-    public function bulkDeactivate(Request $request)
-    {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'exists:clearance_types,id',
-        ]);
-
-        ClearanceType::whereIn('id', $request->ids)->update(['is_active' => false]);
-
-        return response()->json(['message' => 'Selected clearance types deactivated successfully.']);
-    }
-
-    /**
-     * Bulk mark as discountable (NEW)
+     * Bulk mark as discountable
      */
     public function bulkMarkDiscountable(Request $request)
     {
@@ -627,7 +596,7 @@ class ClearanceTypeController extends Controller
     }
 
     /**
-     * Bulk mark as non-discountable (NEW)
+     * Bulk mark as non-discountable
      */
     public function bulkMarkNonDiscountable(Request $request)
     {
@@ -642,72 +611,14 @@ class ClearanceTypeController extends Controller
     }
 
     /**
-     * Bulk delete (separate endpoint)
-     */
-    public function bulkDelete(Request $request)
-    {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'exists:clearance_types,id',
-        ]);
-
-        // Check if any have clearance requests
-        $typesWithRequests = ClearanceType::whereIn('id', $request->ids)
-            ->has('clearanceRequests')
-            ->count();
-
-        if ($typesWithRequests > 0) {
-            return response()->json([
-                'error' => 'Cannot delete clearance types that have associated clearance requests.'
-            ], 422);
-        }
-
-        ClearanceType::whereIn('id', $request->ids)->delete();
-
-        return response()->json(['message' => 'Selected clearance types deleted successfully.']);
-    }
-
-    /**
-     * Bulk duplicate (separate endpoint)
-     */
-    public function bulkDuplicate(Request $request)
-    {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'exists:clearance_types,id',
-        ]);
-
-        DB::transaction(function () use ($request) {
-            $clearanceTypes = ClearanceType::whereIn('id', $request->ids)->get();
-            
-            foreach ($clearanceTypes as $type) {
-                // Duplicate the clearance type
-                $newType = $type->replicate();
-                $newType->name = $type->name . ' (Copy)';
-                $newType->code = $type->code . '_COPY_' . time();
-                $newType->save();
-
-                // Duplicate document requirements
-                foreach ($type->documentRequirements()->get() as $requirement) {
-                    $newRequirement = $requirement->replicate();
-                    $newRequirement->clearance_type_id = $newType->id;
-                    $newRequirement->save();
-                }
-            }
-        });
-
-        return response()->json(['message' => 'Selected clearance types duplicated successfully.']);
-    }
-
-    /**
-     * Bulk update (separate endpoint)
+     * Bulk update
      */
     public function bulkUpdate(Request $request)
     {
         $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'exists:clearance_types,id',
-            'field' => 'required|string|in:processing_days,validity_days,fee,requires_payment,requires_approval,is_online_only,is_active,is_discountable', // Added is_discountable
+            'field' => 'required|string|in:processing_days,validity_days,fee,requires_payment,requires_approval,is_online_only,is_active,is_discountable',
             'value' => 'required',
         ]);
 
@@ -719,7 +630,7 @@ class ClearanceTypeController extends Controller
             $value = (int) $value;
         } elseif ($field === 'fee') {
             $value = (float) $value;
-        } elseif (in_array($field, ['requires_payment', 'requires_approval', 'is_online_only', 'is_active', 'is_discountable'])) { // Added is_discountable
+        } elseif (in_array($field, ['requires_payment', 'requires_approval', 'is_online_only', 'is_active', 'is_discountable'])) {
             $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
         }
 
@@ -757,7 +668,7 @@ class ClearanceTypeController extends Controller
             $query->where('requires_payment', $request->requires_payment === 'yes');
         }
 
-        if ($request->has('discountable')) { // NEW
+        if ($request->has('discountable')) {
             if ($request->discountable === 'yes') {
                 $query->where('is_discountable', true);
             } elseif ($request->discountable === 'no') {
@@ -772,7 +683,7 @@ class ClearanceTypeController extends Controller
         $clearanceTypes = $query->get();
 
         // Generate CSV content
-        $csv = "ID,Name,Code,Description,Fee,Discountable,Processing Days,Validity Days,Active,Requires Payment,Requires Approval,Online Only,Document Count,Clearance Requests\n"; // Added Discountable column
+        $csv = "ID,Name,Code,Description,Fee,Discountable,Processing Days,Validity Days,Active,Requires Payment,Requires Approval,Online Only,Document Count,Clearance Requests\n";
         
         foreach ($clearanceTypes as $type) {
             $csv .= sprintf(
@@ -782,7 +693,7 @@ class ClearanceTypeController extends Controller
                 $type->code,
                 $type->description,
                 $type->fee,
-                $type->is_discountable ? 'Yes' : 'No', // NEW
+                $type->is_discountable ? 'Yes' : 'No',
                 $type->processing_days,
                 $type->validity_days,
                 $type->is_active ? 'Yes' : 'No',
@@ -810,8 +721,8 @@ class ClearanceTypeController extends Controller
         return [
             'total' => ClearanceType::count(),
             'active' => ClearanceType::where('is_active', true)->count(),
-            'discountable' => ClearanceType::where('is_discountable', true)->count(), // NEW
-            'non_discountable' => ClearanceType::where('is_discountable', false)->count(), // NEW
+            'discountable' => ClearanceType::where('is_discountable', true)->count(),
+            'non_discountable' => ClearanceType::where('is_discountable', false)->count(),
             'requires_payment' => ClearanceType::where('requires_payment', true)->count(),
             'requires_approval' => ClearanceType::where('requires_approval', true)->count(),
             'online_only' => ClearanceType::where('is_online_only', true)->count(),

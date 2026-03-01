@@ -121,7 +121,7 @@ export default function PuroksIndex({
                 }
             });
             
-            router.get('/puroks', params, {
+            router.get('/admin/puroks', params, {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
@@ -284,7 +284,7 @@ export default function PuroksIndex({
             switch (operation) {
                 case 'delete':
                     if (confirm(`Are you sure you want to delete ${selectedPuroks.length} selected purok(s)?`)) {
-                        await router.post('/puroks/bulk-action', {
+                        await router.post('/admin/puroks/bulk-action', {
                             action: 'delete',
                             purok_ids: selectedPuroks,
                         }, {
@@ -307,7 +307,7 @@ export default function PuroksIndex({
                         return;
                     }
                     
-                    await router.post('/puroks/bulk-action', {
+                    await router.post('/admin/puroks/bulk-action', {
                         action: 'update_status',
                         purok_ids: selectedPuroks,
                         status: bulkEditValue
@@ -370,7 +370,7 @@ export default function PuroksIndex({
                 case 'print':
                     // Open print preview for each selected purok
                     selectedPuroks.forEach(id => {
-                        window.open(`/puroks/${id}/print`, '_blank');
+                        window.open(`/admin/puroks/${id}/print`, '_blank');
                     });
                     toast.success(`${selectedPuroks.length} purok(s) opened for printing`);
                     break;
@@ -378,7 +378,7 @@ export default function PuroksIndex({
                 case 'generate_report':
                     // Generate report for selected puroks
                     const idsParam = selectedPuroks.join(',');
-                    window.open(`/puroks/report?ids=${idsParam}`, '_blank');
+                    window.open(`/admin/puroks/report?ids=${idsParam}`, '_blank');
                     toast.success(`Generating report for ${selectedPuroks.length} purok(s)`);
                     break;
 
@@ -441,7 +441,7 @@ export default function PuroksIndex({
     // Individual purok operations
     const handleDelete = (purok: Purok) => {
         if (confirm(`Are you sure you want to delete purok "${purok.name || 'Untitled'}"?`)) {
-            router.delete(`/puroks/${purok.id}`, {
+            router.delete(`/admin/puroks/${purok.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedPuroks(selectedPuroks.filter(id => id !== purok.id));
@@ -456,7 +456,7 @@ export default function PuroksIndex({
 
     const handleUpdateStatistics = () => {
         if (confirm('Update statistics for all puroks? This will recalculate household and resident counts.')) {
-            router.post('/puroks/update-statistics', {}, {
+            router.post('/admin/puroks/update-statistics', {}, {
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success('Statistics updated successfully');
@@ -507,8 +507,8 @@ export default function PuroksIndex({
         <AppLayout
             title="Purok Management"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Puroks', href: '/puroks' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Puroks', href: '/admin/puroks' }
             ]}
         >
             <TooltipProvider>

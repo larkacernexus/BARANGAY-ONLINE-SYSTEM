@@ -43,7 +43,7 @@ export default function ClearancesHeader({
                     )}
                 </Button>
                 <Button asChild>
-                    <a href="/clearances/create">
+                    <a href="/admin/clearances/create">
                         <Plus className="h-4 w-4 mr-2" />
                         New Request
                     </a>
