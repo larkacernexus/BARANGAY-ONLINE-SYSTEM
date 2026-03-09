@@ -108,7 +108,7 @@ export const MobilePaymentCard = ({
 
                     <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
                         <Link 
-                            href={`/my-payments/${payment.id}`} 
+                            href={`/payments/${payment.id}`} 
                             className="flex-1"
                         >
                             <Button variant="outline" size="sm" className="w-full">

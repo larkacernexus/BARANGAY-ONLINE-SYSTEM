@@ -167,6 +167,241 @@ class Fee extends Model
         return $this->belongsTo(User::class, 'cancelled_by');
     }
 
+    // ==================== PAYER & PAYMENT CHECK METHODS ====================
+
+    /**
+     * Check if fee belongs to a specific payer
+     */
+    public function isPayer(string $payerType, int $payerId): bool
+    {
+        $normalizedType = $this->normalizePayerType($payerType);
+        return $this->payer_type === $normalizedType && $this->payer_id === $payerId;
+    }
+
+    /**
+     * Check if fee has any payments from a specific payer
+     */
+    public function hasPaymentsFromPayer(string $payerType, int $payerId): bool
+    {
+        if (!$this->isPayer($payerType, $payerId)) {
+            return false;
+        }
+        
+        return $this->paymentItems()->exists();
+    }
+
+    /**
+     * Get all payments for a specific payer
+     */
+    public function getPaymentsByPayer(string $payerType, int $payerId)
+    {
+        return $this->where('payer_type', $this->normalizePayerType($payerType))
+            ->where('payer_id', $payerId)
+            ->with(['paymentItems.payment'])
+            ->get()
+            ->flatMap(function ($fee) {
+                return $fee->paymentItems->map(function ($item) {
+                    return [
+                        'fee_id' => $item->fee_id,
+                        'fee_code' => $item->fee->fee_code ?? null,
+                        'payment_id' => $item->payment_id,
+                        'payment' => $item->payment,
+                        'amount' => $item->amount,
+                        'paid_at' => $item->payment?->payment_date,
+                        'or_number' => $item->payment?->or_number,
+                        'payment_method' => $item->payment?->payment_method,
+                    ];
+                });
+            })
+            ->filter(function ($payment) {
+                return !is_null($payment['payment_id']);
+            })
+            ->values();
+    }
+
+    /**
+     * Check if payer has any outstanding fees
+     */
+    public function hasOutstandingFees(string $payerType, int $payerId): bool
+    {
+        return $this->where('payer_type', $this->normalizePayerType($payerType))
+            ->where('payer_id', $payerId)
+            ->whereNotIn('status', ['paid', 'cancelled', 'waived'])
+            ->where('balance', '>', 0)
+            ->exists();
+    }
+
+    /**
+     * Get total amount paid by payer
+     */
+    public function getTotalPaidByPayer(string $payerType, int $payerId): float
+    {
+        return (float) $this->where('payer_type', $this->normalizePayerType($payerType))
+            ->where('payer_id', $payerId)
+            ->where('status', 'paid')
+            ->sum('amount_paid');
+    }
+
+    /**
+     * Get total outstanding amount for payer
+     */
+    public function getTotalOutstandingByPayer(string $payerType, int $payerId): float
+    {
+        return (float) $this->where('payer_type', $this->normalizePayerType($payerType))
+            ->where('payer_id', $payerId)
+            ->whereNotIn('status', ['paid', 'cancelled', 'waived'])
+            ->sum('balance');
+    }
+
+    /**
+     * Get fee history for a payer
+     */
+    public function getPayerFeeHistory(string $payerType, int $payerId, array $options = [])
+    {
+        $query = $this->where('payer_type', $this->normalizePayerType($payerType))
+            ->where('payer_id', $payerId)
+            ->with(['feeType', 'paymentItems.payment']);
+        
+        // Filter by date range
+        if (isset($options['from_date'])) {
+            $query->whereDate('created_at', '>=', $options['from_date']);
+        }
+        
+        if (isset($options['to_date'])) {
+            $query->whereDate('created_at', '<=', $options['to_date']);
+        }
+        
+        // Filter by status
+        if (isset($options['status'])) {
+            $query->where('status', $options['status']);
+        }
+        
+        // Filter by fee type
+        if (isset($options['fee_type_id'])) {
+            $query->where('fee_type_id', $options['fee_type_id']);
+        }
+        
+        // Filter by payment method
+        if (isset($options['payment_method'])) {
+            $query->whereHas('paymentItems.payment', function ($q) use ($options) {
+                $q->where('payment_method', $options['payment_method']);
+            });
+        }
+        
+        return $query->orderBy('created_at', 'desc')->get();
+    }
+
+    /**
+     * Get payment summary for a payer
+     */
+    public function getPayerPaymentSummary(string $payerType, int $payerId): array
+    {
+        $fees = $this->where('payer_type', $this->normalizePayerType($payerType))
+            ->where('payer_id', $payerId)
+            ->get();
+        
+        $paymentsByMethod = $this->getPaymentsByPayer($payerType, $payerId)
+            ->groupBy('payment_method')
+            ->map(function ($payments) {
+                return [
+                    'count' => $payments->count(),
+                    'total' => $payments->sum('amount'),
+                ];
+            });
+        
+        return [
+            'total_fees' => $fees->count(),
+            'total_amount' => $fees->sum('total_amount'),
+            'total_paid' => $fees->sum('amount_paid'),
+            'total_balance' => $fees->sum('balance'),
+            'paid_fees' => $fees->where('status', 'paid')->count(),
+            'pending_fees' => $fees->whereIn('status', ['pending', 'issued', 'partially_paid'])->count(),
+            'overdue_fees' => $fees->where('status', 'overdue')->count(),
+            'cancelled_fees' => $fees->where('status', 'cancelled')->count(),
+            'waived_fees' => $fees->where('status', 'waived')->count(),
+            'payments_by_method' => $paymentsByMethod,
+            'payment_history' => $this->getPaymentsByPayer($payerType, $payerId),
+            'last_payment_date' => $fees->where('status', 'paid')
+                ->sortByDesc('updated_at')
+                ->first()?->updated_at,
+        ];
+    }
+
+    /**
+     * Check if fee has been paid via specific payment method
+     */
+    public function hasPaymentMethod(string $paymentMethod): bool
+    {
+        return $this->paymentItems()
+            ->whereHas('payment', function ($q) use ($paymentMethod) {
+                $q->where('payment_method', $paymentMethod);
+            })
+            ->exists();
+    }
+
+    /**
+     * Get payments by payment type for this fee
+     */
+    public function getPaymentsByMethod(string $paymentMethod)
+    {
+        return $this->paymentItems()
+            ->whereHas('payment', function ($q) use ($paymentMethod) {
+                $q->where('payment_method', $paymentMethod);
+            })
+            ->with('payment')
+            ->get();
+    }
+
+    /**
+     * Get payment methods used for this fee
+     */
+    public function getPaymentMethodsAttribute(): array
+    {
+        return $this->paymentItems()
+            ->whereHas('payment')
+            ->with('payment')
+            ->get()
+            ->pluck('payment.payment_method')
+            ->unique()
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * Check if fee was fully paid using a single payment method
+     */
+    public function isPaidByMethod(string $paymentMethod): bool
+    {
+        if ($this->status !== 'paid') {
+            return false;
+        }
+        
+        $methods = $this->payment_methods;
+        
+        return count($methods) === 1 && $methods[0] === $paymentMethod;
+    }
+
+    /**
+     * Normalize payer type to full class name
+     */
+    private function normalizePayerType(string $payerType): string
+    {
+        $morphMap = [
+            'resident' => 'App\Models\Resident',
+            'household' => 'App\Models\Household',
+            'business' => 'App\Models\Business',
+            'visitor' => 'App\Models\Visitor',
+            'other' => 'App\Models\Other',
+        ];
+        
+        // If it's already a full class name, return it
+        if (class_exists($payerType)) {
+            return $payerType;
+        }
+        
+        return $morphMap[strtolower($payerType)] ?? $payerType;
+    }
+
     // ==================== SCOPES ====================
 
     public function scopePending($query)
@@ -215,10 +450,41 @@ class Fee extends Model
             ->whereNotIn('status', ['paid', 'cancelled', 'waived']);
     }
 
-    public function scopeByPayer($query, $payerType, $payerId)
+    /**
+     * Scope to filter by payer
+     */
+    public function scopeByPayer($query, string $payerType, int $payerId)
     {
-        return $query->where('payer_type', $payerType)
+        return $query->where('payer_type', $this->normalizePayerType($payerType))
             ->where('payer_id', $payerId);
+    }
+
+    /**
+     * Scope to get fees with payment status for payer
+     */
+    public function scopeWithPayerPaymentStatus($query, string $payerType, int $payerId)
+    {
+        return $query->byPayer($payerType, $payerId)
+            ->select('fees.*')
+            ->selectRaw('CASE 
+                WHEN fees.status = "paid" THEN "paid"
+                WHEN fees.balance > 0 AND fees.due_date < CURDATE() THEN "overdue"
+                WHEN fees.balance > 0 THEN "pending"
+                ELSE fees.status
+            END as payment_status')
+            ->with(['paymentItems' => function($q) {
+                $q->latest();
+            }]);
+    }
+
+    /**
+     * Scope to filter by payment method
+     */
+    public function scopeByPaymentMethod($query, string $paymentMethod)
+    {
+        return $query->whereHas('paymentItems.payment', function ($q) use ($paymentMethod) {
+            $q->where('payment_method', $paymentMethod);
+        });
     }
 
     public function scopeByFeeType($query, $feeTypeId)
@@ -263,7 +529,6 @@ class Fee extends Model
 
     /**
      * Calculate penalty based on fee type rules and payment date
-     * FIXED: Penalty should only apply if payment is made AFTER due date
      */
     public function calculatePenalty($paymentDate = null): float
     {
@@ -292,7 +557,6 @@ class Fee extends Model
 
     /**
      * Recalculate all amounts
-     * FIXED: Pass payment date to penalty calculation
      */
     public function recalculate($paymentDate = null): self
     {
@@ -338,7 +602,6 @@ class Fee extends Model
 
     /**
      * Check if fee is overdue
-     * FIXED: Use proper date comparison
      */
     public function isOverdue(): bool
     {
@@ -523,6 +786,23 @@ class Fee extends Model
     }
 
     /**
+     * Get payment summary
+     */
+    public function getPaymentSummaryAttribute(): array
+    {
+        $payments = $this->paymentItems()->with('payment')->get();
+        
+        return [
+            'total_payments' => $payments->count(),
+            'total_amount' => $payments->sum('amount'),
+            'first_payment' => $payments->sortBy('created_at')->first()?->payment,
+            'last_payment' => $payments->sortByDesc('created_at')->first()?->payment,
+            'payment_methods' => $payments->pluck('payment.payment_method')->unique()->values(),
+            'or_numbers' => $payments->pluck('payment.or_number')->filter()->values(),
+        ];
+    }
+
+    /**
      * Generate certificate number
      */
     public function generateCertificateNumber(): string
@@ -598,6 +878,9 @@ class Fee extends Model
         return $this;
     }
 
+    /**
+     * Get payer type attribute accessor
+     */
     public function getPayerTypeAttribute($value)
     {
         // Convert legacy values to full class names
@@ -611,6 +894,9 @@ class Fee extends Model
         return $morphMap[$value] ?? $value;
     }
 
+    /**
+     * Set payer type attribute mutator
+     */
     public function setPayerTypeAttribute($value)
     {
         // Ensure we store full class names

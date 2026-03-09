@@ -9,11 +9,13 @@ use Spatie\Activitylog\Traits\CausesActivity;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Traits\HasNotificationPreferences;
 use App\Models\Session;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, CausesActivity, LogsActivity;
+    use HasFactory, Notifiable, CausesActivity, LogsActivity, HasNotificationPreferences;
 
     protected $fillable = [
         'username',
@@ -46,6 +48,14 @@ class User extends Authenticatable
         'resident_id',
         'household_id',
         'current_resident_id',
+        // ADD THESE QR CODE FIELDS
+        'login_qr_code',
+        'login_qr_code_generated_at',
+        'login_qr_code_expires_at',
+        'login_qr_code_used_count',
+        'qr_code_url',
+        'qr_code_generated_at',
+        'qr_code_download_count',
     ];
 
     protected $hidden = [
@@ -53,6 +63,7 @@ class User extends Authenticatable
         'remember_token',
         'two_factor_secret',
         'two_factor_recovery_codes',
+        'login_qr_code', // Hide QR token for security
     ];
 
     protected function casts(): array
@@ -71,6 +82,13 @@ class User extends Authenticatable
             'failed_login_attempts' => 'integer',
             'two_factor_used_recovery_codes' => 'array',
             'login_count' => 'integer',
+            'notification_preferences' => 'array',
+            // ADD THESE QR CODE CASTS
+            'login_qr_code_generated_at' => 'datetime',
+            'login_qr_code_expires_at' => 'datetime',
+            'qr_code_generated_at' => 'datetime',
+            'login_qr_code_used_count' => 'integer',
+            'qr_code_download_count' => 'integer',
         ];
     }
 
@@ -89,6 +107,78 @@ class User extends Authenticatable
             ->dontSubmitEmptyLogs()
             ->useLogName('user');
     }
+
+    // ADD HELPER METHODS FOR QR CODE
+
+    /**
+     * Check if user has a QR code
+     */
+    public function hasQrCode(): bool
+    {
+        return !is_null($this->login_qr_code) && !is_null($this->qr_code_url);
+    }
+
+    /**
+     * Check if QR code is expired
+     */
+    public function isQrCodeExpired(): bool
+    {
+        if (!$this->login_qr_code_expires_at) {
+            return false;
+        }
+        return now()->gt($this->login_qr_code_expires_at);
+    }
+
+    /**
+     * Get QR code image URL
+     */
+    public function getQrCodeUrlAttribute($value): ?string
+    {
+        if (!$value) {
+            return null;
+        }
+        return asset('storage/' . $value);
+    }
+
+    /**
+     * Increment QR code download count
+     */
+    public function incrementQrCodeDownloadCount(): void
+    {
+        $this->increment('qr_code_download_count');
+    }
+
+    /**
+     * Clear QR code data (when regenerating)
+     */
+    public function clearQrCode(): void
+    {
+        $this->update([
+            'login_qr_code' => null,
+            'login_qr_code_generated_at' => null,
+            'login_qr_code_expires_at' => null,
+            'login_qr_code_used_count' => 0,
+            'qr_code_url' => null,
+        ]);
+    }
+
+    /**
+     * Get QR code status
+     */
+    public function getQrCodeStatusAttribute(): array
+    {
+        return [
+            'has_code' => $this->hasQrCode(),
+            'url' => $this->qr_code_url,
+            'generated_at' => $this->login_qr_code_generated_at,
+            'expires_at' => $this->login_qr_code_expires_at,
+            'is_expired' => $this->isQrCodeExpired(),
+            'used_count' => $this->login_qr_code_used_count,
+            'download_count' => $this->qr_code_download_count,
+        ];
+    }
+
+    // ... rest of your existing methods remain the same ...
 
     public function role()
     {
@@ -400,5 +490,27 @@ class User extends Authenticatable
                 'current_resident_id' => null,
             ]);
         }
+    }
+
+    public function getNotificationPreferences(): array
+    {
+        $defaults = [
+            'clearance' => true,
+            'fees' => true,
+            'household' => true,
+            'announcements' => true,
+            'reports' => true,
+            'email' => true,
+            'sms' => false,
+            'quiet_hours' => false,
+        ];
+        
+        return array_merge($defaults, $this->notification_preferences ?? []);
+    }
+
+    public function setNotificationPreferences(array $preferences): void
+    {
+        $this->notification_preferences = $preferences;
+        $this->save();
     }
 }

@@ -1,10 +1,11 @@
 import AppLayout from '@/layouts/resident-app-layout';
 import SettingsLayout from '@/layouts/settings/residentlayout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { 
   Smartphone, 
   Monitor, 
+  Tablet,
   Globe, 
   CheckCircle, 
   XCircle, 
@@ -14,8 +15,11 @@ import {
   LogOut,
   RefreshCw,
   Shield,
-  Tablet,
-  Laptop
+  Laptop,
+  MoreVertical,
+  Info,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +27,16 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { useState } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
+import { route } from 'ziggy-js';
+import { cn } from '@/lib/utils';
 
 const breadcrumbs: BreadcrumbItem[] = [
   {
@@ -35,85 +49,368 @@ const breadcrumbs: BreadcrumbItem[] = [
   },
 ];
 
-// Dummy data for connected devices
-const devices = [
-  {
-    id: 1,
-    name: 'iPhone 14 Pro',
-    type: 'mobile',
-    icon: Smartphone,
-    browser: 'Safari',
-    os: 'iOS 16.5',
-    ip: '192.168.1.105',
-    location: 'New York, USA',
-    lastActive: '5 minutes ago',
-    isCurrent: true,
-    status: 'active',
-  },
-  {
-    id: 2,
-    name: 'MacBook Pro',
-    type: 'desktop',
-    icon: Monitor,
-    browser: 'Chrome 119',
-    os: 'macOS Ventura',
-    ip: '192.168.1.110',
-    location: 'New York, USA',
-    lastActive: '2 hours ago',
-    isCurrent: false,
-    status: 'active',
-  },
-  {
-    id: 3,
-    name: 'Windows Desktop',
-    type: 'desktop',
-    icon: Monitor,
-    browser: 'Firefox 118',
-    os: 'Windows 11',
-    ip: '203.0.113.25',
-    location: 'London, UK',
-    lastActive: '3 days ago',
-    isCurrent: false,
-    status: 'inactive',
-  },
-  {
-    id: 4,
-    name: 'Android Tablet',
-    type: 'tablet',
-    icon: Tablet,
-    browser: 'Chrome Mobile',
-    os: 'Android 13',
-    ip: '198.51.100.42',
-    location: 'Tokyo, Japan',
-    lastActive: '1 week ago',
-    isCurrent: false,
-    status: 'inactive',
-  },
-];
+// Types from backend
+interface Device {
+  id: number;
+  name: string;
+  type: 'mobile' | 'desktop' | 'tablet' | 'laptop';
+  browser: string;
+  os: string;
+  ip_address: string;
+  location: string;
+  last_active: string;
+  last_active_human: string;
+  is_current: boolean;
+  status: 'active' | 'inactive';
+  created_at: string;
+  is_trusted: boolean;
+  user_agent: string;
+}
 
-// Dummy data for session history
-const sessionHistory = [
-  { id: 1, device: 'iPhone 14 Pro', action: 'Login', location: 'New York', time: 'Today, 10:30 AM', status: 'success' },
-  { id: 2, device: 'MacBook Pro', action: 'Login', location: 'New York', time: 'Yesterday, 3:45 PM', status: 'success' },
-  { id: 3, device: 'Unknown Device', action: 'Login Attempt', location: 'Berlin, Germany', time: '2 days ago', status: 'failed' },
-  { id: 4, device: 'Windows Desktop', action: 'Logout', location: 'London', time: '3 days ago', status: 'success' },
-];
+interface SessionHistory {
+  id: number;
+  device_name: string;
+  action: 'login' | 'logout' | 'login_attempt';
+  location: string;
+  created_at: string;
+  created_at_human: string;
+  status: 'success' | 'failed';
+  ip_address: string;
+}
+
+interface SecurityStats {
+  total_devices: number;
+  active_devices: number;
+  inactive_devices: number;
+  suspicious_count: number;
+  two_factor_enabled: boolean;
+  security_score: number;
+  inactive_warning_count: number;
+}
+
+// Define Flash interface
+interface Flash {
+  success?: string;
+  error?: string;
+  warning?: string;
+  info?: string;
+}
+
+// Extend PageProps with index signature to satisfy Inertia's constraints
+interface PageProps {
+  devices: Device[];
+  sessionHistory: SessionHistory[];
+  securityStats: SecurityStats;
+  flash?: Flash;
+  [key: string]: unknown; // Add index signature for Inertia compatibility
+}
+
+// Device Icon Mapper
+const getDeviceIcon = (type: string) => {
+  switch (type) {
+    case 'mobile':
+      return Smartphone;
+    case 'tablet':
+      return Tablet;
+    case 'laptop':
+      return Laptop;
+    default:
+      return Monitor;
+  }
+};
+
+// Device Card Component
+const DeviceCard = ({ 
+  device, 
+  isCurrent = false,
+  onLogout,
+  onTrust,
+  onUntrust,
+  isProcessing 
+}: { 
+  device: Device;
+  isCurrent?: boolean;
+  onLogout: (id: number) => void;
+  onTrust?: (id: number) => void;
+  onUntrust?: (id: number) => void;
+  isProcessing: boolean;
+}) => {
+  const Icon = getDeviceIcon(device.type);
+  
+  return (
+    <div className={cn(
+      "p-4 rounded-lg border transition-colors",
+      isCurrent && "bg-green-500/5 border-green-500/20 dark:bg-green-500/10 dark:border-green-500/30",
+      device.is_trusted && !isCurrent && "bg-blue-500/5 border-blue-500/20 dark:bg-blue-500/10 dark:border-blue-500/30",
+      !isCurrent && !device.is_trusted && "hover:bg-accent/50 dark:hover:bg-accent/20"
+    )}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3">
+          <div className={cn(
+            "p-2 rounded-lg",
+            isCurrent && "bg-green-100 dark:bg-green-900/30",
+            device.is_trusted && !isCurrent && "bg-blue-100 dark:bg-blue-900/30",
+            !isCurrent && !device.is_trusted && "bg-gray-100 dark:bg-gray-800"
+          )}>
+            <Icon className={cn(
+              "h-5 w-5",
+              isCurrent && "text-green-600 dark:text-green-400",
+              device.is_trusted && !isCurrent && "text-blue-600 dark:text-blue-400",
+              !isCurrent && !device.is_trusted && "text-gray-500 dark:text-gray-400"
+            )} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-medium dark:text-gray-100">{device.name}</h4>
+              {isCurrent && (
+                <Badge variant="default" className="bg-green-500 text-white text-xs">
+                  Current Device
+                </Badge>
+              )}
+              {device.is_trusted && !isCurrent && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800 text-xs">
+                  Trusted
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground dark:text-gray-400">
+              {device.browser} • {device.os}
+            </p>
+          </div>
+        </div>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 dark:hover:bg-gray-800">
+              <MoreVertical className="h-4 w-4 dark:text-gray-400" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="dark:bg-gray-900 dark:border-gray-800">
+            {!isCurrent && (
+              <DropdownMenuItem 
+                onClick={() => onLogout(device.id)}
+                disabled={isProcessing}
+                className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400 dark:focus:bg-red-950/30"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Log Out Device
+              </DropdownMenuItem>
+            )}
+            {!isCurrent && device.is_trusted ? (
+              <DropdownMenuItem 
+                onClick={() => onUntrust?.(device.id)}
+                disabled={isProcessing}
+                className="dark:text-gray-300 dark:focus:bg-gray-800"
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Remove Trust
+              </DropdownMenuItem>
+            ) : !isCurrent && !device.is_trusted ? (
+              <DropdownMenuItem 
+                onClick={() => onTrust?.(device.id)}
+                disabled={isProcessing}
+                className="dark:text-gray-300 dark:focus:bg-gray-800"
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Trust Device
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuItem className="dark:text-gray-300 dark:focus:bg-gray-800">
+              <Info className="mr-2 h-4 w-4" />
+              Details
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
+        <div className="flex items-center gap-2">
+          <Globe className="h-3 w-3 text-muted-foreground dark:text-gray-500" />
+          <span className="text-xs font-mono text-gray-600 dark:text-gray-400">{device.ip_address}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <MapPin className="h-3 w-3 text-muted-foreground dark:text-gray-500" />
+          <span className="text-xs text-gray-600 dark:text-gray-400">{device.location}</span>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mt-3 text-xs">
+        <div className="flex items-center gap-2 text-muted-foreground dark:text-gray-500">
+          <Clock className="h-3 w-3" />
+          <span>Last active: {device.last_active_human}</span>
+        </div>
+        <Badge 
+          variant="outline" 
+          className={cn(
+            "text-xs",
+            device.status === 'active' 
+              ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800' 
+              : 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-700'
+          )}
+        >
+          {device.status === 'active' ? (
+            <><Wifi className="h-3 w-3 mr-1" /> Active</>
+          ) : (
+            <><WifiOff className="h-3 w-3 mr-1" /> Inactive</>
+          )}
+        </Badge>
+      </div>
+    </div>
+  );
+};
+
+// Session History Item Component
+const SessionItem = ({ session }: { session: SessionHistory }) => (
+  <div className="flex items-center justify-between p-2 hover:bg-accent/30 dark:hover:bg-gray-800/50 rounded">
+    <div>
+      <div className="font-medium text-sm dark:text-gray-200">{session.device_name}</div>
+      <div className="text-xs text-muted-foreground dark:text-gray-400">
+        {session.location} • {session.created_at_human}
+        {session.ip_address && <span className="ml-2 font-mono">({session.ip_address})</span>}
+      </div>
+    </div>
+    <Badge 
+      variant="outline" 
+      className={
+        session.status === 'success' 
+          ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800' 
+          : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800'
+      }
+    >
+      {session.status === 'success' ? 'Success' : 'Failed'}
+    </Badge>
+  </div>
+);
+
+// Loading Skeleton
+const DevicesSkeleton = () => (
+  <div className="space-y-6">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <Skeleton className="h-8 w-48 dark:bg-gray-800" />
+        <Skeleton className="h-4 w-64 mt-2 dark:bg-gray-800" />
+      </div>
+      <Skeleton className="h-9 w-24 dark:bg-gray-800" />
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2 space-y-6">
+        <Skeleton className="h-64 w-full dark:bg-gray-800" />
+        <Skeleton className="h-80 w-full dark:bg-gray-800" />
+        <Skeleton className="h-96 w-full dark:bg-gray-800" />
+      </div>
+      <div className="space-y-6">
+        <Skeleton className="h-48 w-full dark:bg-gray-800" />
+        <Skeleton className="h-64 w-full dark:bg-gray-800" />
+        <Skeleton className="h-72 w-full dark:bg-gray-800" />
+        <Skeleton className="h-48 w-full dark:bg-gray-800" />
+      </div>
+    </div>
+  </div>
+);
 
 export default function ConnectedDevices() {
-  const activeDevices = devices.filter(d => d.status === 'active');
-  const inactiveDevices = devices.filter(d => d.status === 'inactive');
+  // Properly type the usePage hook
+  const { props } = usePage<PageProps>();
+  const { devices, sessionHistory, securityStats, flash } = props;
+  
+  const [processing, setProcessing] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const handleLogoutDevice = (deviceId: number) => {
-    alert(`Logging out device #${deviceId} - This would be a real API call`);
+    setProcessing(deviceId);
+    
+    router.post(route('user.devices.logout'), {
+      device_id: deviceId
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setProcessing(null);
+      },
+      onError: () => {
+        setProcessing(null);
+      }
+    });
   };
 
   const handleLogoutAll = () => {
-    alert('Logging out all other devices - This would be a real API call');
+    if (!confirm('Are you sure you want to log out from all other devices?')) {
+      return;
+    }
+
+    setProcessing(-1);
+    
+    router.post(route('user.devices.logout-all'), {}, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setProcessing(null);
+      },
+      onError: () => {
+        setProcessing(null);
+      }
+    });
+  };
+
+  const handleTrustDevice = (deviceId: number) => {
+    setProcessing(deviceId);
+    
+    router.post(route('user.devices.trust'), {
+      device_id: deviceId
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setProcessing(null);
+      },
+      onError: () => {
+        setProcessing(null);
+      }
+    });
+  };
+
+  const handleUntrustDevice = (deviceId: number) => {
+    setProcessing(deviceId);
+    
+    router.post(route('user.devices.untrust'), {
+      device_id: deviceId
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setProcessing(null);
+      },
+      onError: () => {
+        setProcessing(null);
+      }
+    });
+  };
+
+  const handleReportSuspicious = () => {
+    router.post(route('user.devices.report-suspicious'), {}, {
+      preserveScroll: true
+    });
   };
 
   const handleRefresh = () => {
-    alert('Refreshing device list - This would be a real API call');
+    setRefreshing(true);
+    router.reload({
+      only: ['devices', 'sessionHistory', 'securityStats'],
+      onFinish: () => setRefreshing(false)
+    });
   };
+
+  if (!devices || !sessionHistory || !securityStats) {
+    return (
+      <AppLayout breadcrumbs={breadcrumbs}>
+        <Head title="Connected Devices" />
+        <SettingsLayout>
+          <DevicesSkeleton />
+        </SettingsLayout>
+      </AppLayout>
+    );
+  }
+
+  const currentDevice = devices.find(d => d.is_current);
+  const activeDevices = devices.filter(d => d.status === 'active' && !d.is_current);
+  const inactiveDevices = devices.filter(d => d.status === 'inactive');
+  const trustedDevices = devices.filter(d => d.is_trusted && !d.is_current);
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -121,328 +418,347 @@ export default function ConnectedDevices() {
       
       <SettingsLayout>
         <div className="space-y-6">
+          {/* Flash Messages - Fixed variant types */}
+          {flash?.success && (
+            <Alert className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-green-800 dark:text-green-300">
+                {flash.success}
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {flash?.error && (
+            <Alert variant="destructive" className="dark:bg-red-950 dark:border-red-800">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="dark:text-red-300">
+                {flash.error}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {flash?.warning && (
+            <Alert className="bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+              <AlertDescription className="text-yellow-800 dark:text-yellow-300">
+                {flash.warning}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {flash?.info && (
+            <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <AlertDescription className="text-blue-800 dark:text-blue-300">
+                {flash.info}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Smartphone className="h-6 w-6 text-blue-600" />
+              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3 dark:text-gray-100">
+                <div className="p-2 bg-blue-100 rounded-lg dark:bg-blue-900/30">
+                  <Smartphone className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 Connected Devices
               </h1>
-              <p className="text-muted-foreground mt-2">
+              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-1">
                 Manage devices that have access to your account
               </p>
             </div>
-            <Button variant="outline" onClick={handleRefresh}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
+            <Button 
+              variant="outline" 
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="w-full sm:w-auto dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
 
           {/* Security Alert */}
-          <Alert className="bg-blue-50 border-blue-200">
-            <Shield className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800">
-              <div className="flex items-center justify-between">
+          <Alert className={cn(
+            "border",
+            securityStats.suspicious_count > 0
+              ? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
+              : 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800'
+          )}>
+            <Shield className={cn(
+              "h-4 w-4",
+              securityStats.suspicious_count > 0
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-blue-600 dark:text-blue-400'
+            )} />
+            <AlertDescription className={cn(
+              securityStats.suspicious_count > 0
+                ? 'text-red-800 dark:text-red-300'
+                : 'text-blue-800 dark:text-blue-300'
+            )}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <span className="font-medium">Security Status:</span>
-                  <span className="ml-2 text-green-600 font-medium">All devices are recognized</span>
+                  <span className={cn(
+                    "ml-2 font-medium",
+                    securityStats.suspicious_count > 0
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-green-600 dark:text-green-400'
+                  )}>
+                    {securityStats.suspicious_count > 0
+                      ? `${securityStats.suspicious_count} suspicious ${securityStats.suspicious_count === 1 ? 'device' : 'devices'} detected`
+                      : 'All devices are recognized'
+                    }
+                  </span>
                 </div>
-                <Badge variant="outline" className="bg-white">
-                  {activeDevices.length} active • {inactiveDevices.length} inactive
+                <Badge variant="outline" className="bg-white dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700 w-fit">
+                  {securityStats.active_devices} active • {securityStats.inactive_devices} inactive
                 </Badge>
               </div>
             </AlertDescription>
           </Alert>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Active Devices */}
+            {/* Left Column - Devices */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Current Device Card */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                      Current Device
-                    </CardTitle>
-                    <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
-                      Active Now
-                    </Badge>
-                  </div>
-                  <CardDescription>
-                    You're currently using this device
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {devices
-                    .filter(device => device.isCurrent)
-                    .map(device => (
-                      <div key={device.id} className="flex items-center gap-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                        <div className="p-3 bg-green-100 rounded-lg">
-                          <device.icon className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-semibold">{device.name}</h3>
-                              <p className="text-sm text-muted-foreground">
-                                {device.browser} • {device.os}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <Badge variant="outline" className="bg-white">
-                                This Device
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
-                            <div className="flex items-center gap-2">
-                              <Globe className="h-4 w-4 text-muted-foreground" />
-                              <span>{device.ip}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground" />
-                              <span>{device.location}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
-                            <Clock className="h-4 w-4" />
-                            <span>Active now • Last activity: {device.lastActive}</span>
-                          </div>
-                        </div>
-                      </div>
+              {/* Current Device */}
+              {currentDevice && (
+                <Card className="dark:bg-gray-900 dark:border-gray-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base dark:text-gray-100">Current Device</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <DeviceCard
+                      device={currentDevice}
+                      isCurrent={true}
+                      onLogout={handleLogoutDevice}
+                      isProcessing={processing === currentDevice.id}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Trusted Devices */}
+              {trustedDevices.length > 0 && (
+                <Card className="dark:bg-gray-900 dark:border-gray-800">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base dark:text-gray-100">Trusted Devices</CardTitle>
+                      <Badge variant="outline" className="dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{trustedDevices.length}</Badge>
+                    </div>
+                    <CardDescription className="text-xs dark:text-gray-400">
+                      Devices you've marked as trusted
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {trustedDevices.map(device => (
+                      <DeviceCard
+                        key={device.id}
+                        device={device}
+                        onLogout={handleLogoutDevice}
+                        onUntrust={handleUntrustDevice}
+                        isProcessing={processing === device.id}
+                      />
                     ))}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Other Active Devices */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Monitor className="h-5 w-5 text-blue-500" />
-                      Other Active Devices
-                    </CardTitle>
-                    <Badge variant="outline">
-                      {activeDevices.filter(d => !d.isCurrent).length} devices
-                    </Badge>
-                  </div>
-                  <CardDescription>
-                    Devices currently logged into your account
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {activeDevices
-                    .filter(device => !device.isCurrent)
-                    .map(device => (
-                      <div key={device.id} className="p-4 rounded-lg border hover:bg-accent/50 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                              <device.icon className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                              <h4 className="font-medium">{device.name}</h4>
-                              <p className="text-sm text-muted-foreground">
-                                {device.browser} • {device.os}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleLogoutDevice(device.id)}
-                          >
-                            <LogOut className="h-4 w-4 mr-1" />
-                            Log Out
-                          </Button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs">{device.location}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs">{device.lastActive}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  
-                  {activeDevices.filter(d => !d.isCurrent).length === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Monitor className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                      <p>No other active devices</p>
+              {activeDevices.length > 0 && (
+                <Card className="dark:bg-gray-900 dark:border-gray-800">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base dark:text-gray-100">Other Active Devices</CardTitle>
+                      <Badge variant="outline" className="dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{activeDevices.length}</Badge>
                     </div>
+                    <CardDescription className="text-xs dark:text-gray-400">
+                      Devices currently logged into your account
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {activeDevices.map(device => (
+                      <DeviceCard
+                        key={device.id}
+                        device={device}
+                        onLogout={handleLogoutDevice}
+                        onTrust={handleTrustDevice}
+                        isProcessing={processing === device.id}
+                      />
+                    ))}
+                  </CardContent>
+                  {activeDevices.length > 0 && (
+                    <CardFooter className="border-t bg-muted/30 dark:bg-gray-800/50 dark:border-gray-700">
+                      <Button 
+                        variant="outline" 
+                        className="w-full dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                        onClick={handleLogoutAll}
+                        disabled={processing === -1}
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        {processing === -1 ? 'Logging out...' : 'Log Out From All Other Devices'}
+                      </Button>
+                    </CardFooter>
                   )}
-                </CardContent>
-                <CardFooter className="border-t bg-muted/30">
-                  <Button variant="outline" className="w-full" onClick={handleLogoutAll}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Log Out From All Other Devices
-                  </Button>
-                </CardFooter>
-              </Card>
+                </Card>
+              )}
 
               {/* Inactive Devices */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-muted-foreground" />
-                    Inactive Devices
-                  </CardTitle>
-                  <CardDescription>
-                    Devices that haven't been active recently
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {inactiveDevices.map(device => (
-                    <div key={device.id} className="p-4 rounded-lg border opacity-75">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-gray-100 rounded-lg">
-                            <device.icon className="h-5 w-5 text-gray-500" />
-                          </div>
-                          <div>
-                            <h4 className="font-medium">{device.name}</h4>
-                            <p className="text-sm text-muted-foreground">
-                              {device.browser} • {device.os}
-                            </p>
-                          </div>
-                        </div>
-                        <Button variant="ghost" size="sm" disabled>
-                          Inactive
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs">{device.location}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs">{device.lastActive}</span>
-                        </div>
-                      </div>
+              {inactiveDevices.length > 0 && (
+                <Card className="dark:bg-gray-900 dark:border-gray-800">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base dark:text-gray-100">Inactive Devices</CardTitle>
+                      <Badge variant="outline" className="dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{inactiveDevices.length}</Badge>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
+                    <CardDescription className="text-xs dark:text-gray-400">
+                      Devices that haven't been active recently
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {inactiveDevices.map(device => (
+                      <DeviceCard
+                        key={device.id}
+                        device={device}
+                        onLogout={handleLogoutDevice}
+                        onTrust={handleTrustDevice}
+                        isProcessing={processing === device.id}
+                      />
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Right Column - Stats & Security */}
             <div className="space-y-6">
               {/* Security Stats */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-green-600" />
+              <Card className="dark:bg-gray-900 dark:border-gray-800">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 dark:text-gray-100">
+                    <Shield className="h-4 w-4 text-green-600 dark:text-green-400" />
                     Security Overview
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Account Security</span>
-                      <span className="font-medium text-green-600">High</span>
+                      <span className="text-muted-foreground dark:text-gray-400">Account Security</span>
+                      <span className={cn(
+                        "font-medium",
+                        securityStats.security_score >= 80
+                          ? 'text-green-600 dark:text-green-400'
+                          : securityStats.security_score >= 60
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-red-600 dark:text-red-400'
+                      )}>
+                        {securityStats.security_score}%
+                      </span>
                     </div>
-                    <Progress value={85} className="h-2" />
+                    <Progress 
+                      value={securityStats.security_score} 
+                      className="h-2 dark:bg-gray-800"
+                    />
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{activeDevices.length}</div>
-                      <div className="text-xs text-muted-foreground">Active Devices</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center p-3 bg-blue-50 rounded-lg dark:bg-blue-950/30">
+                      <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                        {securityStats.active_devices}
+                      </div>
+                      <div className="text-xs text-muted-foreground dark:text-gray-400">Active</div>
                     </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">0</div>
-                      <div className="text-xs text-muted-foreground">Suspicious</div>
+                    <div className="text-center p-3 bg-red-50 rounded-lg dark:bg-red-950/30">
+                      <div className="text-xl font-bold text-red-600 dark:text-red-400">
+                        {securityStats.suspicious_count}
+                      </div>
+                      <div className="text-xs text-muted-foreground dark:text-gray-400">Suspicious</div>
                     </div>
                   </div>
 
-                  <Separator />
+                  <Separator className="dark:bg-gray-800" />
 
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>All recognized devices</span>
+                      <CheckCircle className={cn(
+                        "h-4 w-4",
+                        securityStats.suspicious_count === 0
+                          ? 'text-green-500 dark:text-green-400'
+                          : 'text-gray-300 dark:text-gray-600'
+                      )} />
+                      <span className="text-xs text-gray-600 dark:text-gray-300">All devices recognized</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>2FA enabled</span>
+                      <CheckCircle className={cn(
+                        "h-4 w-4",
+                        securityStats.two_factor_enabled
+                          ? 'text-green-500 dark:text-green-400'
+                          : 'text-gray-300 dark:text-gray-600'
+                      )} />
+                      <span className="text-xs text-gray-600 dark:text-gray-300">
+                        2FA {securityStats.two_factor_enabled ? 'enabled' : 'disabled'}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
-                      <span>1 inactive device for 7+ days</span>
-                    </div>
+                    {securityStats.inactive_warning_count > 0 && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+                        <span className="text-xs text-gray-600 dark:text-gray-300">
+                          {securityStats.inactive_warning_count} inactive for 7+ days
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
 
               {/* Recent Activity */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                  <CardDescription>Latest login attempts</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {sessionHistory.map(session => (
-                    <div key={session.id} className="flex items-center justify-between p-2 hover:bg-accent/30 rounded">
-                      <div>
-                        <div className="font-medium text-sm">{session.device}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {session.location} • {session.time}
-                        </div>
-                      </div>
-                      {session.status === 'success' ? (
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                          Success
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                          Failed
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+              {sessionHistory.length > 0 && (
+                <Card className="dark:bg-gray-900 dark:border-gray-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base dark:text-gray-100">Recent Activity</CardTitle>
+                    <CardDescription className="text-xs dark:text-gray-400">Latest login attempts</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {sessionHistory.slice(0, 5).map(session => (
+                      <SessionItem key={session.id} session={session} />
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Security Tips */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-blue-600" />
+              <Card className="dark:bg-gray-900 dark:border-gray-800">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2 dark:text-gray-100">
+                    <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     Security Tips
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex items-start gap-2 p-2">
-                    <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0 dark:text-green-400" />
                     <div>
-                      <p className="text-sm font-medium">Log out unused devices</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-medium dark:text-gray-200">Log out unused devices</p>
+                      <p className="text-xs text-muted-foreground dark:text-gray-400">
                         Keep your account secure by logging out from devices you no longer use
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-2 p-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0 dark:text-amber-400" />
                     <div>
-                      <p className="text-sm font-medium">Check unrecognized locations</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-medium dark:text-gray-200">Check unrecognized locations</p>
+                      <p className="text-xs text-muted-foreground dark:text-gray-400">
                         Report any login attempts from unfamiliar locations
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-2 p-2">
-                    <Shield className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div className="flex items-start gap-2">
+                    <Shield className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0 dark:text-blue-400" />
                     <div>
-                      <p className="text-sm font-medium">Enable 2FA</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-medium dark:text-gray-200">Enable 2FA</p>
+                      <p className="text-xs text-muted-foreground dark:text-gray-400">
                         Add an extra layer of security to your account
                       </p>
                     </div>
@@ -451,43 +767,67 @@ export default function ConnectedDevices() {
               </Card>
 
               {/* Quick Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
+              <Card className="dark:bg-gray-900 dark:border-gray-800">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base dark:text-gray-100">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <Button variant="outline" className="w-full justify-start" onClick={handleLogoutAll}>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start text-sm h-9 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    onClick={handleLogoutAll}
+                    disabled={processing === -1}
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
-                    Log Out Everywhere
+                    {processing === -1 ? 'Logging out...' : 'Log Out Everywhere'}
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start text-sm h-9 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    onClick={handleReportSuspicious}
+                  >
                     <AlertTriangle className="mr-2 h-4 w-4" />
                     Report Suspicious Activity
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Shield className="mr-2 h-4 w-4" />
-                    View Security Settings
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start text-sm h-9 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    asChild
+                  >
+                    <a href="/residentsettings/security">
+                      <Shield className="mr-2 h-4 w-4" />
+                      Security Settings
+                    </a>
                   </Button>
                 </CardContent>
               </Card>
             </div>
           </div>
 
-          {/* Bottom Warning */}
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-medium">Warning:</span> If you notice any unfamiliar devices or locations, 
-                  log out immediately and change your password.
+          {/* Bottom Warning - Only show if suspicious activity */}
+          {securityStats.suspicious_count > 0 && (
+            <Alert variant="destructive" className="dark:bg-red-950 dark:border-red-800">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="text-sm dark:text-red-300">
+                    <span className="font-medium">Warning:</span> We've detected {securityStats.suspicious_count} suspicious device{securityStats.suspicious_count > 1 ? 's' : ''}. 
+                    Log out immediately and change your password.
+                  </div>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="w-full sm:w-auto dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-100"
+                    asChild
+                  >
+                    <a href="/residentsettings/security/password">
+                      Secure Account Now
+                    </a>
+                  </Button>
                 </div>
-                <Button variant="destructive" size="sm">
-                  Secure Account
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       </SettingsLayout>
     </AppLayout>

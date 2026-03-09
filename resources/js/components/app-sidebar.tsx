@@ -806,6 +806,7 @@ export function AppSidebar({ className }: { className?: string }) {
         resolved: 0,
         rejected: 0,
         high_priority: 0,
+        pending_clearances: 0, // Added for clearance approval requests
     };
 
     // Helper function to check if user has permission
@@ -1006,6 +1007,18 @@ export function AppSidebar({ className }: { className?: string }) {
                             !url.startsWith('/admin/clearances/approval') &&
                             !url.includes('/create'),
                         requiredPermission: 'view-clearances',
+                    },
+                    {
+                        title: 'Approval Requests', // Added clearance approval requests
+                        href: '/admin/clearances/approval/requests',
+                        icon: CheckCircle,
+                        description: 'Review clearance requests',
+                        color: 'bg-violet-100 dark:bg-violet-800 text-violet-600 dark:text-violet-400',
+                        isActive: (url: string) =>
+                            url.startsWith('/admin/clearances/approval'),
+                        requiredPermission: 'issue-clearances',
+                        badge: reportStats.pending_clearances || 0,
+                        isNew: true,
                     },
                 ],
             },
@@ -1401,6 +1414,16 @@ export function AppSidebar({ className }: { className?: string }) {
                     description: 'Issue barangay clearance',
                 },
                 {
+                    title: 'Approval Requests', // Added clearance approval requests
+                    href: '/admin/clearances/approval/requests',
+                    icon: CheckCircle,
+                    color: 'violet' as const,
+                    requiredPermission: 'issue-clearances',
+                    description: 'Review clearance requests',
+                    badge: reportStats.pending_clearances || 0,
+                    isNew: true,
+                },
+                {
                     title: 'Record Payment',
                     href: '/admin/payments/payments/create',
                     icon: CreditCard,
@@ -1441,7 +1464,7 @@ export function AppSidebar({ className }: { className?: string }) {
             residents: groups.residents.filter(a => hasPermission(a.requiredPermission)),
             services: groups.services.filter(a => hasPermission(a.requiredPermission)),
         };
-    }, [userPermissions, userRoleName]);
+    }, [userPermissions, userRoleName, reportStats]);
 
     // Grouped Quick Actions for Settings tab (UPDATED WITH /admin PREFIX)
     const settingsQuickActionGroups = useMemo(() => {
@@ -1619,7 +1642,7 @@ export function AppSidebar({ className }: { className?: string }) {
         const allActions = [
             ...operationsQuickActionGroups.reports.slice(0, 1),
             ...operationsQuickActionGroups.residents.slice(0, 1),
-            ...operationsQuickActionGroups.services.slice(0, 2),
+            ...operationsQuickActionGroups.services.slice(0, 2), // Will include Approval Requests if it's in top 2
         ].slice(0, 5);
 
         return allActions;

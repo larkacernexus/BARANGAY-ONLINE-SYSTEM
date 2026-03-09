@@ -69,6 +69,9 @@ class ClearanceRequest extends Model
         'contact_address',
         'contact_purok_id',
         'contact_email',
+
+        'requested_by_user_id',
+        'household_id',
     ];
 
     protected $casts = [

@@ -29,57 +29,64 @@ class FeeCreatedNotification extends Notification
         return ['database'];
     }
 
-    public function toArray($notifiable): array
-    {
-        $feeTypeName = $this->fee->feeType->name ?? 'Fee';
-        $amount = number_format($this->fee->total_amount, 2);
-        
-        // Determine who this fee is for
-        $forWhom = '';
-        $residentName = $this->residentName;
-        
-        if (!$residentName && $this->fee->payer_type === 'resident' && $this->fee->resident) {
-            $residentName = $this->fee->resident->full_name;
-        }
-        
-        if ($residentName) {
-            $forWhom = " for {$residentName}";
-        } elseif ($this->fee->payer_type === 'household') {
-            $forWhom = " for your household";
-        }
-
-        // Create the message
-        $message = match($this->action) {
-            'created' => "New fee created{$forWhom}: {$feeTypeName} - ₱{$amount}",
-            'bulk_created' => "Bulk created {$this->bulkCount} fees for your household: {$feeTypeName}",
-            'duplicated' => "Fee duplicated{$forWhom}: {$feeTypeName} - ₱{$amount}",
-            default => "Fee {$this->action}: {$feeTypeName}",
-        };
-
-        // Create a short title for display
-        $title = $residentName 
-            ? "Fee for {$residentName}" 
-            : ($this->fee->payer_type === 'household' ? "Household Fee" : "New Fee");
-
-        return [
-            'type' => 'fee_created',
-            'fee_id' => $this->fee->id,
-            'fee_code' => $this->fee->fee_code,
-            'fee_type' => $feeTypeName,
-            'payer_name' => $this->fee->payer_name,
-            'resident_name' => $residentName,
-            'payer_type' => $this->fee->payer_type,
-            'amount' => $this->fee->total_amount,
-            'formatted_amount' => "₱{$amount}",
-            'action' => $this->action,
-            'message' => $message,
-            'title' => $title,
-            'bulk_count' => $this->bulkCount,
-            'created_by' => $this->fee->created_by,
-            'created_at' => now()->toISOString(),
-            'link' => "/admin/fees/{$this->fee->id}",
-            'household_id' => $this->fee->household_id,
-            'resident_id' => $this->fee->resident_id,
-        ];
+  public function toArray($notifiable): array
+{
+    $feeTypeName = $this->fee->feeType->name ?? 'Fee';
+    $amount = number_format($this->fee->total_amount, 2);
+    
+    // Determine who this fee is for
+    $forWhom = '';
+    $residentName = $this->residentName;
+    
+    if (!$residentName && $this->fee->payer_type === 'resident' && $this->fee->resident) {
+        $residentName = $this->fee->resident->full_name;
     }
+    
+    if ($residentName) {
+        $forWhom = " for {$residentName}";
+    } elseif ($this->fee->payer_type === 'household') {
+        $forWhom = " for your household";
+    }
+
+    // Create the message
+    $message = match($this->action) {
+        'created' => "New fee created{$forWhom}: {$feeTypeName} - ₱{$amount}",
+        'bulk_created' => "Bulk created {$this->bulkCount} fees for your household: {$feeTypeName}",
+        'duplicated' => "Fee duplicated{$forWhom}: {$feeTypeName} - ₱{$amount}",
+        default => "Fee {$this->action}: {$feeTypeName}",
+    };
+
+    // Create a short title for display
+    $title = $residentName 
+        ? "Fee for {$residentName}" 
+        : ($this->fee->payer_type === 'household' ? "Household Fee" : "New Fee");
+
+    // ✅ FIX: Determine the correct base URL based on who's receiving the notification
+    $isAdmin = $notifiable instanceof \App\Models\User && $notifiable->is_admin; // Adjust based on your admin check
+    $baseUrl = $isAdmin ? '/admin' : '/portal';
+
+    return [
+        'type' => 'fee_created',
+        'fee_id' => $this->fee->id,
+        'fee_code' => $this->fee->fee_code,
+        'fee_type' => $feeTypeName,
+        'payer_name' => $this->fee->payer_name,
+        'resident_name' => $residentName,
+        'payer_type' => $this->fee->payer_type,
+        'amount' => $this->fee->total_amount,
+        'formatted_amount' => "₱{$amount}",
+        'action' => $this->action,
+        'message' => $message,
+        'title' => $title,
+        'bulk_count' => $this->bulkCount,
+        'created_by' => $this->fee->created_by,
+        'created_at' => now()->toISOString(),
+        // ✅ FIXED: Dynamic link based on user role
+        'link' => $baseUrl . '/fees/' . $this->fee->id,
+        // ✅ ADDED: Also add action_url for compatibility
+        'action_url' => $baseUrl . '/fees/' . $this->fee->id,
+        'household_id' => $this->fee->household_id,
+        'resident_id' => $this->fee->resident_id,
+    ];
+}
 }

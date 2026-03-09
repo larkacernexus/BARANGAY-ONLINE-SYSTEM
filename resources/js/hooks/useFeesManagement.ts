@@ -5,12 +5,52 @@ import { route } from 'ziggy-js';
 import { Fee, Filters, Stats, PaginationData, BulkOperation, SelectionMode, SelectionStats } from '@/types/fees.types';
 
 export const useFeesManagement = (
-    initialFees: PaginationData,
-    initialFilters: Filters,
-    statuses: Record<string, string>,
-    categories: Record<string, string>,
-    puroks: string[],
-    initialStats: Stats
+    initialFees: PaginationData = {
+        data: [],
+        current_page: 1,
+        last_page: 1,
+        per_page: 15,
+        total: 0,
+        from: 0,
+        to: 0
+    },
+    initialFilters: Filters = {
+        status: 'all',
+        category: 'all',
+        purok: 'all',
+        from_date: '',
+        to_date: '',
+        sort_by: 'created_at',
+        sort_order: 'desc',
+        search: ''
+    },
+    statuses: Record<string, string> = {},
+    categories: Record<string, string> = {},
+    puroks: string[] = [],
+    initialStats: Stats = {
+        total: 0,
+        total_amount: 0,
+        collected: 0,
+        pending: 0,
+        overdue_count: 0,
+        due_soon_count: 0,
+        today_count: 0,
+        today_amount: 0,
+        today_collected: 0,
+        this_month_count: 0,
+        this_month_amount: 0,
+        this_month_collected: 0,
+        status_counts: {
+            pending: 0,
+            issued: 0,
+            partially_paid: 0,
+            paid: 0,
+            overdue: 0,
+            cancelled: 0,
+            waived: 0
+        },
+        category_totals: {}
+    }
 ) => {
     const { flash } = usePage().props as any;
     
@@ -119,14 +159,16 @@ export const useFeesManagement = (
 
     // Filter fees client-side
     const filteredFees = useMemo(() => {
-        let result = [...initialFees.data];
+        // Safe access to initialFees.data
+        const feesData = initialFees?.data || [];
+        let result = [...feesData];
 
         // Apply filters
         if (search) {
             const searchLower = search.toLowerCase();
             result = result.filter(fee => 
-                fee.fee_code.toLowerCase().includes(searchLower) ||
-                fee.payer_name.toLowerCase().includes(searchLower) ||
+                (fee.fee_code?.toLowerCase() || '').includes(searchLower) ||
+                (fee.payer_name?.toLowerCase() || '').includes(searchLower) ||
                 (fee.contact_number && fee.contact_number.includes(search)) ||
                 (fee.purok && fee.purok.toLowerCase().includes(searchLower)) ||
                 (fee.fee_type?.name && fee.fee_type.name.toLowerCase().includes(searchLower)) ||
@@ -164,28 +206,28 @@ export const useFeesManagement = (
             
             switch (sortBy) {
                 case 'fee_code':
-                    aValue = a.fee_code.toLowerCase();
-                    bValue = b.fee_code.toLowerCase();
+                    aValue = (a.fee_code || '').toLowerCase();
+                    bValue = (b.fee_code || '').toLowerCase();
                     break;
                 case 'payer_name':
-                    aValue = a.payer_name.toLowerCase();
-                    bValue = b.payer_name.toLowerCase();
+                    aValue = (a.payer_name || '').toLowerCase();
+                    bValue = (b.payer_name || '').toLowerCase();
                     break;
                 case 'total_amount':
-                    aValue = a.total_amount;
-                    bValue = b.total_amount;
+                    aValue = a.total_amount || 0;
+                    bValue = b.total_amount || 0;
                     break;
                 case 'due_date':
-                    aValue = new Date(a.due_date).getTime();
-                    bValue = new Date(b.due_date).getTime();
+                    aValue = new Date(a.due_date || 0).getTime();
+                    bValue = new Date(b.due_date || 0).getTime();
                     break;
                 case 'status':
-                    aValue = a.status;
-                    bValue = b.status;
+                    aValue = a.status || '';
+                    bValue = b.status || '';
                     break;
                 default:
-                    aValue = new Date(a.created_at).getTime();
-                    bValue = new Date(b.created_at).getTime();
+                    aValue = new Date(a.created_at || 0).getTime();
+                    bValue = new Date(b.created_at || 0).getTime();
             }
 
             const sortOrder = filters.sort_order || 'desc';
@@ -197,7 +239,7 @@ export const useFeesManagement = (
         });
 
         return result;
-    }, [initialFees.data, search, filters]);
+    }, [initialFees?.data, search, filters]);
 
     // Pagination
     const totalItems = filteredFees.length;
@@ -236,7 +278,8 @@ export const useFeesManagement = (
     };
 
     const handleSelectAll = () => {
-        if (confirm(`This will select ALL ${initialFees.total} fees. This action may take a moment.`)) {
+        const total = initialFees?.total || 0;
+        if (confirm(`This will select ALL ${total} fees. This action may take a moment.`)) {
             const pageIds = paginatedFees.map(fee => fee.id);
             setSelectedFees(pageIds);
             setSelectionMode('all');
@@ -256,7 +299,7 @@ export const useFeesManagement = (
     // Check if all items on current page are selected
     useEffect(() => {
         const allPageIds = paginatedFees.map(fee => fee.id);
-        const allSelected = allPageIds.every(id => selectedFees.includes(id));
+        const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedFees.includes(id));
         setIsSelectAll(allSelected);
     }, [selectedFees, paginatedFees]);
 
@@ -269,9 +312,9 @@ export const useFeesManagement = (
     const selectionStats = useMemo<SelectionStats>(() => {
         const selectedData = selectedFeesData;
         
-        const totalAmount = selectedData.reduce((sum, fee) => sum + fee.total_amount, 0);
-        const totalPaid = selectedData.reduce((sum, fee) => sum + fee.amount_paid, 0);
-        const totalBalance = selectedData.reduce((sum, fee) => sum + fee.balance, 0);
+        const totalAmount = selectedData.reduce((sum, fee) => sum + (fee.total_amount || 0), 0);
+        const totalPaid = selectedData.reduce((sum, fee) => sum + (fee.amount_paid || 0), 0);
+        const totalBalance = selectedData.reduce((sum, fee) => sum + (fee.balance || 0), 0);
         const overdueCount = selectedData.filter(fee => 
             isOverdue(fee.due_date) && fee.status !== 'paid'
         ).length;

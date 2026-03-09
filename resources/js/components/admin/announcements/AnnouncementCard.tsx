@@ -100,14 +100,14 @@ export function AnnouncementCard({
                         <ActionDropdown>
                             <ActionDropdownItem
                                 icon={<Eye className="h-4 w-4" />}
-                                href={route('announcements.show', announcement.id)}
+                                href={route('admin.announcements.show', announcement.id)}
                             >
                                 View Details
                             </ActionDropdownItem>
                             
                             <ActionDropdownItem
                                 icon={<Edit className="h-4 w-4" />}
-                                href={route('announcements.edit', announcement.id)}
+                                href={route('admin.announcements.edit', announcement.id)}
                             >
                                 Edit
                             </ActionDropdownItem>

@@ -52,7 +52,7 @@ const residentNav = [
   { title: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard, shortTitle: 'Dashboard' },
   { title: 'Profile', href: '/residentsettings/profile', icon: User, shortTitle: 'Profile' },
   { title: 'Fees & Charges', href: '/portal/fees', icon: Receipt, shortTitle: 'Fees' },
-  { title: 'Payment History', href: '/portal/my-payments', icon: Wallet, shortTitle: 'Payments' },
+  { title: 'Payment History', href: '/portal/payments', icon: Wallet, shortTitle: 'Payments' },
   { title: 'Clearances', href: '/portal/my-clearances', icon: ShieldCheck, shortTitle: 'Clearances' },
   { title: 'Community Reports', href: '/portal/community-reports', icon: BarChart3, shortTitle: 'Reports' },
   { title: 'Documents', href: '/portal/my-records', icon: FolderOpen, shortTitle: 'Documents' },
@@ -62,7 +62,7 @@ const residentQuickActions = [
   { 
     title: 'Make Payment', 
     shortTitle: 'Pay',
-    href: '/portal/my-payments/pay', 
+    href: '/portal/payments/pay', 
     icon: DollarSign, 
     description: 'Pay fees online'
   },
@@ -86,7 +86,7 @@ const residentResources = [
   { title: 'Announcements', href: '/portal/announcements', icon: Newspaper, badge: '2', shortTitle: 'News' },
   { title: 'Forms & Templates', href: '/portal/forms', icon: FileText, shortTitle: 'Forms' },
   { title: 'Support Center', href: '/portal/support', icon: HelpCircle, shortTitle: 'Support' },
-  { title: 'Settings', href: '/portal/settings', icon: Settings, shortTitle: 'Settings' },
+  { title: 'Settings', href: '/residentsettings/profile', icon: Settings, shortTitle: 'Settings' },
 ];
 
 export function ResidentSidebar({ className }: { className?: string }) {

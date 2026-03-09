@@ -589,7 +589,7 @@ export default function MyPayments() {
             }
         });
         
-        router.get('/portal/my-payments', cleanFilters, {
+        router.get('/portal/payments', cleanFilters, {
             preserveState: true,
             preserveScroll: true,
             replace: true,
@@ -639,7 +639,7 @@ export default function MyPayments() {
         setPaymentMethodFilter('all');
         setYearFilter('all');
         
-        router.get('/portal/my-payments', {}, {
+        router.get('/portal/payments', {}, {
             preserveState: true,
             preserveScroll: true,
             onFinish: () => setLoading(false),
@@ -724,11 +724,11 @@ export default function MyPayments() {
     };
     
     const handleViewDetails = (id: number) => {
-        router.visit(`/portal/my-payments/${id}`);
+        router.visit(`/portal/payments/${id}`);
     };
     
     const handleMakePayment = (id: number) => {
-        router.visit(`/portal/my-payments/create?payment_id=${id}`);
+        router.visit(`/portal/payments/create?payment_id=${id}`);
     };
     
     const handleDownloadReceipt = (payment: Payment) => {
@@ -1138,7 +1138,7 @@ export default function MyPayments() {
             <ResidentLayout
                 breadcrumbs={[
                     { title: 'Dashboard', href: '/portal/dashboard' },
-                    { title: 'My Payments', href: '/portal/my-payments' }
+                    { title: 'My Payments', href: '/portal/payments' }
                 ]}
             >
                 <Head title="My Payments" />
@@ -1169,7 +1169,7 @@ export default function MyPayments() {
             <ResidentLayout
                 breadcrumbs={[
                     { title: 'Dashboard', href: '/portal/dashboard' },
-                    { title: 'My Payments', href: '/portal/my-payments' }
+                    { title: 'My Payments', href: '/portal/payments' }
                 ]}
             >
                 <div className="space-y-6">
@@ -1205,7 +1205,7 @@ export default function MyPayments() {
             <ResidentLayout
                 breadcrumbs={[
                     { title: 'Dashboard', href: '/portal/dashboard' },
-                    { title: 'My Payments', href: '/portal/my-payments' }
+                    { title: 'My Payments', href: '/portal/payments' }
                 ]}
             >
                 <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
@@ -1242,7 +1242,7 @@ export default function MyPayments() {
                                         <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse" />
                                     )}
                                 </Button>
-                                <Link href="/portal/my-payments/create">
+                                <Link href="/portal/payments/create">
                                     <Button size="sm" className="h-8 px-3 bg-gradient-to-r from-blue-500 to-blue-600">
                                         <Plus className="h-4 w-4 mr-1" />
                                         Pay
@@ -1283,7 +1283,7 @@ export default function MyPayments() {
                                     <Download className="h-4 w-4" />
                                     {isExporting ? 'Exporting...' : 'Export'}
                                 </Button>
-                                {/* <Link href="/portal/my-payments/create">
+                                {/* <Link href="/portal/payments/create">
                                     <Button className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600">
                                         <Plus className="h-4 w-4" />
                                         <span>Make Payment</span>
@@ -1355,7 +1355,7 @@ export default function MyPayments() {
                 {/* Mobile FAB */}
                 {isMobile && (
                     <div className="fixed bottom-6 right-6 z-50 safe-bottom animate-scale-in">
-                        <Link href="/portal/my-payments/create">
+                        <Link href="/portal/payments/create">
                             <Button 
                                 size="lg" 
                                 className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"

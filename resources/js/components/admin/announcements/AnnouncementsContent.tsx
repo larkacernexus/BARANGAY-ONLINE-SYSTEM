@@ -1,3 +1,5 @@
+// resources/js/components/admin/announcements/AnnouncementsContent.tsx
+
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -15,10 +17,14 @@ import {
     Edit,
     Trash2,
     Bell,
+    BellRing,
     Calendar,
     AlertCircle,
     CheckSquare,
-    Square
+    Square,
+    Eye,
+    Users,
+    BarChart
 } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -56,16 +62,22 @@ interface AnnouncementsContentProps {
     onClearSelection: () => void;
     onDelete: (announcement: Announcement) => void;
     onToggleStatus: (announcement: Announcement) => void;
+    onSendNotifications: (announcement: Announcement) => void;
+    onResendNotifications: (announcement: Announcement) => void;
+    onViewNotificationStats: (announcement: Announcement) => void;
+    onDuplicate: (announcement: Announcement) => void;
     onSort: (column: string) => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: string, additionalData?: any) => void;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
+    setShowBulkNotifyDialog?: (show: boolean) => void;
     filtersState: AnnouncementFilters;
     isPerformingBulkAction: boolean;
     selectionMode: 'page' | 'filtered' | 'all';
     selectionStats?: any;
     types?: Record<string, string>;
     priorities?: Record<string, string>;
+    audienceTypes?: Record<string, string>;
 }
 
 export default function AnnouncementsContent({
@@ -92,21 +104,34 @@ export default function AnnouncementsContent({
     onClearSelection,
     onDelete,
     onToggleStatus,
+    onSendNotifications,
+    onResendNotifications,
+    onViewNotificationStats,
+    onDuplicate,
     onSort,
     onBulkOperation,
     onCopySelectedData,
     setShowBulkDeleteDialog,
+    setShowBulkNotifyDialog,
     filtersState,
     isPerformingBulkAction,
     selectionMode,
     selectionStats,
     types = {},
-    priorities = {}
+    priorities = {},
+    audienceTypes = {}
 }: AnnouncementsContentProps) {
     
     // Bulk action items configuration
     const bulkActions = {
         primary: [
+            {
+                label: 'Send Notifications',
+                icon: <BellRing className="h-3.5 w-3.5 mr-1.5" />,
+                onClick: () => setShowBulkNotifyDialog?.(true),
+                tooltip: 'Send notifications to target audience',
+                variant: 'default' as const
+            },
             {
                 label: 'Export',
                 icon: <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />,
@@ -118,12 +143,6 @@ export default function AnnouncementsContent({
                 icon: <Send className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('publish'),
                 tooltip: 'Publish selected announcements'
-            },
-            {
-                label: 'Print',
-                icon: <Printer className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('print'),
-                tooltip: 'Print selected announcements'
             }
         ],
         secondary: [
@@ -146,16 +165,10 @@ export default function AnnouncementsContent({
                 tooltip: 'Archive selected announcements'
             },
             {
-                label: 'Change Status',
-                icon: <Edit className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_status'),
-                tooltip: 'Change status for selected announcements'
-            },
-            {
-                label: 'Change Type',
-                icon: <AlertCircle className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_type'),
-                tooltip: 'Change type for selected announcements'
+                label: 'Change Audience',
+                icon: <Users className="h-3.5 w-3.5 mr-1.5" />,
+                onClick: () => setShowBulkNotifyDialog?.(true),
+                tooltip: 'Change audience for selected announcements'
             },
             {
                 label: 'Copy Data',
@@ -202,6 +215,7 @@ export default function AnnouncementsContent({
                     onBulkOperation={onBulkOperation}
                     onCopySelectedData={onCopySelectedData}
                     setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                    setShowBulkNotifyDialog={setShowBulkNotifyDialog}
                     bulkActions={bulkActions}
                 />
             )}
@@ -272,7 +286,7 @@ export default function AnnouncementsContent({
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        <p>Toggle bulk selection mode</p>
+                                        <p>Toggle bulk selection mode (Ctrl+Shift+B)</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </div>
@@ -315,6 +329,10 @@ export default function AnnouncementsContent({
                                     onClearFilters={onClearFilters}
                                     onDelete={onDelete}
                                     onToggleStatus={onToggleStatus}
+                                    onSendNotifications={onSendNotifications}
+                                    onResendNotifications={onResendNotifications}
+                                    onViewNotificationStats={onViewNotificationStats}
+                                    onDuplicate={onDuplicate}
                                     onSelectAllOnPage={onSelectAllOnPage}
                                     isSelectAll={isSelectAll}
                                 />
@@ -328,6 +346,10 @@ export default function AnnouncementsContent({
                                     onItemSelect={onItemSelect}
                                     onDelete={onDelete}
                                     onToggleStatus={onToggleStatus}
+                                    onSendNotifications={onSendNotifications}
+                                    onResendNotifications={onResendNotifications}
+                                    onViewNotificationStats={onViewNotificationStats}
+                                    onDuplicate={onDuplicate}
                                     hasActiveFilters={hasActiveFilters}
                                     onClearFilters={onClearFilters}
                                 />

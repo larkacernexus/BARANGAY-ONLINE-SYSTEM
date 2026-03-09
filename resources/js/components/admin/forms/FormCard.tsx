@@ -83,14 +83,14 @@ export function FormCard({
                         <ActionDropdown>
                             <ActionDropdownItem
                                 icon={<Eye className="h-4 w-4" />}
-                                href={route('forms.show', form.id)}
+                                href={route('admin.forms.show', form.id)}
                             >
                                 View Details
                             </ActionDropdownItem>
                             
                             <ActionDropdownItem
                                 icon={<Edit className="h-4 w-4" />}
-                                href={route('forms.edit', form.id)}
+                                href={route('admin.forms.edit', form.id)}
                             >
                                 Edit Form
                             </ActionDropdownItem>

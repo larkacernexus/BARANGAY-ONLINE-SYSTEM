@@ -139,7 +139,7 @@ private function sendFeeNotifications($fees, $request)
                 'fee_id' => $fee->id,
                 'fee_code' => $fee->fee_code,
                 'payer_type' => $fee->payer_type,
-                'payer_id' => $fee->payer_id,  // This is the key!
+                'payer_id' => $fee->payer_id,
                 'payer_name' => $fee->payer_name
             ]);
             
@@ -254,31 +254,54 @@ private function sendFeeNotifications($fees, $request)
             ]);
         }
 
-        // Send notifications
+        // === ADD NOTIFICATION PREFERENCE CHECK ===
+        // Send notifications only if user wants them
         if (count($fees) > 1) {
             $firstFee = $fees[0];
             $bulkCount = count($fees);
             
             foreach ($usersToNotify as $user) {
-                $user->notify(new FeeCreatedNotification(
-                    $firstFee,
-                    'bulk_created',
-                    $bulkCount
-                ));
+                // Get user notification preferences
+                $prefs = $user->getNotificationPreferences();
+                
+                // Check if user wants fee notifications via email
+                if ($prefs['fees'] && $prefs['email']) {
+                    $user->notify(new FeeCreatedNotification(
+                        $firstFee,
+                        'bulk_created',
+                        $bulkCount
+                    ));
+                    Log::info('✓ Bulk notification sent to user: ' . $user->id);
+                } else {
+                    Log::info('✗ User opted out of fee notifications: ' . $user->id, [
+                        'wants_fees' => $prefs['fees'],
+                        'wants_email' => $prefs['email']
+                    ]);
+                }
             }
-            Log::info('Bulk notifications sent to ' . $usersToNotify->count() . ' users');
         } else {
             foreach ($fees as $fee) {
                 foreach ($usersToNotify as $user) {
-                    $user->notify(new FeeCreatedNotification(
-                        $fee, 
-                        'created',
-                        null,
-                        $fee->resident_name ?? null
-                    ));
+                    // Get user notification preferences
+                    $prefs = $user->getNotificationPreferences();
+                    
+                    // Check if user wants fee notifications via email
+                    if ($prefs['fees'] && $prefs['email']) {
+                        $user->notify(new FeeCreatedNotification(
+                            $fee, 
+                            'created',
+                            null,
+                            $fee->resident_name ?? null
+                        ));
+                        Log::info('✓ Single notification sent to user: ' . $user->id);
+                    } else {
+                        Log::info('✗ User opted out of fee notifications: ' . $user->id, [
+                            'wants_fees' => $prefs['fees'],
+                            'wants_email' => $prefs['email']
+                        ]);
+                    }
                 }
             }
-            Log::info('Single notification sent to ' . $usersToNotify->count() . ' users');
         }
         
         Log::info('========== END NOTIFICATION DEBUG ==========');

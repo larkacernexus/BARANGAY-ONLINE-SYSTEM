@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Inertia\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use App\Models\Household;
 use App\Models\HouseholdMember;
 use App\Models\Resident;
@@ -17,6 +18,7 @@ use App\Models\ClearanceRequest;
 use App\Models\Form;
 use App\Models\Announcement;
 use App\Models\Payment;
+use App\Helpers\NotificationHelper;
 
 class ResidentHandleInertiaRequests extends Middleware
 {
@@ -173,74 +175,119 @@ class ResidentHandleInertiaRequests extends Middleware
                 }
             }
             
-            // ========== FIXED: PROPER NOTIFICATION MAPPING ==========
-            $notifications = $user->notifications()
+            // ========== FIXED: PROPER NOTIFICATION HANDLING WITH CORRECT LINKS ==========
+            $rawNotifications = $user->notifications()
                 ->orderBy('created_at', 'desc')
                 ->limit(10)
-                ->get()
-                ->map(function ($notification) {
-                    $data = $notification->data;
-                    
-                    // Determine the resident name from various possible sources
-                    $residentName = null;
-                    
-                    // Check direct resident_name field
-                    if (isset($data['resident_name']) && $data['resident_name']) {
-                        $residentName = $data['resident_name'];
-                    }
-                    // Check if it's from payer_name with resident type
-                    elseif (isset($data['payer_name']) && isset($data['payer_type'])) {
-                        if (str_contains($data['payer_type'], 'Resident')) {
-                            $residentName = $data['payer_name'];
-                        }
-                    }
-                    
-                    // Create a meaningful title
-                    $title = 'New Notification';
-                    if ($residentName) {
-                        $title = "Fee for {$residentName}";
-                    } elseif (isset($data['fee_type']) && $data['fee_type']) {
-                        $title = "New {$data['fee_type']} Fee";
-                    } elseif (isset($data['message']) && $data['message']) {
-                        // Extract first few words from message for title
-                        $words = explode(' ', $data['message']);
-                        $title = implode(' ', array_slice($words, 0, 4)) . '...';
-                    }
-                    
-                    // Create a description/message
-                    $message = $data['message'] ?? 'New notification received';
-                    
-                    // Add amount to message if available
-                    if (isset($data['formatted_amount']) && $data['formatted_amount']) {
-                        $message .= ' - ' . $data['formatted_amount'];
-                    }
-                    
-                    return [
-                        'id' => $notification->id,
-                        'type' => $notification->type,
-                        'data' => $data,
-                        'read_at' => $notification->read_at,
-                        'created_at' => $notification->created_at,
-                        'created_at_diff' => $notification->created_at->diffForHumans(),
-                        'is_fee_notification' => $notification->type === 'App\Notifications\FeeCreatedNotification',
-                        'message' => $message,
-                        'title' => $title,
-                        'resident_name' => $residentName,
-                        'formatted_amount' => $data['formatted_amount'] ?? null,
-                        'fee_code' => $data['fee_code'] ?? null,
-                        'fee_type' => $data['fee_type'] ?? null,
-                        'link' => $data['link'] ?? '#',
-                    ];
-                });
+                ->get();
             
-            $unreadNotificationCount = $user->unreadNotifications()->count();
-            
-            \Log::info('User notifications fetched', [
+            // Format each notification using NotificationHelper
+            $notifications = $rawNotifications->map(function ($notification) use ($user) {
+                // Use the helper to properly format the notification
+                $formatted = NotificationHelper::formatNotification($notification, $user);
+                
+                // Get the notification data
+                $notificationData = $formatted->data ?? [];
+                
+                // Determine the correct link - PRIORITY ORDER:
+                // 1. Check for link in data
+                // 2. Check for action_url in data
+                // 3. Check for url in formatted
+                // 4. Check if it's admin link and convert to portal
+                // 5. Default to '#'
+                $link = $notificationData['link'] 
+                    ?? $notificationData['action_url'] 
+                    ?? $formatted->url 
+                    ?? '#';
+                
+                // Convert admin links to portal links for residents
+                if (str_starts_with($link, '/admin/')) {
+                    $link = str_replace('/admin/', '/portal/', $link);
+                    Log::debug('Converted admin link to portal link', [
+                        'original' => $notificationData['link'] ?? null,
+                        'converted' => $link
+                    ]);
+                }
+                
+                // Also create action_url for compatibility
+                $actionUrl = $notificationData['action_url'] 
+                    ?? $notificationData['link'] 
+                    ?? $formatted->url 
+                    ?? '#';
+                    
+                if (str_starts_with($actionUrl, '/admin/')) {
+                    $actionUrl = str_replace('/admin/', '/portal/', $actionUrl);
+                }
+                
+                return [
+                    'id' => $formatted->id,
+                    'type' => $formatted->type,
+                    'data' => $notificationData,
+                    'read_at' => $formatted->read_at,
+                    'created_at' => $formatted->created_at,
+                    'created_at_diff' => $formatted->created_at_diff ?? $formatted->created_at->diffForHumans(),
+                    
+                    // Fields from NotificationHelper formatting
+                    'title' => $formatted->title ?? 'Notification',
+                    'message' => $formatted->message ?? 'New notification',
+                    'url' => $formatted->url ?? '#',
+                    
+                    // ✅ FIXED: Use our properly determined links
+                    'link' => $link,
+                    'action_url' => $actionUrl,
+                    
+                    // Type flags
+                    'is_announcement' => $formatted->is_announcement ?? false,
+                    'is_fee_notification' => $formatted->is_fee_notification ?? false,
+                    'is_clearance_notification' => $formatted->is_clearance_notification ?? false,
+                    
+                    // Resident data
+                    'resident_name' => $formatted->resident_name ?? null,
+                    'resident_id' => $formatted->resident_id ?? null,
+                    
+                    // Clearance data
+                    'reference_number' => $formatted->reference_number ?? null,
+                    'clearance_type' => $formatted->clearance_type ?? null,
+                    'clearance_id' => $formatted->clearance_id ?? null,
+                    'purpose' => $formatted->purpose ?? null,
+                    
+                    // Fee/Payment data
+                    'fee_amount' => $formatted->fee_amount ?? null,
+                    'formatted_amount' => $formatted->formatted_amount ?? null,
+                    'fee_id' => $formatted->fee_id ?? null,
+                    'fee_code' => $formatted->fee_code ?? null,
+                    'fee_type' => $formatted->fee_type ?? null,
+                    'payment_id' => $formatted->payment_id ?? null,
+                    
+                    // Status
+                    'status' => $formatted->status ?? null,
+                    
+                    // Announcement specific fields
+                    'priority' => $formatted->priority ?? null,
+                    'priority_label' => $formatted->priority_label ?? null,
+                    'priority_color' => $formatted->priority_color ?? null,
+                    'type_label' => $formatted->type_label ?? null,
+                    'type_icon' => $formatted->type_icon ?? null,
+                    'type_color' => $formatted->type_color ?? null,
+                    'audience_summary' => $formatted->audience_summary ?? null,
+                    'estimated_reach' => $formatted->estimated_reach ?? null,
+                    'formatted_date_range' => $formatted->formatted_date_range ?? null,
+                    'time_range' => $formatted->time_range ?? null,
+                    'created_by' => $formatted->created_by ?? null,
+                    'formatted_created' => $formatted->formatted_created ?? null,
+                    'is_active' => $formatted->is_active ?? true,
+                    'is_currently_active' => $formatted->is_currently_active ?? true,
+                ];
+            })->toArray();
+
+            $unreadNotificationCount = NotificationHelper::getUnreadCount($user);
+
+            Log::info('User notifications fetched with NotificationHelper', [
                 'user_id' => $user->id,
-                'user_name' => $user->full_name,
-                'notification_count' => $notifications->count(),
+                'notification_count' => count($notifications),
                 'unread_count' => $unreadNotificationCount,
-                'sample_notification' => $notifications->first()
+                'has_announcements' => collect($notifications)->contains('is_announcement', true),
+                'sample_link' => count($notifications) > 0 ? $notifications[0]['link'] ?? 'none' : 'none'
             ]);
         }
         
@@ -542,37 +589,37 @@ class ResidentHandleInertiaRequests extends Middleware
         return $businesses;
     }
 
-    protected function searchOwnPayments($searchTerm, $residentId)
-    {
-        $payments = Payment::where('payer_type', 'resident')
-            ->where('payer_id', $residentId)
-            ->where(function($query) use ($searchTerm) {
-                $query->where('or_number', 'like', $searchTerm)
-                    ->orWhere('reference_number', 'like', $searchTerm)
-                    ->orWhere('purpose', 'like', $searchTerm);
-            })
-            ->limit(5)
-            ->get()
-            ->map(function ($payment) {
-                return [
-                    'id' => $payment->id,
-                    'type' => 'payment',
-                    'title' => 'Payment: OR #' . ($payment->or_number ?? 'N/A'),
-                    'subtitle' => 'Amount: ₱' . number_format($payment->total_amount ?? 0, 2),
-                    'description' => $payment->purpose ?? '',
-                    'url' => route('admin.payments.show', $payment->id),
-                    'icon' => 'Receipt',
-                    'badge' => 'My Payment',
-                    'tags' => [$payment->payment_method, $payment->status],
-                    'meta' => [
-                        'date' => $payment->payment_date ? date('M d, Y', strtotime($payment->payment_date)) : null,
-                    ]
-                ];
-            })
-            ->toArray();
+   protected function searchOwnPayments($searchTerm, $residentId)
+{
+    $payments = Payment::where('payer_type', 'resident')
+        ->where('payer_id', $residentId)
+        ->where(function($query) use ($searchTerm) {
+            $query->where('or_number', 'like', $searchTerm)
+                ->orWhere('reference_number', 'like', $searchTerm)
+                ->orWhere('purpose', 'like', $searchTerm);
+        })
+        ->limit(5)
+        ->get()
+        ->map(function ($payment) {
+            return [
+                'id' => $payment->id,
+                'type' => 'payment',
+                'title' => 'Payment: OR #' . ($payment->or_number ?? 'N/A'),
+                'subtitle' => 'Amount: ₱' . number_format($payment->total_amount ?? 0, 2),
+                'description' => $payment->purpose ?? '',
+                'url' => route('resident.payments.show', $payment->id),
+                'icon' => 'Receipt',
+                'badge' => 'My Payment',
+                'tags' => [$payment->payment_method, $payment->status],
+                'meta' => [
+                    'date' => $payment->payment_date ? date('M d, Y', strtotime($payment->payment_date)) : null,
+                ]
+            ];
+        })
+        ->toArray();
 
-        return $payments;
-    }
+    return $payments;
+}
 
     protected function searchOwnReports($searchTerm, $residentId)
     {

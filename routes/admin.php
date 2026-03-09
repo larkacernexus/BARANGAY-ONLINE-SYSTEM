@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\CommitteeController;
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\HouseholdController;
 use App\Http\Controllers\Admin\FeeController;
+use App\Http\Controllers\Admin\FeeReminderController;
 use App\Http\Controllers\Admin\Fees\FeeCreateController;
 use App\Http\Controllers\Admin\Fees\FeeStoreController;
 use App\Http\Controllers\Admin\Fees\FeeShowController;
@@ -20,10 +21,15 @@ use App\Http\Controllers\Admin\Fees\FeeTypeController;
 use App\Http\Controllers\Admin\ReportTypeController;
 use App\Http\Controllers\Admin\DocumentTypeController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\PermissionController;
-use App\Http\Controllers\Admin\PaymentController;
-use App\Http\Controllers\Admin\ReportsController;
+use App\Http\Controllers\Admin\Payment\PaymentIndexController;
+use App\Http\Controllers\Admin\Payment\PaymentCreateController;
+use App\Http\Controllers\Admin\Payment\PaymentStoreController;
+use App\Http\Controllers\Admin\Payment\PaymentShowController;
+use App\Http\Controllers\Admin\Payment\PaymentEditController;use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\FormController;
+
 use App\Http\Controllers\Admin\ReceiptsController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\DashboardController;
@@ -195,6 +201,21 @@ Route::middleware('permission:manage-committees')->prefix('committees')->name('c
 });
 
 // ====================
+// NOTIFICATIONS
+// ====================
+Route::middleware('auth')->prefix('notifications')->name('notifications.')->group(function () {
+    Route::get('/', [NotificationController::class, 'index'])->name('index');
+    Route::get('/api', [NotificationController::class, 'getNotifications'])->name('api');
+    Route::get('/unread-count', [NotificationController::class, 'getUnreadCount'])->name('unread-count');
+    Route::post('/{id}/read', [NotificationController::class, 'markAsRead'])->name('mark-read');
+    Route::post('/read-all', [NotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+    Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('destroy');
+    Route::patch('/{id}/mark-as-read', [NotificationController::class, 'markAsRead'])
+        ->name('mark-as-read');
+
+    });
+
+// ====================
 // POSITIONS MANAGEMENT
 // ====================
 Route::middleware('permission:manage-positions')->prefix('positions')->name('positions.')->group(function () {
@@ -227,22 +248,36 @@ Route::middleware('permission:manage-households')->prefix('households')->name('h
     Route::delete('/{household}/members/{resident}', [HouseholdController::class, 'removeMember'])->name('members.remove');
 });
 
-// ====================
-// PAYMENTS MANAGEMENT
-// ====================
 Route::middleware('permission:view-payments')->prefix('payments')->name('payments.')->group(function () {
-    Route::get('/', [PaymentController::class, 'index'])->name('index');
-    Route::get('/{payment}', [PaymentController::class, 'show'])->name('show');
+    Route::get('/', [PaymentIndexController::class, 'index'])->name('index');
+    Route::get('/statistics', [PaymentIndexController::class, 'statistics'])->name('statistics');
+    Route::get('/clearance-types', [PaymentShowController::class, 'getClearanceTypes'])->name('clearance-types');
+    Route::get('/outstanding-fees', [PaymentCreateController::class, 'getOutstandingFees'])->name('outstanding-fees');
+    Route::get('/export/pdf', [PaymentShowController::class, 'exportPdf'])->name('export-pdf');
+    Route::get('/{payment}', [PaymentShowController::class, 'show'])->name('show');
+    Route::get('/{payment}/receipt', [PaymentShowController::class, 'printReceipt'])->name('receipt');
 });
 
+// Routes for managing payments (permission: manage-payments)
 Route::middleware('permission:manage-payments')->prefix('payments')->name('payments.')->group(function () {
-    Route::get('/payments/create', [PaymentController::class, 'create'])->name('create');
-    Route::post('/', [PaymentController::class, 'store'])->name('store');
-    Route::get('/{payment}/edit', [PaymentController::class, 'edit'])->name('edit');
-    Route::put('/{payment}', [PaymentController::class, 'update'])->name('update');
-    Route::delete('/{payment}', [PaymentController::class, 'destroy'])->name('destroy');
-    Route::get('/{payment}/receipt', [PaymentController::class, 'printReceipt'])->name('receipt');
+    // Create routes
+    Route::get('/payments/create', [PaymentCreateController::class, 'create'])->name('create');
+    Route::get('/create-for-clearance/{clearanceRequest}', [PaymentCreateController::class, 'createForClearance'])->name('create-for-clearance');
+    Route::post('/', [PaymentStoreController::class, 'store'])->name('store');
+    
+    // Edit/Update routes
+    Route::get('/{payment}/edit', [PaymentEditController::class, 'edit'])->name('edit');
+    Route::put('/{payment}', [PaymentEditController::class, 'update'])->name('update');
+    
+    // Status management routes
+    Route::patch('/{payment}/cancel', [PaymentEditController::class, 'cancel'])->name('cancel');
+    Route::patch('/{payment}/refund', [PaymentEditController::class, 'refund'])->name('refund');
+    
+    // Delete route (if needed)
+    Route::delete('/{payment}', [PaymentEditController::class, 'destroy'])->name('destroy');
 });
+
+
 
 // ====================
 // FEES MANAGEMENT
@@ -270,6 +305,15 @@ Route::middleware('permission:manage-fees')->prefix('fees')->name('fees.')->grou
     Route::get('/status-chart', [FeeController::class, 'statusChartData'])->name('statusChart');
     Route::get('/monthly-collection-chart', [FeeController::class, 'monthlyCollectionChart'])->name('monthlyCollectionChart');
     Route::get('/dashboard', [FeeController::class, 'dashboard'])->name('dashboard');
+});
+
+
+
+Route::prefix('fees/reminders')->name('fees.reminders.')->group(function () {
+    Route::get('/due-stats', [FeeController::class, 'getDueStats'])->name('due-stats');
+    Route::post('/send', [FeeController::class, 'sendDueReminders'])->name('send');
+    Route::post('/{id}/send-single', [FeeController::class, 'sendSingleReminder'])->name('send-single');
+    Route::get('/{id}/history', [FeeController::class, 'getReminderHistory'])->name('history');
 });
 
 // ====================
@@ -418,7 +462,7 @@ Route::middleware('permission:issue-clearances')->prefix('clearances')->name('cl
     Route::post('/{clearance}/reject', [ClearanceController::class, 'reject'])->name('reject');
 });
 
-Route::middleware('permission:issue-clearances')->prefix('clearances/approval')->name('admin.clearances.approval.')->group(function () {
+Route::middleware('permission:issue-clearances')->prefix('clearances/approval')->name('clearances.approval.')->group(function () {
     Route::get('/requests', [ClearanceApprovalController::class, 'index'])->name('index');
     Route::get('/{clearanceRequest}', [ClearanceApprovalController::class, 'show'])->name('show');
     Route::post('/{clearanceRequest}/approve', [ClearanceApprovalController::class, 'approve'])->name('approve');
@@ -508,7 +552,9 @@ Route::prefix('receipts')->name('receipts.')->group(function () {
     Route::post('/{receipt}/void', [ReceiptsController::class, 'void'])->name('void');
     Route::post('/bulk/operation', [ReceiptsController::class, 'bulkOperation'])->name('bulk-operation');
     Route::post('/export', [ReceiptsController::class, 'export'])->name('export');
-});
+    Route::get('/receipts/{receipt}', [ReceiptsController::class, 'show'])->name('show');
+
+    });
 
 // ====================
 // SECURITY LOGS

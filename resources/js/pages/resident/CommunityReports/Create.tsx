@@ -1,4 +1,4 @@
-// pages/resident/community-report.tsx (refactored)
+// pages/resident/community-report.tsx
 
 import { useForm, usePage, Link } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
@@ -38,6 +38,7 @@ export default function CommunityReport() {
     const safeReportTypes = Array.isArray(reportTypes) ? reportTypes : [];
     const safeUser = auth?.user || {};
     
+    // ========== STATE DECLARATIONS ==========
     const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
     const [anonymous, setAnonymous] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,10 +49,13 @@ export default function CommunityReport() {
     const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'issues' | 'complaints'>('issues');
     
+    // Validation states
+    const [isDetailsValid, setIsDetailsValid] = useState(false);
+    
     // Mobile state
     const { isMobile, isButtonsVisible } = useMobileNavigation();
     
-    // Form data
+    // ========== FORM SETUP ==========
     const today = new Date().toISOString().split('T')[0];
     const { data, setData, post, processing, errors, reset } = useForm({
         report_type_id: null as number | null,
@@ -68,7 +72,7 @@ export default function CommunityReport() {
         _method: 'post' as 'post' | 'put'
     });
 
-    // File handling
+    // ========== FILE HANDLING ==========
     const {
         files,
         setFiles,
@@ -84,7 +88,7 @@ export default function CommunityReport() {
         clearAllFiles
     } = useFileHandling();
 
-    // Draft storage
+    // ========== DRAFT STORAGE ==========
     const {
         hasUnsavedChanges,
         saveDraft: saveDraftToStorage,
@@ -105,10 +109,21 @@ export default function CommunityReport() {
         setAnonymous
     });
 
-    // Active report types and selected type
+    // ========== DERIVED VALUES ==========
     const activeReportTypes = safeReportTypes.filter((type: ReportType) => type.is_active);
     const selectedType = activeReportTypes.find((type: ReportType) => type.id === data.report_type_id);
+    
+    // ✅ Define totalFiles here - BEFORE any functions or effects that use it
+    const totalFiles = files.length + existingFiles.length;
 
+    // ✅ Define canProceed here - uses totalFiles
+    const canProceed = {
+        step1: !!data.report_type_id,
+        step2: isDetailsValid,
+        step3: selectedType?.requires_evidence ? totalFiles > 0 : true
+    };
+
+    // ========== EFFECTS ==========
     // Load draft from localStorage on component mount
     useEffect(() => {
         const loadDraft = () => {
@@ -197,23 +212,39 @@ export default function CommunityReport() {
         };
     }, [files]);
 
-    // Navigation
+    // Monitor isButtonsVisible changes
+    useEffect(() => {
+        console.log('📱 isButtonsVisible changed:', isButtonsVisible);
+    }, [isButtonsVisible]);
+
+    // ✅ Monitor submission state - uses totalFiles (now defined)
+    useEffect(() => {
+        console.log('📊 State Monitor:', {
+            isSubmitting,
+            processing,
+            activeStep,
+            isButtonsVisible,
+            canProceed: canProceed.step3,
+            evidenceCount: totalFiles,
+            isDetailsValid
+        });
+    }, [isSubmitting, processing, activeStep, isButtonsVisible, totalFiles, canProceed.step3, isDetailsValid]);
+
+    // ========== NAVIGATION FUNCTIONS ==========
     const nextStep = () => {
+        console.log('👉 nextStep called for step:', activeStep);
+        
         if (activeStep === 1 && !data.report_type_id) {
             toast.error('Please select a report type');
             return;
         }
         
-        if (activeStep === 2) {
-            if (!data.title.trim() || !data.description.trim() || !data.location.trim() || !data.incident_date) {
-                toast.error('Please fill in all required fields');
-                return;
-            }
+        if (activeStep === 2 && !isDetailsValid) {
+            toast.error('Please fill in all required fields correctly (description must be at least 15 characters)');
+            return;
         }
         
-        if (activeStep === 3 && selectedType?.requires_evidence && 
-            (!Array.isArray(data.evidence) || data.evidence.length === 0) && 
-            existingFiles.length === 0) {
+        if (activeStep === 3 && selectedType?.requires_evidence && totalFiles === 0) {
             toast.error('Evidence is required for this type of report');
             return;
         }
@@ -231,6 +262,7 @@ export default function CommunityReport() {
         }
     };
 
+    // ========== HANDLER FUNCTIONS ==========
     // Handle manual save draft
     const handleSaveDraft = async () => {
         if (isSavingDraft || isSubmitting || processing) return;
@@ -281,53 +313,94 @@ export default function CommunityReport() {
 
     // Form submission
     const handleSubmit = async () => {
+        console.log('🔵 ========== HANDLE SUBMIT STARTED ==========');
+        console.log('🔵 Current state:', {
+            isSubmitting,
+            processing,
+            activeStep,
+            anonymous,
+            selectedType: selectedType?.name,
+            requiresEvidence: selectedType?.requires_evidence,
+            evidenceCount: {
+                new: files.length,
+                existing: existingFiles.length,
+                total: totalFiles  // ✅ Now totalFiles is defined
+            },
+            isDetailsValid
+        });
+
         if (isSubmitting || processing) {
+            console.log('⛔ Submission blocked: already in progress', { isSubmitting, processing });
             return;
         }
         
         // Final validation
         if (!data.report_type_id) {
+            console.log('⛔ Validation failed: no report type selected');
             toast.error('Please select a report type');
             setActiveStep(1);
             return;
         }
         
-        if (!data.title.trim() || !data.description.trim() || !data.location.trim() || !data.incident_date) {
-            toast.error('Please fill in all required fields');
+        if (!isDetailsValid) {
+            console.log('⛔ Validation failed: details form invalid');
+            toast.error('Please fill in all required fields correctly (description must be at least 15 characters)');
             setActiveStep(2);
             return;
         }
         
-        if (selectedType?.requires_evidence && 
-            (!Array.isArray(data.evidence) || data.evidence.length === 0) && 
-            existingFiles.length === 0) {
+        if (selectedType?.requires_evidence && totalFiles === 0) {
+            console.log('⛔ Validation failed: evidence required but none provided');
             toast.error('Evidence is required for this type of report');
             setActiveStep(3);
             return;
         }
         
         if (!anonymous && !data.reporter_contact?.trim()) {
+            console.log('⛔ Validation failed: contact info missing');
             toast.error('Please provide your contact information');
             return;
         }
+
+        console.log('✅ Validation passed, preparing FormData...');
         
         try {
+            console.log('🔵 Setting isSubmitting to true');
             setIsSubmitting(true);
             
             const formData = new FormData();
+            console.log('✅ FormData created');
             
+            // Append all fields with logging
             formData.append('report_type_id', String(data.report_type_id));
+            console.log('  - report_type_id:', data.report_type_id);
+            
             formData.append('title', data.title);
+            console.log('  - title:', data.title);
+            
             formData.append('description', data.description);
+            console.log('  - description length:', data.description.length);
+            
             formData.append('detailed_description', data.description);
+            
             formData.append('location', data.location);
+            console.log('  - location:', data.location);
+            
             formData.append('incident_date', data.incident_date);
+            console.log('  - incident_date:', data.incident_date);
+            
             formData.append('incident_time', data.incident_time || '');
+            console.log('  - incident_time:', data.incident_time || 'none');
+            
             formData.append('urgency_level', data.urgency);
+            console.log('  - urgency_level:', data.urgency);
+            
             formData.append('recurring_issue', '0');
             formData.append('affected_people', 'individual');
             formData.append('estimated_affected_count', '1');
             formData.append('is_anonymous', anonymous ? '1' : '0');
+            console.log('  - is_anonymous:', anonymous ? '1' : '0');
+            
             formData.append('has_previous_report', '0');
             formData.append('impact_level', 'moderate');
             formData.append('safety_concern', '0');
@@ -338,23 +411,32 @@ export default function CommunityReport() {
             if (!anonymous) {
                 formData.append('reporter_name', data.reporter_name || '');
                 formData.append('reporter_contact', data.reporter_contact || '');
+                console.log('  - reporter_name:', data.reporter_name);
+                console.log('  - reporter_contact:', data.reporter_contact);
             }
             
             const evidenceFiles = Array.isArray(data.evidence) ? data.evidence : [];
+            console.log('📸 Evidence files:', evidenceFiles.length);
+            
             if (evidenceFiles.length > 0) {
                 evidenceFiles.forEach((file, index) => {
                     if (isFile(file)) {
                         formData.append('evidence[]', file);
+                        console.log(`  - evidence[${index}]:`, file.name);
                     }
                 });
             }
             
-            const routeUrl = route('resident.community-reports.store');
+            const routeUrl = route('portal.community-reports.store');
+            console.log('🌐 Submitting to URL:', routeUrl);
+            
+            console.log('🔵 Calling post() method...');
             
             await post(routeUrl, formData, {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => {
+                onSuccess: (response) => {
+                    console.log('✅✅✅ SUBMISSION SUCCESS!', response);
                     toast.success(anonymous 
                         ? 'Anonymous report submitted successfully!' 
                         : 'Report submitted successfully!'
@@ -377,8 +459,10 @@ export default function CommunityReport() {
                     setActiveStep(1);
                 },
                 onError: (errors) => {
+                    console.error('❌❌❌ SUBMISSION ERROR!', errors);
                     if (errors) {
                         Object.entries(errors).forEach(([field, message]) => {
+                            console.error(`  - ${field}:`, message);
                             toast.error(`${field}: ${message}`);
                         });
                     } else {
@@ -386,25 +470,20 @@ export default function CommunityReport() {
                     }
                 },
                 onFinish: () => {
+                    console.log('🏁 SUBMISSION FINISHED');
+                    console.log('🔵 Setting isSubmitting to false');
                     setIsSubmitting(false);
                 },
             });
             
         } catch (error) {
+            console.error('💥 UNCAUGHT ERROR:', error);
             toast.error('An unexpected error occurred');
             setIsSubmitting(false);
         }
     };
 
-    // Determine if we can proceed
-    const canProceed = {
-        step1: !!data.report_type_id,
-        step2: !!data.title.trim() && !!data.description.trim() && !!data.location.trim() && !!data.incident_date,
-        step3: selectedType?.requires_evidence ? (files.length + existingFiles.length) > 0 : true
-    };
-
-    const totalFiles = files.length + existingFiles.length;
-
+    // ========== RENDER ==========
     return (
         <ResidentLayout
             breadcrumbs={[
@@ -414,7 +493,16 @@ export default function CommunityReport() {
             ]}
         >
             <div className="space-y-4 md:space-y-6">
-                <form id="report-form" className="space-y-6">
+                <form 
+                    id="report-form" 
+                    className="space-y-6"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        if (activeStep === 4) {
+                            handleSubmit();
+                        }
+                    }}
+                >
                     {/* Mobile Header with Progress */}
                     {isMobile && (
                         <StepProgress 
@@ -559,6 +647,7 @@ export default function CommunityReport() {
                                         errors={errors}
                                         setData={setData}
                                         today={today}
+                                        onValidationChange={setIsDetailsValid}
                                     />
                                 </div>
 

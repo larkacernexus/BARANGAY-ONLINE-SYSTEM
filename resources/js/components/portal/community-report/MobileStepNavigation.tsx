@@ -4,7 +4,6 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
 import { Loader2 } from 'lucide-react';
-import { steps } from '@/types/portal/communityreports/utils/community-report-helpers';
 
 interface MobileStepNavigationProps {
     activeStep: number;
@@ -52,6 +51,22 @@ export const MobileStepNavigation: React.FC<MobileStepNavigationProps> = ({
         return false;
     };
 
+    const isSubmitDisabled = () => {
+        if (processing || isSubmitting) return true;
+        if (selectedTypeRequiresEvidence && evidenceCount === 0) return true;
+        if (!anonymous && (!reporterName?.trim() || !reporterContact?.trim())) return true;
+        return false;
+    };
+
+    const handleSubmitClick = (e: React.MouseEvent) => {
+        e.preventDefault(); // Prevent any default button behavior
+        console.log('Submit button clicked, calling onSubmit...');
+        onSubmit();
+    };
+
+    const stepDisabled = getStepDisabled();
+    const submitDisabled = isSubmitDisabled();
+
     return (
         <div className={`fixed bottom-16 left-0 right-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border-t border-gray-200 dark:border-gray-800 p-4 transition-all duration-400 ease-[cubic-bezier(0.34,1.56,0.64,1)] shadow-lg ${
             isButtonsVisible 
@@ -81,16 +96,16 @@ export const MobileStepNavigation: React.FC<MobileStepNavigationProps> = ({
                         type="button"
                         className="flex-1"
                         onClick={onNextStep}
-                        disabled={getStepDisabled()}
+                        disabled={stepDisabled}
                     >
                         Continue
                     </Button>
                 ) : (
                     <Button 
-                        type="button"
-                        className="flex-1" 
-                        onClick={onSubmit}
-                        disabled={processing || isSubmitting}
+                        type="button" // Keep as button, but we'll handle submission manually
+                        className={`flex-1 ${submitDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={handleSubmitClick}
+                        disabled={submitDisabled}
                     >
                         {isSubmitting ? (
                             <>
@@ -106,12 +121,20 @@ export const MobileStepNavigation: React.FC<MobileStepNavigationProps> = ({
             {activeStep === 4 && (
                 <div className="text-center mt-2">
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {!anonymous && reporterName && reporterContact 
-                            ? 'Ready to submit your report'
-                            : anonymous
-                            ? 'Ready to submit anonymously'
-                            : 'Please complete all required fields'
-                        }
+                        {submitDisabled ? (
+                            <>
+                                {!anonymous && (!reporterName?.trim() || !reporterContact?.trim()) 
+                                    ? 'Please provide your contact information'
+                                    : selectedTypeRequiresEvidence && evidenceCount === 0
+                                    ? 'Evidence is required for this report'
+                                    : 'Complete all required fields'
+                                }
+                            </>
+                        ) : (
+                            anonymous 
+                                ? 'Ready to submit anonymously'
+                                : 'Ready to submit your report'
+                        )}
                     </p>
                 </div>
             )}

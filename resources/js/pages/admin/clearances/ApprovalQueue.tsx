@@ -54,6 +54,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Textarea } from '@/components/ui/textarea';
+import { route } from 'ziggy-js';
 
 interface ClearanceRequest {
     id: number;
@@ -152,6 +153,8 @@ export default function ApprovalQueue() {
     const [rejectReason, setRejectReason] = useState('');
     const [bulkSelection, setBulkSelection] = useState<number[]>([]);
     const [activeTab, setActiveTab] = useState<'pending' | 'processing'>('pending');
+    const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     const [localFilters, setLocalFilters] = useState({
         search: filters.search || '',
@@ -175,6 +178,107 @@ export default function ApprovalQueue() {
         sort_order: localFilters.sort_order,
     });
 
+    // Handle initial load WITHOUT parameters
+    useEffect(() => {
+        if (isInitialized) return;
+        
+        const initialParams: Record<string, any> = {};
+        let hasFilters = false;
+        
+        // Only add filters that are actually set and not default
+        if (filters.search && filters.search.trim() !== '') {
+            setData('search', filters.search);
+            initialParams.search = filters.search;
+            hasFilters = true;
+        }
+        if (filters.urgency && filters.urgency !== 'all' && filters.urgency !== '') {
+            setData('urgency', filters.urgency);
+            initialParams.urgency = filters.urgency;
+            hasFilters = true;
+        }
+        if (filters.type && filters.type !== 'all' && filters.type !== '') {
+            setData('type', filters.type);
+            initialParams.type = filters.type;
+            hasFilters = true;
+        }
+        if (filters.date_from && filters.date_from.trim() !== '') {
+            setData('date_from', filters.date_from);
+            initialParams.date_from = filters.date_from;
+            hasFilters = true;
+        }
+        if (filters.date_to && filters.date_to.trim() !== '') {
+            setData('date_to', filters.date_to);
+            initialParams.date_to = filters.date_to;
+            hasFilters = true;
+        }
+        if (filters.status && filters.status !== 'all' && filters.status !== '') {
+            setData('status', filters.status);
+            initialParams.status = filters.status;
+            hasFilters = true;
+        }
+        if (filters.sort_by && filters.sort_by !== 'created_at') {
+            setData('sort_by', filters.sort_by);
+            initialParams.sort_by = filters.sort_by;
+            hasFilters = true;
+        }
+        if (filters.sort_order && filters.sort_order !== 'desc') {
+            setData('sort_order', filters.sort_order);
+            initialParams.sort_order = filters.sort_order;
+            hasFilters = true;
+        }
+        
+        // Only make the request if we have filters
+        if (hasFilters) {
+            get(route('admin.clearances.approval.index', initialParams), {
+                preserveState: true,
+                preserveScroll: true,
+            });
+        }
+        
+        setIsInitialized(true);
+    }, []); // Empty dependency array - only run once on mount
+
+    // Helper function to build clean params (ONLY non-default values)
+    const buildCleanParams = (overrides: Record<string, any> = {}) => {
+        const params: Record<string, any> = {};
+        
+        // Merge current data with overrides
+        const mergedData = { ...data, ...overrides };
+        
+        // Only add params that have values and aren't defaults
+        if (mergedData.search && mergedData.search.trim() !== '') {
+            params.search = mergedData.search;
+        }
+        if (mergedData.urgency && mergedData.urgency !== 'all' && mergedData.urgency !== '') {
+            params.urgency = mergedData.urgency;
+        }
+        if (mergedData.type && mergedData.type !== 'all' && mergedData.type !== '') {
+            params.type = mergedData.type;
+        }
+        if (mergedData.date_from && mergedData.date_from.trim() !== '') {
+            params.date_from = mergedData.date_from;
+        }
+        if (mergedData.date_to && mergedData.date_to.trim() !== '') {
+            params.date_to = mergedData.date_to;
+        }
+        if (mergedData.status && mergedData.status !== 'all' && mergedData.status !== '') {
+            params.status = mergedData.status;
+        }
+        if (mergedData.sort_by && mergedData.sort_by !== 'created_at') {
+            params.sort_by = mergedData.sort_by;
+        }
+        if (mergedData.sort_order && mergedData.sort_order !== 'desc') {
+            params.sort_order = mergedData.sort_order;
+        }
+        
+        // Only add page if it's not 1
+        if (mergedData.page && mergedData.page !== 1) {
+            params.page = mergedData.page;
+        }
+        
+        return params;
+    };
+
     // Define the missing function
     const confirmIssueClearance = useCallback(() => {
         if (!selectedRequest) return;
@@ -193,35 +297,31 @@ export default function ApprovalQueue() {
 
     // Load data based on active tab
     useEffect(() => {
+        if (!isInitialized) return;
+        
         if (activeTab === 'processing') {
             setData('status', 'processing');
         } else {
             setData('status', 'pending');
         }
-        // Apply filters after a short delay
-        const timer = setTimeout(() => {
-            applyFilters();
-        }, 300);
-
-        return () => clearTimeout(timer);
+        // Apply filters immediately
+        applyFilters();
     }, [activeTab]);
 
     const applyFilters = useCallback(() => {
-        get(route('admin.clearances.approval.index'), {
+        const params = buildCleanParams({ page: 1 });
+        
+        get(route('admin.clearances.approval.index', params), {
             preserveState: true,
             preserveScroll: true,
-            data: {
-                ...data,
-                page: 1, // Reset to first page when filters change
-            },
         });
     }, [data, get]);
 
     const clearFilters = () => {
         const defaultFilters = {
             search: '',
-            urgency: '',
-            type: '',
+            urgency: 'all',
+            type: 'all',
             date_from: '',
             date_to: '',
             status: 'all',
@@ -232,21 +332,38 @@ export default function ApprovalQueue() {
         setLocalFilters(defaultFilters);
         setData(defaultFilters);
         
-        get(route('admin.clearances.approval.index'), {
+        // Go to base URL without any parameters
+        router.get(route('admin.clearances.approval.index'), {}, {
             preserveState: true,
             preserveScroll: true,
-            data: defaultFilters,
         });
     };
 
-    const handleSearchChange = useCallback((value: string) => {
+    // Handle search change with debounce
+    const handleSearchChange = (value: string) => {
         setData('search', value);
-        // Debounced search
-        const timer = setTimeout(() => {
+        
+        // Clear existing timeout
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+        
+        // Set new timeout
+        const timeout = setTimeout(() => {
             applyFilters();
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [setData, applyFilters]);
+        }, 300);
+        
+        setSearchTimeout(timeout);
+    };
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+        };
+    }, [searchTimeout]);
 
     const handleBulkAction = async (action: 'process' | 'return' | 'reject') => {
         if (bulkSelection.length === 0) return;
@@ -258,7 +375,7 @@ export default function ApprovalQueue() {
             } else {
                 await Promise.all(
                     bulkSelection.map(id =>
-                        post(route(`admin.clearances.approval.${action === 'process' ? 'mark-processing' : 'return-pending'}`, id))
+                        post(route(`admin.clearances.approval.${action === 'process' ? 'mark-processing' : 'return-pending'}`, { clearanceRequest: id }))
                     )
                 );
                 setBulkSelection([]);
@@ -271,7 +388,7 @@ export default function ApprovalQueue() {
 
     const handleReject = async (requestId: number, reason?: string) => {
         try {
-            await post(route('admin.clearances.approval.reject', requestId), {
+            await post(route('admin.clearances.approval.reject', { clearanceRequest: requestId }), {
                 reason: reason || rejectReason,
             });
             setRejectDialogOpen(false);
@@ -289,7 +406,7 @@ export default function ApprovalQueue() {
         try {
             await Promise.all(
                 bulkSelection.map(id =>
-                    post(route('admin.clearances.approval.reject', id), {
+                    post(route('admin.clearances.approval.reject', { clearanceRequest: id }), {
                         reason: rejectReason,
                     })
                 )
@@ -680,13 +797,19 @@ export default function ApprovalQueue() {
                                         <Input
                                             type="date"
                                             value={data.date_from}
-                                            onChange={(e) => setData('date_from', e.target.value)}
+                                            onChange={(e) => {
+                                                setData('date_from', e.target.value);
+                                                applyFilters();
+                                            }}
                                             className="flex-1"
                                         />
                                         <Input
                                             type="date"
                                             value={data.date_to}
-                                            onChange={(e) => setData('date_to', e.target.value)}
+                                            onChange={(e) => {
+                                                setData('date_to', e.target.value);
+                                                applyFilters();
+                                            }}
                                             className="flex-1"
                                         />
                                     </div>
@@ -850,11 +973,11 @@ export default function ApprovalQueue() {
                                 <Shield className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                                 <h3 className="text-lg font-semibold mb-2">No requests found</h3>
                                 <p className="text-gray-500 mb-4">
-                                    {data.search || data.urgency || data.type || data.date_from
+                                    {data.search || data.urgency !== 'all' || data.type !== 'all' || data.date_from || data.date_to
                                         ? 'Try adjusting your filters'
                                         : 'All clearance requests have been processed.'}
                                 </p>
-                                {(data.search || data.urgency || data.type || data.date_from) && (
+                                {(data.search || data.urgency !== 'all' || data.type !== 'all' || data.date_from || data.date_to) && (
                                     <Button variant="outline" onClick={clearFilters}>
                                         Clear Filters
                                     </Button>
@@ -908,7 +1031,7 @@ export default function ApprovalQueue() {
                                                         </td>
                                                         <td className="p-4">
                                                             <Link
-                                                                href={route('admin.clearances.approval.show', request.id)}
+                                                                href={route('admin.clearances.approval.show', { clearanceRequest: request.id })}
                                                                 className="font-mono font-medium text-blue-600 hover:text-blue-800 block"
                                                             >
                                                                 {request.reference_number}
@@ -1013,7 +1136,7 @@ export default function ApprovalQueue() {
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
                                                                             <Link
-                                                                                href={route('admin.clearances.approval.show', request.id)}
+                                                                                href={route('admin.clearances.approval.show', { clearanceRequest: request.id })}
                                                                             >
                                                                                 <Button variant="ghost" size="icon">
                                                                                     <Eye className="h-4 w-4" />
@@ -1033,7 +1156,7 @@ export default function ApprovalQueue() {
                                                                                 <Button
                                                                                     variant="ghost"
                                                                                     size="icon"
-                                                                                    onClick={() => post(route('admin.clearances.approval.mark-processing', request.id))}
+                                                                                    onClick={() => post(route('admin.clearances.approval.mark-processing', { clearanceRequest: request.id }))}
                                                                                 >
                                                                                     <RefreshCw className="h-4 w-4" />
                                                                                 </Button>
@@ -1052,7 +1175,7 @@ export default function ApprovalQueue() {
                                                                                 <Button
                                                                                     variant="ghost"
                                                                                     size="icon"
-                                                                                    onClick={() => post(route('admin.clearances.approval.return-pending', request.id))}
+                                                                                    onClick={() => post(route('admin.clearances.approval.return-pending', { clearanceRequest: request.id }))}
                                                                                 >
                                                                                     <Clock className="h-4 w-4" />
                                                                                 </Button>
@@ -1106,10 +1229,13 @@ export default function ApprovalQueue() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => router.get(route('admin.clearances.approval.index', {
-                                                    ...data,
-                                                    page: clearanceRequests.current_page - 1
-                                                }))}
+                                                onClick={() => {
+                                                    const params = buildCleanParams({ page: clearanceRequests.current_page - 1 });
+                                                    router.get(route('admin.clearances.approval.index', params), {}, {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                    });
+                                                }}
                                                 disabled={clearanceRequests.current_page === 1}
                                             >
                                                 Previous
@@ -1132,10 +1258,13 @@ export default function ApprovalQueue() {
                                                             key={pageNum}
                                                             variant={clearanceRequests.current_page === pageNum ? "default" : "outline"}
                                                             size="sm"
-                                                            onClick={() => router.get(route('admin.clearances.approval.index', {
-                                                                ...data,
-                                                                page: pageNum
-                                                            }))}
+                                                            onClick={() => {
+                                                                const params = buildCleanParams({ page: pageNum });
+                                                                router.get(route('admin.clearances.approval.index', params), {}, {
+                                                                    preserveState: true,
+                                                                    preserveScroll: true,
+                                                                });
+                                                            }}
                                                         >
                                                             {pageNum}
                                                         </Button>
@@ -1145,10 +1274,13 @@ export default function ApprovalQueue() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => router.get(route('admin.clearances.approval.index', {
-                                                    ...data,
-                                                    page: clearanceRequests.current_page + 1
-                                                }))}
+                                                onClick={() => {
+                                                    const params = buildCleanParams({ page: clearanceRequests.current_page + 1 });
+                                                    router.get(route('admin.clearances.approval.index', params), {}, {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                    });
+                                                }}
                                                 disabled={clearanceRequests.current_page === clearanceRequests.last_page}
                                             >
                                                 Next

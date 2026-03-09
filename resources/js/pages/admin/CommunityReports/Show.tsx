@@ -152,7 +152,16 @@ import {
     Snowflake as SnowflakeIcon,
     Haze as HazeIcon,
     Sunrise as SunriseIcon,
-    Sunset as SunsetIcon
+    Sunset as SunsetIcon,
+    Users,
+    Repeat,
+    TreePine,
+    VolumeX,
+    Volume,
+    Volume2,
+    Mic,
+    Timer,
+    AlertOctagon as AlertOctagonIcon
 } from 'lucide-react';
 
 type CommunityReport = {
@@ -172,55 +181,67 @@ type CommunityReport = {
         id: number;
         name: string;
         category: string;
+        description?: string;
     };
     title: string;
     description: string;
     detailed_description?: string;
-    location: string;
-    incident_date: string;
-    incident_time?: string;
+    location: string | null;
+    incident_date: string | null;
+    incident_time?: string | null;
     urgency_level: 'low' | 'medium' | 'high';
     recurring_issue: boolean;
-    affected_people: 'individual' | 'family' | 'group' | 'community' | 'multiple';
-    estimated_affected_count?: number;
+    affected_people: 'individual' | 'family' | 'community';
+    estimated_affected_count?: number | null;
     is_anonymous: boolean;
-    reporter_name?: string;
-    reporter_contact?: string;
-    reporter_address?: string;
-    perpetrator_details?: string;
-    preferred_resolution?: string;
+    reporter_name?: string | null;
+    reporter_contact?: string | null;
+    reporter_address?: string | null;
+    perpetrator_details?: string | null;
+    preferred_resolution?: string | null;
     has_previous_report: boolean;
-    previous_report_id?: number;
-    impact_level: 'minor' | 'moderate' | 'major' | 'severe';
+    previous_report_id?: number | null;
+    previous_report?: {
+        id: number;
+        report_number: string;
+        title: string;
+        status: string;
+    } | null;
+    impact_level: 'low' | 'moderate' | 'high' | 'severe';
     safety_concern: boolean;
     environmental_impact: boolean;
-    noise_level?: 'low' | 'medium' | 'high';
-    duration_hours?: number;
+    noise_level?: 'low' | 'moderate' | 'high' | 'severe' | null;
+    duration_hours?: number | null;
     status: 'pending' | 'under_review' | 'assigned' | 'in_progress' | 'resolved' | 'rejected';
     priority: 'low' | 'medium' | 'high' | 'critical';
-    assigned_to?: number;
+    assigned_to?: number | null;
     assignedTo?: {
         id: number;
         first_name: string;
         last_name: string;
+        name?: string;
         email?: string;
         contact_number?: string;
         position?: string;
         role?: string;
-        name?: string;
-    };
-    resolution_notes?: string;
-    resolved_at?: string;
-    acknowledged_at?: string;
-    created_at: string;
-    updated_at: string;
+    } | null;
+    resolution_notes?: string | null;
+    resolved_at?: string | null;
+    acknowledged_at?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
     evidences?: Array<{
         id: number;
         file_path: string;
         file_name: string;
         file_type: string;
         file_size: number;
+        url?: string;
     }>;
+    status_color?: string | null;
+    priority_color?: string | null;
+    urgency_color?: string | null;
+    canEdit?: boolean;
 };
 
 interface ActivityLog {
@@ -232,6 +253,7 @@ interface ActivityLog {
     created_at: string;
     ip_address?: string;
     user_agent?: string;
+    changes?: any;
 }
 
 interface StaffMember {
@@ -253,6 +275,7 @@ declare module '@inertiajs/react' {
         report: CommunityReport;
         similar_reports?: CommunityReport[];
         activity_logs?: ActivityLog[];
+        owner_notifications?: any[];
         flash?: {
             success?: string;
             error?: string;
@@ -287,6 +310,15 @@ const formatDateTime = (dateString: string | null | undefined): string => {
         return format(new Date(dateString), 'MMM dd, yyyy HH:mm');
     } catch (error) {
         return 'Invalid Date';
+    }
+};
+
+const formatTime = (timeString: string | null | undefined): string => {
+    if (!timeString) return 'Not specified';
+    try {
+        return format(new Date(`2000-01-01T${timeString}`), 'hh:mm a');
+    } catch {
+        return 'Invalid time';
     }
 };
 
@@ -361,15 +393,30 @@ const getUrgencyIcon = (urgency: string | null | undefined) => {
 const getImpactIcon = (impact: string | null | undefined) => {
     switch (impact) {
         case 'severe':
-            return <AlertTriangle className="h-4 w-4 text-red-500" />;
-        case 'major':
-            return <AlertOctagon className="h-4 w-4 text-orange-500" />;
+            return <AlertOctagonIcon className="h-4 w-4 text-red-500" />;
+        case 'high':
+            return <AlertTriangle className="h-4 w-4 text-orange-500" />;
         case 'moderate':
             return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-        case 'minor':
+        case 'low':
             return <Info className="h-4 w-4 text-blue-500" />;
         default:
             return <AlertCircle className="h-4 w-4" />;
+    }
+};
+
+const getNoiseLevelIcon = (noise: string | null | undefined) => {
+    switch (noise) {
+        case 'severe':
+            return <Mic className="h-4 w-4 text-red-500" />;
+        case 'high':
+            return <Volume2 className="h-4 w-4 text-orange-500" />;
+        case 'moderate':
+            return <Volume className="h-4 w-4 text-yellow-500" />;
+        case 'low':
+            return <VolumeX className="h-4 w-4 text-green-500" />;
+        default:
+            return <Volume className="h-4 w-4" />;
     }
 };
 
@@ -395,6 +442,35 @@ const getPriorityColor = (priority: string | null | undefined): string => {
     }
 };
 
+const getUrgencyColor = (urgency: string | null | undefined): string => {
+    switch (urgency) {
+        case 'high': return 'bg-red-100 text-red-800';
+        case 'medium': return 'bg-yellow-100 text-yellow-800';
+        case 'low': return 'bg-green-100 text-green-800';
+        default: return 'bg-gray-100 text-gray-800';
+    }
+};
+
+const getImpactColor = (impact: string | null | undefined): string => {
+    switch (impact) {
+        case 'severe': return 'bg-red-100 text-red-800';
+        case 'high': return 'bg-orange-100 text-orange-800';
+        case 'moderate': return 'bg-yellow-100 text-yellow-800';
+        case 'low': return 'bg-green-100 text-green-800';
+        default: return 'bg-gray-100 text-gray-800';
+    }
+};
+
+const getNoiseLevelColor = (noise: string | null | undefined): string => {
+    switch (noise) {
+        case 'severe': return 'bg-red-100 text-red-800';
+        case 'high': return 'bg-orange-100 text-orange-800';
+        case 'moderate': return 'bg-yellow-100 text-yellow-800';
+        case 'low': return 'bg-green-100 text-green-800';
+        default: return 'bg-gray-100 text-gray-800';
+    }
+};
+
 // Format status text safely
 const formatStatusText = (status: string | null | undefined): string => {
     if (!status) return 'Unknown';
@@ -412,9 +488,7 @@ const getAffectedPeopleIcon = (type: string | null | undefined) => {
     switch (type) {
         case 'individual': return <User className="h-4 w-4" />;
         case 'family': return <Home className="h-4 w-4" />;
-        case 'group': return <Users className="h-4 w-4" />;
         case 'community': return <Building className="h-4 w-4" />;
-        case 'multiple': return <Users className="h-4 w-4" />;
         default: return <User className="h-4 w-4" />;
     }
 };
@@ -427,28 +501,24 @@ const getFullName = (person: { first_name?: string; last_name?: string; name?: s
     return person.name || 'Unknown User';
 };
 
-const Users = ({ className }: { className?: string }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5 2.5a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-);
-
 export default function CommunityReportShow({
     report,
     similar_reports = [],
     activity_logs = [],
+    owner_notifications = [],
     flash,
     staff = [],
-    statuses = [],
-    priorities = [],
-    urgencies = [],
-    impact_levels = [],
-    affected_people_options = [],
+    statuses = ['pending', 'under_review', 'assigned', 'in_progress', 'resolved', 'rejected'],
+    priorities = ['low', 'medium', 'high', 'critical'],
+    urgencies = ['low', 'medium', 'high'],
+    impact_levels = ['low', 'moderate', 'high', 'severe'],
+    affected_people_options = ['individual', 'family', 'community'],
     report_types = []
 }: {
     report: CommunityReport | null;
     similar_reports?: CommunityReport[];
     activity_logs?: ActivityLog[];
+    owner_notifications?: any[];
     flash?: {
         success?: string;
         error?: string;
@@ -545,6 +615,33 @@ export default function CommunityReportShow({
         }
     };
 
+    // Handle priority change
+    const handlePriorityChange = (newPriority: string) => {
+        router.put(route('admin.community-reports.update', report.id), {
+            priority: newPriority,
+        }, {
+            preserveScroll: true,
+        });
+    };
+
+    // Handle urgency change
+    const handleUrgencyChange = (newUrgency: string) => {
+        router.put(route('admin.community-reports.update', report.id), {
+            urgency_level: newUrgency,
+        }, {
+            preserveScroll: true,
+        });
+    };
+
+    // Handle impact level change
+    const handleImpactChange = (newImpact: string) => {
+        router.put(route('admin.community-reports.update', report.id), {
+            impact_level: newImpact,
+        }, {
+            preserveScroll: true,
+        });
+    };
+
     // Handle assign to staff
     const handleAssignToStaff = () => {
         setShowAssignDialog(true);
@@ -559,7 +656,7 @@ export default function CommunityReportShow({
 
         setIsAssigning(true);
         const selectedStaffMember = staff.find(s => s.id === selectedStaff);
-        const notesPrefix = `[Assigned to ${selectedStaffMember?.name || selectedStaffMember?.first_name + ' ' + selectedStaffMember?.last_name} on ${new Date().toLocaleDateString()}]`;
+        const notesPrefix = `[Assigned to ${selectedStaffMember?.name || getFullName(selectedStaffMember as any)} on ${new Date().toLocaleDateString()}]`;
         
         router.put(route('admin.community-reports.update', report.id), {
             assigned_to: selectedStaff,
@@ -824,9 +921,11 @@ export default function CommunityReportShow({
                                             <p className="text-xs font-medium text-gray-500 mb-2">Priority Information:</p>
                                             <div className="flex flex-wrap gap-1">
                                                 {priorities.map((priority) => (
-                                                    <Badge
+                                                    <Button
                                                         key={priority}
                                                         variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handlePriorityChange(priority)}
                                                         className={`h-7 text-xs px-2 ${getPriorityColor(priority)} ${
                                                             report.priority === priority 
                                                                 ? 'border-current font-semibold' 
@@ -834,7 +933,90 @@ export default function CommunityReportShow({
                                                         }`}
                                                     >
                                                         {priority}
-                                                    </Badge>
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* Urgency and Impact Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Urgency Card */}
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm font-medium text-gray-500">
+                                            Urgency Level
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="flex items-center gap-3">
+                                            {getUrgencyIcon(report.urgency_level)}
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-lg sm:text-xl font-semibold capitalize truncate">
+                                                    {report.urgency_level || 'Not set'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="pt-3 border-t mt-3">
+                                            <p className="text-xs font-medium text-gray-500 mb-2">Change Urgency:</p>
+                                            <div className="flex flex-wrap gap-1">
+                                                {urgencies.map((urgency) => (
+                                                    <Button
+                                                        key={urgency}
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleUrgencyChange(urgency)}
+                                                        className={`h-7 text-xs px-2 ${getUrgencyColor(urgency)} ${
+                                                            report.urgency_level === urgency 
+                                                                ? 'border-current font-semibold' 
+                                                                : 'opacity-60'
+                                                        }`}
+                                                    >
+                                                        {urgency}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Impact Card */}
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm font-medium text-gray-500">
+                                            Impact Level
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="flex items-center gap-3">
+                                            {getImpactIcon(report.impact_level)}
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-lg sm:text-xl font-semibold capitalize truncate">
+                                                    {report.impact_level || 'Not set'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="pt-3 border-t mt-3">
+                                            <p className="text-xs font-medium text-gray-500 mb-2">Change Impact:</p>
+                                            <div className="flex flex-wrap gap-1">
+                                                {impact_levels.map((impact) => (
+                                                    <Button
+                                                        key={impact}
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleImpactChange(impact)}
+                                                        className={`h-7 text-xs px-2 ${getImpactColor(impact)} ${
+                                                            report.impact_level === impact 
+                                                                ? 'border-current font-semibold' 
+                                                                : 'opacity-60'
+                                                        }`}
+                                                    >
+                                                        {impact}
+                                                    </Button>
                                                 ))}
                                             </div>
                                         </div>
@@ -883,11 +1065,10 @@ export default function CommunityReportShow({
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <Label className="text-xs sm:text-sm font-medium text-gray-500">Urgency Level</Label>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        {getUrgencyIcon(report.urgency_level)}
-                                                        <span className="text-sm sm:text-base capitalize">{report.urgency_level}</span>
-                                                    </div>
+                                                    <Label className="text-xs sm:text-sm font-medium text-gray-500">Report Number</Label>
+                                                    <p className="mt-1 text-sm sm:text-base font-mono truncate">
+                                                        {report.report_number || 'N/A'}
+                                                    </p>
                                                 </div>
                                                 <div className="md:col-span-2">
                                                     <Label className="text-xs sm:text-sm font-medium text-gray-500">Title</Label>
@@ -931,7 +1112,7 @@ export default function CommunityReportShow({
                                                     </Label>
                                                     <p className="mt-1 text-sm sm:text-base">{formatDate(report.incident_date)}</p>
                                                     {report.incident_time && (
-                                                        <p className="text-xs sm:text-sm text-gray-500">Time: {report.incident_time}</p>
+                                                        <p className="text-xs sm:text-sm text-gray-500">Time: {formatTime(report.incident_time)}</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -943,7 +1124,7 @@ export default function CommunityReportShow({
                                                         {getImpactIcon(report.impact_level)}
                                                         <span className="truncate">Impact Level</span>
                                                     </Label>
-                                                    <Badge variant="outline" className="mt-1 text-xs capitalize">
+                                                    <Badge variant="outline" className={`mt-1 text-xs capitalize ${getImpactColor(report.impact_level)}`}>
                                                         {report.impact_level}
                                                     </Badge>
                                                 </div>
@@ -961,6 +1142,26 @@ export default function CommunityReportShow({
                                                         </p>
                                                     )}
                                                 </div>
+                                                {report.noise_level && (
+                                                    <div>
+                                                        <Label className="text-xs sm:text-sm font-medium text-gray-500 flex items-center gap-2">
+                                                            {getNoiseLevelIcon(report.noise_level)}
+                                                            <span className="truncate">Noise Level</span>
+                                                        </Label>
+                                                        <Badge variant="outline" className={`mt-1 text-xs capitalize ${getNoiseLevelColor(report.noise_level)}`}>
+                                                            {report.noise_level}
+                                                        </Badge>
+                                                    </div>
+                                                )}
+                                                {report.duration_hours && (
+                                                    <div>
+                                                        <Label className="text-xs sm:text-sm font-medium text-gray-500 flex items-center gap-2">
+                                                            <Timer className="h-3 w-3 sm:h-4 sm:w-4" />
+                                                            <span className="truncate">Duration</span>
+                                                        </Label>
+                                                        <p className="mt-1 text-sm sm:text-base">{report.duration_hours} hours</p>
+                                                    </div>
+                                                )}
                                                 <div className="md:col-span-2">
                                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
                                                         {report.safety_concern && (
@@ -971,19 +1172,43 @@ export default function CommunityReportShow({
                                                         )}
                                                         {report.environmental_impact && (
                                                             <div className="flex items-center gap-2">
-                                                                <Globe className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                                                                <TreePine className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
                                                                 <span className="text-xs sm:text-sm">Environmental Impact</span>
                                                             </div>
                                                         )}
                                                         {report.recurring_issue && (
                                                             <div className="flex items-center gap-2">
-                                                                <History className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500" />
+                                                                <Repeat className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500" />
                                                                 <span className="text-xs sm:text-sm">Recurring Issue</span>
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {/* Previous Report */}
+                                            {report.has_previous_report && report.previous_report && (
+                                                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <History className="h-4 w-4 text-amber-600" />
+                                                        <p className="text-sm font-medium text-amber-800">Previous Related Report</p>
+                                                    </div>
+                                                    <Link 
+                                                        href={route('admin.community-reports.show', report.previous_report.id)}
+                                                        className="block p-2 bg-white rounded-md hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <p className="font-medium text-sm">{report.previous_report.title}</p>
+                                                                <p className="text-xs text-gray-500 mt-1">#{report.previous_report.report_number}</p>
+                                                            </div>
+                                                            <Badge className={getStatusColor(report.previous_report.status)}>
+                                                                {report.previous_report.status}
+                                                            </Badge>
+                                                        </div>
+                                                    </Link>
+                                                </div>
+                                            )}
 
                                             {/* Additional Information */}
                                             {report.perpetrator_details && (
@@ -1077,7 +1302,7 @@ export default function CommunityReportShow({
                                                 )}
                                             </CardFooter>
                                         </Card>
-                                    ) : report.is_anonymous && (report.reporter_name || report.reporter_contact) ? (
+                                    ) : report.is_anonymous && (report.reporter_name || report.reporter_contact || report.reporter_address) ? (
                                         <Card>
                                             <CardHeader>
                                                 <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
@@ -1138,7 +1363,7 @@ export default function CommunityReportShow({
                                         <CardHeader>
                                             <CardTitle className="text-lg sm:text-xl">Evidence Files</CardTitle>
                                             <CardDescription className="text-sm sm:text-base">
-                                                Attached evidence and documentation (view only)
+                                                Attached evidence and documentation
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent>
@@ -1146,8 +1371,9 @@ export default function CommunityReportShow({
                                                 <div className="space-y-4">
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                                         {report.evidences.map((evidence) => {
-                                                            const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(evidence.file_name);
-                                                            const fileUrl = `/storage/${evidence.file_path}`;
+                                                            const isImage = evidence.file_type?.includes('image') || /\.(jpg|jpeg|png|gif|webp)$/i.test(evidence.file_name);
+                                                            const isVideo = evidence.file_type?.includes('video') || /\.(mp4|mov|avi|wmv)$/i.test(evidence.file_name);
+                                                            const fileUrl = evidence.url || `/storage/${evidence.file_path}`;
                                                             
                                                             return (
                                                                 <div key={evidence.id} className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow">
@@ -1156,6 +1382,8 @@ export default function CommunityReportShow({
                                                                             <div className="p-2 rounded-lg bg-gray-100 shrink-0">
                                                                                 {isImage ? (
                                                                                     <FileImage className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+                                                                                ) : isVideo ? (
+                                                                                    <FileVideo className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
                                                                                 ) : (
                                                                                     <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-gray-600" />
                                                                                 )}
@@ -1165,7 +1393,7 @@ export default function CommunityReportShow({
                                                                                     {evidence.file_name}
                                                                                 </p>
                                                                                 <p className="text-xs text-gray-500">
-                                                                                    {isImage ? 'Image file' : 'Document'}
+                                                                                    {isImage ? 'Image' : isVideo ? 'Video' : 'Document'}
                                                                                 </p>
                                                                                 <p className="text-xs text-gray-500">
                                                                                     {(evidence.file_size / 1024).toFixed(1)} KB
@@ -1247,6 +1475,7 @@ export default function CommunityReportShow({
                                                                         safeIncludes(action, 'deleted') ? 'bg-red-100 text-red-600' :
                                                                         safeIncludes(action, 'resolved') ? 'bg-green-100 text-green-600' :
                                                                         safeIncludes(action, 'assigned') ? 'bg-purple-100 text-purple-600' :
+                                                                        safeIncludes(action, 'viewed') ? 'bg-gray-100 text-gray-600' :
                                                                         'bg-gray-100 text-gray-600'
                                                                     }`}>
                                                                         {safeIncludes(action, 'created') ? <Plus className="h-3 w-3 sm:h-4 sm:w-4" /> :
@@ -1254,6 +1483,7 @@ export default function CommunityReportShow({
                                                                          safeIncludes(action, 'deleted') ? <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" /> :
                                                                          safeIncludes(action, 'resolved') ? <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" /> :
                                                                          safeIncludes(action, 'assigned') ? <UserCheck className="h-3 w-3 sm:h-4 sm:w-4" /> :
+                                                                         safeIncludes(action, 'viewed') ? <Eye className="h-3 w-3 sm:h-4 sm:w-4" /> :
                                                                          <History className="h-3 w-3 sm:h-4 sm:w-4" />}
                                                                     </div>
                                                                     {index < activity_logs.length - 1 && (
@@ -1334,122 +1564,144 @@ export default function CommunityReportShow({
                                 </CardFooter>
                             </Card>
 
-                            {/* Staff Assignment */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-lg sm:text-xl">Staff Assignment</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {report.assignedTo ? (
-                                        <div>
-                                            <div className="flex items-center justify-between mb-3">
-                                                <Label className="text-sm font-medium">Currently Assigned</Label>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={handleUnassignStaff}
-                                                    className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                >
-                                                    <X className="h-3 w-3 mr-1" />
-                                                    Unassign
-                                                </Button>
-                                            </div>
-                                            <div className="flex items-center gap-3 p-3 border rounded-lg bg-blue-50">
-                                                <div className="p-2 rounded-full bg-blue-100 shrink-0">
-                                                    <User className="h-5 w-5 text-blue-600" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-medium truncate">
-                                                        {getFullName(report.assignedTo)}
-                                                    </p>
-                                                    {report.assignedTo.email && (
-                                                        <p className="text-xs text-gray-600 truncate">{report.assignedTo.email}</p>
-                                                    )}
-                                                    {report.assignedTo.contact_number && (
-                                                        <p className="text-xs text-gray-600 truncate">{report.assignedTo.contact_number}</p>
-                                                    )}
-                                                    {report.assignedTo.position && (
-                                                        <p className="text-xs text-gray-500 truncate">{report.assignedTo.position}</p>
-                                                    )}
-                                                    {report.assignedTo.role && (
-                                                        <Badge variant="outline" className="mt-1 text-xs">
-                                                            {report.assignedTo.role}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <Label className="text-sm font-medium mb-3 block">Not Assigned</Label>
-                                            <div className="p-4 border border-dashed rounded-lg text-center">
-                                                <User className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                                                <p className="text-sm text-gray-600 mb-3">No staff assigned to this report</p>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={handleAssignToStaff}
-                                                    className="w-full"
-                                                >
-                                                    <UserCheck className="h-4 w-4 mr-2" />
-                                                    Assign Staff
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                    
-                                    {/* Quick Assign Suggestions */}
-                                    {staff.length > 0 && !report.assignedTo && (
-                                        <div className="pt-4 border-t">
-                                            <Label className="text-sm font-medium mb-2 block">Quick Assign</Label>
-                                            <div className="space-y-2">
-                                                {staff.slice(0, 3).map((staffMember) => (
-                                                    <Button
-                                                        key={staffMember.id}
-                                                        variant="outline"
-                                                        className="w-full justify-start text-sm"
-                                                        onClick={() => {
-                                                            router.put(route('admin.community-reports.update', report.id), {
-                                                                assigned_to: staffMember.id,
-                                                                status: 'assigned'
-                                                            }, {
-                                                                preserveScroll: true,
-                                                            });
-                                                        }}
-                                                        size="sm"
-                                                    >
-                                                        <User className="h-4 w-4 mr-2" />
-                                                        <div className="flex-1 text-left truncate">
-                                                            <span className="font-medium truncate">{staffMember.name}</span>
-                                                            {staffMember.position && (
-                                                                <span className="text-xs text-gray-500 ml-2 truncate hidden sm:inline">
-                                                                    • {staffMember.position}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {staffMember.role && (
-                                                            <Badge variant="secondary" className="ml-auto text-xs shrink-0">
-                                                                {staffMember.role}
-                                                            </Badge>
-                                                        )}
-                                                    </Button>
-                                                ))}
-                                                {staff.length > 3 && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        className="w-full text-sm"
-                                                        onClick={handleAssignToStaff}
-                                                        size="sm"
-                                                    >
-                                                        <Plus className="h-3 w-3 mr-1" />
-                                                        View all {staff.length} staff members
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                     {/* Staff Assignment */}
+<Card>
+    <CardHeader>
+        <CardTitle className="text-lg sm:text-xl">Staff Assignment</CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-4">
+        {report.assignedTo ? (
+            <div>
+                <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm font-medium">Currently Assigned</Label>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleUnassignStaff}
+                        className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                        <X className="h-3 w-3 mr-1" />
+                        Unassign
+                    </Button>
+                </div>
+                <div className="flex items-center gap-3 p-3 border rounded-lg bg-blue-50">
+                    <div className="p-2 rounded-full bg-blue-100 shrink-0">
+                        <User className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        {/* Fix: Handle different possible name formats */}
+                        <p className="font-medium truncate">
+                            {report.assignedTo.name || 
+                             (report.assignedTo.first_name && report.assignedTo.last_name 
+                                ? `${report.assignedTo.first_name} ${report.assignedTo.last_name}`.trim()
+                                : report.assignedTo.first_name || 
+                                  report.assignedTo.last_name || 
+                                  'Unknown Staff')}
+                        </p>
+                        
+                        {/* Email */}
+                        {report.assignedTo.email && (
+                            <p className="text-xs text-gray-600 truncate flex items-center gap-1 mt-1">
+                                <Mail className="h-3 w-3" />
+                                {report.assignedTo.email}
+                            </p>
+                        )}
+                        
+                        {/* Contact Number */}
+                        {report.assignedTo.phone || report.assignedTo.contact_number ? (
+                            <p className="text-xs text-gray-600 truncate flex items-center gap-1 mt-1">
+                                <Phone className="h-3 w-3" />
+                                {report.assignedTo.phone || report.assignedTo.contact_number}
+                            </p>
+                        ) : null}
+                        
+                        {/* Position */}
+                        {report.assignedTo.position && (
+                            <p className="text-xs text-gray-500 truncate mt-1">
+                                Position: {report.assignedTo.position}
+                            </p>
+                        )}
+                        
+                        {/* Role */}
+                        {report.assignedTo.role && (
+                            <Badge variant="outline" className="mt-2 text-xs">
+                                {report.assignedTo.role}
+                            </Badge>
+                        )}
+                    </div>
+                </div>
+            </div>
+        ) : (
+            <div>
+                <Label className="text-sm font-medium mb-3 block">Not Assigned</Label>
+                <div className="p-4 border border-dashed rounded-lg text-center">
+                    <User className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-3">No staff assigned to this report</p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAssignToStaff}
+                        className="w-full"
+                    >
+                        <UserCheck className="h-4 w-4 mr-2" />
+                        Assign Staff
+                    </Button>
+                </div>
+            </div>
+        )}
+        
+        {/* Quick Assign Suggestions */}
+        {staff.length > 0 && !report.assignedTo && (
+            <div className="pt-4 border-t">
+                <Label className="text-sm font-medium mb-2 block">Quick Assign</Label>
+                <div className="space-y-2">
+                    {staff.slice(0, 3).map((staffMember) => (
+                        <Button
+                            key={staffMember.id}
+                            variant="outline"
+                            className="w-full justify-start text-sm"
+                            onClick={() => {
+                                router.put(route('admin.community-reports.update', report.id), {
+                                    assigned_to: staffMember.id,
+                                    status: 'assigned'
+                                }, {
+                                    preserveScroll: true,
+                                });
+                            }}
+                            size="sm"
+                        >
+                            <User className="h-4 w-4 mr-2" />
+                            <div className="flex-1 text-left truncate">
+                                <span className="font-medium truncate">{staffMember.name}</span>
+                                {staffMember.position && (
+                                    <span className="text-xs text-gray-500 ml-2 truncate hidden sm:inline">
+                                        • {staffMember.position}
+                                    </span>
+                                )}
+                            </div>
+                            {staffMember.role && (
+                                <Badge variant="secondary" className="ml-auto text-xs shrink-0">
+                                    {staffMember.role}
+                                </Badge>
+                            )}
+                        </Button>
+                    ))}
+                    {staff.length > 3 && (
+                        <Button
+                            variant="ghost"
+                            className="w-full text-sm"
+                            onClick={handleAssignToStaff}
+                            size="sm"
+                        >
+                            <Plus className="h-3 w-3 mr-1" />
+                            View all {staff.length} staff members
+                        </Button>
+                    )}
+                </div>
+            </div>
+        )}
+    </CardContent>
+</Card>
 
                             {/* Quick Actions */}
                             <Card>

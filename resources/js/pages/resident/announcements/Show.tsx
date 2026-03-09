@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+// pages/resident/Announcements/Show.tsx
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import ResidentLayout from '@/layouts/resident-app-layout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-    ArrowLeft, 
-    Calendar, 
-    Clock, 
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+    ArrowLeft,
+    Calendar,
+    Clock,
     AlertTriangle,
     Info,
     Wrench,
@@ -46,56 +48,173 @@ import {
     Shield,
     AlertCircle,
     FileSpreadsheet,
-    FileArchive
+    FileArchive,
+    Heart,
+    ThumbsUp,
+    MessageCircle,
+    Share,
+    BookmarkPlus,
+    BookmarkCheck,
+    Target,
+    Globe,
+    Home,
+    Briefcase,
+    MoreVertical,
+    Inbox,
+    Loader2,
+    Layers,
+    Receipt,
+    X
 } from 'lucide-react';
-import ResidentMobileFooter from '@/layouts/resident-mobile-sticky-footer';
+
+// Import from reusable UI library
+import { formatCurrency, formatDate, formatDateTime, downloadFile } from '@/components/residentui/lib/resident-ui-utils';
+import { useMobileDetect, useScrollSpy, useExpandableSections } from '@/components/residentui/hooks/useResidentUI';
+import { ModernStatusBadge } from '@/components/residentui/modern-status-badge';
+import { ModernUrgencyBadge } from '@/components/residentui/modern-urgency-badge';
+import { ModernCard } from '@/components/residentui/modern-card';
+import { ModernDocumentViewer, ModernDocumentThumbnail } from '@/components/residentui/modern-document-viewer';
+import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
+import { ModernTabs } from '@/components/residentui/modern-tabs';
+import { ModernExpandableSection } from '@/components/residentui/modern-expandable-section';
+import { ModernFloatingActionButton } from '@/components/residentui/modern-floating-action-button';
+import { ModernMobileHeader } from '@/components/residentui/modern-mobile-header';
+import { ModernLoadingOverlay } from '@/components/residentui/modern-loading-overlay';
+import { cn } from '@/lib/utils';
+
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 // Type configuration
 const TYPE_CONFIG = {
-    important: { 
-        label: 'Important', 
+    important: {
+        label: 'Important',
         color: 'bg-red-50 text-red-700 border-red-200',
         icon: ShieldAlert,
-        gradient: 'from-red-50/80 to-white',
-        bgColor: 'bg-red-50'
+        gradient: 'from-red-500 to-red-600',
+        bgColor: 'bg-red-50',
+        textColor: 'text-red-700',
+        borderColor: 'border-red-200',
+        hoverColor: 'hover:bg-red-100'
     },
-    event: { 
-        label: 'Event', 
+    event: {
+        label: 'Event',
         color: 'bg-green-50 text-green-700 border-green-200',
         icon: PartyPopper,
-        gradient: 'from-green-50/80 to-white',
-        bgColor: 'bg-green-50'
+        gradient: 'from-green-500 to-green-600',
+        bgColor: 'bg-green-50',
+        textColor: 'text-green-700',
+        borderColor: 'border-green-200',
+        hoverColor: 'hover:bg-green-100'
     },
-    maintenance: { 
-        label: 'Maintenance', 
+    maintenance: {
+        label: 'Maintenance',
         color: 'bg-blue-50 text-blue-700 border-blue-200',
         icon: Wrench,
-        gradient: 'from-blue-50/80 to-white',
-        bgColor: 'bg-blue-50'
+        gradient: 'from-blue-500 to-blue-600',
+        bgColor: 'bg-blue-50',
+        textColor: 'text-blue-700',
+        borderColor: 'border-blue-200',
+        hoverColor: 'hover:bg-blue-100'
     },
-    general: { 
-        label: 'General', 
+    general: {
+        label: 'General',
         color: 'bg-gray-50 text-gray-700 border-gray-200',
         icon: Megaphone,
-        gradient: 'from-gray-50/80 to-white',
-        bgColor: 'bg-gray-50'
+        gradient: 'from-gray-500 to-gray-600',
+        bgColor: 'bg-gray-50',
+        textColor: 'text-gray-700',
+        borderColor: 'border-gray-200',
+        hoverColor: 'hover:bg-gray-100'
     },
-    other: { 
-        label: 'Other', 
+    other: {
+        label: 'Other',
         color: 'bg-purple-50 text-purple-700 border-purple-200',
         icon: Bell,
-        gradient: 'from-purple-50/80 to-white',
-        bgColor: 'bg-purple-50'
+        gradient: 'from-purple-500 to-purple-600',
+        bgColor: 'bg-purple-50',
+        textColor: 'text-purple-700',
+        borderColor: 'border-purple-200',
+        hoverColor: 'hover:bg-purple-100'
     },
 };
 
 // Priority configuration
 const PRIORITY_CONFIG = {
-    0: { label: 'Normal', color: 'bg-gray-100 text-gray-700 border-gray-300', icon: Bell },
-    1: { label: 'Low', color: 'bg-blue-100 text-blue-700 border-blue-300', icon: Info },
-    2: { label: 'Medium', color: 'bg-yellow-100 text-yellow-700 border-yellow-300', icon: AlertCircle },
-    3: { label: 'High', color: 'bg-orange-100 text-orange-700 border-orange-300', icon: AlertTriangle },
-    4: { label: 'Urgent', color: 'bg-red-100 text-red-700 border-red-300', icon: Shield },
+    0: {
+        label: 'Normal',
+        color: 'bg-gray-100 text-gray-700 border-gray-300',
+        icon: Bell,
+        gradient: 'from-gray-100 to-gray-200',
+        bgColor: 'bg-gray-100',
+        textColor: 'text-gray-700',
+        borderColor: 'border-gray-300'
+    },
+    1: {
+        label: 'Low',
+        color: 'bg-blue-100 text-blue-700 border-blue-300',
+        icon: Info,
+        gradient: 'from-blue-100 to-blue-200',
+        bgColor: 'bg-blue-100',
+        textColor: 'text-blue-700',
+        borderColor: 'border-blue-300'
+    },
+    2: {
+        label: 'Medium',
+        color: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+        icon: AlertCircle,
+        gradient: 'from-yellow-100 to-yellow-200',
+        bgColor: 'bg-yellow-100',
+        textColor: 'text-yellow-700',
+        borderColor: 'border-yellow-300'
+    },
+    3: {
+        label: 'High',
+        color: 'bg-orange-100 text-orange-700 border-orange-300',
+        icon: AlertTriangle,
+        gradient: 'from-orange-100 to-orange-200',
+        bgColor: 'bg-orange-100',
+        textColor: 'text-orange-700',
+        borderColor: 'border-orange-300'
+    },
+    4: {
+        label: 'Urgent',
+        color: 'bg-red-100 text-red-700 border-red-300',
+        icon: Shield,
+        gradient: 'from-red-100 to-red-200',
+        bgColor: 'bg-red-100',
+        textColor: 'text-red-700',
+        borderColor: 'border-red-300'
+    },
+};
+
+// Audience icon mapping
+const AUDIENCE_ICONS = {
+    all: Globe,
+    roles: Users,
+    puroks: MapPin,
+    households: Home,
+    household_members: Users,
+    businesses: Briefcase,
+    specific_users: User,
 };
 
 // Helper function to get priority config safely
@@ -115,7 +234,9 @@ interface AnnouncementAttachment {
     file_name: string;
     original_name: string;
     file_size: number;
+    formatted_size: string;
     mime_type: string;
+    is_image: boolean;
     description?: string;
     created_at: string;
     updated_at: string;
@@ -125,9 +246,13 @@ interface RelatedAnnouncement {
     id: number;
     title: string;
     type: string;
+    type_label: string;
     priority: number;
-    created_at: string;
+    priority_label: string;
     excerpt?: string;
+    created_at: string;
+    has_attachments?: boolean;
+    attachments_count?: number;
 }
 
 interface PageProps {
@@ -136,22 +261,39 @@ interface PageProps {
         title: string;
         content: string;
         type: 'general' | 'important' | 'event' | 'maintenance' | 'other';
+        type_label: string;
         priority: number;
-        is_active: boolean;
+        priority_label: string;
+        is_currently_active: boolean;
+        status: string;
+        status_label: string;
+        status_color: string;
         start_date: string | null;
         end_date: string | null;
+        start_time: string | null;
+        end_time: string | null;
         created_at: string;
         updated_at: string;
+        audience_type: string;
+        audience_summary: string;
+        estimated_reach?: number;
+        views_count?: number;
+        has_attachments: boolean;
+        attachments_count: number;
+        attachments?: AnnouncementAttachment[];
         author?: {
             id: number;
             name: string;
             role?: string;
             avatar?: string;
         };
-        attachments?: AnnouncementAttachment[];
-        views_count?: number;
     };
     relatedAnnouncements: RelatedAnnouncement[];
+    resident?: {
+        full_name: string;
+        household_number?: string;
+        purok?: string;
+    } | null;
     priorityOptions: Record<number, string>;
     types: Record<string, string>;
 }
@@ -175,24 +317,39 @@ const getFileIcon = (mimeType: string, fileName: string) => {
     return File;
 };
 
-export default function AnnouncementShow({ announcement, relatedAnnouncements, priorityOptions, types }: PageProps) {
+export default function AnnouncementShow({ announcement, relatedAnnouncements, resident }: PageProps) {
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [isShareCopied, setIsShareCopied] = useState(false);
+    const [isLiked, setIsLiked] = useState(false);
     const [isClient, setIsClient] = useState(false);
     const [expandedAttachments, setExpandedAttachments] = useState(false);
     const [showAllRelated, setShowAllRelated] = useState(false);
+    const [viewingDocument, setViewingDocument] = useState<AnnouncementAttachment | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    const { isMobile, isClient: isMobileClient } = useMobileDetect();
+    const showStickyActions = useScrollSpy(200);
+    const { expandedSections, toggleSection } = useExpandableSections({
+        announcementInfo: true,
+        attachments: true,
+        related: true
+    });
+
+    const headerRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const typeConfig = getTypeConfig(announcement.type);
     const priorityConfig = getPriorityConfig(announcement.priority);
     const PriorityIcon = priorityConfig.icon;
-    
+    const TypeIcon = typeConfig.icon;
+
+    // Get audience icon
+    const AudienceIcon = AUDIENCE_ICONS[announcement.audience_type as keyof typeof AUDIENCE_ICONS] || Globe;
+
     // Set client state
     useEffect(() => {
         setIsClient(true);
-        // Mark announcement as read
-        if (announcement.views_count !== undefined) {
-            // You can add analytics tracking here
-        }
     }, []);
 
     // Set document title
@@ -202,42 +359,31 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, p
         }
     }, [announcement.title, isClient]);
 
-    // Format date
-    const formatDate = (dateString: string | null): string => {
-        if (!dateString) return 'Not specified';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-PH', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
-    };
+    // Check if bookmarked on mount
+    useEffect(() => {
+        if (isClient) {
+            const bookmarks = JSON.parse(localStorage.getItem('announcement_bookmarks') || '[]');
+            setIsBookmarked(bookmarks.includes(announcement.id));
+        }
+    }, [announcement.id, isClient]);
 
-    const formatDateTime = (dateString: string): string => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-PH', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    };
 
     // Format relative time
     const formatRelativeTime = (dateString: string): string => {
         const date = new Date(dateString);
         const now = new Date();
-        const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-        
-        if (diffInHours < 1) {
-            const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-            return diffInMinutes < 1 ? 'Just now' : `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
-        } else if (diffInHours < 24) {
-            return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
-        } else if (diffInHours < 168) { // 7 days
-            const days = Math.floor(diffInHours / 24);
+        const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+        if (diffInSeconds < 60) {
+            return 'Just now';
+        } else if (diffInSeconds < 3600) {
+            const minutes = Math.floor(diffInSeconds / 60);
+            return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+        } else if (diffInSeconds < 86400) {
+            const hours = Math.floor(diffInSeconds / 3600);
+            return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+        } else if (diffInSeconds < 604800) {
+            const days = Math.floor(diffInSeconds / 86400);
             return `${days} day${days > 1 ? 's' : ''} ago`;
         } else {
             return formatDate(dateString);
@@ -246,38 +392,56 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, p
 
     // Check if announcement is upcoming
     const isUpcoming = announcement.start_date && new Date(announcement.start_date) > new Date();
-    
+
     // Check if announcement is expired
     const isExpired = announcement.end_date && new Date(announcement.end_date) < new Date();
-    
-    // Check if announcement is currently active
-    const isActive = !isExpired && (!isUpcoming || announcement.start_date === null);
 
     // Handle download attachment
     const handleDownloadAttachment = async (attachment: AnnouncementAttachment) => {
         if (!isClient) return;
-        
+
+        setIsDownloading(true);
         try {
-            // Create a temporary link and trigger download
-            const link = document.createElement('a');
-            link.href = `/storage/${attachment.file_path}`;
-            link.download = attachment.original_name;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // Try to download via API first for tracking
+            const response = await fetch(`/portal/announcements/attachments/${attachment.id}/download`);
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = attachment.original_name || attachment.file_name;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                // Fallback to direct storage access
+                await downloadFile(
+                    `/storage/${attachment.file_path}`,
+                    attachment.original_name || attachment.file_name
+                );
+            }
+            
+            // Track download
+            router.post(`/portal/announcements/attachments/${attachment.id}/track-download`, {}, {
+                preserveState: true,
+                preserveScroll: true,
+                onError: () => console.error('Failed to track download')
+            });
         } catch (error) {
             console.error('Download error:', error);
-            alert('Failed to download attachment. Please try again.');
+        } finally {
+            setIsDownloading(false);
         }
     };
 
     // Handle share
     const handleShare = async () => {
         if (!isClient) return;
-        
+
         const shareUrl = window.location.href;
         const shareText = `Check out this announcement: ${announcement.title}`;
-        
+
         if (navigator.share) {
             try {
                 await navigator.share({
@@ -297,14 +461,13 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, p
 
     const handleCopyShareLink = () => {
         if (!isClient) return;
-        
+
         navigator.clipboard.writeText(window.location.href)
             .then(() => {
                 setIsShareCopied(true);
                 setTimeout(() => setIsShareCopied(false), 2000);
             })
-            .catch(err => {
-                console.error('Failed to copy:', err);
+            .catch(() => {
                 // Fallback for older browsers
                 const textArea = document.createElement('textarea');
                 textArea.value = window.location.href;
@@ -315,135 +478,108 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, p
                     setIsShareCopied(true);
                     setTimeout(() => setIsShareCopied(false), 2000);
                 } catch (err) {
-                    console.error('Fallback copy failed:', err);
+                    console.error('Copy failed:', err);
                 }
                 document.body.removeChild(textArea);
             });
     };
 
+    // Handle bookmark
+    const handleBookmark = () => {
+        if (!isClient) return;
+
+        const bookmarks = JSON.parse(localStorage.getItem('announcement_bookmarks') || '[]');
+
+        if (isBookmarked) {
+            const newBookmarks = bookmarks.filter((id: number) => id !== announcement.id);
+            localStorage.setItem('announcement_bookmarks', JSON.stringify(newBookmarks));
+            setIsBookmarked(false);
+        } else {
+            bookmarks.push(announcement.id);
+            localStorage.setItem('announcement_bookmarks', JSON.stringify(bookmarks));
+            setIsBookmarked(true);
+        }
+    };
+
+    // Handle like
+    const handleLike = () => {
+        setIsLiked(!isLiked);
+    };
+
     // Handle print
     const handlePrint = () => {
         if (!isClient) return;
-        
-        const printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>${announcement.title}</title>
-                <style>
-                    body { 
-                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                        line-height: 1.6; 
-                        padding: 20px; 
-                        max-width: 800px; 
-                        margin: 0 auto;
-                        color: #333;
-                    }
-                    .header { 
-                        border-bottom: 3px solid #2c5282; 
-                        padding-bottom: 20px; 
-                        margin-bottom: 30px; 
-                    }
-                    .title { 
-                        font-size: 24px; 
-                        font-weight: bold; 
-                        margin-bottom: 10px;
-                        color: #2c5282;
-                    }
-                    .meta { 
-                        color: #666; 
-                        font-size: 14px; 
-                        margin-bottom: 5px;
-                        display: flex;
-                        align-items: center;
-                        gap: 5px;
-                    }
-                    .meta-container {
-                        display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                        gap: 10px;
-                        margin-top: 15px;
-                        padding: 15px;
-                        background: #f7fafc;
-                        border-radius: 8px;
-                    }
-                    .content { 
-                        margin-top: 30px; 
-                        font-size: 16px;
-                    }
-                    .content img {
-                        max-width: 100%;
-                        height: auto;
-                    }
-                    .footer { 
-                        margin-top: 50px; 
-                        padding-top: 20px; 
-                        border-top: 1px solid #ccc; 
-                        font-size: 12px; 
-                        color: #666; 
-                        text-align: center; 
-                    }
-                    @page {
-                        margin: 20mm;
-                    }
-                    @media print {
-                        body {
-                            padding: 0;
-                        }
-                        .no-print { display: none; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <div class="title">${announcement.title}</div>
-                    <div class="meta-container">
-                        <div class="meta">
-                            📅 Posted: ${formatDateTime(announcement.created_at)}
-                        </div>
-                        <div class="meta">
-                            📋 Type: ${typeConfig.label}
-                        </div>
-                        <div class="meta">
-                            ⚡ Priority: ${priorityConfig.label}
-                        </div>
-                        ${announcement.author ? `<div class="meta">👤 Author: ${announcement.author.name}</div>` : ''}
-                        ${announcement.start_date ? `<div class="meta">🚀 Starts: ${formatDate(announcement.start_date)}</div>` : ''}
-                        ${announcement.end_date ? `<div class="meta">⏰ Ends: ${formatDate(announcement.end_date)}</div>` : ''}
-                    </div>
-                </div>
-                <div class="content">
-                    ${announcement.content}
-                </div>
-                <div class="footer">
-                    <p>Barangay Announcement System | Printed on ${new Date().toLocaleDateString('en-PH', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    })}</p>
-                    <p>For verification, visit: ${window.location.href}</p>
-                </div>
-            </body>
-            </html>
-        `;
-        
+
         const printWindow = window.open('', '_blank');
         if (printWindow) {
-            printWindow.document.write(printContent);
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>${announcement.title}</title>
+                    <style>
+                        body { font-family: system-ui; padding: 40px; max-width: 800px; margin: 0 auto; }
+                        .title { font-size: 28px; font-weight: bold; margin-bottom: 16px; }
+                        .meta { color: #666; margin-bottom: 32px; }
+                        .content { line-height: 1.6; }
+                        .attachments { margin-top: 32px; padding-top: 16px; border-top: 1px solid #eee; }
+                        .attachment { display: flex; align-items: center; gap: 8px; padding: 8px; background: #f9f9f9; border-radius: 4px; margin-bottom: 8px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="title">${announcement.title}</div>
+                    <div class="meta">Posted: ${formatDateTime(announcement.created_at)}</div>
+                    <div class="content">${announcement.content}</div>
+                    ${announcement.attachments && announcement.attachments.length > 0 ? `
+                        <div class="attachments">
+                            <h3>Attachments (${announcement.attachments.length})</h3>
+                            ${announcement.attachments.map(att => `
+                                <div class="attachment">
+                                    <span>📎</span>
+                                    <span>${att.original_name} (${att.formatted_size})</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </body>
+                </html>
+            `);
             printWindow.document.close();
             printWindow.focus();
-            setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-            }, 500);
+            printWindow.print();
         }
     };
 
     // Filter attachments by type
-    const imageAttachments = announcement.attachments?.filter(a => a.mime_type.includes('image')) || [];
-    const documentAttachments = announcement.attachments?.filter(a => !a.mime_type.includes('image')) || [];
+    const imageAttachments = announcement.attachments?.filter(a => a.is_image) || [];
+    const documentAttachments = announcement.attachments?.filter(a => !a.is_image) || [];
+
+    // Tabs configuration
+    const tabsConfig = [
+        { id: 'details', label: 'Details', icon: FileText },
+        { id: 'attachments', label: 'Attachments', icon: Paperclip },
+        { id: 'related', label: 'Related', icon: Layers },
+    ];
+
+    const [activeTab, setActiveTab] = useState('details');
+
+    const getTabCount = (tabId: string) => {
+        switch (tabId) {
+            case 'attachments':
+                return announcement.attachments?.length || 0;
+            case 'related':
+                return relatedAnnouncements.length;
+            default:
+                return 0;
+        }
+    };
+
+    const handleTabChange = (tabId: string) => {
+        setActiveTab(tabId);
+        if (isMobile) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
 
     return (
         <ResidentLayout
@@ -453,597 +589,832 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, p
                 { title: announcement.title, href: '#' }
             ]}
         >
-            <div className="pb-24 lg:pb-6">
+            <Head title={`${announcement.title} | Barangay Announcements`} />
+
+            <div ref={scrollContainerRef} className="space-y-3 md:space-y-6 px-4 md:px-6 pb-32 md:pb-6">
                 {/* Mobile Header */}
-                <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b pb-3 pt-2 px-4 -mx-4 mb-4 lg:hidden">
-                    <div className="flex items-center gap-3">
-                        <Link href="/portal/resident-announcements">
-                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-                                <ArrowLeft className="h-5 w-5" />
-                            </Button>
-                        </Link>
-                        <div className="flex-1 min-w-0">
-                            <h1 className="text-lg font-bold truncate pr-2">
-                                Announcement
-                            </h1>
-                        </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-10 w-10 rounded-full"
-                            onClick={handleShare}
-                        >
-                            {isShareCopied ? (
-                                <Check className="h-5 w-5 text-green-600" />
-                            ) : (
-                                <Share2 className="h-5 w-5" />
-                            )}
-                        </Button>
+                {isMobile && (
+                    <div ref={headerRef}>
+                        <ModernMobileHeader
+                            title={announcement.title}
+                            subtitle="Announcement"
+                            onBack={() => router.get('/portal/resident-announcements')}
+                            showSticky={showStickyActions}
+                            actions={
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm" className="h-8 w-8 p-0 rounded-xl">
+                                            <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-48">
+                                        <DropdownMenuItem onClick={handlePrint}>
+                                            <Printer className="h-4 w-4 mr-2" />
+                                            Print
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={handleShare}>
+                                            {isShareCopied ? (
+                                                <>
+                                                    <Check className="h-4 w-4 mr-2 text-green-600" />
+                                                    Copied!
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Share2 className="h-4 w-4 mr-2" />
+                                                    Share
+                                                </>
+                                            )}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={handleBookmark}>
+                                            <Bookmark className={`h-4 w-4 mr-2 ${isBookmarked ? 'fill-current' : ''}`} />
+                                            {isBookmarked ? 'Saved' : 'Save'}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={handleLike}>
+                                            <ThumbsUp className={`h-4 w-4 mr-2 ${isLiked ? 'fill-current' : ''}`} />
+                                            Helpful
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            }
+                        />
                     </div>
-                </div>
+                )}
 
                 {/* Desktop Header */}
-                <div className="hidden lg:flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                        <Link href="/portal/resident-announcements">
-                            <Button variant="ghost" size="sm" className="gap-2 rounded-lg">
-                                <ArrowLeft className="h-4 w-4" />
-                                Back to Announcements
+                {!isMobile && (
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <Link href="/portal/resident-announcements">
+                                <Button variant="ghost" size="sm" className="gap-2 rounded-xl">
+                                    <ArrowLeft className="h-4 w-4" />
+                                    Back
+                                </Button>
+                            </Link>
+                            <div>
+                                <h1 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent">
+                                    {announcement.title}
+                                </h1>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Posted {formatRelativeTime(announcement.created_at)}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 rounded-xl"
+                                onClick={handleLike}
+                            >
+                                <ThumbsUp className={`h-4 w-4 ${isLiked ? 'fill-current text-blue-600' : ''}`} />
+                                Helpful
                             </Button>
-                        </Link>
-                        <div className="h-4 w-px bg-gray-300" />
-                        <div className="text-sm text-gray-500">
-                            Last updated: {formatRelativeTime(announcement.updated_at)}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 rounded-xl"
+                                onClick={handlePrint}
+                            >
+                                <Printer className="h-4 w-4" />
+                                Print
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 rounded-xl"
+                                onClick={handleShare}
+                            >
+                                {isShareCopied ? (
+                                    <>
+                                        <Check className="h-4 w-4 text-green-600" />
+                                        Copied!
+                                    </>
+                                ) : (
+                                    <>
+                                        <Share2 className="h-4 w-4" />
+                                        Share
+                                    </>
+                                )}
+                            </Button>
+                            <Button
+                                variant={isBookmarked ? "default" : "outline"}
+                                size="sm"
+                                className="gap-2 rounded-xl"
+                                onClick={handleBookmark}
+                            >
+                                <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                                {isBookmarked ? 'Saved' : 'Save'}
+                            </Button>
                         </div>
                     </div>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 rounded-lg"
-                            onClick={handlePrint}
-                        >
-                            <Printer className="h-4 w-4" />
-                            Print
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 rounded-lg"
-                            onClick={handleShare}
-                        >
-                            {isShareCopied ? (
-                                <>
-                                    <Check className="h-4 w-4" />
-                                    Copied!
-                                </>
-                            ) : (
-                                <>
-                                    <Share2 className="h-4 w-4" />
-                                    Share
-                                </>
-                            )}
-                        </Button>
-                        <Button
-                            variant={isBookmarked ? "default" : "outline"}
-                            size="sm"
-                            className="gap-2 rounded-lg"
-                            onClick={() => setIsBookmarked(!isBookmarked)}
-                        >
-                            <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-current' : ''}`} />
-                            {isBookmarked ? 'Saved' : 'Save'}
-                        </Button>
-                    </div>
-                </div>
+                )}
 
-                {/* Main Content Container */}
-                <div className="space-y-6">
-                    {/* Improved Priority Alert Banner */}
-                    {announcement.priority >= 3 && (
-                        <div className={`rounded-xl p-4 mb-4 ${announcement.priority === 4 ? 'bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500' : 'bg-gradient-to-r from-orange-50 to-orange-100 border-l-4 border-orange-500'}`}>
-                            <div className="flex items-start gap-3">
-                                <div className="flex-shrink-0 mt-0.5">
+                {/* Priority Alert Banner */}
+                {announcement.priority >= 3 && (
+                    <Alert className={cn(
+                        "border-0 rounded-xl shadow-lg",
+                        announcement.priority === 4
+                            ? "bg-gradient-to-r from-red-500 to-red-600"
+                            : "bg-gradient-to-r from-orange-500 to-orange-600"
+                    )}>
+                        <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0">
+                                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
                                     {announcement.priority === 4 ? (
-                                        <div className="h-10 w-10 rounded-full bg-white border-2 border-red-200 flex items-center justify-center shadow-sm">
-                                            <Shield className="h-5 w-5 text-red-600" />
-                                        </div>
+                                        <Shield className="h-5 w-5 text-white" />
                                     ) : (
-                                        <div className="h-10 w-10 rounded-full bg-white border-2 border-orange-200 flex items-center justify-center shadow-sm">
-                                            <AlertTriangle className="h-5 w-5 text-orange-600" />
-                                        </div>
+                                        <AlertTriangle className="h-5 w-5 text-white" />
                                     )}
                                 </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <h3 className="font-bold text-gray-900">
-                                            {announcement.priority === 4 ? 'Urgent Announcement' : 'High Priority Notice'}
-                                        </h3>
-                                        <Badge variant={announcement.priority === 4 ? "destructive" : "secondary"} className="text-xs">
-                                            {announcement.priority === 4 ? 'URGENT' : 'HIGH'}
-                                        </Badge>
-                                    </div>
-                                    <p className="text-sm text-gray-700 mb-2">
-                                        {announcement.priority === 4 
-                                            ? '🚨 Immediate action required. This announcement contains critical information that needs your urgent attention.'
-                                            : '⚠️ Please review carefully. This announcement contains important information that requires your attention.'}
-                                    </p>
-                                    <div className="flex items-center gap-4 text-xs text-gray-600">
-                                        <div className="flex items-center gap-1">
-                                            <Eye className="h-3 w-3" />
-                                            <span>Read carefully</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <Clock className="h-3 w-3" />
-                                            <span>{announcement.priority === 4 ? 'Action needed ASAP' : 'Review promptly'}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <Share2 className="h-3 w-3" />
-                                            <span>Share if relevant</span>
-                                        </div>
-                                    </div>
-                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <AlertTitle className="text-white font-bold">
+                                    {announcement.priority === 4 ? '🚨 URGENT ANNOUNCEMENT' : '⚠️ HIGH PRIORITY NOTICE'}
+                                </AlertTitle>
+                                <AlertDescription className="text-white/90 text-sm mt-1">
+                                    {announcement.priority === 4
+                                        ? 'Immediate action required. Please read this announcement carefully.'
+                                        : 'Important information that requires your attention.'}
+                                </AlertDescription>
                             </div>
                         </div>
-                    )}
+                    </Alert>
+                )}
 
-                    {/* Announcement Header Card */}
-                    <Card className={`border-0 shadow-lg rounded-2xl overflow-hidden ${typeConfig.bgColor}`}>
-                        <div className={`p-6 ${typeConfig.gradient} bg-gradient-to-br`}>
-                            {/* Status Badges */}
-                            <div className="flex flex-wrap gap-2 mb-4">
-                                <Badge className={`${typeConfig.color} gap-1.5 px-3 py-1.5 border rounded-full`}>
-                                    <typeConfig.icon className="h-3.5 w-3.5" />
-                                    {typeConfig.label}
-                                </Badge>
-                                <Badge className={`${priorityConfig.color} gap-1.5 px-3 py-1.5 border rounded-full`}>
-                                    <PriorityIcon className="h-3.5 w-3.5" />
-                                    {priorityConfig.label}
-                                </Badge>
-                                <Badge className={`gap-1.5 px-3 py-1.5 border rounded-full ${
-                                    isExpired ? 'bg-gray-100 text-gray-700 border-gray-300' :
-                                    isUpcoming ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                                    'bg-green-100 text-green-700 border-green-300'
-                                }`}>
-                                    {isExpired ? (
-                                        <>
-                                            <Clock className="h-3.5 w-3.5" />
-                                            Expired
-                                        </>
-                                    ) : isUpcoming ? (
-                                        <>
-                                            <Calendar className="h-3.5 w-3.5" />
-                                            Upcoming
-                                        </>
-                                    ) : (
-                                        <>
-                                            <BellRing className="h-3.5 w-3.5" />
-                                            Active
-                                        </>
-                                    )}
-                                </Badge>
-                            </div>
+                {/* Main Content */}
+                <div className={cn(
+                    "grid gap-3 md:gap-6",
+                    isMobile ? "grid-cols-1" : "lg:grid-cols-3"
+                )}>
+                    {/* Left Column */}
+                    <div className={cn(
+                        isMobile ? "col-span-1" : "lg:col-span-2"
+                    )}>
+                        <ModernTabs
+                            tabs={tabsConfig}
+                            activeTab={activeTab}
+                            onTabChange={handleTabChange}
+                            getTabCount={getTabCount}
+                            className="mb-3"
+                        />
 
-                            {/* Title */}
-                            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-4 leading-tight">
-                                {announcement.title}
-                            </h1>
-
-                            {/* Metadata */}
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                                <div className="flex items-center gap-1.5">
-                                    <Calendar className="h-4 w-4" />
-                                    <span>Posted {formatRelativeTime(announcement.created_at)}</span>
-                                </div>
-                                
-                                {announcement.author && (
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="flex items-center justify-center h-6 w-6 rounded-full bg-gray-200">
-                                            <User className="h-3 w-3 text-gray-600" />
-                                        </div>
-                                        <span>By {announcement.author.name}</span>
-                                        {announcement.author.role && (
-                                            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
-                                                {announcement.author.role}
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-
-                                {announcement.views_count !== undefined && (
-                                    <div className="flex items-center gap-1.5">
-                                        <Eye className="h-4 w-4" />
-                                        <span>{announcement.views_count.toLocaleString()} views</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Validity Period */}
-                            {(announcement.start_date || announcement.end_date) && (
-                                <div className="mt-6 p-4 bg-white/60 rounded-xl border">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Clock4 className="h-5 w-5 text-gray-600" />
-                                        <span className="font-bold text-gray-700">Validity Period</span>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {announcement.start_date && (
-                                            <div className="bg-white p-3 rounded-lg border">
-                                                <div className="text-xs text-gray-500 mb-1">Starts</div>
-                                                <div className="font-semibold text-gray-900">{formatDate(announcement.start_date)}</div>
-                                            </div>
-                                        )}
-                                        {announcement.end_date && (
-                                            <div className="bg-white p-3 rounded-lg border">
-                                                <div className="text-xs text-gray-500 mb-1">Ends</div>
-                                                <div className="font-semibold text-gray-900">{formatDate(announcement.end_date)}</div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </Card>
-
-                    {/* Content Section */}
-                    <Card className="border shadow-lg rounded-2xl overflow-hidden">
-                        <CardContent className="p-0">
-                            <div className="p-6 lg:p-8">
-                                <div 
-                                    className="prose prose-lg max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900 prose-a:text-blue-600 hover:prose-a:text-blue-800"
-                                    dangerouslySetInnerHTML={{ __html: announcement.content }}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Attachments Section */}
-                    {announcement.attachments && announcement.attachments.length > 0 && (
-                        <div className="space-y-4">
-                            {/* Image Attachments */}
-                            {imageAttachments.length > 0 && (
-                                <Card className="border rounded-2xl overflow-hidden">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="flex items-center gap-2">
-                                            <FileImage className="h-5 w-5" />
-                                            Photos ({imageAttachments.length})
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                            {imageAttachments.map((attachment) => (
-                                                <div 
-                                                    key={attachment.id}
-                                                    className="group relative rounded-lg overflow-hidden border cursor-pointer"
-                                                    onClick={() => window.open(`/storage/${attachment.file_path}`, '_blank')}
-                                                >
-                                                    <img
-                                                        src={`/storage/${attachment.file_path}`}
-                                                        alt={attachment.original_name}
-                                                        className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
-                                                    />
-                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3">
-                                                        <p className="text-xs text-white truncate">
-                                                            {attachment.original_name}
-                                                        </p>
-                                                    </div>
+                        <div className="mt-3 space-y-3">
+                            {/* Details Tab */}
+                            {activeTab === 'details' && (
+                                <>
+                                    {/* Personalized Audience Badge */}
+                                    {announcement.audience_type !== 'all' && (
+                                        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                                            <div className="flex items-start gap-3">
+                                                <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
+                                                    <Target className="h-5 w-5 text-purple-600" />
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {/* Document Attachments */}
-                            {documentAttachments.length > 0 && (
-                                <Card className="border rounded-2xl overflow-hidden">
-                                    <CardHeader className="pb-3">
-                                        <div className="flex items-center justify-between">
-                                            <CardTitle className="flex items-center gap-2">
-                                                <Paperclip className="h-5 w-5" />
-                                                Documents ({documentAttachments.length})
-                                            </CardTitle>
-                                            {documentAttachments.length > 3 && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => setExpandedAttachments(!expandedAttachments)}
-                                                    className="gap-1"
-                                                >
-                                                    {expandedAttachments ? (
-                                                        <>
-                                                            <ChevronUp className="h-4 w-4" />
-                                                            Show Less
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <ChevronDown className="h-4 w-4" />
-                                                            Show All
-                                                        </>
+                                                <div className="flex-1">
+                                                    <h3 className="font-semibold text-purple-900 mb-1">Personalized for You</h3>
+                                                    <p className="text-sm text-purple-700">{announcement.audience_summary}</p>
+                                                    {announcement.estimated_reach && (
+                                                        <p className="text-xs text-purple-600 mt-2">
+                                                            Target audience: {announcement.estimated_reach.toLocaleString()} residents
+                                                        </p>
                                                     )}
-                                                </Button>
-                                            )}
+                                                </div>
+                                            </div>
                                         </div>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-2">
-                                            {documentAttachments
-                                                .slice(0, expandedAttachments ? documentAttachments.length : 3)
-                                                .map((attachment) => {
-                                                    const FileIcon = getFileIcon(attachment.mime_type, attachment.file_name);
-                                                    
-                                                    return (
-                                                        <div 
-                                                            key={attachment.id}
-                                                            className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors group"
-                                                        >
-                                                            <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                                                <FileIcon className="h-6 w-6 text-gray-600" />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="font-medium truncate text-sm">
-                                                                    {attachment.original_name}
-                                                                </p>
-                                                                <div className="flex items-center gap-2 text-xs text-gray-500">
-                                                                    <span>{formatFileSize(attachment.file_size)}</span>
-                                                                    <span>•</span>
-                                                                    <span className="truncate">{attachment.mime_type.split('/')[1]?.toUpperCase() || 'FILE'}</span>
-                                                                    {attachment.description && (
-                                                                        <>
-                                                                            <span>•</span>
-                                                                            <span className="text-gray-400">{attachment.description}</span>
-                                                                        </>
+                                    )}
+
+                                    {isMobile ? (
+                                        // Mobile Expandable Sections
+                                        <>
+                                            <ModernExpandableSection
+                                                title="Announcement Details"
+                                                icon={
+                                                    <div className="h-6 w-6 rounded-lg bg-gradient-to-r ${typeConfig.gradient} flex items-center justify-center">
+                                                        <TypeIcon className="h-3.5 w-3.5 text-white" />
+                                                    </div>
+                                                }
+                                                isExpanded={expandedSections.announcementInfo}
+                                                onToggle={() => toggleSection('announcementInfo')}
+                                            >
+                                                <div className="space-y-3">
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <Badge className={`${typeConfig.color} gap-1.5 px-3 py-1.5 border rounded-full`}>
+                                                            <TypeIcon className="h-3.5 w-3.5" />
+                                                            {announcement.type_label}
+                                                        </Badge>
+                                                        <Badge className={`${priorityConfig.color} gap-1.5 px-3 py-1.5 border rounded-full`}>
+                                                            <PriorityIcon className="h-3.5 w-3.5" />
+                                                            {announcement.priority_label}
+                                                        </Badge>
+                                                        {announcement.has_attachments && (
+                                                            <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border rounded-full bg-blue-50 text-blue-700 border-blue-200">
+                                                                <Paperclip className="h-3.5 w-3.5" />
+                                                                {announcement.attachments_count}
+                                                            </Badge>
+                                                        )}
+                                                        <Badge className={cn(
+                                                            "gap-1.5 px-3 py-1.5 border rounded-full",
+                                                            isExpired ? 'bg-gray-100 text-gray-700' :
+                                                                isUpcoming ? 'bg-blue-100 text-blue-700' :
+                                                                    'bg-green-100 text-green-700'
+                                                        )}>
+                                                            {isExpired ? (
+                                                                <>
+                                                                    <Clock className="h-3.5 w-3.5" />
+                                                                    Expired
+                                                                </>
+                                                            ) : isUpcoming ? (
+                                                                <>
+                                                                    <Calendar className="h-3.5 w-3.5" />
+                                                                    Upcoming
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <BellRing className="h-3.5 w-3.5" />
+                                                                    Active
+                                                                </>
+                                                            )}
+                                                        </Badge>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                            <p className="text-[10px] text-gray-500">Posted</p>
+                                                            <p className="text-xs">{formatRelativeTime(announcement.created_at)}</p>
+                                                        </div>
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                            <p className="text-[10px] text-gray-500">Views</p>
+                                                            <p className="text-xs">{announcement.views_count?.toLocaleString() || 0}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {announcement.author && (
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                            <p className="text-[10px] text-gray-500 mb-1">Author</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <Avatar className="h-6 w-6">
+                                                                    <AvatarFallback className="text-xs bg-gray-200">
+                                                                        {announcement.author.name.split(' ').map(n => n[0]).join('')}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+                                                                <div>
+                                                                    <p className="text-xs font-medium">{announcement.author.name}</p>
+                                                                    {announcement.author.role && (
+                                                                        <p className="text-[10px] text-gray-500">{announcement.author.role}</p>
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            <div className="flex gap-1">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8"
-                                                                    onClick={() => window.open(`/storage/${attachment.file_path}`, '_blank')}
-                                                                    title="Preview"
-                                                                >
-                                                                    <Eye className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8"
-                                                                    onClick={() => handleDownloadAttachment(attachment)}
-                                                                    title="Download"
-                                                                >
-                                                                    <Download className="h-4 w-4" />
-                                                                </Button>
+                                                        </div>
+                                                    )}
+
+                                                    {(announcement.start_date || announcement.end_date) && (
+                                                        <div className="space-y-2">
+                                                            {announcement.start_date && (
+                                                                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                                    <p className="text-[10px] text-gray-500">Starts</p>
+                                                                    <p className="text-xs">{formatDate(announcement.start_date)}</p>
+                                                                    {announcement.start_time && (
+                                                                        <p className="text-[10px] text-gray-500">{announcement.start_time}</p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {announcement.end_date && (
+                                                                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                                    <p className="text-[10px] text-gray-500">Ends</p>
+                                                                    <p className="text-xs">{formatDate(announcement.end_date)}</p>
+                                                                    {announcement.end_time && (
+                                                                        <p className="text-[10px] text-gray-500">{announcement.end_time}</p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </ModernExpandableSection>
+
+                                            <ModernCard title="Content">
+                                                <div
+                                                    className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700"
+                                                    dangerouslySetInnerHTML={{ __html: announcement.content }}
+                                                />
+                                            </ModernCard>
+                                        </>
+                                    ) : (
+                                        // Desktop View
+                                        <>
+                                            <ModernCard
+                                                title="Announcement Information"
+                                                icon={TypeIcon}
+                                                iconColor={typeConfig.gradient}
+                                            >
+                                                <div className="flex flex-wrap gap-2 mb-4">
+                                                    <Badge className={`${typeConfig.color} gap-1.5 px-3 py-1.5 border rounded-full`}>
+                                                        <TypeIcon className="h-3.5 w-3.5" />
+                                                        {announcement.type_label}
+                                                    </Badge>
+                                                    <Badge className={`${priorityConfig.color} gap-1.5 px-3 py-1.5 border rounded-full`}>
+                                                        <PriorityIcon className="h-3.5 w-3.5" />
+                                                        {announcement.priority_label}
+                                                    </Badge>
+                                                    {announcement.has_attachments && (
+                                                        <Badge variant="outline" className="gap-1.5 px-3 py-1.5 border rounded-full bg-blue-50 text-blue-700 border-blue-200">
+                                                            <Paperclip className="h-3.5 w-3.5" />
+                                                            {announcement.attachments_count} attachment{announcement.attachments_count !== 1 ? 's' : ''}
+                                                        </Badge>
+                                                    )}
+                                                    <Badge className={cn(
+                                                        "gap-1.5 px-3 py-1.5 border rounded-full",
+                                                        isExpired ? 'bg-gray-100 text-gray-700' :
+                                                            isUpcoming ? 'bg-blue-100 text-blue-700' :
+                                                                'bg-green-100 text-green-700'
+                                                    )}>
+                                                        {isExpired ? (
+                                                            <>
+                                                                <Clock className="h-3.5 w-3.5" />
+                                                                Expired
+                                                            </>
+                                                        ) : isUpcoming ? (
+                                                            <>
+                                                                <Calendar className="h-3.5 w-3.5" />
+                                                                Upcoming
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <BellRing className="h-3.5 w-3.5" />
+                                                                Active
+                                                            </>
+                                                        )}
+                                                    </Badge>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    <div className="p-3 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                                                        <p className="text-xs text-gray-500">Posted</p>
+                                                        <p className="font-medium mt-1">{formatRelativeTime(announcement.created_at)}</p>
+                                                    </div>
+                                                    <div className="p-3 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                                                        <p className="text-xs text-gray-500">Views</p>
+                                                        <p className="font-medium mt-1">{announcement.views_count?.toLocaleString() || 0}</p>
+                                                    </div>
+                                                </div>
+
+                                                {announcement.author && (
+                                                    <div className="p-3 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                                                        <p className="text-xs text-gray-500 mb-2">Author</p>
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar className="h-10 w-10">
+                                                                <AvatarFallback className="bg-gray-200">
+                                                                    {announcement.author.name.split(' ').map(n => n[0]).join('')}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                            <div>
+                                                                <p className="font-medium">{announcement.author.name}</p>
+                                                                {announcement.author.role && (
+                                                                    <p className="text-sm text-gray-500">{announcement.author.role}</p>
+                                                                )}
                                                             </div>
                                                         </div>
+                                                    </div>
+                                                )}
+
+                                                {(announcement.start_date || announcement.end_date) && (
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        {announcement.start_date && (
+                                                            <div className="p-3 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                                                                <p className="text-xs text-gray-500">Starts</p>
+                                                                <p className="font-medium mt-1">{formatDate(announcement.start_date)}</p>
+                                                                {announcement.start_time && (
+                                                                    <p className="text-sm text-gray-500 mt-1">at {announcement.start_time}</p>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {announcement.end_date && (
+                                                            <div className="p-3 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                                                                <p className="text-xs text-gray-500">Ends</p>
+                                                                <p className="font-medium mt-1">{formatDate(announcement.end_date)}</p>
+                                                                {announcement.end_time && (
+                                                                    <p className="text-sm text-gray-500 mt-1">at {announcement.end_time}</p>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </ModernCard>
+
+                                            <ModernCard title="Content">
+                                                <div
+                                                    className="prose prose-lg max-w-none prose-headings:text-gray-900 prose-p:text-gray-700"
+                                                    dangerouslySetInnerHTML={{ __html: announcement.content }}
+                                                />
+                                            </ModernCard>
+                                        </>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Attachments Tab */}
+                            {activeTab === 'attachments' && (
+                                <>
+                                    {announcement.attachments && announcement.attachments.length > 0 ? (
+                                        <div className="space-y-4">
+                                            {/* Image Attachments */}
+                                            {imageAttachments.length > 0 && (
+                                                <ModernCard
+                                                    title={`Photos (${imageAttachments.length})`}
+                                                    icon={FileImage}
+                                                    iconColor="from-green-500 to-green-600"
+                                                >
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                        {imageAttachments.map((attachment) => (
+                                                            <ModernDocumentThumbnail
+                                                                key={attachment.id}
+                                                                document={attachment}
+                                                                onView={() => setViewingDocument(attachment)}
+                                                                onDownload={() => handleDownloadAttachment(attachment)}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </ModernCard>
+                                            )}
+
+                                            {/* Document Attachments */}
+                                            {documentAttachments.length > 0 && (
+                                                <ModernCard
+                                                    title={`Documents (${documentAttachments.length})`}
+                                                    icon={Paperclip}
+                                                    iconColor="from-blue-500 to-blue-600"
+                                                >
+                                                    <div className="space-y-2">
+                                                        {documentAttachments.map((attachment) => {
+                                                            const FileIcon = getFileIcon(attachment.mime_type, attachment.file_name);
+                                                            
+                                                            return (
+                                                                <div
+                                                                    key={attachment.id}
+                                                                    className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors group"
+                                                                >
+                                                                    <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center flex-shrink-0">
+                                                                        <FileIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="font-medium text-sm truncate">
+                                                                            {attachment.original_name}
+                                                                        </p>
+                                                                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                                                                            <span>{attachment.formatted_size}</span>
+                                                                            <span>•</span>
+                                                                            <span className="truncate">
+                                                                                {attachment.mime_type.split('/')[1]?.toUpperCase() || 'FILE'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <TooltipProvider>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger asChild>
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="h-8 w-8 rounded-lg"
+                                                                                        onClick={() => window.open(`/storage/${attachment.file_path}`, '_blank')}
+                                                                                    >
+                                                                                        <Eye className="h-4 w-4" />
+                                                                                    </Button>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent>Preview</TooltipContent>
+                                                                            </Tooltip>
+                                                                        </TooltipProvider>
+                                                                        <TooltipProvider>
+                                                                            <Tooltip>
+                                                                                <TooltipTrigger asChild>
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="h-8 w-8 rounded-lg"
+                                                                                        onClick={() => handleDownloadAttachment(attachment)}
+                                                                                        disabled={isDownloading}
+                                                                                    >
+                                                                                        {isDownloading ? (
+                                                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                                                        ) : (
+                                                                                            <Download className="h-4 w-4" />
+                                                                                        )}
+                                                                                    </Button>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent>Download</TooltipContent>
+                                                                            </Tooltip>
+                                                                        </TooltipProvider>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </ModernCard>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <ModernEmptyState
+                                            status="empty"
+                                            title="No Attachments"
+                                            description="This announcement has no attachments"
+                                            icon={Inbox}
+                                            className="py-12"
+                                        />
+                                    )}
+                                </>
+                            )}
+
+                            {/* Related Tab */}
+                            {activeTab === 'related' && (
+                                <>
+                                    {relatedAnnouncements.length > 0 ? (
+                                        <ModernCard
+                                            title="Related Announcements"
+                                            icon={Layers}
+                                            iconColor="from-purple-500 to-purple-600"
+                                        >
+                                            <div className="space-y-3">
+                                                {(showAllRelated ? relatedAnnouncements : relatedAnnouncements.slice(0, 5)).map((related) => {
+                                                    const relatedTypeConfig = getTypeConfig(related.type);
+                                                    const relatedPriorityConfig = getPriorityConfig(related.priority);
+                                                    const RelatedPriorityIcon = relatedPriorityConfig.icon;
+
+                                                    return (
+                                                        <Link
+                                                            key={related.id}
+                                                            href={`/portal/resident-announcements/${related.id}`}
+                                                            className="block"
+                                                        >
+                                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
+                                                                <div className="flex gap-3">
+                                                                    <div className={`h-10 w-10 rounded-lg ${relatedTypeConfig.color} flex items-center justify-center flex-shrink-0`}>
+                                                                        <relatedTypeConfig.icon className="h-5 w-5" />
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                                            <Badge className={`${relatedTypeConfig.color} text-xs px-2 py-0.5 rounded-full`}>
+                                                                                {related.type_label}
+                                                                            </Badge>
+                                                                            <Badge className={`${relatedPriorityConfig.color} text-xs px-2 py-0.5 rounded-full`}>
+                                                                                <RelatedPriorityIcon className="h-3 w-3 mr-1" />
+                                                                                {related.priority_label}
+                                                                            </Badge>
+                                                                            {related.has_attachments && (
+                                                                                <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border-blue-200">
+                                                                                    <Paperclip className="h-3 w-3 mr-1" />
+                                                                                    {related.attachments_count}
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
+                                                                        <h4 className="font-medium text-sm line-clamp-2">
+                                                                            {related.title}
+                                                                        </h4>
+                                                                        <p className="text-xs text-gray-500 mt-1">
+                                                                            {formatRelativeTime(related.created_at)}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </Link>
                                                     );
                                                 })}
-                                        </div>
-                                    </CardContent>
-                                </Card>
+
+                                                {relatedAnnouncements.length > 5 && (
+                                                    <div className="text-center mt-4">
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() => setShowAllRelated(!showAllRelated)}
+                                                            className="gap-2 rounded-lg"
+                                                            size="sm"
+                                                        >
+                                                            {showAllRelated ? 'Show Less' : `Show ${relatedAnnouncements.length - 5} More`}
+                                                            {showAllRelated ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </ModernCard>
+                                    ) : (
+                                        <ModernEmptyState
+                                            status="info"
+                                            title="No Related Announcements"
+                                            description="Check back later for updates"
+                                            icon={Inbox}
+                                            className="py-12"
+                                        />
+                                    )}
+                                </>
                             )}
                         </div>
-                    )}
+                    </div>
 
-                    {/* Quick Actions Card - Mobile */}
-                    <div className="lg:hidden">
-                        <Card className="border rounded-2xl">
-                            <CardContent className="p-4">
-                                <div className="grid grid-cols-4 gap-2">
+                    {/* Right Column - Desktop Only */}
+                    {!isMobile && (
+                        <div className="space-y-4 lg:space-y-6">
+                            {/* Quick Actions */}
+                            <ModernCard title="Quick Actions">
+                                <div className="space-y-2">
                                     <Button
                                         variant="outline"
-                                        className="flex-col gap-1 h-auto py-3 rounded-lg"
+                                        className="w-full justify-start gap-2 rounded-xl"
                                         onClick={handleShare}
                                     >
                                         {isShareCopied ? (
-                                            <Check className="h-5 w-5 text-green-600" />
+                                            <>
+                                                <Check className="h-4 w-4 text-green-600" />
+                                                Copied!
+                                            </>
                                         ) : (
-                                            <Share2 className="h-5 w-5" />
+                                            <>
+                                                <Share2 className="h-4 w-4" />
+                                                Share
+                                            </>
                                         )}
-                                        <span className="text-xs font-medium">
-                                            {isShareCopied ? 'Copied' : 'Share'}
-                                        </span>
                                     </Button>
                                     <Button
                                         variant="outline"
-                                        className="flex-col gap-1 h-auto py-3 rounded-lg"
-                                        onClick={() => setIsBookmarked(!isBookmarked)}
+                                        className="w-full justify-start gap-2 rounded-xl"
+                                        onClick={handleBookmark}
                                     >
-                                        <Bookmark className={`h-5 w-5 ${isBookmarked ? 'fill-current text-blue-600' : ''}`} />
-                                        <span className="text-xs font-medium">
-                                            {isBookmarked ? 'Saved' : 'Save'}
-                                        </span>
+                                        <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                                        {isBookmarked ? 'Saved' : 'Save'}
                                     </Button>
                                     <Button
                                         variant="outline"
-                                        className="flex-col gap-1 h-auto py-3 rounded-lg"
+                                        className="w-full justify-start gap-2 rounded-xl"
+                                        onClick={handleLike}
+                                    >
+                                        <ThumbsUp className={`h-4 w-4 ${isLiked ? 'fill-current' : ''}`} />
+                                        Helpful
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full justify-start gap-2 rounded-xl"
                                         onClick={handlePrint}
                                     >
-                                        <Printer className="h-5 w-5" />
-                                        <span className="text-xs font-medium">Print</span>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="flex-col gap-1 h-auto py-3 rounded-lg"
-                                        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                                    >
-                                        <ArrowLeft className="h-5 w-5 rotate-90" />
-                                        <span className="text-xs font-medium">Top</span>
+                                        <Printer className="h-4 w-4" />
+                                        Print
                                     </Button>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                            </ModernCard>
 
-                    {/* Related Announcements */}
-                    {relatedAnnouncements.length > 0 && (
-                        <div className="mt-8">
-                            <div className="flex items-center justify-between mb-6">
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-900">Related Announcements</h2>
-                                    <p className="text-sm text-gray-500 mt-1">You might also be interested in these</p>
-                                </div>
-                                <Link href="/portal/resident-announcements">
-                                    <Button variant="ghost" size="sm" className="gap-1">
-                                        View All
-                                        <ChevronRight className="h-3.5 w-3.5" />
-                                    </Button>
-                                </Link>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {(showAllRelated ? relatedAnnouncements : relatedAnnouncements.slice(0, 4)).map((related) => {
-                                    const relatedTypeConfig = getTypeConfig(related.type);
-                                    const relatedPriorityConfig = getPriorityConfig(related.priority);
-                                    const RelatedPriorityIcon = relatedPriorityConfig.icon;
-                                    
-                                    return (
-                                        <Link 
-                                            key={related.id} 
-                                            href={`/portal/resident-announcements/${related.id}`}
-                                            className="block"
-                                        >
-                                            <Card className="h-full border hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                                                <CardContent className="p-4">
-                                                    <div className="flex gap-3">
-                                                        <div className={`h-12 w-12 rounded-lg ${relatedTypeConfig.color} flex items-center justify-center flex-shrink-0`}>
-                                                            <relatedTypeConfig.icon className="h-6 w-6" />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-2">
-                                                                <Badge className={`${relatedTypeConfig.color} text-xs px-2 py-0.5 rounded-full`}>
-                                                                    {relatedTypeConfig.label}
-                                                                </Badge>
-                                                                <Badge className={`${relatedPriorityConfig.color} text-xs px-2 py-0.5 rounded-full`}>
-                                                                    <RelatedPriorityIcon className="h-3 w-3 mr-1" />
-                                                                    {relatedPriorityConfig.label}
-                                                                </Badge>
-                                                            </div>
-                                                            <h3 className="font-semibold text-gray-900 line-clamp-2 text-sm mb-1">
-                                                                {related.title}
-                                                            </h3>
-                                                            <p className="text-xs text-gray-500">
-                                                                {formatRelativeTime(related.created_at)}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        </Link>
-                                    );
-                                })}
-                            </div>
-                            
-                            {relatedAnnouncements.length > 4 && (
-                                <div className="text-center mt-6">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => setShowAllRelated(!showAllRelated)}
-                                        className="gap-2"
-                                    >
-                                        {showAllRelated ? 'Show Less' : `Show ${relatedAnnouncements.length - 4} More`}
-                                        {showAllRelated ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                    </Button>
-                                </div>
+                            {/* Resident Information */}
+                            {resident && (
+                                <ModernCard title="Your Information" icon={User} iconColor="from-blue-500 to-blue-600">
+                                    <div className="space-y-3">
+                                        <div className="p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                                            <p className="text-xs text-gray-500">Name</p>
+                                            <p className="font-medium mt-1">{resident.full_name}</p>
+                                        </div>
+                                        {resident.household_number && (
+                                            <div className="p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                                                <p className="text-xs text-gray-500">Household</p>
+                                                <p className="font-medium mt-1">{resident.household_number}</p>
+                                            </div>
+                                        )}
+                                        {resident.purok && (
+                                            <div className="p-3 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                                                <p className="text-xs text-gray-500">Purok</p>
+                                                <p className="font-medium mt-1">{resident.purok}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </ModernCard>
                             )}
+
+                            {/* Attachments Summary */}
+                            {announcement.has_attachments && (
+                                <ModernCard title="Attachments" icon={Paperclip} iconColor="from-green-500 to-green-600">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                                            <div className="flex items-center gap-2">
+                                                <FileImage className="h-4 w-4 text-gray-500" />
+                                                <span className="text-sm">Images</span>
+                                            </div>
+                                            <Badge>{imageAttachments.length}</Badge>
+                                        </div>
+                                        <div className="flex items-center justify-between p-2 rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="h-4 w-4 text-gray-500" />
+                                                <span className="text-sm">Documents</span>
+                                            </div>
+                                            <Badge>{documentAttachments.length}</Badge>
+                                        </div>
+                                        <Button 
+                                            variant="ghost" 
+                                            className="w-full mt-2"
+                                            onClick={() => setActiveTab('attachments')}
+                                        >
+                                            View All Attachments
+                                        </Button>
+                                    </div>
+                                </ModernCard>
+                            )}
+
+                            {/* Contact Information */}
+                            <ModernCard title="Contact Information" icon={MessageSquare} iconColor="from-purple-500 to-purple-600">
+                                <div className="space-y-3">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                        <Building className="h-5 w-5 text-gray-400 mt-0.5" />
+                                        <div>
+                                            <p className="font-medium text-sm">Barangay Hall</p>
+                                            <p className="text-xs text-gray-500">Mon-Fri, 8AM-5PM</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                        <Phone className="h-5 w-5 text-gray-400 mt-0.5" />
+                                        <div>
+                                            <p className="font-medium text-sm">Emergency Hotline</p>
+                                            <p className="text-xs text-gray-500">(02) 8888-9999</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                        <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
+                                        <div>
+                                            <p className="font-medium text-sm">Email</p>
+                                            <p className="text-xs text-gray-500">barangay@example.com</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                        <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+                                        <div>
+                                            <p className="font-medium text-sm">Location</p>
+                                            <p className="text-xs text-gray-500">Barangay Hall, Main Street</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </ModernCard>
                         </div>
                     )}
-
-                    {/* Contact Section */}
-                    <Card className="border rounded-2xl mt-8 bg-gradient-to-br from-blue-50 to-white">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <MessageSquare className="h-5 w-5 text-blue-600" />
-                                <span>Need Help or Have Questions?</span>
-                            </CardTitle>
-                            <CardDescription>
-                                Contact our barangay office for any clarifications or assistance
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                            <Building className="h-4 w-4 text-blue-600" />
-                                        </div>
-                                        <span className="font-semibold text-gray-900">Office Hours</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600">
-                                        Monday - Friday
-                                        <br />
-                                        8:00 AM - 5:00 PM
-                                    </p>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                            <Phone className="h-4 w-4 text-blue-600" />
-                                        </div>
-                                        <span className="font-semibold text-gray-900">Emergency Hotline</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600">
-                                        (02) 8888-9999
-                                        <br />
-                                        0917-123-4567 (Globe)
-                                    </p>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                            <Mail className="h-4 w-4 text-blue-600" />
-                                        </div>
-                                        <span className="font-semibold text-gray-900">Email</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600">
-                                        barangay@example.com
-                                        <br />
-                                        support@barangay.ph
-                                    </p>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                                            <MapPin className="h-4 w-4 text-blue-600" />
-                                        </div>
-                                        <span className="font-semibold text-gray-900">Location</span>
-                                    </div>
-                                    <p className="text-sm text-gray-600">
-                                        Barangay Hall
-                                        <br />
-                                        123 Main Street, City
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="mt-6 pt-6 border-t border-gray-200">
-                                <p className="text-sm text-gray-600 text-center">
-                                    For urgent matters outside office hours, please use the emergency hotline.
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Floating Share Button (Mobile) */}
-                <div className="lg:hidden fixed bottom-20 right-4 z-40">
-                    <Button
-                        size="icon"
-                        className="h-14 w-14 rounded-full shadow-xl bg-blue-600 hover:bg-blue-700"
-                        onClick={handleShare}
-                    >
-                        {isShareCopied ? (
-                            <Check className="h-6 w-6 text-white" />
-                        ) : (
-                            <Share2 className="h-6 w-6 text-white" />
-                        )}
-                    </Button>
-                </div>
-
-                {/* Mobile Footer */}
-                <div className="lg:hidden">
-                    <ResidentMobileFooter />
                 </div>
             </div>
+
+            {/* Mobile Floating Action Button */}
+            {isMobile && showStickyActions && (
+                <ModernFloatingActionButton
+                    icon={<Share2 className="h-6 w-6 text-white" />}
+                    label="Share"
+                    onClick={handleShare}
+                    color="blue"
+                />
+            )}
+
+            {/* Document Viewer Modal */}
+            {viewingDocument && (
+                <Dialog open={!!viewingDocument} onOpenChange={() => setViewingDocument(null)}>
+                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>{viewingDocument.original_name}</DialogTitle>
+                            <DialogDescription>
+                                {viewingDocument.formatted_size} • Uploaded on {new Date(viewingDocument.created_at).toLocaleDateString()}
+                            </DialogDescription>
+                        </DialogHeader>
+                        {viewingDocument.is_image ? (
+                            <div className="mt-4 flex justify-center">
+                                <img
+                                    src={`/storage/${viewingDocument.file_path}`}
+                                    alt={viewingDocument.original_name}
+                                    className="max-w-full max-h-[60vh] object-contain rounded-lg"
+                                />
+                            </div>
+                        ) : (
+                            <div className="mt-4 p-8 text-center bg-gray-50 rounded-lg">
+                                <FileText className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                                <p className="text-gray-600">Preview not available for this file type</p>
+                                <Button 
+                                    className="mt-4"
+                                    onClick={() => handleDownloadAttachment(viewingDocument)}
+                                    disabled={isDownloading}
+                                >
+                                    {isDownloading ? (
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <Download className="h-4 w-4 mr-2" />
+                                    )}
+                                    Download File
+                                </Button>
+                            </div>
+                        )}
+                        <div className="flex justify-end gap-2 mt-4">
+                            <Button variant="outline" onClick={() => window.open(`/storage/${viewingDocument.file_path}`, '_blank')}>
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                Open in New Tab
+                            </Button>
+                            <Button onClick={() => handleDownloadAttachment(viewingDocument)} disabled={isDownloading}>
+                                {isDownloading ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Download className="h-4 w-4 mr-2" />
+                                )}
+                                Download
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            <ModernLoadingOverlay loading={loading} message="Loading..." />
         </ResidentLayout>
     );
 }

@@ -9,25 +9,53 @@ use App\Http\Controllers\Resident\ResidentFeeController;
 use App\Http\Controllers\Resident\ResidentClearanceController;
 use App\Http\Controllers\Resident\CommunityReportController;
 use App\Http\Controllers\Resident\RecordController;
+use App\Http\Controllers\Resident\SupportController;
 use App\Http\Controllers\Resident\ResidentFormController;
 use App\Http\Controllers\Resident\ResidentAnnouncementController;
-Use Inertia\Inertia;
+use App\Http\Controllers\Resident\ResidentNotificationController;
+use Inertia\Inertia;
 
 // ====================
 // RESIDENT DASHBOARD
 // ====================
 Route::get('/dashboard', [ResidentDashboardController::class, 'residentdashboard'])
     ->name('dashboard');
+
 Route::get('/instructions', function () {
     return Inertia::render('resident/Instructions/HouseholdInstructions', [
-        'section' => request('section', 'overview'), // optional section parameter
+        'section' => request('section', 'overview'),
         'userRole' => auth()->user()->role ?? 'staff'
     ]);
 })->name('instructions');
+
+// ====================
+// RESIDENT NOTIFICATIONS
+// ====================
+Route::prefix('notifications')->name('notifications.')->group(function () {
+    // Get notifications list
+    Route::get('/', [ResidentNotificationController::class, 'index'])->name('index');
+    
+    // Mark a single notification as read
+    Route::patch('/{id}/mark-as-read', [ResidentNotificationController::class, 'markAsRead'])
+        ->name('mark-as-read');
+    
+    // Mark all notifications as read
+    Route::post('/mark-all-as-read', [ResidentNotificationController::class, 'markAllAsRead'])
+        ->name('mark-all-as-read');
+    
+    // Get unread count (for polling/updates)
+    Route::get('/unread-count', [ResidentNotificationController::class, 'unreadCount'])
+        ->name('unread-count');
+    
+    // Delete a notification
+    Route::delete('/{id}', [ResidentNotificationController::class, 'destroy'])
+        ->name('destroy');
+});
+
 // ====================
 // RESIDENT PAYMENTS
 // ====================
-Route::prefix('my-payments')->name('my.payments.')->group(function () {
+Route::prefix('payments')->name('my.payments.')->group(function () {
     Route::get('/', [ResidentPaymentController::class, 'index'])->name('index');
     Route::get('/pay', [ResidentPaymentController::class, 'create'])->name('create');
     Route::post('/', [ResidentPaymentController::class, 'store'])->name('store');
@@ -35,36 +63,20 @@ Route::prefix('my-payments')->name('my.payments.')->group(function () {
     Route::get('/{payment}/receipt', [ResidentPaymentController::class, 'receipt'])->name('receipt');
     Route::post('/verify', [ResidentPaymentController::class, 'verify'])->name('verify');
     Route::post('/save-payment-method', [ResidentPaymentController::class, 'savePaymentMethod'])->name('save-method');
-});
+       Route::get('/{payment}/receipt', [ResidentPaymentController::class, 'receipt'])
+            ->name('receipt.view'); // This creates portal.my.payments.receipt.view
+    });
 
 // ====================
-// RESIDENT PAYMENTS
+// RESIDENT CLEARANCES
 // ====================
-Route::prefix('my-payments')->name('resident.payments.')->group(function () {
-    Route::get('/', [ResidentPaymentController::class, 'index'])->name('index');
-    Route::get('/create', [ResidentPaymentController::class, 'create'])->name('create');
-    Route::post('/', [ResidentPaymentController::class, 'store'])->name('store');
-    Route::get('/{payment}', [ResidentPaymentController::class, 'show'])->name('show');
-    
-    // Receipt routes
-    Route::get('/{payment}/receipt/download', [ResidentPaymentController::class, 'downloadReceipt'])->name('receipt.download');
-    Route::get('/{payment}/receipt/view', [ResidentPaymentController::class, 'viewReceipt'])->name('receipt.view');
-    Route::post('/{payment}/receipt/save', [ResidentPaymentController::class, 'saveReceipt'])->name('receipt.save');
-    
-    // Note routes
-    Route::post('/{payment}/notes', [ResidentPaymentController::class, 'addNote'])->name('notes.store');
-    
-    // Attachment routes
-    Route::post('/{payment}/attachments', [ResidentPaymentController::class, 'uploadAttachment'])->name('attachments.store');
-    Route::get('/{payment}/attachments/{attachment}/download', [ResidentPaymentController::class, 'downloadAttachment'])->name('attachments.download');
-    Route::delete('/{payment}/attachments/{attachment}', [ResidentPaymentController::class, 'deleteAttachment'])->name('attachments.destroy');
-    
-    // Payment action routes
-    Route::put('/{payment}/payment-method', [ResidentPaymentController::class, 'updatePaymentMethod'])->name('update-method');
-    Route::put('/{payment}/cancel', [ResidentPaymentController::class, 'cancel'])->name('cancel');
-    Route::get('/{payment}/receipt', [ResidentPaymentController::class, 'receipt'])->name('receipt');
-    Route::post('/{payment}/verify', [ResidentPaymentController::class, 'verify'])->name('verify');
-    Route::get('/{payment}/payment-link', [ResidentPaymentController::class, 'getPaymentLink'])->name('payment-link');
+Route::prefix('my-clearances')->name('my.clearances.')->group(function () {
+    Route::get('/', [ResidentClearanceController::class, 'index'])->name('index');
+    Route::get('/request', [ResidentClearanceController::class, 'create'])->name('create');
+    Route::post('/', [ResidentClearanceController::class, 'store'])->name('store');
+    Route::get('/{clearance}', [ResidentClearanceController::class, 'show'])->name('show');
+    Route::get('/{clearance}/download', [ResidentClearanceController::class, 'download'])->name('download');
+    Route::put('/{clearance}/cancel', [ResidentClearanceController::class, 'cancel'])->name('cancel');
 });
 
 // ====================
@@ -137,6 +149,22 @@ Route::prefix('announcements')->name('announcements.')->group(function () {
     Route::post('/{announcement}/bookmark', [ResidentAnnouncementController::class, 'bookmark'])->name('bookmark');
     Route::post('/subscribe', [ResidentAnnouncementController::class, 'subscribe'])->name('subscribe');
 });
+
+
+   // ========== SUPPORT CENTER ROUTES ==========
+    Route::get('/support', [SupportController::class, 'index'])->name('support.index');
+    Route::get('/support/tickets/{id}', [SupportController::class, 'show'])->name('support.tickets.show');
+    Route::post('/support/tickets', [SupportController::class, 'store'])->name('support.tickets.store');
+    Route::post('/support/tickets/{id}/reply', [SupportController::class, 'reply'])->name('support.tickets.reply');
+    Route::get('/support/faqs', [SupportController::class, 'faqs'])->name('support.faqs');
+    Route::get('/support/guides', [SupportController::class, 'guides'])->name('support.guides');
+    Route::get('/support/video-tutorials', [SupportController::class, 'videos'])->name('support.videos');
+    
+    // API routes for AJAX requests
+    Route::prefix('api')->name('api.')->group(function () {
+        Route::get('/support/faqs/search', [SupportController::class, 'searchFaqs'])->name('support.faqs.search');
+        Route::post('/support/tickets/{id}/rate', [SupportController::class, 'rate'])->name('support.tickets.rate');
+    });
 
 // ====================
 // RESIDENT FEES

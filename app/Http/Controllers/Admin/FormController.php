@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Models\User;
+use App\Models\Household;
+use App\Notifications\FormUploadedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -107,8 +110,6 @@ class FormController extends Controller
         $weekStart = Carbon::now()->startOfWeek();
         $monthStart = Carbon::now()->startOfMonth();
 
-        // Note: In a real application, you'd have separate tables for tracking views/downloads
-        // For now, we'll use approximate values based on the form's overall stats
         $downloadStats = [
             'today' => $this->getFormDownloadsForPeriod($form, $today, now()),
             'this_week' => $this->getFormDownloadsForPeriod($form, $weekStart, now()),
@@ -129,7 +130,7 @@ class FormController extends Controller
 
         // Add additional fields expected by frontend
         $formData = array_merge($form->toArray(), [
-            'mime_type' => $form->file_type, // Map file_type to mime_type for frontend
+            'mime_type' => $form->file_type,
             'is_featured' => $form->is_featured ?? false,
             'is_public' => $form->is_public ?? true,
             'requires_login' => $form->requires_login ?? false,
@@ -159,7 +160,128 @@ class FormController extends Controller
         ]);
     }
 
-    // Store new form
+    /**
+     * Get all household users (heads and members with accounts)
+     */
+    private function getAllHouseholdUsers(): \Illuminate\Support\Collection
+    {
+        // Get household heads with user accounts
+        $householdHeads = User::whereHas('role', function($query) {
+            $query->where('name', 'Household Head');
+        })->where('status', 'active')->get();
+        
+        // Also get household members who might have user accounts
+        $householdMembers = User::whereHas('role', function($query) {
+            $query->where('name', 'Household Member');
+        })->where('status', 'active')->get();
+        
+        // Also get any users with household_id (fallback)
+        $householdUsers = User::whereNotNull('household_id')
+            ->where('status', 'active')
+            ->get();
+        
+        // Merge all collections and remove duplicates
+        return $householdHeads
+            ->merge($householdMembers)
+            ->merge($householdUsers)
+            ->unique('id');
+    }
+
+    /**
+     * Get all active households with user accounts
+     */
+    private function getAllHouseholdsWithUsers(): \Illuminate\Support\Collection
+    {
+        return Household::with('user')
+            ->whereHas('user', function($query) {
+                $query->where('status', 'active');
+            })
+            ->where('status', 'active')
+            ->get();
+    }
+
+    /**
+     * Send form notifications to all households
+     */
+    private function sendFormNotifications(Form $form, string $action = 'uploaded'): void
+    {
+        try {
+            Log::info('Sending form notifications to households', [
+                'form_id' => $form->id,
+                'form_title' => $form->title,
+                'action' => $action
+            ]);
+
+            // Get all household users
+            $householdUsers = $this->getAllHouseholdUsers();
+            
+            $notification = new FormUploadedNotification($form, $action);
+            
+            $sentCount = 0;
+            $householdIds = [];
+            
+            foreach ($householdUsers as $user) {
+                $user->notify($notification);
+                $sentCount++;
+                
+                if ($user->household_id) {
+                    $householdIds[] = $user->household_id;
+                }
+                
+                Log::info('Form notification sent to household user', [
+                    'user_id' => $user->id,
+                    'user_name' => $user->name ?? 'Unknown',
+                    'household_id' => $user->household_id,
+                    'role' => $user->role?->name ?? 'No Role'
+                ]);
+            }
+
+            // Also notify admins
+            $admins = User::whereHas('role', function($query) {
+                $query->whereIn('name', ['admin', 'super-admin', 'secretary', 'treasurer']);
+            })->where('status', 'active')->get();
+
+            foreach ($admins as $admin) {
+                $admin->notify($notification);
+                $sentCount++;
+                
+                Log::info('Form notification sent to admin', [
+                    'admin_id' => $admin->id,
+                    'admin_name' => $admin->name,
+                    'role' => $admin->role?->name ?? 'No Role'
+                ]);
+            }
+
+            // Get households that were notified
+            $uniqueHouseholds = array_unique($householdIds);
+            
+            // Also notify households without user accounts? (Optional)
+            // You could send emails or SMS here if needed
+
+            Log::info('Form notifications completed successfully', [
+                'form_id' => $form->id,
+                'form_title' => $form->title,
+                'households_notified' => count($uniqueHouseholds),
+                'household_users_notified' => $householdUsers->count(),
+                'admins_notified' => $admins->count(),
+                'total_notifications_sent' => $sentCount,
+                'household_ids' => $uniqueHouseholds
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send form notifications', [
+                'form_id' => $form->id,
+                'form_title' => $form->title ?? 'Unknown',
+                'action' => $action,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * Store new form
+     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -192,7 +314,7 @@ class FormController extends Controller
         $mimeType = $file->getMimeType();
         
         // Create form
-        Form::create([
+        $form = Form::create([
             'title' => $validated['title'],
             'slug' => $slug,
             'description' => $validated['description'] ?? null,
@@ -212,8 +334,11 @@ class FormController extends Controller
             'created_by' => auth()->id(),
         ]);
 
+        // ========== SEND NOTIFICATIONS TO ALL HOUSEHOLDS ==========
+        $this->sendFormNotifications($form, 'uploaded');
+
         return redirect()->route('admin.forms.index')
-            ->with('success', 'Form uploaded successfully.');
+            ->with('success', 'Form uploaded successfully and notifications sent to all households.');
     }
 
     // Show edit form
@@ -226,7 +351,9 @@ class FormController extends Controller
         ]);
     }
 
-    // Update form
+    /**
+     * Update form
+     */
     public function update(Request $request, Form $form)
     {
         $validated = $request->validate([
@@ -243,6 +370,9 @@ class FormController extends Controller
             'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
         ]);
 
+        // Determine action type
+        $action = 'updated';
+        
         // Handle file update if provided
         if ($request->hasFile('file')) {
             $file = $request->file('file');
@@ -256,6 +386,8 @@ class FormController extends Controller
             $form->file_name = $file->getClientOriginalName();
             $form->file_size = $file->getSize();
             $form->file_type = $file->getMimeType();
+            
+            $action = 'updated_with_new_file';
         }
 
         // Update other fields
@@ -282,105 +414,117 @@ class FormController extends Controller
 
         $form->save();
 
+        // ========== SEND NOTIFICATIONS ABOUT FORM UPDATE ==========
+        // Only send if form is active
+        if ($form->is_active) {
+            $this->sendFormNotifications($form, $action);
+        }
+
         return redirect()->route('admin.forms.index')
-            ->with('success', 'Form updated successfully.');
+            ->with('success', 'Form updated successfully and notifications sent to all households.');
     }
 
-    // Download form - Enhanced version
-public function download(Form $form)
-{
-    // Check if form is active
-    if (!$form->is_active && !auth()->user()->isAdmin()) {
-        abort(404, 'This form is not currently available.');
-    }
+    /**
+     * Download form - Enhanced version
+     */
+    public function download(Form $form)
+    {
+        // Check if form is active
+        if (!$form->is_active && !auth()->user()->isAdmin()) {
+            abort(404, 'This form is not currently available.');
+        }
 
-    // Check if login is required
-    if ($form->requires_login && !auth()->check()) {
-        return redirect()->route('login')->with('error', 'Please login to download this form.');
-    }
+        // Check if login is required
+        if ($form->requires_login && !auth()->check()) {
+            return redirect()->route('login')->with('error', 'Please login to download this form.');
+        }
 
-    // Check if file exists
-    $filePath = storage_path('app/public/' . $form->file_path);
-    
-    if (!file_exists($filePath)) {
-        abort(404, 'File not found on server.');
-    }
+        // Check if file exists
+        $filePath = storage_path('app/public/' . $form->file_path);
+        
+        if (!file_exists($filePath)) {
+            abort(404, 'File not found on server.');
+        }
 
-    // Increment download count
-    $form->increment('download_count');
-    
-    // Update last download info
-    $form->update([
-        'last_downloaded_at' => now(),
-        'last_downloaded_by' => auth()->id(),
-    ]);
+        // Increment download count
+        $form->increment('download_count');
+        
+        // Update last download info
+        $form->update([
+            'last_downloaded_at' => now(),
+            'last_downloaded_by' => auth()->id(),
+        ]);
 
-    // Get file information
-    $fileName = $form->file_name;
-    $fileSize = filesize($filePath);
-    $fileMime = $form->file_type;
+        // Get file information
+        $fileName = $form->file_name;
+        $fileSize = filesize($filePath);
+        $fileMime = $form->file_type;
 
-    // Determine if it's a direct download or should open in browser
-    $shouldOpenInBrowser = request()->query('preview', false) || 
-                           in_array($fileMime, [
-                               'application/pdf', 
-                               'image/jpeg', 
-                               'image/png', 
-                               'image/gif',
-                               'image/webp',
-                               'image/svg+xml'
-                           ]);
+        // Determine if it's a direct download or should open in browser
+        $shouldOpenInBrowser = request()->query('preview', false) || 
+                               in_array($fileMime, [
+                                   'application/pdf', 
+                                   'image/jpeg', 
+                                   'image/png', 
+                                   'image/gif',
+                                   'image/webp',
+                                   'image/svg+xml'
+                               ]);
 
-    // Get download disposition
-    $disposition = $shouldOpenInBrowser ? 'inline' : 'attachment';
+        // Get download disposition
+        $disposition = $shouldOpenInBrowser ? 'inline' : 'attachment';
 
-    // If it's a preview request, serve the file directly
-    if (request()->query('preview', false)) {
-        return response()->file($filePath, [
+        // If it's a preview request, serve the file directly
+        if (request()->query('preview', false)) {
+            return response()->file($filePath, [
+                'Content-Type' => $fileMime,
+                'Content-Disposition' => 'inline',
+            ]);
+        }
+
+        // Prepare response for download
+        $response = response()->download($filePath, $fileName, [
             'Content-Type' => $fileMime,
-            'Content-Disposition' => 'inline',
+            'Content-Length' => $fileSize,
+            'Content-Disposition' => $disposition . '; filename="' . $fileName . '"',
+            'Cache-Control' => 'private, max-age=3600',
+            'X-Form-ID' => $form->id,
+            'X-Download-Count' => $form->download_count,
+            'Access-Control-Expose-Headers' => 'X-Form-ID, X-Download-Count',
         ]);
+
+        // Set cache headers for public forms
+        if ($form->is_public && !$form->requires_login) {
+            $response->headers->set('Cache-Control', 'public, max-age=3600');
+        }
+
+        // If requested to open in new tab via frontend or JSON request
+        if (request()->expectsJson() || request()->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Download initiated',
+                'data' => [
+                    'download_url' => url('/storage/' . $form->file_path),
+                    'direct_download_url' => route('admin.forms.download', $form),
+                    'file_name' => $fileName,
+                    'file_size' => $fileSize,
+                    'formatted_file_size' => $form->formatted_file_size,
+                    'form_title' => $form->title,
+                    'download_count' => $form->download_count,
+                ]
+            ]);
+        }
+
+        return $response;
     }
 
-    // Prepare response for download
-    $response = response()->download($filePath, $fileName, [
-        'Content-Type' => $fileMime,
-        'Content-Length' => $fileSize,
-        'Content-Disposition' => $disposition . '; filename="' . $fileName . '"',
-        'Cache-Control' => 'private, max-age=3600',
-        'X-Form-ID' => $form->id,
-        'X-Download-Count' => $form->download_count,
-        'Access-Control-Expose-Headers' => 'X-Form-ID, X-Download-Count',
-    ]);
-
-    // Set cache headers for public forms
-    if ($form->is_public && !$form->requires_login) {
-        $response->headers->set('Cache-Control', 'public, max-age=3600');
-    }
-
-    // If requested to open in new tab via frontend or JSON request
-    if (request()->expectsJson() || request()->wantsJson()) {
-        return response()->json([
-            'success' => true,
-            'message' => 'Download initiated',
-            'data' => [
-                'download_url' => url('/storage/' . $form->file_path),
-                'direct_download_url' => route('forms.download', $form), // FIXED: Changed from admin.forms.download
-                'file_name' => $fileName,
-                'file_size' => $fileSize,
-                'formatted_file_size' => $form->formatted_file_size,
-                'form_title' => $form->title,
-                'download_count' => $form->download_count,
-            ]
-        ]);
-    }
-
-    return $response;
-}
-
-    // Toggle form status
+    /**
+     * Toggle form status
+     */
     public function toggleStatus(Form $form)
     {
+        $oldStatus = $form->is_active;
+        
         $form->update([
             'is_active' => !$form->is_active
         ]);
@@ -389,12 +533,21 @@ public function download(Form $form)
             ? 'Form activated successfully.' 
             : 'Form deactivated successfully.';
 
+        // Send notification if activated
+        if ($form->is_active && !$oldStatus) {
+            $this->sendFormNotifications($form, 'activated');
+        }
+
         return back()->with('success', $message);
     }
 
-    // Toggle form featured status
+    /**
+     * Toggle form featured status
+     */
     public function toggleFeatured(Form $form)
     {
+        $wasFeatured = $form->is_featured;
+        
         $form->update([
             'is_featured' => !$form->is_featured
         ]);
@@ -403,10 +556,17 @@ public function download(Form $form)
             ? 'Form marked as featured successfully.' 
             : 'Form removed from featured list.';
 
+        // ========== SEND NOTIFICATION IF FEATURED ==========
+        if ($form->is_featured && !$wasFeatured) {
+            $this->sendFormNotifications($form, 'featured');
+        }
+
         return back()->with('success', $message);
     }
 
-    // Toggle form public status
+    /**
+     * Toggle form public status
+     */
     public function togglePublic(Form $form)
     {
         $form->update([
@@ -420,7 +580,9 @@ public function download(Form $form)
         return back()->with('success', $message);
     }
 
-    // Bulk actions
+    /**
+     * Bulk actions
+     */
     public function bulkAction(Request $request)
     {
         $request->validate([
@@ -430,6 +592,7 @@ public function download(Form $form)
         ]);
 
         $forms = Form::whereIn('id', $request->form_ids)->get();
+        $count = count($forms);
 
         switch ($request->action) {
             case 'delete':
@@ -437,37 +600,49 @@ public function download(Form $form)
                     Storage::disk('public')->delete($form->file_path);
                     $form->delete();
                 }
-                $message = count($forms) . ' form(s) deleted successfully.';
+                $message = $count . ' form(s) deleted successfully.';
                 break;
                 
             case 'activate':
                 Form::whereIn('id', $request->form_ids)->update(['is_active' => true]);
-                $message = count($forms) . ' form(s) activated successfully.';
+                // Send notifications for activated forms
+                foreach ($forms as $form) {
+                    if (!$form->is_active) {
+                        $this->sendFormNotifications($form, 'activated');
+                    }
+                }
+                $message = $count . ' form(s) activated successfully.';
                 break;
                 
             case 'deactivate':
                 Form::whereIn('id', $request->form_ids)->update(['is_active' => false]);
-                $message = count($forms) . ' form(s) deactivated successfully.';
+                $message = $count . ' form(s) deactivated successfully.';
                 break;
                 
             case 'feature':
                 Form::whereIn('id', $request->form_ids)->update(['is_featured' => true]);
-                $message = count($forms) . ' form(s) featured successfully.';
+                // Send notifications for featured forms
+                foreach ($forms as $form) {
+                    if (!$form->is_featured) {
+                        $this->sendFormNotifications($form, 'featured');
+                    }
+                }
+                $message = $count . ' form(s) featured successfully.';
                 break;
                 
             case 'unfeature':
                 Form::whereIn('id', $request->form_ids)->update(['is_featured' => false]);
-                $message = count($forms) . ' form(s) unfeatured successfully.';
+                $message = $count . ' form(s) unfeatured successfully.';
                 break;
                 
             case 'make_public':
                 Form::whereIn('id', $request->form_ids)->update(['is_public' => true]);
-                $message = count($forms) . ' form(s) made public successfully.';
+                $message = $count . ' form(s) made public successfully.';
                 break;
                 
             case 'make_private':
                 Form::whereIn('id', $request->form_ids)->update(['is_public' => false]);
-                $message = count($forms) . ' form(s) made private successfully.';
+                $message = $count . ' form(s) made private successfully.';
                 break;
                 
             default:
@@ -477,7 +652,9 @@ public function download(Form $form)
         return back()->with('success', $message);
     }
 
-    // Delete form
+    /**
+     * Delete form
+     */
     public function destroy(Form $form)
     {
         // Delete file from storage
@@ -490,7 +667,9 @@ public function download(Form $form)
             ->with('success', 'Form deleted successfully.');
     }
 
-    // Get statistics API
+    /**
+     * Get statistics API
+     */
     public function getStats(Form $form)
     {
         $today = Carbon::today();
@@ -521,7 +700,9 @@ public function download(Form $form)
         ]);
     }
 
-    // Export forms to CSV
+    /**
+     * Export forms to CSV
+     */
     public function export(Request $request)
     {
         $request->validate([
@@ -593,11 +774,12 @@ public function download(Form $form)
         ]);
     }
 
-    // Helper method to simulate download stats for a period
+    /**
+     * Helper method to simulate download stats for a period
+     */
     private function getFormDownloadsForPeriod(Form $form, $startDate, $endDate)
     {
         // In a real application, you would query a downloads log table
-        // For now, return a percentage of total downloads based on form age
         $formAgeInDays = $form->created_at->diffInDays(now());
         if ($formAgeInDays === 0) return 0;
         
@@ -607,10 +789,11 @@ public function download(Form $form)
         return round($form->download_count * $percentageOfPeriod);
     }
 
-    // Helper method to simulate view stats for a period
+    /**
+     * Helper method to simulate view stats for a period
+     */
     private function getFormViewsForPeriod(Form $form, $startDate, $endDate)
     {
-        // Similar to downloads, return percentage based on form age
         $formAgeInDays = $form->created_at->diffInDays(now());
         if ($formAgeInDays === 0) return 0;
         
@@ -620,7 +803,9 @@ public function download(Form $form)
         return round($form->view_count * $percentageOfPeriod);
     }
 
-    // Preview form file (for inline viewing)
+    /**
+     * Preview form file (for inline viewing)
+     */
     public function preview(Form $form)
     {
         // Check if form is active
@@ -656,6 +841,33 @@ public function download(Form $form)
             'Content-Type' => $form->file_type,
             'Content-Disposition' => 'inline',
             'Cache-Control' => 'private, max-age=3600',
+        ]);
+    }
+
+    /**
+     * Get notification statistics
+     */
+    public function getNotificationStats()
+    {
+        $totalHouseholds = Household::where('status', 'active')->count();
+        $householdsWithUsers = Household::whereHas('user', function($query) {
+            $query->where('status', 'active');
+        })->count();
+        
+        $householdUsers = $this->getAllHouseholdUsers()->count();
+        $admins = User::whereHas('role', function($query) {
+            $query->whereIn('name', ['admin', 'super-admin', 'secretary', 'treasurer']);
+        })->where('status', 'active')->count();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total_households' => $totalHouseholds,
+                'households_with_users' => $householdsWithUsers,
+                'household_users' => $householdUsers,
+                'admins' => $admins,
+                'total_potential_recipients' => $householdUsers + $admins,
+            ]
         ]);
     }
 }

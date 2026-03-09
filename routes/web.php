@@ -32,6 +32,8 @@ Route::middleware('guest')->group(function () {
     Route::post('login', [App\Http\Controllers\Auth\LoginController::class, 'store']);
 });
 
+
+
 // Authenticated routes (logged in)
 Route::middleware('auth')->group(function () {
     Route::post('logout', [App\Http\Controllers\Auth\LoginController::class, 'destroy'])->name('logout');

@@ -10,6 +10,8 @@ use App\Models\Household;
 use App\Models\HouseholdMember;
 use App\Models\Resident;
 use App\Models\ClearanceRequestDocument;
+use App\Models\User;
+use App\Notifications\ClearanceRequestNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -70,7 +72,7 @@ class ResidentClearanceController extends Controller
                     ],
                     'householdResidents' => [],
                     'currentResident' => null,
-                    'household' => $household,
+                    'household' => $this->formatHouseholdBasic($household),
                     'error' => 'No residents found in your household. Please contact the barangay administrator.'
                 ]);
             }
@@ -112,7 +114,10 @@ class ResidentClearanceController extends Controller
         // Get paginated results
         $clearances = $query->paginate(10);
         
-        // Get statistics - include all your statuses
+        // Transform clearances to avoid circular references
+        $formattedClearances = $this->formatClearances($clearances);
+        
+        // Get statistics
         $statistics = [
             'total' => ClearanceRequest::whereIn('resident_id', $residentIds)->count(),
             'pending' => ClearanceRequest::whereIn('resident_id', $residentIds)->where('status', 'pending')->count(),
@@ -120,66 +125,83 @@ class ResidentClearanceController extends Controller
             'processing' => ClearanceRequest::whereIn('resident_id', $residentIds)->where('status', 'processing')->count(),
             'approved' => ClearanceRequest::whereIn('resident_id', $residentIds)->where('status', 'approved')->count(),
             'issued' => ClearanceRequest::whereIn('resident_id', $residentIds)->where('status', 'issued')->count(),
-            // You might want to consider what status counts as "completed" - maybe 'issued'?
             'completed' => ClearanceRequest::whereIn('resident_id', $residentIds)
-                ->whereIn('status', ['issued']) // Or whatever you consider completed
-                ->count(),
+                ->whereIn('status', ['issued'])->count(),
         ];
         
         // Get the head resident
         $headResident = $this->getHeadResident($household);
         
+        // Format household data properly
+        $formattedHousehold = $this->formatHouseholdData($household, $headResident);
+        
+        // Format residents data
+        $formattedResidents = $this->formatResidents($residents);
+        
         return Inertia::render('resident/Clearances/Index', [
-            'clearances' => $clearances,
+            'clearances' => $formattedClearances,
             'filters' => $request->only(['search', 'status', 'resident']),
             'statistics' => $statistics,
-            'householdResidents' => $residents,
-            'currentResident' => $headResident ?? $residents->first(),
-            'household' => $household,
+            'householdResidents' => $formattedResidents,
+            'currentResident' => $headResident ? $this->formatResidentBasic($headResident) : $this->formatResidentBasic($residents->first()),
+            'household' => $formattedHousehold,
         ]);
     }
     
-// app/Http/Controllers/Resident/ResidentClearanceController.php
-
-public function show(ClearanceRequest $clearance)
-{
-    // Manual authorization - resident can only view their own clearances
-    $user = auth()->user();
-    
-    // Get the user's household
-    $household = $user->household_id ? Household::find($user->household_id) : null;
-    
-    if (!$household) {
-        abort(403, 'You are not associated with any household.');
+    public function show(ClearanceRequest $clearance)
+    {
+        $user = auth()->user();
+        
+        // Get the user's household
+        $household = $user->household_id ? Household::find($user->household_id) : null;
+        
+        if (!$household) {
+            abort(403, 'You are not associated with any household.');
+        }
+        
+        // Get all residents in the household
+        $residentIds = Resident::where('household_id', $household->id)->pluck('id');
+        
+        // Check if the clearance belongs to any resident in the household
+        if (!in_array($clearance->resident_id, $residentIds->toArray())) {
+            abort(403, 'You are not authorized to view this clearance.');
+        }
+        
+        // Load relationships
+        $clearance->load([
+            'clearance_type',
+            'documents.documentType',
+            'statusHistory.causer',
+            'resident',
+        ]);
+        
+        // Format the clearance data
+        $formattedClearance = $this->formatClearanceDetail($clearance);
+        
+        // Load payment items if the relationship exists
+        $paymentItems = collect();
+        if (method_exists($clearance, 'paymentItems')) {
+            $clearance->load('paymentItems.payment');
+            $paymentItems = $clearance->paymentItems->map(function($item) {
+                return [
+                    'id' => $item->id,
+                    'amount' => $item->amount,
+                    'payment' => $item->payment ? [
+                        'id' => $item->payment->id,
+                        'or_number' => $item->payment->or_number,
+                        'amount' => $item->payment->amount,
+                        'status' => $item->payment->status,
+                        'paid_at' => $item->payment->paid_at,
+                    ] : null,
+                ];
+            });
+        }
+        
+        return Inertia::render('resident/Clearances/Show', [
+            'clearance' => $formattedClearance,
+            'payment_items' => $paymentItems,
+        ]);
     }
-    
-    // Get all residents in the household
-    $residentIds = Resident::where('household_id', $household->id)->pluck('id');
-    
-    // Check if the clearance belongs to any resident in the household
-    if (!in_array($clearance->resident_id, $residentIds->toArray())) {
-        abort(403, 'You are not authorized to view this clearance.');
-    }
-    
-    // Load relationships - REMOVED invalid 'payment' relationship
-    $clearance->load([
-        'clearance_type',
-        'documents.documentType',
-        'statusHistory.causer',
-    ]);
-    
-    // Load payment items if the relationship exists
-    $paymentItems = collect();
-    if (method_exists($clearance, 'paymentItems')) {
-        $clearance->load('paymentItems.payment');
-        $paymentItems = $clearance->paymentItems;
-    }
-    
-    return Inertia::render('resident/Clearances/Show', [
-        'clearance' => $clearance,
-        'payment_items' => $paymentItems,
-    ]);
-}
     
     /**
      * Show the form for creating a new clearance request.
@@ -188,7 +210,7 @@ public function show(ClearanceRequest $clearance)
     {
         $user = Auth::user();
         
-        // Find the household where this user belongs (using household_id from users table)
+        // Find the household
         $household = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$household) {
@@ -218,9 +240,8 @@ public function show(ClearanceRequest $clearance)
         $householdMembers = HouseholdMember::with('resident')
             ->where('household_id', $household->id)
             ->get()
-            ->map(function ($member) use ($headMember) {
+            ->map(function ($member) {
                 $resident = $member->resident;
-                $isHead = $member->is_head;
                 
                 return [
                     'id' => (int) $resident->id,
@@ -231,9 +252,9 @@ public function show(ClearanceRequest $clearance)
                     'address' => $resident->address,
                     'contact_number' => $resident->contact_number,
                     'purok_name' => $resident->purok_name,
-                    'household_id' => $member->household_id,
-                    'is_head' => $isHead,
-                    'relationship' => $isHead ? 'Head' : ($member->relationship_to_head ?? 'Family Member'),
+                    'household_id' => (int) $member->household_id,
+                    'is_head' => (bool) $member->is_head,
+                    'relationship' => $member->is_head ? 'Head' : ($member->relationship_to_head ?? 'Family Member'),
                 ];
             })
             ->toArray();
@@ -243,67 +264,10 @@ public function show(ClearanceRequest $clearance)
             ->orderBy('name')
             ->get();
         
-        // Get all active document types for reference
-        $allDocTypes = DocumentType::where('is_active', true)
-            ->get()
-            ->keyBy('id');
+        // Format clearance types
+        $formattedClearanceTypes = $this->formatClearanceTypes($clearanceTypes);
         
-        // Get document requirements grouped by clearance type
-        $requirements = DB::table('document_requirements')
-            ->whereIn('clearance_type_id', $clearanceTypes->pluck('id'))
-            ->orderBy('clearance_type_id')
-            ->orderBy('sort_order')
-            ->get()
-            ->groupBy('clearance_type_id');
-        
-        // Format clearance types with their document requirements
-        $formattedClearanceTypes = $clearanceTypes->map(function ($type) use ($requirements, $allDocTypes) {
-            $documentTypes = [];
-            
-            if (isset($requirements[$type->id])) {
-                foreach ($requirements[$type->id] as $requirement) {
-                    if (isset($allDocTypes[$requirement->document_type_id])) {
-                        $docType = $allDocTypes[$requirement->document_type_id];
-                        $documentTypes[] = [
-                            'id' => (int) $requirement->document_type_id,
-                            'name' => $docType->name,
-                            'description' => $docType->description ?? '',
-                            'is_required' => (bool) $requirement->is_required,
-                            'sort_order' => (int) $requirement->sort_order,
-                        ];
-                    }
-                }
-                
-                // Sort by sort_order
-                usort($documentTypes, function ($a, $b) {
-                    return $a['sort_order'] <=> $b['sort_order'];
-                });
-            }
-            
-            // Parse purpose options
-            $purposeOptions = $this->parsePurposeOptions($type->purpose_options);
-            
-            return [
-                'id' => (int) $type->id,
-                'name' => $type->name,
-                'code' => $type->code,
-                'fee' => (float) $type->fee,
-                'formatted_fee' => '₱' . number_format($type->fee, 2),
-                'processing_days' => (int) $type->processing_days,
-                'validity_days' => (int) $type->validity_days,
-                'description' => $type->description ?? '',
-                'is_active' => (bool) $type->is_active,
-                'requires_payment' => (bool) $type->requires_payment,
-                'requires_approval' => (bool) $type->requires_approval,
-                'is_online_only' => (bool) $type->is_online_only,
-                'document_types' => $documentTypes,
-                'purpose_options' => $purposeOptions,
-                'has_required_documents' => collect($documentTypes)->contains('is_required', true),
-                'document_types_count' => count($documentTypes),
-            ];
-        });
-        
-        // Load all document types for the form dropdown
+        // Get all document types
         $allDocumentTypes = DocumentType::where('is_active', true)
             ->orderBy('name')
             ->get()
@@ -317,47 +281,41 @@ public function show(ClearanceRequest $clearance)
             ->toArray();
         
         // Get current resident data
-        $currentResident = $user->current_resident_id ? Resident::find($user->current_resident_id) : null;
+        $currentResident = $user->current_resident_id ? Resident::find($user->current_resident_id) : $headResident;
+        $residentData = $currentResident ? $this->formatResidentBasic($currentResident) : null;
         
-        // Format the resident data
-        $residentData = $currentResident ? [
-            'id' => (int) $currentResident->id,
-            'first_name' => $currentResident->first_name,
-            'last_name' => $currentResident->last_name,
-            'middle_name' => $currentResident->middle_name,
-            'full_name' => $currentResident->full_name,
-            'address' => $currentResident->address,
-            'contact_number' => $currentResident->contact_number,
-            'purok_name' => $currentResident->purok_name,
-            'household_id' => $currentResident->household_id,
-            'is_head' => $this->isHeadOfHousehold($household, $currentResident),
-        ] : null;
+        // Add is_head to resident data
+        if ($residentData) {
+            $residentData['is_head'] = $this->isHeadOfHousehold($household, $currentResident);
+        }
+        
+        // Format household info
+        $householdInfo = [
+            'id' => (int) $household->id,
+            'number' => $household->household_number,
+            'head_name' => $headResident->full_name ?? $household->head_of_family,
+            'address' => $household->address,
+        ];
         
         Log::info('Clearance request form loaded', [
             'user_id' => $user->id,
-            'clearance_types' => $clearanceTypes->count(),
+            'clearance_types' => count($formattedClearanceTypes),
             'household_members' => count($householdMembers),
-            'current_resident' => $residentData ? $residentData['full_name'] : 'None',
         ]);
         
         return Inertia::render('resident/Clearances/Request', [
             'clearanceTypes' => $formattedClearanceTypes,
             'resident' => $residentData,
             'householdMembers' => $householdMembers,
-            'household_info' => [
-                'id' => $household->id,
-                'number' => $household->household_number,
-                'head_name' => $household->head_of_family,
-                'address' => $household->address,
-            ],
+            'household_info' => $householdInfo,
             'allDocumentTypes' => $allDocumentTypes,
         ]);
     }
     
-    /**
-     * Store a newly created clearance request in storage.
-     */
- public function store(Request $request)
+/**
+ * Store a newly created clearance request in storage.
+ */
+public function store(Request $request)
 {
     try {
         // Enhanced validation
@@ -368,9 +326,9 @@ public function show(ClearanceRequest $clearance)
             'needed_date' => 'required|date|after_or_equal:today',
             'resident_id' => 'required|exists:residents,id',
             'additional_notes' => 'nullable|string|max:1000',
-            'documents' => 'nullable|array|max:20', // Limit number of files
-            'documents.*' => 'file|max:5120|mimes:pdf,jpg,jpeg,png,doc,docx', // 5MB max
-            'document_type_ids' => 'nullable|array', // Document type IDs
+            'documents' => 'nullable|array|max:20',
+            'documents.*' => 'file|max:5120|mimes:pdf,jpg,jpeg,png,doc,docx',
+            'document_type_ids' => 'nullable|array',
             'document_type_ids.*' => 'nullable|integer|exists:document_types,id',
             'descriptions' => 'nullable|array',
             'descriptions.*' => 'nullable|string|max:255',
@@ -380,83 +338,33 @@ public function show(ClearanceRequest $clearance)
         $user = Auth::user();
         
         if (!$user) {
-            Log::warning('Unauthenticated clearance request attempt', [
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent()
-            ]);
-            
-            return back()->withErrors([
-                'message' => 'User not authenticated'
-            ]);
+            return back()->withErrors(['message' => 'User not authenticated']);
         }
-
-        // Log the request start
-        Log::info('Clearance request submission started', [
-            'user_id' => $user->id,
-            'user_email' => $user->email,
-            'resident_id' => $validated['resident_id'],
-            'clearance_type_id' => $validated['clearance_type_id'],
-            'request_data' => $request->except(['documents', 'descriptions'])
-        ]);
 
         // Get the user's household
         $userHousehold = $user->household_id ? Household::find($user->household_id) : null;
         
         if (!$userHousehold) {
-            Log::error('Household not found for user', [
-                'user_id' => $user->id,
-                'email' => $user->email
-            ]);
-            
-            return back()->withErrors([
-                'message' => 'Household not found. Please contact support.'
-            ]);
+            return back()->withErrors(['message' => 'Household not found. Please contact support.']);
         }
 
         // Get the resident being requested
         $requestedResident = Resident::find($validated['resident_id']);
         
         if (!$requestedResident) {
-            Log::warning('Resident not found', [
-                'resident_id' => $validated['resident_id'],
-                'user_id' => $user->id
-            ]);
-            
-            return back()->withErrors([
-                'message' => 'Resident not found'
-            ]);
+            return back()->withErrors(['message' => 'Resident not found']);
         }
 
         // Check if requested resident belongs to user's household
         if ($requestedResident->household_id !== $userHousehold->id) {
-            Log::warning('Attempt to request clearance for non-household resident', [
-                'user_id' => $user->id,
-                'user_household_id' => $userHousehold->id,
-                'resident_household_id' => $requestedResident->household_id,
-                'resident_id' => $requestedResident->id
-            ]);
-            
-            return back()->withErrors([
-                'message' => 'You can only request clearance for residents in your household'
-            ]);
+            return back()->withErrors(['message' => 'You can only request clearance for residents in your household']);
         }
 
-        // Get clearance type with logging
+        // Get clearance type
         $clearanceType = ClearanceType::findOrFail($validated['clearance_type_id']);
-        
-        Log::info('Clearance type details', [
-            'clearance_type_id' => $clearanceType->id,
-            'name' => $clearanceType->name,
-            'fee' => $clearanceType->fee,
-            'processing_days' => $clearanceType->processing_days
-        ]);
 
         // Generate reference number
         $referenceNumber = 'CLEAR-' . date('Ymd') . '-' . strtoupper(Str::random(6));
-        
-        Log::info('Generated reference number', [
-            'reference_number' => $referenceNumber
-        ]);
 
         // Create clearance request
         $clearanceRequest = ClearanceRequest::create([
@@ -473,132 +381,63 @@ public function show(ClearanceRequest $clearance)
             'household_id' => $userHousehold->id,
         ]);
 
-        Log::info('Clearance request created', [
-            'request_id' => $clearanceRequest->id,
-            'reference_number' => $clearanceRequest->reference_number,
-            'status' => $clearanceRequest->status
-        ]);
+        // Load relationships for notification
+        $clearanceRequest->load(['resident', 'clearance_type']);
 
-        // Handle file uploads with document_type_ids
-        $uploadedDocuments = [];
-        if ($request->hasFile('documents')) {
-            $documents = $request->file('documents');
-            
-            Log::info('Processing document uploads', [
-                'total_files' => count($documents),
-                'request_id' => $clearanceRequest->id
-            ]);
-            
-            foreach ($documents as $index => $file) {
-                try {
-                    if ($file->isValid()) {
-                        // Get document type ID from request
-                        $documentTypeId = $request->input("document_type_ids.{$index}");
-                        
-                        // Validate document type exists if provided
-                        if ($documentTypeId && !DocumentType::where('id', $documentTypeId)->exists()) {
-                            Log::warning('Invalid document type ID provided', [
-                                'document_type_id' => $documentTypeId,
-                                'index' => $index
-                            ]);
-                            $documentTypeId = null;
-                        }
-                        
-                        // Generate filename
-                        $originalName = $file->getClientOriginalName();
-                        $extension = $file->getClientOriginalExtension();
-                        $filename = 'clearance_' . $clearanceRequest->id . '_' . time() . '_' . $index . '.' . $extension;
-                        $path = $file->storeAs('clearance_docs', $filename, 'public');
-                        
-                        // Get description if provided
-                        $description = $request->input("descriptions.{$index}", '');
-                        
-                        // Save document record with document_type_id
-                        $document = ClearanceRequestDocument::create([
-                            'clearance_request_id' => $clearanceRequest->id,
-                            'document_type_id' => $documentTypeId,
-                            'file_path' => $path,
-                            'file_name' => $filename,
-                            'original_name' => $originalName,
-                            'description' => $description,
-                            'file_size' => $file->getSize(),
-                            'file_type' => $extension,
-                        ]);
-                        
-                        $uploadedDocuments[] = [
-                            'original_name' => $originalName,
-                            'file_name' => $filename,
-                            'document_type_id' => $documentTypeId,
-                            'size' => $file->getSize()
-                        ];
-                        
-                        Log::info('Document uploaded successfully', [
-                            'document_id' => $document->id,
-                            'original_name' => $originalName,
-                            'document_type_id' => $documentTypeId
-                        ]);
-                    } else {
-                        Log::warning('Invalid file uploaded', [
-                            'index' => $index,
-                            'file_name' => $file->getClientOriginalName(),
-                            'error' => $file->getError()
-                        ]);
-                    }
-                } catch (\Exception $e) {
-                    Log::error('Document upload failed for index ' . $index, [
-                        'error' => $e->getMessage(),
-                        'file_name' => $file->getClientOriginalName(),
-                        'request_id' => $clearanceRequest->id
-                    ]);
-                }
-            }
-        } else {
-            Log::info('No documents uploaded with request', [
-                'request_id' => $clearanceRequest->id
-            ]);
+     // ============ NOTIFICATION TO OFFICIALS ONLY ============
+    try {
+        // Target roles that should receive this notification - USE EXACT NAMES
+        $targetRoles = ['Administrator', 'Barangay Captain', 'Barangay Secretary'];
+        
+        // Get users through role relationship
+        $officials = User::whereHas('role', function($query) use ($targetRoles) {
+            $query->whereIn('name', $targetRoles);
+        })->get();
+        
+        // Send notification to EACH official individually
+        foreach ($officials as $official) {
+            $official->notify(new ClearanceRequestNotification($clearanceRequest, 'submitted'));
         }
+        
+        Log::info('Clearance request notification sent to officials', [
+            'clearance_id' => $clearanceRequest->id,
+            'target_roles' => $targetRoles,
+            'recipient_count' => $officials->count(),
+            'recipient_ids' => $officials->pluck('id')->toArray()
+        ]);
+        
+    } catch (\Exception $e) {
+        Log::error('Failed to send notifications to officials', [
+            'error' => $e->getMessage(),
+            'clearance_id' => $clearanceRequest->id
+        ]);
+    }
+    // =========================================================
+
+        // Handle file uploads
+        $this->handleDocumentUploads($request, $clearanceRequest);
 
         // Calculate estimated completion
         $estimatedCompletion = now()->addDays($clearanceType->processing_days);
         $formattedDate = $estimatedCompletion->format('F j, Y');
 
-        // Log successful submission
         Log::info('Clearance request submitted successfully', [
             'request_id' => $clearanceRequest->id,
             'reference_number' => $clearanceRequest->reference_number,
-            'resident_id' => $clearanceRequest->resident_id,
-            'clearance_type' => $clearanceType->name,
-            'documents_uploaded' => count($uploadedDocuments),
-            'total_fee' => $clearanceType->fee,
-            'estimated_completion' => $formattedDate,
-            'user_id' => $user->id,
-            'timestamp' => now()->toDateTimeString()
         ]);
 
-        return redirect()->route('my.clearances.index')
+        return redirect()->route('portal.my.clearances.index')
             ->with('success', 'Clearance request submitted successfully!')
             ->with('reference_number', $referenceNumber)
             ->with('estimated_completion', $formattedDate);
 
     } catch (\Illuminate\Validation\ValidationException $e) {
-        Log::warning('Validation failed for clearance request', [
-            'errors' => $e->errors(),
-            'user_id' => Auth::id() ?? 'guest',
-            'request_data' => $request->except(['documents', 'descriptions'])
-        ]);
-        
-        throw $e; // Let Inertia handle the validation exception
-        
+        throw $e;
     } catch (\Exception $e) {
-        // Comprehensive error logging
         Log::error('Clearance request submission failed', [
-            'error_message' => $e->getMessage(),
-            'error_trace' => $e->getTraceAsString(),
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
             'user_id' => Auth::id() ?? 'unknown',
-            'request_data' => $request->except(['documents', 'descriptions']),
-            'timestamp' => now()->toDateTimeString(),
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent()
         ]);
         
         return back()->withErrors([
@@ -606,6 +445,7 @@ public function show(ClearanceRequest $clearance)
         ]);
     }
 }
+
     /**
      * Cancel a clearance request.
      */
@@ -613,7 +453,7 @@ public function show(ClearanceRequest $clearance)
     {
         $user = Auth::user();
         
-        // Check authorization - use requested_by_user_id
+        // Check authorization
         if ($clearanceRequest->requested_by_user_id !== $user->id) {
             abort(403, 'Unauthorized');
         }
@@ -638,9 +478,18 @@ public function show(ClearanceRequest $clearance)
                 'cancelled_at' => now(),
                 'cancelled_by' => $user->id,
             ]);
+
+            // Load relationships for notification
+            $clearanceRequest->load(['resident', 'clearance_type']);
             
-            // Using the new status_history relationship
-            // The activity will be automatically logged via Spatie's LogsActivity trait
+            // Send cancellation notification to requester
+            $user->notify(new ClearanceRequestNotification($clearanceRequest, 'cancelled'));
+            
+            // Send cancellation notification to admins
+            $admins = User::whereIn('role', ['admin', 'captain', 'secretary'])->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new ClearanceRequestNotification($clearanceRequest, 'cancelled'));
+            }
             
             DB::commit();
             
@@ -663,9 +512,297 @@ public function show(ClearanceRequest $clearance)
                 ->with('error', 'Failed to cancel request. Please try again.');
         }
     }
+
+    // ==================== FORMATTING METHODS ====================
+
+    /**
+     * Format household data for Inertia
+     */
+    private function formatHouseholdData($household, $headResident = null)
+    {
+        if (!$household) {
+            return null;
+        }
+        
+        return [
+            'id' => (int) $household->id,
+            'household_number' => $household->household_number,
+            'address' => $household->address,
+            'full_address' => $household->address,
+            'head_of_family' => $headResident ? $headResident->full_name : $household->head_of_family,
+            'contact_number' => $household->contact_number,
+            'email' => $household->email,
+            'member_count' => (int) $household->member_count,
+            'status' => $household->status,
+            'purok' => $household->purok ? [
+                'id' => (int) $household->purok->id,
+                'name' => $household->purok->name,
+            ] : null,
+            'head_of_household' => $headResident ? $this->formatResidentBasic($headResident) : null,
+        ];
+    }
+
+    /**
+     * Format household basic info
+     */
+    private function formatHouseholdBasic($household)
+    {
+        if (!$household) {
+            return null;
+        }
+        
+        return [
+            'id' => (int) $household->id,
+            'household_number' => $household->household_number,
+            'address' => $household->address,
+            'head_of_family' => $household->head_of_family,
+            'member_count' => (int) $household->member_count,
+        ];
+    }
+
+    /**
+     * Format resident basic data
+     */
+    private function formatResidentBasic($resident)
+    {
+        if (!$resident) {
+            return null;
+        }
+        
+        return [
+            'id' => (int) $resident->id,
+            'first_name' => $resident->first_name,
+            'last_name' => $resident->last_name,
+            'middle_name' => $resident->middle_name,
+            'full_name' => $resident->full_name,
+            'address' => $resident->address,
+            'contact_number' => $resident->contact_number,
+            'purok_name' => $resident->purok_name,
+            'household_id' => (int) $resident->household_id,
+            'age' => (int) $resident->age,
+            'gender' => $resident->gender,
+            'civil_status' => $resident->civil_status,
+            'occupation' => $resident->occupation,
+            'is_voter' => (bool) $resident->is_voter,
+        ];
+    }
+
+    /**
+     * Format residents collection
+     */
+    private function formatResidents($residents)
+    {
+        return $residents->map(function($resident) {
+            return $this->formatResidentBasic($resident);
+        })->toArray();
+    }
+
+    /**
+     * Format clearances for listing
+     */
+    private function formatClearances($clearances)
+    {
+        $clearances->getCollection()->transform(function($clearance) {
+            return [
+                'id' => (int) $clearance->id,
+                'reference_number' => $clearance->reference_number,
+                'control_number' => $clearance->control_number,
+                'purpose' => $clearance->purpose,
+                'specific_purpose' => $clearance->specific_purpose,
+                'fee_amount' => (float) $clearance->fee_amount,
+                'status' => $clearance->status,
+                'created_at' => $clearance->created_at?->toDateTimeString(),
+                'needed_date' => $clearance->needed_date?->toDateString(),
+                'resident' => $clearance->resident ? [
+                    'id' => (int) $clearance->resident->id,
+                    'full_name' => $clearance->resident->full_name,
+                ] : null,
+                'clearance_type' => $clearance->clearance_type ? [
+                    'id' => (int) $clearance->clearance_type->id,
+                    'name' => $clearance->clearance_type->name,
+                ] : null,
+            ];
+        });
+        
+        return $clearances;
+    }
+
+    /**
+     * Format single clearance detail
+     */
+    private function formatClearanceDetail($clearance)
+    {
+        return [
+            'id' => (int) $clearance->id,
+            'reference_number' => $clearance->reference_number,
+            'control_number' => $clearance->control_number,
+            'purpose' => $clearance->purpose,
+            'specific_purpose' => $clearance->specific_purpose,
+            'additional_notes' => $clearance->additional_notes,
+            'fee_amount' => (float) $clearance->fee_amount,
+            'status' => $clearance->status,
+            'created_at' => $clearance->created_at?->toDateTimeString(),
+            'updated_at' => $clearance->updated_at?->toDateTimeString(),
+            'needed_date' => $clearance->needed_date?->toDateString(),
+            'processed_at' => $clearance->processed_at?->toDateTimeString(),
+            'approved_at' => $clearance->approved_at?->toDateTimeString(),
+            'issued_at' => $clearance->issued_at?->toDateTimeString(),
+            'rejected_at' => $clearance->rejected_at?->toDateTimeString(),
+            'rejection_reason' => $clearance->rejection_reason,
+            'cancelled_at' => $clearance->cancelled_at?->toDateTimeString(),
+            'cancellation_reason' => $clearance->cancellation_reason,
+            'resident' => $clearance->resident ? $this->formatResidentBasic($clearance->resident) : null,
+            'clearance_type' => $clearance->clearance_type ? [
+                'id' => (int) $clearance->clearance_type->id,
+                'name' => $clearance->clearance_type->name,
+                'code' => $clearance->clearance_type->code,
+                'fee' => (float) $clearance->clearance_type->fee,
+                'processing_days' => (int) $clearance->clearance_type->processing_days,
+                'validity_days' => (int) $clearance->clearance_type->validity_days,
+            ] : null,
+            'documents' => $clearance->documents->map(function($doc) {
+                return [
+                    'id' => (int) $doc->id,
+                    'file_name' => $doc->file_name,
+                    'original_name' => $doc->original_name,
+                    'file_path' => $doc->file_path,
+                    'description' => $doc->description,
+                    'file_size' => (int) $doc->file_size,
+                    'file_type' => $doc->file_type,
+                    'document_type' => $doc->documentType ? [
+                        'id' => (int) $doc->documentType->id,
+                        'name' => $doc->documentType->name,
+                    ] : null,
+                    'created_at' => $doc->created_at?->toDateTimeString(),
+                ];
+            }),
+            'status_history' => $clearance->statusHistory->map(function($history) {
+                return [
+                    'id' => (int) $history->id,
+                    'status' => $history->status,
+                    'remarks' => $history->remarks,
+                    'created_at' => $history->created_at?->toDateTimeString(),
+                    'causer' => $history->causer ? [
+                        'id' => (int) $history->causer->id,
+                        'name' => $history->causer->name,
+                    ] : null,
+                ];
+            }),
+        ];
+    }
+
+    /**
+     * Format clearance types with requirements
+     */
+    private function formatClearanceTypes($clearanceTypes)
+    {
+        $allDocTypes = DocumentType::where('is_active', true)
+            ->get()
+            ->keyBy('id');
+        
+        $requirements = DB::table('document_requirements')
+            ->whereIn('clearance_type_id', $clearanceTypes->pluck('id'))
+            ->orderBy('clearance_type_id')
+            ->orderBy('sort_order')
+            ->get()
+            ->groupBy('clearance_type_id');
+        
+        return $clearanceTypes->map(function ($type) use ($requirements, $allDocTypes) {
+            $documentTypes = [];
+            
+            if (isset($requirements[$type->id])) {
+                foreach ($requirements[$type->id] as $requirement) {
+                    if (isset($allDocTypes[$requirement->document_type_id])) {
+                        $docType = $allDocTypes[$requirement->document_type_id];
+                        $documentTypes[] = [
+                            'id' => (int) $requirement->document_type_id,
+                            'name' => $docType->name,
+                            'description' => $docType->description ?? '',
+                            'is_required' => (bool) $requirement->is_required,
+                            'sort_order' => (int) $requirement->sort_order,
+                        ];
+                    }
+                }
+                
+                usort($documentTypes, function ($a, $b) {
+                    return $a['sort_order'] <=> $b['sort_order'];
+                });
+            }
+            
+            return [
+                'id' => (int) $type->id,
+                'name' => $type->name,
+                'code' => $type->code,
+                'fee' => (float) $type->fee,
+                'formatted_fee' => '₱' . number_format($type->fee, 2),
+                'processing_days' => (int) $type->processing_days,
+                'validity_days' => (int) $type->validity_days,
+                'description' => $type->description ?? '',
+                'is_active' => (bool) $type->is_active,
+                'requires_payment' => (bool) $type->requires_payment,
+                'requires_approval' => (bool) $type->requires_approval,
+                'is_online_only' => (bool) $type->is_online_only,
+                'document_types' => $documentTypes,
+                'purpose_options' => $this->parsePurposeOptions($type->purpose_options),
+                'has_required_documents' => collect($documentTypes)->contains('is_required', true),
+                'document_types_count' => count($documentTypes),
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Handle document uploads
+     */
+    private function handleDocumentUploads(Request $request, $clearanceRequest)
+    {
+        if (!$request->hasFile('documents')) {
+            return;
+        }
+        
+        $documents = $request->file('documents');
+        
+        foreach ($documents as $index => $file) {
+            try {
+                if (!$file->isValid()) {
+                    continue;
+                }
+                
+                $documentTypeId = $request->input("document_type_ids.{$index}");
+                
+                // Validate document type exists if provided
+                if ($documentTypeId && !DocumentType::where('id', $documentTypeId)->exists()) {
+                    $documentTypeId = null;
+                }
+                
+                $extension = $file->getClientOriginalExtension();
+                $filename = 'clearance_' . $clearanceRequest->id . '_' . time() . '_' . $index . '.' . $extension;
+                $path = $file->storeAs('clearance_docs', $filename, 'public');
+                
+                $description = $request->input("descriptions.{$index}", '');
+                
+                ClearanceRequestDocument::create([
+                    'clearance_request_id' => $clearanceRequest->id,
+                    'document_type_id' => $documentTypeId,
+                    'file_path' => $path,
+                    'file_name' => $filename,
+                    'original_name' => $file->getClientOriginalName(),
+                    'description' => $description,
+                    'file_size' => $file->getSize(),
+                    'file_type' => $extension,
+                ]);
+                
+            } catch (\Exception $e) {
+                Log::error('Document upload failed', [
+                    'error' => $e->getMessage(),
+                    'file' => $file->getClientOriginalName(),
+                    'request_id' => $clearanceRequest->id
+                ]);
+            }
+        }
+    }
     
     /**
-     * Helper method to parse purpose options.
+     * Parse purpose options
      */
     private function parsePurposeOptions($purposeOptions): array
     {
@@ -690,7 +827,6 @@ public function show(ClearanceRequest $clearance)
      */
     private function getHeadResident(Household $household)
     {
-        // First try to find through household members with is_head = true
         $headMember = HouseholdMember::where('household_id', $household->id)
             ->where('is_head', true)
             ->first();
@@ -699,9 +835,7 @@ public function show(ClearanceRequest $clearance)
             return $headMember->resident;
         }
         
-        // If no head found in household members, check residents table
-        return Resident::where('household_id', $household->id)
-            ->first();
+        return Resident::where('household_id', $household->id)->first();
     }
     
     /**

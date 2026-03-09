@@ -41,11 +41,18 @@ class AdminMiddleware
             'Staff',
         ];
         
-        // Check if user has an admin role
-        if (!in_array($user->role->name, $adminRoles)) {
-            // If not admin, redirect to resident portal
+        // Check if role exists and has is_system_role property
+        $isSystemRole = isset($user->role->is_system_role) ? $user->role->is_system_role : null;
+        
+        // If is_system_role is 0 OR role is Household Head, redirect to resident portal
+        if ($isSystemRole === 0 || $user->role->name === 'Household Head') {
             return redirect('/portal/dashboard')
-                ->with('error', 'You do not have access to the admin dashboard. Redirecting to resident portal.');
+                ->with('info', 'Welcome to the resident portal. The admin dashboard is for staff only.');
+        }
+        
+        // Check if user has an admin role (for cases where is_system_role might not be set)
+        if (!in_array($user->role->name, $adminRoles) && $isSystemRole !== 1) {
+            abort(403, 'Access denied. You do not have permission to access the admin area. Your role: ' . $user->role->name);
         }
 
         return $next($request);

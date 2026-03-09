@@ -586,8 +586,8 @@ export default function FormsShow({ form, related_forms = [], download_stats, vi
             <AppLayout
                 title="Loading Form..."
                 breadcrumbs={[
-                    { title: 'Dashboard', href: route('dashboard') },
-                    { title: 'Forms', href: route('forms.index') },
+                    { title: 'Dashboard', href: route('admin.dashboard') },
+                    { title: 'Forms', href: route('admin.forms.index') },
                     { title: 'Loading...', href: '#' }
                 ]}
             >
@@ -754,9 +754,9 @@ Download Link: ${route('forms.download', form.id)}
             <AppLayout
                 title={`${form.title} - Form Details`}
                 breadcrumbs={[
-                    { title: 'Dashboard', href: route('dashboard') },
-                    { title: 'Forms', href: route('forms.index') },
-                    { title: form.title, href: route('forms.show', form.id) }
+                    { title: 'Dashboard', href: route('admin.dashboard') },
+                    { title: 'Forms', href: route('admin.forms.index') },
+                    { title: form.title, href: route('admin.forms.show', form.id) }
                 ]}
             >
                 <Head title={`${form.title} - Form Details`} />
@@ -766,7 +766,7 @@ Download Link: ${route('forms.download', form.id)}
                         {/* Header with Actions */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
-                                <Link href={route('forms.index')}>
+                                <Link href={route('admin.forms.index')}>
                                     <Button variant="ghost" size="sm">
                                         <ArrowLeft className="h-4 w-4 mr-2" />
                                         Back to Forms
@@ -864,7 +864,7 @@ Download Link: ${route('forms.download', form.id)}
                                         {form.is_featured ? 'Remove from featured forms' : 'Add to featured forms'}
                                     </TooltipContent>
                                 </Tooltip>
-                                <Link href={route('forms.edit', form.id)}>
+                                <Link href={route('admin.forms.edit', form.id)}>
                                     <Button variant="outline" size="sm" className="h-9">
                                         <Edit className="h-4 w-4 mr-2" />
                                         Edit
@@ -1444,7 +1444,7 @@ Download Link: ${route('forms.download', form.id)}
                                                             {getFileTypeIcon(relatedForm.file_type)}
                                                             <div>
                                                                 <Link
-                                                                    href={route('forms.show', relatedForm.id)}
+                                                                    href={route('admin.forms.show', relatedForm.id)}
                                                                     className="font-medium hover:text-blue-600"
                                                                 >
                                                                     {relatedForm.title}
@@ -1460,12 +1460,12 @@ Download Link: ${route('forms.download', form.id)}
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <Link href={route('forms.show', relatedForm.id)}>
+                                                            <Link href={route('admin.forms.show', relatedForm.id)}>
                                                                 <Button variant="outline" size="sm">
                                                                     <Eye className="h-3 w-3" />
                                                                 </Button>
                                                             </Link>
-                                                            <a href={route('forms.download', relatedForm.id)} target="_blank">
+                                                            <a href={route('admin.forms.download', relatedForm.id)} target="_blank">
                                                                 <Button variant="outline" size="sm">
                                                                     <Download className="h-3 w-3" />
                                                                 </Button>
@@ -1667,7 +1667,7 @@ Download Link: ${route('forms.download', form.id)}
                                                 <Printer className="h-3 w-3 mr-1" />
                                                 Print
                                             </Button>
-                                            <Link href={route('forms.edit', form.id)}>
+                                            <Link href={route('admin.forms.edit', form.id)}>
                                                 <Button
                                                     variant="outline"
                                                     size="sm"

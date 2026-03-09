@@ -1,13 +1,14 @@
+// components/ui/custom-tabs.tsx
 import { List, Clock, FileCheck, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
 // Default tabs for backward compatibility
 const DEFAULT_TABS = [
-    { id: 'all', label: 'All', icon: List, count: 'all' },
-    { id: 'pending', label: 'Pending', icon: Clock, count: 'pending' },
-    { id: 'issued', label: 'Issued', icon: FileCheck, count: 'issued' },
-    { id: 'overdue', label: 'Overdue', icon: AlertCircle, count: 'overdue' },
-    { id: 'paid', label: 'Paid', icon: CheckCircle, count: 'paid' },
-    { id: 'cancelled', label: 'Cancelled', icon: XCircle, count: 'cancelled' },
+    { id: 'all', label: 'All', icon: List },
+    { id: 'pending', label: 'Pending', icon: Clock },
+    { id: 'issued', label: 'Issued', icon: FileCheck },
+    { id: 'overdue', label: 'Overdue', icon: AlertCircle },
+    { id: 'paid', label: 'Paid', icon: CheckCircle },
+    { id: 'cancelled', label: 'Cancelled', icon: XCircle },
 ];
 
 interface TabConfig {
@@ -20,35 +21,34 @@ interface CustomTabsProps {
     statusFilter: string;
     handleTabChange: (tab: string) => void;
     getStatusCount: (status: string) => number;
-    tabsConfig?: TabConfig[]; // Make this optional for backward compatibility
+    tabsConfig?: TabConfig[];
 }
 
 export function CustomTabs({ 
     statusFilter, 
     handleTabChange, 
     getStatusCount,
-    tabsConfig = DEFAULT_TABS // Use default if not provided
+    tabsConfig = DEFAULT_TABS
 }: CustomTabsProps) {
+    // Calculate total count for "all" tab
+    const totalCount = tabsConfig.reduce((total, tab) => {
+        if (tab.id !== 'all') {
+            return total + (getStatusCount(tab.id) || 0);
+        }
+        return total;
+    }, 0);
+
     return (
         <div className="overflow-x-auto scrollbar-hide">
             <div className="flex min-w-max space-x-1 pb-2">
                 {tabsConfig.map((tab) => {
                     const Icon = tab.icon;
-                    const count = tab.id === 'all' 
-                        ? tabsConfig.reduce((total, t) => {
-                            if (t.id !== 'all') {
-                                const tabCount = getStatusCount(t.id);
-                                return total + (tabCount || 0);
-                            }
-                            return total;
-                        }, 0)
-                        : getStatusCount(tab.id);
-                    
+                    const count = tab.id === 'all' ? totalCount : getStatusCount(tab.id);
                     const isActive = statusFilter === tab.id;
                     
                     return (
                         <button
-                            key={tab.id}
+                            key={`tab-${tab.id}`} // ✅ Unique key with prefix
                             onClick={() => handleTabChange(tab.id)}
                             className={`
                                 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap

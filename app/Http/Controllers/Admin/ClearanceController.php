@@ -9,6 +9,12 @@ use App\Models\Resident;
 use App\Models\Household;
 use App\Models\Business;
 use App\Models\Purok;
+use App\Models\User;
+use App\Models\Document;
+use App\Notifications\ClearanceRequestCreated;
+use App\Notifications\ClearanceStatusUpdated;
+use App\Notifications\ClearancePaymentNotification;
+use App\Notifications\ClearanceDocumentNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -17,211 +23,212 @@ use Inertia\Inertia;
 
 class ClearanceController extends Controller
 {
-   public function index(Request $request)
-{
-    $query = ClearanceRequest::query()
-        ->with(['resident', 'household', 'business', 'clearanceType', 'issuingOfficer', 'payment'])
-        ->latest();
+    /**
+     * Display a listing of clearance requests.
+     */
+    public function index(Request $request)
+    {
+        $query = ClearanceRequest::query()
+            ->with(['resident', 'household', 'business', 'clearanceType', 'issuingOfficer', 'payment'])
+            ->latest();
 
-    // Search filter
-    if ($search = $request->input('search')) {
-        $query->where(function ($q) use ($search) {
-            $q->where('reference_number', 'like', "%{$search}%")
-              ->orWhere('clearance_number', 'like', "%{$search}%")
-              ->orWhere('purpose', 'like', "%{$search}%")
-              ->orWhereHas('resident', function ($q) use ($search) {
-                  $q->where(DB::raw("CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name)"), 'like', "%{$search}%")
-                    ->orWhere('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%");
-              })
-              // Add search for household and business
-              ->orWhereHas('household', function ($q) use ($search) {
-                  $q->where('household_number', 'like', "%{$search}%")
-                    ->orWhere('head_name', 'like', "%{$search}%");
-              })
-              ->orWhereHas('business', function ($q) use ($search) {
-                  $q->where('business_name', 'like', "%{$search}%")
-                    ->orWhere('owner_name', 'like', "%{$search}%");
-              });
+        // Search filter
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('reference_number', 'like', "%{$search}%")
+                  ->orWhere('clearance_number', 'like', "%{$search}%")
+                  ->orWhere('purpose', 'like', "%{$search}%")
+                  ->orWhereHas('resident', function ($q) use ($search) {
+                      $q->where(DB::raw("CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name)"), 'like', "%{$search}%")
+                        ->orWhere('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('household', function ($q) use ($search) {
+                      $q->where('household_number', 'like', "%{$search}%")
+                        ->orWhere('head_name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('business', function ($q) use ($search) {
+                      $q->where('business_name', 'like', "%{$search}%")
+                        ->orWhere('owner_name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Status filter
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        // Payment status filter
+        if ($payment_status = $request->input('payment_status')) {
+            $query->where('payment_status', $payment_status);
+        }
+
+        // Type filter
+        if ($type = $request->input('type')) {
+            $query->where('clearance_type_id', $type);
+        }
+
+        // Get paginated results with formatted data
+        $clearances = $query->paginate(20)->through(function ($clearance) {
+            // Build payer data based on payer_type
+            $payerData = [
+                'payer_type' => $clearance->payer_type,
+                'payer_id' => $clearance->payer_id,
+                'payer_name' => $clearance->payer_name,
+                'payer_display' => $clearance->payer_display,
+            ];
+
+            // Add resident data if exists
+            $residentData = $clearance->resident ? [
+                'id' => $clearance->resident->id,
+                'full_name' => $clearance->resident->full_name ?? $clearance->resident->getFullName(),
+                'first_name' => $clearance->resident->first_name,
+                'last_name' => $clearance->resident->last_name,
+                'address' => $clearance->resident->address,
+                'contact_number' => $clearance->resident->contact_number,
+                'purok' => $clearance->resident->purok,
+            ] : null;
+
+            // Add household data if exists
+            $householdData = $clearance->household ? [
+                'id' => $clearance->household->id,
+                'household_number' => $clearance->household->household_number,
+                'head_name' => $clearance->household->head_name,
+                'address' => $clearance->household->address,
+                'purok' => $clearance->household->purok,
+            ] : null;
+
+            // Add business data if exists
+            $businessData = $clearance->business ? [
+                'id' => $clearance->business->id,
+                'business_name' => $clearance->business->business_name,
+                'owner_name' => $clearance->business->owner_name,
+                'contact_number' => $clearance->business->contact_number,
+                'address' => $clearance->business->address,
+                'purok' => $clearance->business->purok,
+                'owner_id' => $clearance->business->owner_id,
+            ] : null;
+
+            return array_merge(
+                $clearance->toArray(),
+                $payerData,
+                [
+                    'resident' => $residentData,
+                    'household' => $householdData,
+                    'business' => $businessData,
+                    'clearance_type' => $clearance->clearanceType ? [
+                        'id' => $clearance->clearanceType->id,
+                        'name' => $clearance->clearanceType->name,
+                        'code' => $clearance->clearanceType->code,
+                        'fee' => (float) $clearance->clearanceType->fee,
+                        'processing_days' => $clearance->clearanceType->processing_days,
+                        'validity_days' => $clearance->clearanceType->validity_days,
+                        'requires_payment' => (bool) $clearance->clearanceType->requires_payment,
+                    ] : null,
+                    'payment' => $clearance->payment ? [
+                        'id' => $clearance->payment->id,
+                        'or_number' => $clearance->payment->or_number,
+                        'amount_paid' => $clearance->payment->amount_paid,
+                        'status' => $clearance->payment->status,
+                        'payment_date' => $clearance->payment->payment_date,
+                    ] : null,
+                    'status_display' => $clearance->status_display,
+                    'payment_status_display' => $clearance->payment_status_display,
+                    'urgency_display' => $clearance->urgency_display,
+                    'formatted_fee' => $clearance->formatted_fee,
+                    'formatted_amount_paid' => $clearance->formatted_amount_paid,
+                    'formatted_balance' => $clearance->formatted_balance,
+                    'is_valid' => $clearance->is_valid,
+                    'days_remaining' => $clearance->days_remaining,
+                    'is_fully_paid' => $clearance->is_fully_paid,
+                    'created_at' => $clearance->created_at->toDateTimeString(),
+                    'updated_at' => $clearance->updated_at->toDateTimeString(),
+                    'issue_date' => $clearance->issue_date?->toDateString(),
+                    'valid_until' => $clearance->valid_until?->toDateString(),
+                    'payment_date' => $clearance->payment_date?->toDateTimeString(),
+                    'contact_number' => $clearance->contact_number,
+                    'contact_address' => $clearance->contact_address,
+                    'contact_purok' => $clearance->contact_purok,
+                ]
+            );
         });
-    }
 
-    // Status filter
-    if ($status = $request->input('status')) {
-        $query->where('status', $status);
-    }
-
-    // Payment status filter
-    if ($payment_status = $request->input('payment_status')) {
-        $query->where('payment_status', $payment_status);
-    }
-
-    // Type filter
-    if ($type = $request->input('type')) {
-        $query->where('clearance_type_id', $type);
-    }
-
-    // Get paginated results with formatted data
-    $clearances = $query->paginate(20)->through(function ($clearance) {
-        // Build payer data based on payer_type
-        $payerData = [
-            'payer_type' => $clearance->payer_type,
-            'payer_id' => $clearance->payer_id,
-            'payer_name' => $clearance->payer_name,
-            'payer_display' => $clearance->payer_display,
+        // Get stats with payment tracking
+        $stats = [
+            'total' => ClearanceRequest::count(),
+            'totalIssued' => ClearanceRequest::where('status', 'issued')->count(),
+            'issuedThisMonth' => ClearanceRequest::where('status', 'issued')
+                ->whereMonth('issue_date', now()->month)
+                ->whereYear('issue_date', now()->year)
+                ->count(),
+            'pending' => ClearanceRequest::where('status', 'pending')->count(),
+            'pendingToday' => ClearanceRequest::where('status', 'pending')
+                ->whereDate('created_at', today())
+                ->count(),
+            'expiringSoon' => ClearanceRequest::where('status', 'issued')
+                ->where('valid_until', '<=', now()->addDays(30))
+                ->where('valid_until', '>', now())
+                ->count(),
+            'totalRevenue' => (float) ClearanceRequest::where('status', 'issued')
+                ->sum('amount_paid'),
+            'unpaid' => ClearanceRequest::where('payment_status', 'unpaid')->count(),
+            'partially_paid' => ClearanceRequest::where('payment_status', 'partially_paid')->count(),
+            'paid' => ClearanceRequest::where('payment_status', 'paid')->count(),
+            'pending_payment' => ClearanceRequest::where('status', 'pending_payment')->count(),
         ];
 
-        // Add resident data if exists
-        $residentData = $clearance->resident ? [
-            'id' => $clearance->resident->id,
-            'full_name' => $clearance->resident->full_name ?? $clearance->resident->getFullName(),
-            'first_name' => $clearance->resident->first_name,
-            'last_name' => $clearance->resident->last_name,
-            'address' => $clearance->resident->address,
-            'contact_number' => $clearance->resident->contact_number,
-            'purok' => $clearance->resident->purok,
-        ] : null;
+        // Get active clearance types with counts
+        $clearanceTypes = ClearanceType::active()
+            ->withCount(['clearanceRequests'])
+            ->orderBy('name')
+            ->get()
+            ->map(function ($type) {
+                return [
+                    'id' => $type->id,
+                    'name' => $type->name,
+                    'code' => $type->code,
+                    'fee' => (float) $type->fee,
+                    'formatted_fee' => $type->formatted_fee,
+                    'processing_days' => $type->processing_days,
+                    'validity_days' => $type->validity_days,
+                    'is_active' => (bool) $type->is_active,
+                    'description' => $type->description,
+                    'requires_payment' => (bool) $type->requires_payment,
+                    'document_types_count' => $type->document_types_count,
+                    'required_document_types_count' => $type->required_document_types_count,
+                    'total_requests' => $type->clearance_requests_count,
+                ];
+            });
 
-        // Add household data if exists
-        $householdData = $clearance->household ? [
-            'id' => $clearance->household->id,
-            'household_number' => $clearance->household->household_number,
-            'head_name' => $clearance->household->head_name,
-            'address' => $clearance->household->address,
-            'purok' => $clearance->household->purok,
-        ] : null;
+        // Status options for filter
+        $statusOptions = [
+            ['value' => 'pending', 'label' => 'Pending Review'],
+            ['value' => 'pending_payment', 'label' => 'Pending Payment'],
+            ['value' => 'processing', 'label' => 'Under Processing'],
+            ['value' => 'approved', 'label' => 'Approved'],
+            ['value' => 'issued', 'label' => 'Issued'],
+            ['value' => 'rejected', 'label' => 'Rejected'],
+            ['value' => 'cancelled', 'label' => 'Cancelled'],
+            ['value' => 'expired', 'label' => 'Expired'],
+        ];
 
-        // Add business data if exists
-        $businessData = $clearance->business ? [
-            'id' => $clearance->business->id,
-            'business_name' => $clearance->business->business_name,
-            'owner_name' => $clearance->business->owner_name,
-            'contact_number' => $clearance->business->contact_number,
-            'address' => $clearance->business->address,
-            'purok' => $clearance->business->purok,
-            'owner_id' => $clearance->business->owner_id,
-        ] : null;
+        // Payment status options
+        $paymentStatusOptions = [
+            ['value' => 'unpaid', 'label' => 'Unpaid'],
+            ['value' => 'partially_paid', 'label' => 'Partially Paid'],
+            ['value' => 'paid', 'label' => 'Paid'],
+        ];
 
-        return array_merge(
-            $clearance->toArray(),
-            $payerData,
-            [
-                'resident' => $residentData,
-                'household' => $householdData,
-                'business' => $businessData,
-                'clearance_type' => $clearance->clearanceType ? [
-                    'id' => $clearance->clearanceType->id,
-                    'name' => $clearance->clearanceType->name,
-                    'code' => $clearance->clearanceType->code,
-                    'fee' => (float) $clearance->clearanceType->fee,
-                    'processing_days' => $clearance->clearanceType->processing_days,
-                    'validity_days' => $clearance->clearanceType->validity_days,
-                    'requires_payment' => (bool) $clearance->clearanceType->requires_payment,
-                ] : null,
-                'payment' => $clearance->payment ? [
-                    'id' => $clearance->payment->id,
-                    'or_number' => $clearance->payment->or_number,
-                    'amount_paid' => $clearance->payment->amount_paid,
-                    'status' => $clearance->payment->status,
-                    'payment_date' => $clearance->payment->payment_date,
-                ] : null,
-                'status_display' => $clearance->status_display,
-                'payment_status_display' => $clearance->payment_status_display,
-                'urgency_display' => $clearance->urgency_display,
-                'formatted_fee' => $clearance->formatted_fee,
-                'formatted_amount_paid' => $clearance->formatted_amount_paid,
-                'formatted_balance' => $clearance->formatted_balance,
-                'is_valid' => $clearance->is_valid,
-                'days_remaining' => $clearance->days_remaining,
-                'is_fully_paid' => $clearance->is_fully_paid,
-                'created_at' => $clearance->created_at->toDateTimeString(),
-                'updated_at' => $clearance->updated_at->toDateTimeString(),
-                'issue_date' => $clearance->issue_date?->toDateString(),
-                'valid_until' => $clearance->valid_until?->toDateString(),
-                'payment_date' => $clearance->payment_date?->toDateTimeString(),
-                // Add contact info from the clearance
-                'contact_number' => $clearance->contact_number,
-                'contact_address' => $clearance->contact_address,
-                'contact_purok' => $clearance->contact_purok,
-            ]
-        );
-    });
-
-    // Get stats with payment tracking
-    $stats = [
-        'total' => ClearanceRequest::count(),
-        'totalIssued' => ClearanceRequest::where('status', 'issued')->count(),
-        'issuedThisMonth' => ClearanceRequest::where('status', 'issued')
-            ->whereMonth('issue_date', now()->month)
-            ->whereYear('issue_date', now()->year)
-            ->count(),
-        'pending' => ClearanceRequest::where('status', 'pending')->count(),
-        'pendingToday' => ClearanceRequest::where('status', 'pending')
-            ->whereDate('created_at', today())
-            ->count(),
-        'expiringSoon' => ClearanceRequest::where('status', 'issued')
-            ->where('valid_until', '<=', now()->addDays(30))
-            ->where('valid_until', '>', now())
-            ->count(),
-        'totalRevenue' => (float) ClearanceRequest::where('status', 'issued')
-            ->sum('amount_paid'),
-        'unpaid' => ClearanceRequest::where('payment_status', 'unpaid')->count(),
-        'partially_paid' => ClearanceRequest::where('payment_status', 'partially_paid')->count(),
-        'paid' => ClearanceRequest::where('payment_status', 'paid')->count(),
-        'pending_payment' => ClearanceRequest::where('status', 'pending_payment')->count(),
-    ];
-
-    // Get active clearance types with counts
-    $clearanceTypes = ClearanceType::active()
-        ->withCount(['clearanceRequests'])
-        ->orderBy('name')
-        ->get()
-        ->map(function ($type) {
-            return [
-                'id' => $type->id,
-                'name' => $type->name,
-                'code' => $type->code,
-                'fee' => (float) $type->fee,
-                'formatted_fee' => $type->formatted_fee,
-                'processing_days' => $type->processing_days,
-                'validity_days' => $type->validity_days,
-                'is_active' => (bool) $type->is_active,
-                'description' => $type->description,
-                'requires_payment' => (bool) $type->requires_payment,
-                'document_types_count' => $type->document_types_count,
-                'required_document_types_count' => $type->required_document_types_count,
-                'total_requests' => $type->clearance_requests_count,
-            ];
-        });
-
-    // Status options for filter
-    $statusOptions = [
-        ['value' => 'pending', 'label' => 'Pending Review'],
-        ['value' => 'pending_payment', 'label' => 'Pending Payment'],
-        ['value' => 'processing', 'label' => 'Under Processing'],
-        ['value' => 'approved', 'label' => 'Approved'],
-        ['value' => 'issued', 'label' => 'Issued'],
-        ['value' => 'rejected', 'label' => 'Rejected'],
-        ['value' => 'cancelled', 'label' => 'Cancelled'],
-        ['value' => 'expired', 'label' => 'Expired'],
-    ];
-
-    // Payment status options
-    $paymentStatusOptions = [
-        ['value' => 'unpaid', 'label' => 'Unpaid'],
-        ['value' => 'partially_paid', 'label' => 'Partially Paid'],
-        ['value' => 'paid', 'label' => 'Paid'],
-    ];
-
-    return Inertia::render('admin/Clearances/Index', [
-        'clearances' => $clearances,
-        'stats' => $stats,
-        'clearanceTypes' => $clearanceTypes,
-        'filters' => $request->only(['search', 'status', 'type', 'payment_status']),
-        'statusOptions' => $statusOptions,
-        'paymentStatusOptions' => $paymentStatusOptions,
-    ]);
-}
+        return Inertia::render('admin/Clearances/Index', [
+            'clearances' => $clearances,
+            'stats' => $stats,
+            'clearanceTypes' => $clearanceTypes,
+            'filters' => $request->only(['search', 'status', 'type', 'payment_status']),
+            'statusOptions' => $statusOptions,
+            'paymentStatusOptions' => $paymentStatusOptions,
+        ]);
+    }
 
     /**
      * Show the form for creating a new clearance request.
@@ -441,305 +448,308 @@ class ClearanceController extends Controller
         ]);
     }
     
-   /**
- * Store a newly created clearance request in storage.
- */
-public function store(Request $request)
-{
-    try {
-        Log::info('ClearanceController@store started', [
-            'user_id' => auth()->id(),
-            'request_data' => $request->except(['_token'])
-        ]);
+    /**
+     * Store a newly created clearance request in storage.
+     */
+    public function store(Request $request)
+    {
+        try {
+            Log::info('ClearanceController@store started', [
+                'user_id' => auth()->id(),
+                'request_data' => $request->except(['_token'])
+            ]);
 
-        $validator = Validator::make($request->all(), [
-            // Payer information
-            'payer_type' => 'required|in:resident,household,business',
-            'payer_id' => 'required',
-            
-            // Keep resident_id for backward compatibility but make it optional
-            'resident_id' => 'nullable|exists:residents,id',
-            
-            // Clearance details
-            'clearance_type_id' => 'required|exists:clearance_types,id',
-            'purpose' => 'required|string|max:500',
-            'specific_purpose' => 'nullable|string|max:500',
-            'urgency' => 'required|in:normal,rush,express',
-            'needed_date' => 'required|date|after_or_equal:today',
-            'additional_requirements' => 'nullable|string',
-            'fee_amount' => 'nullable|numeric|min:0',
-            'remarks' => 'nullable|string',
-            'proceed_to_payment' => 'nullable|boolean',
-        ]);
-        
-        // Validate that the payer_id exists in the correct table based on payer_type
-        $validator->after(function ($validator) use ($request) {
-            $payerType = $request->payer_type;
-            $payerId = $request->payer_id;
-            
-            if ($payerType === 'resident') {
-                if (!Resident::where('id', $payerId)->exists()) {
-                    $validator->errors()->add('payer_id', 'Selected resident does not exist.');
-                }
-            } elseif ($payerType === 'household') {
-                if (!Household::where('id', $payerId)->exists()) {
-                    $validator->errors()->add('payer_id', 'Selected household does not exist.');
-                }
-            } elseif ($payerType === 'business') {
-                if (!Business::where('id', $payerId)->exists()) {
-                    $validator->errors()->add('payer_id', 'Selected business does not exist.');
-                }
-            }
-        });
-        
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-        
-        DB::beginTransaction();
-
-        // Get clearance type
-        $clearanceType = ClearanceType::find($request->clearance_type_id);
-        
-        // Get payer information based on type
-        $payer = $this->getPayer($request->payer_type, $request->payer_id);
-        
-        // Set resident_id based on payer_type (for backward compatibility)
-        $residentId = null;
-        if ($request->payer_type === 'resident') {
-            $residentId = $request->payer_id;
-        } elseif ($request->payer_type === 'household' && $payer) {
-            // For household, try to get the head resident's ID
-            $headMember = $payer->householdMembers()
-                ->where('is_head', true)
-                ->first();
-            if ($headMember) {
-                $residentId = $headMember->resident_id;
-            }
-        } elseif ($request->payer_type === 'business' && $payer && $payer->owner_id) {
-            // For business, use the owner's resident ID if available
-            $residentId = $payer->owner_id;
-        }
-        
-        // Get contact information from payer
-        $contactInfo = $this->getContactInfoFromPayer($payer, $request->payer_type);
-        
-        // Calculate fee if not provided
-        $feeAmount = $request->fee_amount;
-        if ($clearanceType && ($feeAmount === null || $feeAmount === 0)) {
-            $feeAmount = $clearanceType->fee ?? 0;
-        }
-        
-        // Adjust fee based on urgency (only if fee > 0)
-        if ($feeAmount > 0) {
-            if ($request->urgency === 'rush') {
-                $feeAmount *= 1.5; // 50% surcharge for rush
-            } elseif ($request->urgency === 'express') {
-                $feeAmount *= 2.0; // 100% surcharge for express
-            }
-        }
-        
-        // Round to 2 decimal places
-        $feeAmount = round($feeAmount, 2);
-        
-        // Generate reference number
-        $referenceNumber = $this->generateReferenceNumber();
-        
-        // Determine initial status and payment status based on fee amount
-        $status = 'pending';
-        $paymentStatus = 'unpaid';
-        $balance = $feeAmount;
-        
-        // Check if clearance type requires payment and has fee
-        if ($clearanceType) {
-            if ($feeAmount > 0 && $clearanceType->requires_payment) {
-                // Fee-based clearance that requires payment
-                $status = 'pending_payment';
-                Log::info('Fee-based clearance - requires payment', [
-                    'clearance_type' => $clearanceType->name,
-                    'fee' => $feeAmount,
-                    'status' => $status
-                ]);
-            } elseif ($feeAmount == 0) {
-                // Zero-fee clearance (like Indigency Certificate)
-                $paymentStatus = 'paid'; // Mark as paid automatically since no payment required
-                $balance = 0;
+            $validator = Validator::make($request->all(), [
+                // Payer information
+                'payer_type' => 'required|in:resident,household,business',
+                'payer_id' => 'required',
                 
-                // Determine if approval is required
-                if ($clearanceType->requires_approval) {
-                    // If approval required, stay in pending for review
-                    $status = 'pending';
-                    Log::info('Zero-fee clearance - pending approval', [
-                        'clearance_type' => $clearanceType->name,
-                        'fee' => $feeAmount,
-                        'status' => $status
-                    ]);
-                } else {
-                    // If no approval required, go directly to processing
-                    $status = 'processing';
-                    Log::info('Zero-fee clearance - auto-processed', [
-                        'clearance_type' => $clearanceType->name,
-                        'fee' => $feeAmount,
-                        'status' => $status
-                    ]);
-                }
-            } elseif ($feeAmount > 0 && !$clearanceType->requires_payment) {
-                // Fee-based but payment not required (unusual case, but handle it)
-                $paymentStatus = 'paid';
-                $balance = 0;
-                $status = 'processing';
-                Log::info('Fee-based clearance but payment not required - auto-processed', [
-                    'clearance_type' => $clearanceType->name,
-                    'fee' => $feeAmount,
-                    'status' => $status
-                ]);
-            }
-        }
-        
-        // Get current admin
-        $admin = auth()->user();
-        
-        // Get requested by user ID (if payer has user account)
-        $requestedByUserId = $this->getRequestedByUserId($payer, $request->payer_type);
-        
-        // Create the clearance request with ALL fields properly set
-        $clearanceRequest = ClearanceRequest::create([
-            // Payer information - THESE ARE THE KEY FIELDS THAT WERE NULL BEFORE
-            'payer_type' => $request->payer_type,
-            'payer_id' => $request->payer_id,
-            'resident_id' => $residentId, // For backward compatibility
-            
-            // Contact snapshot
-            'contact_name' => $contactInfo['name'],
-            'contact_number' => $contactInfo['contact_number'],
-            'contact_address' => $contactInfo['address'],
-            'contact_purok_id' => $contactInfo['purok_id'],
-            'contact_email' => $contactInfo['email'],
-            
-            // Clearance details
-            'clearance_type_id' => $request->clearance_type_id,
-            'reference_number' => $referenceNumber,
-            'purpose' => $request->purpose,
-            'specific_purpose' => $request->specific_purpose,
-            'urgency' => $request->urgency,
-            'needed_date' => $request->needed_date,
-            'additional_requirements' => $request->additional_requirements,
-            'fee_amount' => $feeAmount,
-            'status' => $status,
-            'remarks' => $request->remarks,
-            
-            // Payment tracking fields
-            'payment_status' => $paymentStatus,
-            'amount_paid' => 0,
-            'balance' => $balance,
-            
-            // Admin info
-            'issuing_officer_id' => $admin->id,
-            'issuing_officer_name' => $admin->name,
-            'requested_by_user_id' => $requestedByUserId,
-            'processed_by' => $admin->id,
-            'processed_at' => now(),
-        ]);
-
-        // Log activity based on the outcome
-        if ($feeAmount == 0) {
-            if ($status === 'processing') {
-                activity()
-                    ->performedOn($clearanceRequest)
-                    ->causedBy($admin)
-                    ->withProperties([
-                        'reason' => 'Zero-fee clearance type (no payment required)',
-                        'clearance_type' => $clearanceType->name,
-                        'fee' => $feeAmount,
-                        'payer_type' => $request->payer_type,
-                        'payer_id' => $request->payer_id,
-                    ])
-                    ->event('auto_processed')
-                    ->log('Clearance request auto-processed (no payment required)');
-            } else {
-                activity()
-                    ->performedOn($clearanceRequest)
-                    ->causedBy($admin)
-                    ->withProperties([
-                        'reason' => 'Zero-fee clearance type pending approval',
-                        'clearance_type' => $clearanceType->name,
-                        'fee' => $feeAmount,
-                        'payer_type' => $request->payer_type,
-                        'payer_id' => $request->payer_id,
-                    ])
-                    ->event('created')
-                    ->log('Clearance request created (pending approval, no payment required)');
-            }
-        }
-
-        DB::commit();
-
-        Log::info('Clearance request created successfully', [
-            'clearance_id' => $clearanceRequest->id,
-            'reference_number' => $referenceNumber,
-            'payer_type' => $request->payer_type,
-            'payer_id' => $request->payer_id,
-            'resident_id' => $residentId,
-            'fee_amount' => $feeAmount,
-            'payment_status' => $paymentStatus,
-            'status' => $status,
-            'proceed_to_payment' => $request->input('proceed_to_payment', false),
-            'is_zero_fee' => $feeAmount == 0
-        ]);
-
-        // Handle redirect based on fee and payment requirement
-        if ($feeAmount > 0 && $request->input('proceed_to_payment', false)) {
-            // Load relationships for payment page
-            $clearanceRequest->load(['clearanceType']);
-            
-            // Build payment URL parameters
-            $params = http_build_query([
-                'clearance_request_id' => $clearanceRequest->id,
-                'clearance_type_id' => $clearanceRequest->clearance_type_id,
-                'payer_type' => $request->payer_type,
-                'payer_id' => $request->payer_id,
-                'payer_name' => $contactInfo['name'],
-                'contact_number' => $contactInfo['contact_number'],
-                'address' => $contactInfo['address'],
-                'purok' => $contactInfo['purok'],
-                'purpose' => $clearanceType->name . ' Clearance',
-                'fee_amount' => $feeAmount,
+                // Keep resident_id for backward compatibility but make it optional
+                'resident_id' => 'nullable|exists:residents,id',
+                
+                // Clearance details
+                'clearance_type_id' => 'required|exists:clearance_types,id',
+                'purpose' => 'required|string|max:500',
+                'specific_purpose' => 'nullable|string|max:500',
+                'urgency' => 'required|in:normal,rush,express',
+                'needed_date' => 'required|date|after_or_equal:today',
+                'additional_requirements' => 'nullable|string',
+                'fee_amount' => 'nullable|numeric|min:0',
+                'remarks' => 'nullable|string',
+                'proceed_to_payment' => 'nullable|boolean',
             ]);
             
-            return redirect()->route('payments.create') . '?' . $params;
-        } 
-        
-        // For zero-fee clearances, redirect with appropriate message
-        if ($feeAmount == 0) {
-            if ($status === 'processing') {
-                return redirect()->route('clearances.show', $clearanceRequest->id)
-                    ->with('success', 'Clearance request created and auto-processed successfully! No payment required. Reference number: ' . $referenceNumber);
-            } else {
-                return redirect()->route('clearances.show', $clearanceRequest->id)
-                    ->with('success', 'Clearance request created successfully! No payment required, pending review. Reference number: ' . $referenceNumber);
+            // Validate that the payer_id exists in the correct table based on payer_type
+            $validator->after(function ($validator) use ($request) {
+                $payerType = $request->payer_type;
+                $payerId = $request->payer_id;
+                
+                if ($payerType === 'resident') {
+                    if (!Resident::where('id', $payerId)->exists()) {
+                        $validator->errors()->add('payer_id', 'Selected resident does not exist.');
+                    }
+                } elseif ($payerType === 'household') {
+                    if (!Household::where('id', $payerId)->exists()) {
+                        $validator->errors()->add('payer_id', 'Selected household does not exist.');
+                    }
+                } elseif ($payerType === 'business') {
+                    if (!Business::where('id', $payerId)->exists()) {
+                        $validator->errors()->add('payer_id', 'Selected business does not exist.');
+                    }
+                }
+            });
+            
+            if ($validator->fails()) {
+                return redirect()->back()
+                    ->withErrors($validator)
+                    ->withInput();
             }
+            
+            DB::beginTransaction();
+
+            // Get clearance type
+            $clearanceType = ClearanceType::find($request->clearance_type_id);
+            
+            // Get payer information based on type
+            $payer = $this->getPayer($request->payer_type, $request->payer_id);
+            
+            // Set resident_id based on payer_type (for backward compatibility)
+            $residentId = null;
+            if ($request->payer_type === 'resident') {
+                $residentId = $request->payer_id;
+            } elseif ($request->payer_type === 'household' && $payer) {
+                // For household, try to get the head resident's ID
+                $headMember = $payer->householdMembers()
+                    ->where('is_head', true)
+                    ->first();
+                if ($headMember) {
+                    $residentId = $headMember->resident_id;
+                }
+            } elseif ($request->payer_type === 'business' && $payer && $payer->owner_id) {
+                // For business, use the owner's resident ID if available
+                $residentId = $payer->owner_id;
+            }
+            
+            // Get contact information from payer
+            $contactInfo = $this->getContactInfoFromPayer($payer, $request->payer_type);
+            
+            // Calculate fee if not provided
+            $feeAmount = $request->fee_amount;
+            if ($clearanceType && ($feeAmount === null || $feeAmount === 0)) {
+                $feeAmount = $clearanceType->fee ?? 0;
+            }
+            
+            // Adjust fee based on urgency (only if fee > 0)
+            if ($feeAmount > 0) {
+                if ($request->urgency === 'rush') {
+                    $feeAmount *= 1.5; // 50% surcharge for rush
+                } elseif ($request->urgency === 'express') {
+                    $feeAmount *= 2.0; // 100% surcharge for express
+                }
+            }
+            
+            // Round to 2 decimal places
+            $feeAmount = round($feeAmount, 2);
+            
+            // Generate reference number
+            $referenceNumber = $this->generateReferenceNumber();
+            
+            // Determine initial status and payment status based on fee amount
+            $status = 'pending';
+            $paymentStatus = 'unpaid';
+            $balance = $feeAmount;
+            
+            // Check if clearance type requires payment and has fee
+            if ($clearanceType) {
+                if ($feeAmount > 0 && $clearanceType->requires_payment) {
+                    // Fee-based clearance that requires payment
+                    $status = 'pending_payment';
+                    Log::info('Fee-based clearance - requires payment', [
+                        'clearance_type' => $clearanceType->name,
+                        'fee' => $feeAmount,
+                        'status' => $status
+                    ]);
+                } elseif ($feeAmount == 0) {
+                    // Zero-fee clearance (like Indigency Certificate)
+                    $paymentStatus = 'paid'; // Mark as paid automatically since no payment required
+                    $balance = 0;
+                    
+                    // Determine if approval is required
+                    if ($clearanceType->requires_approval) {
+                        // If approval required, stay in pending for review
+                        $status = 'pending';
+                        Log::info('Zero-fee clearance - pending approval', [
+                            'clearance_type' => $clearanceType->name,
+                            'fee' => $feeAmount,
+                            'status' => $status
+                        ]);
+                    } else {
+                        // If no approval required, go directly to processing
+                        $status = 'processing';
+                        Log::info('Zero-fee clearance - auto-processed', [
+                            'clearance_type' => $clearanceType->name,
+                            'fee' => $feeAmount,
+                            'status' => $status
+                        ]);
+                    }
+                } elseif ($feeAmount > 0 && !$clearanceType->requires_payment) {
+                    // Fee-based but payment not required (unusual case, but handle it)
+                    $paymentStatus = 'paid';
+                    $balance = 0;
+                    $status = 'processing';
+                    Log::info('Fee-based clearance but payment not required - auto-processed', [
+                        'clearance_type' => $clearanceType->name,
+                        'fee' => $feeAmount,
+                        'status' => $status
+                    ]);
+                }
+            }
+            
+            // Get current admin
+            $admin = auth()->user();
+            
+            // Get requested by user ID (if payer has user account)
+            $requestedByUserId = $this->getRequestedByUserId($payer, $request->payer_type);
+            
+            // Create the clearance request with ALL fields properly set
+            $clearanceRequest = ClearanceRequest::create([
+                // Payer information - THESE ARE THE KEY FIELDS THAT WERE NULL BEFORE
+                'payer_type' => $request->payer_type,
+                'payer_id' => $request->payer_id,
+                'resident_id' => $residentId, // For backward compatibility
+                
+                // Contact snapshot
+                'contact_name' => $contactInfo['name'],
+                'contact_number' => $contactInfo['contact_number'],
+                'contact_address' => $contactInfo['address'],
+                'contact_purok_id' => $contactInfo['purok_id'],
+                'contact_email' => $contactInfo['email'],
+                
+                // Clearance details
+                'clearance_type_id' => $request->clearance_type_id,
+                'reference_number' => $referenceNumber,
+                'purpose' => $request->purpose,
+                'specific_purpose' => $request->specific_purpose,
+                'urgency' => $request->urgency,
+                'needed_date' => $request->needed_date,
+                'additional_requirements' => $request->additional_requirements,
+                'fee_amount' => $feeAmount,
+                'status' => $status,
+                'remarks' => $request->remarks,
+                
+                // Payment tracking fields
+                'payment_status' => $paymentStatus,
+                'amount_paid' => 0,
+                'balance' => $balance,
+                
+                // Admin info
+                'issuing_officer_id' => $admin->id,
+                'issuing_officer_name' => $admin->name,
+                'requested_by_user_id' => $requestedByUserId,
+                'processed_by' => $admin->id,
+                'processed_at' => now(),
+            ]);
+
+            // Log activity based on the outcome
+            if ($feeAmount == 0) {
+                if ($status === 'processing') {
+                    activity()
+                        ->performedOn($clearanceRequest)
+                        ->causedBy($admin)
+                        ->withProperties([
+                            'reason' => 'Zero-fee clearance type (no payment required)',
+                            'clearance_type' => $clearanceType->name,
+                            'fee' => $feeAmount,
+                            'payer_type' => $request->payer_type,
+                            'payer_id' => $request->payer_id,
+                        ])
+                        ->event('auto_processed')
+                        ->log('Clearance request auto-processed (no payment required)');
+                } else {
+                    activity()
+                        ->performedOn($clearanceRequest)
+                        ->causedBy($admin)
+                        ->withProperties([
+                            'reason' => 'Zero-fee clearance type pending approval',
+                            'clearance_type' => $clearanceType->name,
+                            'fee' => $feeAmount,
+                            'payer_type' => $request->payer_type,
+                            'payer_id' => $request->payer_id,
+                        ])
+                        ->event('created')
+                        ->log('Clearance request created (pending approval, no payment required)');
+                }
+            }
+
+            DB::commit();
+
+            Log::info('Clearance request created successfully', [
+                'clearance_id' => $clearanceRequest->id,
+                'reference_number' => $referenceNumber,
+                'payer_type' => $request->payer_type,
+                'payer_id' => $request->payer_id,
+                'resident_id' => $residentId,
+                'fee_amount' => $feeAmount,
+                'payment_status' => $paymentStatus,
+                'status' => $status,
+                'proceed_to_payment' => $request->input('proceed_to_payment', false),
+                'is_zero_fee' => $feeAmount == 0
+            ]);
+
+            // ========== SEND NOTIFICATIONS ==========
+            $this->sendClearanceCreatedNotifications($clearanceRequest, $payer, $request->payer_type);
+
+            // Handle redirect based on fee and payment requirement
+            if ($feeAmount > 0 && $request->input('proceed_to_payment', false)) {
+                // Load relationships for payment page
+                $clearanceRequest->load(['clearanceType']);
+                
+                // Build payment URL parameters
+                $params = http_build_query([
+                    'clearance_request_id' => $clearanceRequest->id,
+                    'clearance_type_id' => $clearanceRequest->clearance_type_id,
+                    'payer_type' => $request->payer_type,
+                    'payer_id' => $request->payer_id,
+                    'payer_name' => $contactInfo['name'],
+                    'contact_number' => $contactInfo['contact_number'],
+                    'address' => $contactInfo['address'],
+                    'purok' => $contactInfo['purok'],
+                    'purpose' => $clearanceType->name . ' Clearance',
+                    'fee_amount' => $feeAmount,
+                ]);
+                
+                return redirect()->route('payments.create') . '?' . $params;
+            } 
+            
+            // For zero-fee clearances, redirect with appropriate message
+            if ($feeAmount == 0) {
+                if ($status === 'processing') {
+                    return redirect()->route('admin.clearances.show', $clearanceRequest->id)
+                        ->with('success', 'Clearance request created and auto-processed successfully! No payment required. Reference number: ' . $referenceNumber);
+                } else {
+                    return redirect()->route('admin.clearances.show', $clearanceRequest->id)
+                        ->with('success', 'Clearance request created successfully! No payment required, pending review. Reference number: ' . $referenceNumber);
+                }
+            }
+
+            // Default redirect for fee-based clearances
+            return redirect()->route('admin.clearances.show', $clearanceRequest->id)
+                ->with('success', 'Clearance request created successfully! Reference number: ' . $referenceNumber);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            Log::error('ClearanceController@store error', [
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['error' => 'Failed to create clearance request. Please try again.']);
         }
-
-        // Default redirect for fee-based clearances
-        return redirect()->route('clearances.show', $clearanceRequest->id)
-            ->with('success', 'Clearance request created successfully! Reference number: ' . $referenceNumber);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        
-        Log::error('ClearanceController@store error', [
-            'user_id' => auth()->id(),
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-
-        return redirect()->back()
-            ->withInput()
-            ->withErrors(['error' => 'Failed to create clearance request. Please try again.']);
     }
-}
     
     /**
      * Show the form for editing the specified clearance request.
@@ -941,6 +951,9 @@ public function store(Request $request)
      */
     public function update(Request $request, ClearanceRequest $clearance)
     {
+        // Store old status for notification
+        $oldStatus = $clearance->status;
+        
         // Define validation rules based on status
         $rules = [
             'purpose' => 'required|string|max:255',
@@ -1051,7 +1064,12 @@ public function store(Request $request)
         // Update the clearance
         $clearance->update($request->only($editableFields));
 
-        return redirect()->route('clearances.show', $clearance)
+        // Send notification if status changed
+        if ($oldStatus !== $clearance->status) {
+            $this->sendClearanceStatusNotification($clearance, $oldStatus, $clearance->status);
+        }
+
+        return redirect()->route('admin.clearances.show', $clearance)
             ->with('success', 'Clearance request updated successfully.');
     }
 
@@ -1110,7 +1128,7 @@ public function store(Request $request)
                    $user->can('manage-clearances');
         $canDelete = in_array($clearance->status, ['pending', 'pending_payment']) && 
                      $user->can('manage-clearances');
-        $canProcess = in_array($clearance->status, ['pending', 'pending_payment', 'processing']) && 
+        $canProcess = in_array($clearance->status, ['pending', 'pending_payment']) && 
                       $user->can('process-clearances');
         $canIssue = $clearance->status === 'approved' && $user->can('issue-clearances');
         $canApprove = $clearance->status === 'processing' && $user->can('approve-clearances');
@@ -1137,7 +1155,11 @@ public function store(Request $request)
             return redirect()->back()->with('error', 'Cannot process clearance request in current status.');
         }
 
+        $oldStatus = $clearance->status;
         $clearance->markAsProcessing(auth()->id());
+        
+        // Send notification
+        $this->sendClearanceStatusNotification($clearance, $oldStatus, 'processing');
 
         return redirect()->back()->with('success', 'Clearance request marked as processing.');
     }
@@ -1156,7 +1178,11 @@ public function store(Request $request)
             return redirect()->back()->with('error', 'Cannot approve: Payment is required and not yet completed.');
         }
 
+        $oldStatus = $clearance->status;
         $clearance->approve();
+        
+        // Send notification
+        $this->sendClearanceStatusNotification($clearance, $oldStatus, 'approved');
 
         return redirect()->back()->with('success', 'Clearance request approved successfully.');
     }
@@ -1170,7 +1196,11 @@ public function store(Request $request)
             return redirect()->back()->with('error', 'Cannot issue clearance in current status.');
         }
 
+        $oldStatus = $clearance->status;
         $clearance->issue();
+        
+        // Send notification
+        $this->sendClearanceStatusNotification($clearance, $oldStatus, 'issued');
 
         return redirect()->back()->with('success', 'Clearance certificate issued successfully.');
     }
@@ -1188,7 +1218,11 @@ public function store(Request $request)
             return redirect()->back()->with('error', 'Cannot reject clearance request in current status.');
         }
 
+        $oldStatus = $clearance->status;
         $clearance->reject($request->reason, auth()->id());
+        
+        // Send notification with rejection reason
+        $this->sendClearanceStatusNotification($clearance, $oldStatus, 'rejected', $request->reason);
 
         return redirect()->back()->with('success', 'Clearance request rejected.');
     }
@@ -1206,7 +1240,11 @@ public function store(Request $request)
             return redirect()->back()->with('error', 'Cannot cancel clearance request in current status.');
         }
 
+        $oldStatus = $clearance->status;
         $clearance->cancel($request->reason, false);
+        
+        // Send notification
+        $this->sendClearanceStatusNotification($clearance, $oldStatus, 'cancelled', $request->reason);
 
         return redirect()->back()->with('success', 'Clearance request cancelled.');
     }
@@ -1227,7 +1265,7 @@ public function store(Request $request)
 
         $clearance->delete();
 
-        return redirect()->route('clearances.index')->with('success', 'Clearance request deleted.');
+        return redirect()->route('admin.clearances.index')->with('success', 'Clearance request deleted.');
     }
 
     /**
@@ -1261,6 +1299,304 @@ public function store(Request $request)
         return redirect()->back()->with('info', 'Download functionality to be implemented.');
     }
 
+    // ========== NOTIFICATION METHODS ==========
+
+    /**
+     * Send notifications when clearance request is created.
+     */
+    private function sendClearanceCreatedNotifications(ClearanceRequest $clearance, $payer, string $payerType): void
+    {
+        try {
+            Log::info('Sending clearance created notifications', [
+                'clearance_id' => $clearance->id,
+                'reference' => $clearance->reference_number
+            ]);
+
+            // 1. Notify the payer (resident/household/business)
+            $payerUsers = $this->getPayerUsers($payer, $payerType);
+            
+            foreach ($payerUsers as $user) {
+                $user->notify(new ClearanceRequestCreated($clearance, 'created', 'payer'));
+                
+                Log::info('Payer notification sent', [
+                    'user_id' => $user->id,
+                    'user_name' => $user->name ?? 'Unknown'
+                ]);
+            }
+
+            // 2. Notify all admins - FIXED: changed from roles() to role()
+            $admins = User::whereHas('role', function ($query) {
+                $query->whereIn('name', ['admin', 'super-admin', 'treasurer', 'secretary']);
+            })->where('status', 'active')->get();
+
+            foreach ($admins as $admin) {
+                $admin->notify(new ClearanceRequestCreated($clearance, 'created', 'admin'));
+                
+                Log::info('Admin notification sent', [
+                    'admin_id' => $admin->id,
+                    'admin_name' => $admin->name
+                ]);
+            }
+
+            Log::info('Clearance created notifications completed', [
+                'payers_notified' => $payerUsers->count(),
+                'admins_notified' => $admins->count()
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send clearance created notifications', [
+                'clearance_id' => $clearance->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * Send notification when clearance status changes.
+     */
+    private function sendClearanceStatusNotification(ClearanceRequest $clearance, string $oldStatus, string $newStatus, ?string $remarks = null): void
+    {
+        try {
+            Log::info('Sending clearance status notification', [
+                'clearance_id' => $clearance->id,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus
+            ]);
+
+            // 1. Notify the payer
+            $payerUsers = $this->getPayerUsersFromClearance($clearance);
+            
+            foreach ($payerUsers as $user) {
+                $user->notify(new ClearanceStatusUpdated($clearance, $oldStatus, $newStatus, $remarks));
+                
+                Log::info('Payer status notification sent', [
+                    'user_id' => $user->id,
+                    'user_name' => $user->name ?? 'Unknown'
+                ]);
+            }
+
+            // 2. Notify admins for certain status changes - FIXED: changed from roles() to role()
+            if (in_array($newStatus, ['pending_payment', 'processing', 'approved', 'issued'])) {
+                $admins = User::whereHas('role', function ($query) {
+                    $query->whereIn('name', ['admin', 'super-admin', 'treasurer', 'secretary']);
+                })->where('status', 'active')->get();
+
+                foreach ($admins as $admin) {
+                    $admin->notify(new ClearanceStatusUpdated($clearance, $oldStatus, $newStatus, $remarks));
+                }
+            }
+
+            Log::info('Clearance status notifications completed');
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send clearance status notifications', [
+                'clearance_id' => $clearance->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Send payment notification for clearance.
+     */
+    public function sendPaymentNotification(ClearanceRequest $clearance, $payment, string $action = 'received'): void
+    {
+        try {
+            // Notify payer
+            $payerUsers = $this->getPayerUsersFromClearance($clearance);
+            
+            foreach ($payerUsers as $user) {
+                $user->notify(new ClearancePaymentNotification($clearance, $payment, $action));
+            }
+
+            // Notify treasurer/admins
+            $admins = User::whereHas('role', function ($query) {
+                $query->whereIn('name', ['admin', 'super-admin', 'treasurer']);
+            })->where('status', 'active')->get();
+
+            foreach ($admins as $admin) {
+                $admin->notify(new ClearancePaymentNotification($clearance, $payment, $action));
+            }
+
+            Log::info('Payment notification sent', [
+                'clearance_id' => $clearance->id,
+                'payment_id' => $payment->id,
+                'action' => $action
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send payment notification', [
+                'clearance_id' => $clearance->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Send document notification for clearance.
+     */
+    public function sendDocumentNotification(ClearanceRequest $clearance, Document $document, string $action = 'uploaded'): void
+    {
+        try {
+            // Notify admins
+            $admins = User::whereHas('role', function ($query) {
+                $query->whereIn('name', ['admin', 'super-admin', 'secretary']);
+            })->where('status', 'active')->get();
+
+            foreach ($admins as $admin) {
+                $admin->notify(new ClearanceDocumentNotification($clearance, $document, $action));
+            }
+
+            // If document is verified/rejected, notify payer
+            if (in_array($action, ['verified', 'rejected'])) {
+                $payerUsers = $this->getPayerUsersFromClearance($clearance);
+                
+                foreach ($payerUsers as $user) {
+                    $user->notify(new ClearanceDocumentNotification($clearance, $document, $action));
+                }
+            }
+
+            Log::info('Document notification sent', [
+                'clearance_id' => $clearance->id,
+                'document_id' => $document->id,
+                'action' => $action
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send document notification', [
+                'clearance_id' => $clearance->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Get users associated with a payer.
+     */
+    private function getPayerUsers($payer, string $payerType): \Illuminate\Support\Collection
+    {
+        $users = collect();
+
+        if (!$payer) {
+            return $users;
+        }
+
+        if ($payerType === 'resident') {
+            // Residents get user accounts through their household
+            if ($payer->household_id) {
+                // Find the household's user account (household head account)
+                $household = Household::with('user')->find($payer->household_id);
+                
+                if ($household && $household->user) {
+                    // Check if this resident is the current head (the one using the account)
+                    if ($household->user->current_resident_id === $payer->id) {
+                        $users->push($household->user);
+                    }
+                }
+                
+                // Also check for any other users associated with this household
+                $householdUsers = User::where('household_id', $payer->household_id)
+                    ->where('status', 'active')
+                    ->get();
+                
+                foreach ($householdUsers as $user) {
+                    if (!$users->contains('id', $user->id)) {
+                        $users->push($user);
+                    }
+                }
+            }
+            
+            // If resident is the head of household, also check their own user account
+            // FIXED: Use householdMemberships() instead of householdMembers()
+            $isHeadOfHousehold = $payer->householdMemberships()
+                ->where('is_head', true)
+                ->exists();
+                
+            if ($isHeadOfHousehold && $payer->household_id) {
+                $headUser = User::where('household_id', $payer->household_id)
+                    ->where('current_resident_id', $payer->id)
+                    ->where('status', 'active')
+                    ->first();
+                    
+                if ($headUser && !$users->contains('id', $headUser->id)) {
+                    $users->push($headUser);
+                }
+            }
+            
+        } elseif ($payerType === 'household') {
+            // Households have a direct user account
+            if ($payer->user_id) {
+                $user = User::find($payer->user_id);
+                if ($user && $user->status === 'active') {
+                    $users->push($user);
+                }
+            }
+            
+            // Also check for any users with this household_id
+            $householdUsers = User::where('household_id', $payer->id)
+                ->where('status', 'active')
+                ->get();
+        
+            foreach ($householdUsers as $user) {
+                if (!$users->contains('id', $user->id)) {
+                    $users->push($user);
+                }
+            }
+            
+        } elseif ($payerType === 'business') {
+            // Businesses are owned by residents
+            if ($payer->owner_id) {
+                // Find the owner's household and their user account
+                $owner = Resident::with('household')->find($payer->owner_id);
+                
+                if ($owner && $owner->household_id) {
+                    $ownerUser = User::where('household_id', $owner->household_id)
+                        ->where('current_resident_id', $owner->id)
+                        ->where('status', 'active')
+                        ->first();
+                        
+                    if ($ownerUser) {
+                        $users->push($ownerUser);
+                    }
+                }
+            }
+        }
+
+        return $users->unique('id');
+    }
+
+    /**
+     * Get payer users from clearance request.
+     */
+    private function getPayerUsersFromClearance(ClearanceRequest $clearance): \Illuminate\Support\Collection
+    {
+        $users = collect();
+
+        if (!$clearance->payer_id || !$clearance->payer_type) {
+            return $users;
+        }
+
+        $payer = $this->getPayer($clearance->payer_type, $clearance->payer_id);
+        
+        if ($payer) {
+            $users = $this->getPayerUsers($payer, $clearance->payer_type);
+        }
+
+        // Also check if the contact email belongs to a user
+        if ($clearance->contact_email) {
+            $userByEmail = User::where('email', $clearance->contact_email)
+                ->where('status', 'active')
+                ->first();
+            
+            if ($userByEmail && !$users->contains('id', $userByEmail->id)) {
+                $users->push($userByEmail);
+            }
+        }
+
+        return $users->unique('id');
+    }
+
     // ========== HELPER METHODS ==========
 
     /**
@@ -1269,8 +1605,9 @@ public function store(Request $request)
     private function getPayer(string $type, int $id)
     {
         return match($type) {
-            'resident' => Resident::with('purok')->find($id),
-            'household' => Household::with(['householdMembers.resident', 'purok'])->find($id),
+            // FIXED: Use householdMemberships() instead of householdMembers
+            'resident' => Resident::with(['purok', 'household', 'householdMemberships'])->find($id),
+            'household' => Household::with(['purok', 'user', 'householdMembers.resident'])->find($id),
             'business' => Business::with(['owner', 'purok'])->find($id),
             default => null,
         };
@@ -1342,29 +1679,51 @@ public function store(Request $request)
      */
     private function getRequestedByUserId($payer, string $type): ?int
     {
-        if ($type === 'resident' && $payer && $payer->user) {
-            return $payer->user->id;
+        if (!$payer) {
+            return null;
+        }
+
+        if ($type === 'resident') {
+            // Check if this resident is the current head of household with an account
+            if ($payer->household_id) {
+                // FIXED: Use householdMemberships() instead of householdMembers()
+                $isHeadOfHousehold = $payer->householdMemberships()
+                    ->where('is_head', true)
+                    ->exists();
+                    
+                if ($isHeadOfHousehold) {
+                    $user = User::where('household_id', $payer->household_id)
+                        ->where('current_resident_id', $payer->id)
+                        ->where('status', 'active')
+                        ->first();
+                        
+                    return $user?->id;
+                }
+            }
         }
         
-        if ($type === 'household' && $payer) {
-            // Check if household has user account
-            if ($payer->has_user_account && $payer->user_id) {
-                return $payer->user_id;
+        if ($type === 'household') {
+            // Household has direct user account
+            if ($payer->user_id) {
+                $user = User::find($payer->user_id);
+                if ($user && $user->status === 'active') {
+                    return $user->id;
+                }
             }
+        }
+        
+        if ($type === 'business' && $payer->owner_id) {
+            // Check if business owner has a user account
+            $owner = Resident::with('household')->find($payer->owner_id);
             
-            // Check head member's user account
-            $headMember = $payer->householdMembers()
-                ->where('is_head', true)
-                ->with('resident.user')
-                ->first();
-                
-            if ($headMember && $headMember->resident && $headMember->resident->user) {
-                return $headMember->resident->user->id;
+            if ($owner && $owner->household_id) {
+                $user = User::where('household_id', $owner->household_id)
+                    ->where('current_resident_id', $owner->id)
+                    ->where('status', 'active')
+                    ->first();
+                    
+                return $user?->id;
             }
-        }
-        
-        if ($type === 'business' && $payer && $payer->owner && $payer->owner->user) {
-            return $payer->owner->user->id;
         }
         
         return null;
@@ -1399,11 +1758,18 @@ public function store(Request $request)
             return redirect()->back()->with('info', 'No pending documents to verify.');
         }
 
-        $clearance->documents()->where('is_verified', false)->update([
-            'is_verified' => true,
-            'verified_at' => now(),
-            'verified_by' => auth()->id(),
-        ]);
+        $documents = $clearance->documents()->where('is_verified', false)->get();
+        
+        foreach ($documents as $document) {
+            $document->update([
+                'is_verified' => true,
+                'verified_at' => now(),
+                'verified_by' => auth()->id(),
+            ]);
+            
+            // Send notification for each verified document
+            $this->sendDocumentNotification($clearance, $document, 'verified');
+        }
 
         activity()
             ->performedOn($clearance)
@@ -1424,10 +1790,20 @@ public function store(Request $request)
 
         // Update status to pending if it was in processing
         if ($clearance->status === 'processing') {
+            $oldStatus = $clearance->status;
             $clearance->update([
                 'status' => 'pending',
                 'admin_notes' => $clearance->admin_notes . "\nRequested more documents: " . $request->reason,
             ]);
+            
+            // Send status update notification
+            $this->sendClearanceStatusNotification($clearance, $oldStatus, 'pending', 'Additional documents required: ' . $request->reason);
+        }
+
+        // Notify payer about document request
+        $payerUsers = $this->getPayerUsersFromClearance($clearance);
+        foreach ($payerUsers as $user) {
+            $user->notify(new \App\Notifications\ClearanceDocumentRequest($clearance, $request->reason));
         }
 
         activity()
@@ -1448,6 +1824,12 @@ public function store(Request $request)
             $clearance->update(['status' => 'pending_payment']);
         }
 
+        // Notify payer about payment request
+        $payerUsers = $this->getPayerUsersFromClearance($clearance);
+        foreach ($payerUsers as $user) {
+            $user->notify(new \App\Notifications\ClearancePaymentRequest($clearance));
+        }
+
         activity()
             ->performedOn($clearance)
             ->causedBy(auth()->user())
@@ -1465,12 +1847,25 @@ public function store(Request $request)
             return redirect()->back()->with('info', 'Payment already verified.');
         }
 
+        $oldPaymentStatus = $clearance->payment_status;
+        $oldStatus = $clearance->status;
+        
         $clearance->update([
             'payment_status' => 'paid',
             'amount_paid' => $clearance->fee_amount,
             'balance' => 0,
             'status' => 'processing', // Move to processing after payment
         ]);
+
+        // If there's a payment record, send payment notification
+        if ($clearance->payment) {
+            $this->sendPaymentNotification($clearance, $clearance->payment, 'verified');
+        }
+
+        // Send status update notification
+        if ($oldStatus !== $clearance->status) {
+            $this->sendClearanceStatusNotification($clearance, $oldStatus, $clearance->status, 'Payment verified');
+        }
 
         activity()
             ->performedOn($clearance)
@@ -1487,6 +1882,12 @@ public function store(Request $request)
     {
         if ($clearance->payment_status === 'paid') {
             return redirect()->back()->with('info', 'Payment already completed.');
+        }
+
+        // Notify payer about payment reminder
+        $payerUsers = $this->getPayerUsersFromClearance($clearance);
+        foreach ($payerUsers as $user) {
+            $user->notify(new \App\Notifications\ClearancePaymentReminder($clearance));
         }
 
         activity()
@@ -1509,13 +1910,23 @@ public function store(Request $request)
             'ids.*' => 'exists:clearance_requests,id',
         ]);
 
-        $count = ClearanceRequest::whereIn('id', $request->ids)
+        $clearances = ClearanceRequest::whereIn('id', $request->ids)
             ->whereIn('status', ['pending', 'pending_payment'])
-            ->update([
+            ->get();
+
+        $count = 0;
+        foreach ($clearances as $clearance) {
+            $oldStatus = $clearance->status;
+            $clearance->update([
                 'status' => 'processing',
                 'processed_by' => auth()->id(),
                 'processed_at' => now(),
             ]);
+            
+            // Send notification for each clearance
+            $this->sendClearanceStatusNotification($clearance, $oldStatus, 'processing');
+            $count++;
+        }
 
         return redirect()->back()->with('success', "{$count} clearance requests marked as processing.");
     }
@@ -1530,7 +1941,7 @@ public function store(Request $request)
             'ids.*' => 'exists:clearance_requests,id',
         ]);
 
-        $count = ClearanceRequest::whereIn('id', $request->ids)
+        $clearances = ClearanceRequest::whereIn('id', $request->ids)
             ->where('status', 'processing')
             ->where(function ($q) {
                 $q->where('payment_status', 'paid')
@@ -1538,11 +1949,21 @@ public function store(Request $request)
                       $q->where('requires_payment', true);
                   });
             })
-            ->update([
+            ->get();
+
+        $count = 0;
+        foreach ($clearances as $clearance) {
+            $oldStatus = $clearance->status;
+            $clearance->update([
                 'status' => 'approved',
                 'issuing_officer_id' => auth()->id(),
                 'issuing_officer_name' => auth()->user()->name,
             ]);
+            
+            // Send notification for each clearance
+            $this->sendClearanceStatusNotification($clearance, $oldStatus, 'approved');
+            $count++;
+        }
 
         return redirect()->back()->with('success', "{$count} clearance requests approved.");
     }
@@ -1557,13 +1978,23 @@ public function store(Request $request)
             'ids.*' => 'exists:clearance_requests,id',
         ]);
 
-        $count = ClearanceRequest::whereIn('id', $request->ids)
+        $clearances = ClearanceRequest::whereIn('id', $request->ids)
             ->where('status', 'approved')
-            ->update([
+            ->get();
+
+        $count = 0;
+        foreach ($clearances as $clearance) {
+            $oldStatus = $clearance->status;
+            $clearance->update([
                 'status' => 'issued',
                 'issue_date' => now(),
                 'valid_until' => now()->addDays(30), // Default validity
             ]);
+            
+            // Send notification for each clearance
+            $this->sendClearanceStatusNotification($clearance, $oldStatus, 'issued');
+            $count++;
+        }
 
         return redirect()->back()->with('success', "{$count} clearance certificates issued.");
     }
@@ -1579,11 +2010,21 @@ public function store(Request $request)
             'status' => 'required|in:pending,processing,approved,issued,rejected,cancelled',
         ]);
 
-        $count = ClearanceRequest::whereIn('id', $request->ids)->update([
-            'status' => $request->status,
-            'processed_by' => auth()->id(),
-            'processed_at' => now(),
-        ]);
+        $clearances = ClearanceRequest::whereIn('id', $request->ids)->get();
+
+        $count = 0;
+        foreach ($clearances as $clearance) {
+            $oldStatus = $clearance->status;
+            $clearance->update([
+                'status' => $request->status,
+                'processed_by' => auth()->id(),
+                'processed_at' => now(),
+            ]);
+            
+            // Send notification for each clearance
+            $this->sendClearanceStatusNotification($clearance, $oldStatus, $request->status);
+            $count++;
+        }
 
         return redirect()->back()->with('success', "{$count} clearance requests updated to {$request->status}.");
     }

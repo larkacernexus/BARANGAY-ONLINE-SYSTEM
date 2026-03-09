@@ -8,13 +8,12 @@ use App\Models\FeeType;
 use App\Models\Resident;
 use App\Models\Household;
 use App\Models\Business;
-use App\Models\PaymentDiscount;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class FeeShowController extends Controller
 {
@@ -28,7 +27,7 @@ class FeeShowController extends Controller
                 'fee_code' => $fee->fee_code
             ]);
 
-            // Load relationships - FIXED: Use payer() instead of direct resident/household
+            // Load relationships
             $fee->load([
                 'feeType', 
                 'issuedBy', 
@@ -386,28 +385,22 @@ class FeeShowController extends Controller
             'can_record_payment' => $user->can('recordPayment', $fee) && $fee->balance > 0 && !in_array($fee->status, ['cancelled', 'waived']),
             'can_cancel' => $user->can('cancel', $fee) && !in_array($fee->status, ['paid', 'cancelled', 'waived']),
             'can_waive' => $user->can('waive', $fee) && $fee->balance > 0 && !in_array($fee->status, ['paid', 'cancelled']),
-            'can_print' => true,
             'can_view_audit' => $user->can('viewAudit', $fee),
             'can_approve' => $user->can('approve', $fee) && $fee->status === 'pending',
             'can_collect' => $user->can('collect', $fee) && $fee->status === 'approved',
         ];
     }
 
-    // Print fee receipt or certificate
-    public function print(Fee $fee, Request $request)
+    // Download certificate (if fee has one)
+    public function downloadCertificate(Fee $fee)
     {
         try {
-            Log::info('FeeShowController@print accessed', [
-                'user_id' => Auth::id(),
-                'fee_id' => $fee->id,
-                'fee_code' => $fee->fee_code
-            ]);
+            if (!$fee->certificate_number) {
+                return back()->with('error', 'No certificate available for this fee.');
+            }
 
-            $type = $request->get('type', 'receipt');
-            $action = $request->get('action', 'preview');
-
-            // Load basic relationships - FIXED: Use payer() instead of direct relationships
-            $fee->load(['feeType', 'issuedBy', 'payer', 'paymentItems.payment.discounts.rule']);
+            // Load relationships
+            $fee->load(['feeType', 'issuedBy', 'payer']);
             
             // Get the actual payer model
             $payer = $fee->payer;
@@ -429,32 +422,11 @@ class FeeShowController extends Controller
                 }
             }
 
-            // Calculate total discounts from payment items
-            $totalDiscounts = 0;
-            $discountDetails = [];
-            if ($fee->paymentItems) {
-                foreach ($fee->paymentItems as $item) {
-                    if ($item->payment && $item->payment->discounts) {
-                        foreach ($item->payment->discounts as $discount) {
-                            $totalDiscounts += $discount->discount_amount;
-                            $discountDetails[] = [
-                                'rule' => $discount->rule->name ?? 'Unknown',
-                                'amount' => $discount->discount_amount,
-                                'formatted_amount' => '₱' . number_format($discount->discount_amount, 2),
-                            ];
-                        }
-                    }
-                }
-            }
-
             $data = [
                 'fee' => $fee,
                 'payer' => $payer,
                 'payer_name' => $payerName,
                 'issued_by_name' => $issuedByName,
-                'total_discounts' => $totalDiscounts,
-                'formatted_total_discounts' => '₱' . number_format($totalDiscounts, 2),
-                'discount_details' => $discountDetails,
                 'barangay' => [
                     'name' => config('app.barangay_name', 'Barangay Management System'),
                     'address' => config('app.barangay_address', ''),
@@ -463,37 +435,31 @@ class FeeShowController extends Controller
                     'position' => Auth::user()->role ?? 'Barangay Staff',
                 ],
                 'print_date' => now()->format('F j, Y h:i A'),
-                'type' => $type,
             ];
 
-            $filename = "{$type}-{$fee->fee_code}.pdf";
-            $view = 'pdf.fee-receipt';
+            $filename = "certificate-{$fee->certificate_number}.pdf";
             
+            // Try to load certificate view, fallback to simple view
             try {
-                $pdf = Pdf::loadView($view, $data);
+                $pdf = Pdf::loadView('pdf.fee-certificate', $data);
             } catch (\Exception $e) {
-                Log::warning('PDF view not found, using simple view', ['error' => $e->getMessage()]);
-                $html = view('pdf.fee-simple', $data)->render();
+                Log::warning('Certificate PDF view not found', ['error' => $e->getMessage()]);
+                $html = view('pdf.certificate-simple', $data)->render();
                 $pdf = Pdf::loadHTML($html);
             }
 
             $pdf->setPaper('A4', 'portrait');
-
-            if ($action === 'download') {
-                return $pdf->download($filename);
-            }
-
-            return $pdf->stream($filename);
+            return $pdf->download($filename);
 
         } catch (\Exception $e) {
-            Log::error('Fee print failed', [
+            Log::error('Certificate download failed', [
                 'user_id' => Auth::id(),
                 'fee_id' => $fee->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return back()->with('error', 'Failed to generate document. Please try again.');
+            return back()->with('error', 'Failed to download certificate. Please try again.');
         }
     }
 }

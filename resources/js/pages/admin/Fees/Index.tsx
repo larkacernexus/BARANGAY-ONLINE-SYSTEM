@@ -136,7 +136,7 @@ export default function FeesIndex({
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // ===== ADDED MISSING HANDLERS =====
+    // ===== ALL HANDLERS =====
     const handleViewDetails = (fee: any) => {
         router.get(route('admin.fees.show', fee.id));
     };
@@ -163,7 +163,21 @@ export default function FeesIndex({
     const handleClearSelection = () => {
         setIsBulkMode(false);
     };
-    // ===== END ADDED HANDLERS =====
+
+    // ADD THIS MISSING HANDLER
+    const handleRemindersSent = () => {
+        // Refresh data after sending reminders
+        router.reload({ only: ['fees', 'stats'] });
+    };
+
+    // Check if there are fees to send reminders for
+    const hasFeesForReminders = () => {
+        if (isBulkMode && selectedFees.length > 0) {
+            return true;
+        }
+        return paginatedFees.some((fee: any) => fee.status !== 'paid');
+    };
+    // ===== END HANDLERS =====
 
     return (
         <AppLayout
@@ -172,11 +186,6 @@ export default function FeesIndex({
                 { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Fees', href: '/admin/fees' }
             ]}
-            actions={
-                <div className="flex items-center gap-2">
-                    {/* Export button could go here */}
-                </div>
-            }
         >
             <TooltipProvider>
                 <div className="space-y-6">
@@ -213,10 +222,14 @@ export default function FeesIndex({
                         />
                     )}
                     
-                    {/* Header */}
+                    {/* Header with all required props */}
                     <FeesHeader 
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
+                        isMobile={isMobile}
+                        selectedFees={selectedFees}
+                        onRemindersSent={handleRemindersSent}
+                        paginatedFees={paginatedFees}
                     />
                     
                     {/* Stats Cards */}
@@ -245,7 +258,7 @@ export default function FeesIndex({
                         onSelectAll={handleSelectAll}
                     />
                     
-                    {/* Main Content - FIXED: Added all missing props */}
+                    {/* Main Content */}
                     <FeesContent
                         fees={paginatedFees}
                         isBulkMode={isBulkMode}

@@ -756,7 +756,7 @@ Route::middleware(['auth', 'verified', 'resident'])->group(function () {
     // ====================
     // RESIDENT PAYMENTS
     // ====================
-    Route::prefix('my-payments')->name('my.payments.')->group(function () {
+    Route::prefix('payments')->name('my.payments.')->group(function () {
         Route::get('/', [ResidentPaymentController::class, 'index'])->name('index');
         Route::get('/pay', [ResidentPaymentController::class, 'create'])->name('create');
         Route::post('/pay', [ResidentPaymentController::class, 'store'])->name('store');

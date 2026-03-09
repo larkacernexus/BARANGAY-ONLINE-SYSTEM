@@ -1,286 +1,1004 @@
+// pages/admin/Announcements/Edit.tsx
+
+import { useState, useEffect, useCallback } from 'react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { route } from 'ziggy-js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Save, Bell, AlertCircle, Calendar, Clock, Eye } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import AudienceTarget from '@/components/admin/announcements/AudienceTarget';
+import { Badge } from '@/components/ui/badge';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+    ArrowLeft,
+    Save,
+    Bell,
+    AlertCircle,
+    Calendar,
+    Clock,
+    Megaphone,
+    Eye,
+    Settings,
+    Wrench,
+    Tag,
+    CalendarClock,
+    Users,
+    MapPin,
+    Home,
+    Briefcase,
+    UserCog,
+    Globe,
+    Trash2,
+    Copy,
+    Loader2,
+    AlertTriangle
+} from 'lucide-react';
+import { route } from 'ziggy-js';
 
+// Types
 interface Announcement {
+    created_at: string | number | Date;
     id: number;
     title: string;
     content: string;
     type: string;
     priority: number;
     is_active: boolean;
+    audience_type: string;
+    target_roles: number[];
+    target_puroks: number[];
+    target_households: number[];
+    target_businesses: number[];
+    target_users: number[];
     start_date: string | null;
+    start_time: string | null;
     end_date: string | null;
-    created_at: string;
-    updated_at: string;
+    end_time: string | null;
 }
 
-interface Props {
+interface FlashMessage {
+    success?: string;
+    error?: string;
+    warning?: string;
+    info?: string;
+}
+
+interface EditAnnouncementProps {
     announcement: Announcement;
     types: Record<string, string>;
     priorities: Record<string, string>;
+    audience_types: Record<string, string>;
+    roles: Array<{ id: number; name: string }>;
+    puroks: Array<{ id: number; name: string }>;
+    households: Array<{ id: number; household_number: string; purok?: { name: string } }>;
+    businesses: Array<{ id: number; business_name: string; owner_name?: string }>;
+    users: Array<{ id: number; first_name: string; last_name: string; email: string; role?: { name: string } }>;
 }
 
-export default function AnnouncementsEdit({ announcement, types, priorities }: Props) {
-    const { data, setData, put, processing, errors } = useForm({
+interface FormData {
+    title: string;
+    content: string;
+    type: string;
+    priority: number;
+    is_active: boolean;
+    audience_type: string;
+    target_roles: number[];
+    target_puroks: number[];
+    target_households: number[];
+    target_businesses: number[];
+    target_users: number[];
+    start_date: string;
+    start_time: string;
+    end_date: string;
+    end_time: string;
+}
+
+export default function EditAnnouncement({ 
+    announcement,
+    types, 
+    priorities,
+    audience_types,
+    roles,
+    puroks,
+    households,
+    businesses,
+    users
+}: EditAnnouncementProps) {
+    const { flash } = usePage().props as unknown as { flash: FlashMessage };
+    const [activeTab, setActiveTab] = useState('content');
+    const [showStartTime, setShowStartTime] = useState(!!announcement.start_time);
+    const [showEndTime, setShowEndTime] = useState(!!announcement.end_time);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const { data, setData, put, processing, errors, reset } = useForm<FormData>({
         title: announcement.title,
         content: announcement.content,
         type: announcement.type,
         priority: announcement.priority,
         is_active: announcement.is_active,
+        audience_type: announcement.audience_type,
+        target_roles: announcement.target_roles || [],
+        target_puroks: announcement.target_puroks || [],
+        target_households: announcement.target_households || [],
+        target_businesses: announcement.target_businesses || [],
+        target_users: announcement.target_users || [],
         start_date: announcement.start_date || '',
+        start_time: announcement.start_time || '',
         end_date: announcement.end_date || '',
+        end_time: announcement.end_time || '',
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    // Flash messages
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+        if (flash?.warning) {
+            toast.warning(flash.warning);
+        }
+        if (flash?.info) {
+            toast.info(flash.info);
+        }
+    }, [flash]);
+
+    // Auto-set end date if not set
+    useEffect(() => {
+        if (data.start_date && !data.end_date) {
+            const startDate = new Date(data.start_date);
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + 30);
+            
+            const formattedEndDate = endDate.toISOString().split('T')[0];
+            setData('end_date', formattedEndDate);
+            
+            toast.info('End date auto-set to 30 days from start date');
+        }
+    }, [data.start_date]);
+
+    // Validate end date is after start date
+    useEffect(() => {
+        if (data.start_date && data.end_date) {
+            const start = new Date(data.start_date);
+            const end = new Date(data.end_date);
+            
+            if (end < start) {
+                toast.error('End date cannot be before start date');
+                setData('end_date', data.start_date);
+            }
+        }
+    }, [data.start_date, data.end_date]);
+
+    const validateForm = useCallback((): boolean => {
+        if (!data.title.trim()) {
+            toast.error('Title is required');
+            setActiveTab('content');
+            return false;
+        }
+
+        if (data.title.length < 3) {
+            toast.error('Title must be at least 3 characters');
+            setActiveTab('content');
+            return false;
+        }
+
+        if (!data.content.trim()) {
+            toast.error('Content is required');
+            setActiveTab('content');
+            return false;
+        }
+
+        if (data.content.length < 10) {
+            toast.error('Content must be at least 10 characters');
+            setActiveTab('content');
+            return false;
+        }
+        
+        // Validate audience selections
+        switch (data.audience_type) {
+            case 'roles':
+                if (data.target_roles.length === 0) {
+                    toast.error('Please select at least one role');
+                    setActiveTab('audience');
+                    return false;
+                }
+                break;
+            case 'puroks':
+                if (data.target_puroks.length === 0) {
+                    toast.error('Please select at least one purok');
+                    setActiveTab('audience');
+                    return false;
+                }
+                break;
+            case 'households':
+            case 'household_members':
+                if (data.target_households.length === 0) {
+                    toast.error('Please select at least one household');
+                    setActiveTab('audience');
+                    return false;
+                }
+                break;
+            case 'businesses':
+                if (data.target_businesses.length === 0) {
+                    toast.error('Please select at least one business');
+                    setActiveTab('audience');
+                    return false;
+                }
+                break;
+            case 'specific_users':
+                if (data.target_users.length === 0) {
+                    toast.error('Please select at least one user');
+                    setActiveTab('audience');
+                    return false;
+                }
+                break;
+        }
+
+        // Validate dates if provided
+        if (data.start_date && data.end_date) {
+            const start = new Date(data.start_date);
+            const end = new Date(data.end_date);
+            
+            if (end < start) {
+                toast.error('End date must be after start date');
+                setActiveTab('settings');
+                return false;
+            }
+        }
+        
+        return true;
+    }, [data]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        put(route('admin.announcements.update', announcement.id));
+        
+        if (!validateForm()) return;
+        
+        setIsSubmitting(true);
+        
+        const submissionData = {
+            ...data,
+            start_time: showStartTime ? data.start_time : null,
+            end_time: showEndTime ? data.end_time : null,
+            // Ensure arrays are properly formatted
+            target_roles: data.target_roles.map(Number),
+            target_puroks: data.target_puroks.map(Number),
+            target_households: data.target_households.map(Number),
+            target_businesses: data.target_businesses.map(Number),
+            target_users: data.target_users.map(Number),
+        };
+        
+        try {
+            await put(route('admin.announcements.update', announcement.id), {
+                data: submissionData,
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Announcement updated successfully');
+                    setIsSubmitting(false);
+                },
+                onError: (errors) => {
+                    console.error('Update errors:', errors);
+                    
+                    // Handle specific error cases
+                    if (errors.title) {
+                        setActiveTab('content');
+                    } else if (errors.content) {
+                        setActiveTab('content');
+                    } else if (errors.audience_type || Object.keys(errors).some(key => key.startsWith('target_'))) {
+                        setActiveTab('audience');
+                    }
+                    
+                    toast.error('Please check the form for errors');
+                    setIsSubmitting(false);
+                }
+            });
+        } catch (error) {
+            console.error('Submission error:', error);
+            toast.error('An unexpected error occurred');
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleDuplicate = () => {
+        setShowDuplicateDialog(true);
+    };
+
+    const confirmDuplicate = () => {
+        router.post(route('admin.announcements.duplicate', announcement.id), {}, {
+            onSuccess: () => {
+                toast.success('Announcement duplicated successfully');
+                setShowDuplicateDialog(false);
+            },
+            onError: () => {
+                toast.error('Failed to duplicate announcement');
+                setShowDuplicateDialog(false);
+            }
+        });
+    };
+
+    const handleDelete = () => {
+        setShowDeleteDialog(true);
+    };
+
+    const confirmDelete = () => {
+        router.delete(route('admin.announcements.destroy', announcement.id), {
+            onSuccess: () => {
+                toast.success('Announcement deleted successfully');
+                router.visit(route('admin.announcements.index'));
+            },
+            onError: () => {
+                toast.error('Failed to delete announcement');
+                setShowDeleteDialog(false);
+            }
+        });
+    };
+
+    const handleReset = () => {
+        if (confirm('Reset all changes to the original values?')) {
+            reset();
+            setShowStartTime(!!announcement.start_time);
+            setShowEndTime(!!announcement.end_time);
+            toast.info('Form has been reset');
+        }
+    };
+
+    const handleToggleTimes = () => {
+        setShowStartTime(!showStartTime);
+        setShowEndTime(!showEndTime);
+        
+        if (!showStartTime && !showEndTime) {
+            toast.info('Time fields enabled');
+        } else if (showStartTime && showEndTime) {
+            toast.info('Time fields disabled');
+        }
+    };
+
+    const formatDateTimePreview = (date: string, time: string, showTime: boolean): string => {
+        if (!date) return 'Not set';
+        
+        try {
+            const dateObj = new Date(date);
+            const formattedDate = dateObj.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            if (showTime && time) {
+                const [hours, minutes] = time.split(':');
+                const hour = parseInt(hours, 10);
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const displayHour = hour % 12 || 12;
+                return `${formattedDate} at ${displayHour}:${minutes} ${ampm}`;
+            }
+            
+            return formattedDate;
+        } catch (error) {
+            console.error('Date formatting error:', error);
+            return 'Invalid date';
+        }
     };
 
     const getPriorityColor = (priority: number): string => {
         switch (priority) {
-            case 4: return 'text-red-600 bg-red-50 border-red-200';
-            case 3: return 'text-orange-600 bg-orange-50 border-orange-200';
-            case 2: return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-            case 1: return 'text-blue-600 bg-blue-50 border-blue-200';
-            default: return 'text-gray-600 bg-gray-50 border-gray-200';
+            case 4: return 'text-red-600 bg-red-50 border-red-200 dark:bg-red-950 dark:text-red-400';
+            case 3: return 'text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-950 dark:text-orange-400';
+            case 2: return 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400';
+            case 1: return 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950 dark:text-blue-400';
+            default: return 'text-gray-600 bg-gray-50 border-gray-200 dark:bg-gray-800 dark:text-gray-400';
         }
     };
 
-    const formatDateForInput = (dateString: string | null) => {
-        if (!dateString) return '';
-        return dateString.split('T')[0];
+    const getTypeColor = (type: string): string => {
+        switch (type) {
+            case 'important': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+            case 'event': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+            case 'maintenance': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
+            case 'other': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+            default: return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+        }
     };
 
+    const getTypeIcon = (type: string) => {
+        switch (type) {
+            case 'important': return AlertCircle;
+            case 'event': return Calendar;
+            case 'maintenance': return Wrench;
+            case 'other': return Tag;
+            default: return Bell;
+        }
+    };
+
+    const getAudienceIcon = (type: string) => {
+        switch (type) {
+            case 'roles': return Users;
+            case 'puroks': return MapPin;
+            case 'households': return Home;
+            case 'household_members': return Users;
+            case 'businesses': return Briefcase;
+            case 'specific_users': return UserCog;
+            default: return Globe;
+        }
+    };
+
+    const getAudienceCount = (): number => {
+        switch (data.audience_type) {
+            case 'roles': return data.target_roles.length;
+            case 'puroks': return data.target_puroks.length;
+            case 'households':
+            case 'household_members': return data.target_households.length;
+            case 'businesses': return data.target_businesses.length;
+            case 'specific_users': return data.target_users.length;
+            default: return 0;
+        }
+    };
+
+    const typeOptions = Object.entries(types).map(([value, label]) => ({ value, label }));
+    const priorityOptions = Object.entries(priorities).map(([value, label]) => ({ 
+        value: parseInt(value, 10), 
+        label 
+    }));
+
+    const isProcessing = processing || isSubmitting;
+
     return (
-        <AppLayout
-            title={`Edit Announcement: ${announcement.title}`}
-            breadcrumbs={[
-                { title: 'Dashboard', href: route('admin.dashboard') },
-                { title: 'Announcements', href: route('admin.announcements.index') },
-                { title: 'Edit', href: route('admin.announcements.edit', announcement.id) }
-            ]}
-        >
-            <Head title={`Edit Announcement: ${announcement.title}`} />
-
-            <div className="max-w-4xl mx-auto">
-                <div className="mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <Link href={route('admin.announcements.index')}>
-                            <Button variant="outline">
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back to Announcements
+        <>
+            <AppLayout
+                title={`Edit: ${announcement.title}`}
+                breadcrumbs={[
+                    { title: 'Dashboard', href: route('admin.dashboard') },
+                    { title: 'Announcements', href: route('admin.announcements.index') },
+                    { title: announcement.title, href: route('admin.announcements.show', announcement.id) },
+                    { title: 'Edit', href: route('admin.announcements.edit', announcement.id) }
+                ]}
+            >
+                <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <Link href={route('admin.announcements.show', announcement.id)}>
+                                <Button variant="ghost" size="sm" type="button">
+                                    <ArrowLeft className="h-4 w-4 mr-2" />
+                                    Back
+                                </Button>
+                            </Link>
+                            <div>
+                                <h1 className="text-3xl font-bold tracking-tight">Edit Announcement</h1>
+                                <p className="text-gray-500 dark:text-gray-400">
+                                    Update announcement details and audience targeting
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={handleDuplicate}
+                                disabled={isProcessing}
+                            >
+                                <Copy className="h-4 w-4 mr-2" />
+                                Duplicate
                             </Button>
-                        </Link>
-                        <Link href={route('admin.announcements.show', announcement.id)}>
-                            <Button variant="outline">
-                                <Eye className="h-4 w-4 mr-2" />
-                                View
+                            <Button 
+                                type="button" 
+                                variant="destructive" 
+                                onClick={handleDelete}
+                                disabled={isProcessing}
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
                             </Button>
-                        </Link>
+                            <Button 
+                                type="submit" 
+                                disabled={isProcessing}
+                                className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
+                            >
+                                {isProcessing ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Updating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="h-4 w-4 mr-2" />
+                                        Update
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight">Edit Announcement</h1>
-                    <p className="text-gray-500 mt-2">
-                        Last updated: {new Date(announcement.updated_at).toLocaleDateString()}
-                    </p>
-                </div>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="grid gap-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Bell className="h-5 w-5" />
-                                    Basic Information
-                                </CardTitle>
-                                <CardDescription>
-                                    Update the announcement details that will be displayed to residents
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="title">Title *</Label>
-                                    <Input
-                                        id="title"
-                                        value={data.title}
-                                        onChange={(e) => setData('title', e.target.value)}
-                                        placeholder="Enter announcement title"
-                                        className={errors.title ? 'border-red-300' : ''}
-                                    />
-                                    {errors.title && (
-                                        <p className="text-red-500 text-sm">{errors.title}</p>
-                                    )}
-                                </div>
+                    {/* Error Summary */}
+                    {Object.keys(errors).length > 0 && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded dark:bg-red-950 dark:border-red-800 dark:text-red-400">
+                            <div className="flex items-center gap-2 mb-2">
+                                <AlertTriangle className="h-5 w-5" />
+                                <p className="font-bold">Please fix the following errors:</p>
+                            </div>
+                            <ul className="list-disc list-inside mt-2 space-y-1">
+                                {Object.entries(errors).map(([field, error]) => (
+                                    <li key={field} className="text-sm">
+                                        <span className="font-medium capitalize">{field.replace(/_/g, ' ')}:</span>{' '}
+                                        {error as string}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="content">Content *</Label>
-                                    <Textarea
-                                        id="content"
-                                        value={data.content}
-                                        onChange={(e) => setData('content', e.target.value)}
-                                        placeholder="Enter announcement content..."
-                                        rows={6}
-                                        className={errors.content ? 'border-red-300' : ''}
-                                    />
-                                    {errors.content && (
-                                        <p className="text-red-500 text-sm">{errors.content}</p>
-                                    )}
-                                    <p className="text-sm text-gray-500">
-                                        Supports basic HTML formatting. Keep content clear and concise.
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
+                    {/* Unsaved Changes Warning */}
+                    {!isProcessing && (
+                        <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-2 rounded text-sm dark:bg-yellow-950 dark:border-yellow-800 dark:text-yellow-400">
+                            <p>You have unsaved changes. Don't forget to save your updates.</p>
+                        </div>
+                    )}
 
-                        <div className="grid md:grid-cols-2 gap-6">
+                    {/* Main Content Tabs */}
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                        <TabsList className="grid grid-cols-3 w-full max-w-md">
+                            <TabsTrigger value="content" type="button">Content</TabsTrigger>
+                            <TabsTrigger value="settings" type="button">Settings</TabsTrigger>
+                            <TabsTrigger value="audience" type="button">Audience</TabsTrigger>
+                        </TabsList>
+
+                        {/* Content Tab */}
+                        <TabsContent value="content" className="space-y-6">
                             <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
-                                        <AlertCircle className="h-5 w-5" />
-                                        Type & Priority
+                                        <Megaphone className="h-5 w-5" />
+                                        Announcement Content
                                     </CardTitle>
                                     <CardDescription>
-                                        Categorize and prioritize your announcement
+                                        What residents will see when viewing this announcement
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="type">Announcement Type</Label>
-                                        <Select
-                                            value={data.type}
-                                            onValueChange={(value) => setData('type', value)}
-                                        >
-                                            <SelectTrigger className={errors.type ? 'border-red-300' : ''}>
-                                                <SelectValue placeholder="Select type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Object.entries(types).map(([value, label]) => (
-                                                    <SelectItem key={value} value={value}>
-                                                        {label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {errors.type && (
-                                            <p className="text-red-500 text-sm">{errors.type}</p>
+                                        <Label htmlFor="title">
+                                            Title <span className="text-red-500">*</span>
+                                        </Label>
+                                        <Input 
+                                            id="title" 
+                                            placeholder="e.g., Important: Water Service Interruption" 
+                                            value={data.title}
+                                            onChange={(e) => setData('title', e.target.value)}
+                                            className={`text-lg font-medium ${errors.title ? 'border-red-500' : ''}`}
+                                            maxLength={255}
+                                            disabled={isProcessing}
+                                        />
+                                        {errors.title && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.title}</p>
                                         )}
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-gray-500">
+                                                Make the title clear and attention-grabbing
+                                            </span>
+                                            <span className={data.title.length > 200 ? 'text-orange-500' : 'text-gray-500'}>
+                                                {data.title.length}/255 characters
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="priority">Priority Level</Label>
-                                        <Select
-                                            value={data.priority.toString()}
-                                            onValueChange={(value) => setData('priority', parseInt(value))}
-                                        >
-                                            <SelectTrigger className={errors.priority ? 'border-red-300' : ''}>
-                                                <SelectValue placeholder="Select priority" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Object.entries(priorities).map(([value, label]) => (
-                                                    <SelectItem key={value} value={value}>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`px-2 py-1 rounded text-xs ${getPriorityColor(parseInt(value))}`}>
-                                                                {label}
-                                                            </span>
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {errors.priority && (
-                                            <p className="text-red-500 text-sm">{errors.priority}</p>
+                                        <Label htmlFor="content">
+                                            Content <span className="text-red-500">*</span>
+                                        </Label>
+                                        <Textarea 
+                                            id="content" 
+                                            placeholder="Enter the full announcement details here..."
+                                            rows={8}
+                                            value={data.content}
+                                            onChange={(e) => setData('content', e.target.value)}
+                                            className={`min-h-[200px] font-mono ${errors.content ? 'border-red-500' : ''}`}
+                                            disabled={isProcessing}
+                                        />
+                                        {errors.content && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.content}</p>
                                         )}
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-gray-500">
+                                                Supports plain text. Keep it clear and concise.
+                                            </span>
+                                            <span className={data.content.length > 1000 ? 'text-orange-500' : 'text-gray-500'}>
+                                                {data.content.length} characters
+                                            </span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* Settings Tab */}
+                        <TabsContent value="settings" className="space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Settings className="h-5 w-5" />
+                                        Announcement Settings
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Configure how and when the announcement appears to users
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="type">
+                                                Type <span className="text-red-500">*</span>
+                                            </Label>
+                                            <Select 
+                                                value={data.type}
+                                                onValueChange={(value) => setData('type', value)}
+                                                disabled={isProcessing}
+                                            >
+                                                <SelectTrigger id="type" className={errors.type ? 'border-red-500' : ''}>
+                                                    <SelectValue placeholder="Select type" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {typeOptions.map((type) => {
+                                                        const IconComponent = getTypeIcon(type.value);
+                                                        return (
+                                                            <SelectItem key={type.value} value={type.value}>
+                                                                <div className="flex items-center gap-2">
+                                                                    <IconComponent className="h-4 w-4" />
+                                                                    {type.label}
+                                                                </div>
+                                                            </SelectItem>
+                                                        );
+                                                    })}
+                                                </SelectContent>
+                                            </Select>
+                                            {errors.type && (
+                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.type}</p>
+                                            )}
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="priority">
+                                                Priority Level <span className="text-red-500">*</span>
+                                            </Label>
+                                            <Select 
+                                                value={data.priority.toString()}
+                                                onValueChange={(value) => setData('priority', parseInt(value, 10))}
+                                                disabled={isProcessing}
+                                            >
+                                                <SelectTrigger id="priority" className={errors.priority ? 'border-red-500' : ''}>
+                                                    <SelectValue placeholder="Select priority" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {priorityOptions.map((priority) => (
+                                                        <SelectItem key={priority.value} value={priority.value.toString()}>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`px-2 py-1 rounded text-xs ${getPriorityColor(priority.value)}`}>
+                                                                    {priority.label}
+                                                                </span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            {errors.priority && (
+                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.priority}</p>
+                                            )}
+                                        </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between pt-2">
+                                    <Separator />
+
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-base font-medium">Schedule Settings</Label>
+                                            <Button 
+                                                type="button" 
+                                                variant="outline" 
+                                                size="sm"
+                                                onClick={handleToggleTimes}
+                                                disabled={isProcessing}
+                                            >
+                                                <CalendarClock className="h-4 w-4 mr-2" />
+                                                {showStartTime || showEndTime ? 'Disable Times' : 'Enable Times'}
+                                            </Button>
+                                        </div>
+                                        
+                                        {/* Start Date & Time */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-sm font-medium">Start Date & Time</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Switch
+                                                        id="show-start-time"
+                                                        checked={showStartTime}
+                                                        onCheckedChange={setShowStartTime}
+                                                        disabled={isProcessing}
+                                                    />
+                                                    <Label htmlFor="show-start-time" className="text-sm text-gray-500 cursor-pointer">
+                                                        Add specific time
+                                                    </Label>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="grid gap-4 md:grid-cols-2">
+                                                <div className="space-y-2">
+                                                    <Input 
+                                                        id="start_date" 
+                                                        type="date" 
+                                                        value={data.start_date}
+                                                        onChange={(e) => setData('start_date', e.target.value)}
+                                                        min={new Date().toISOString().split('T')[0]}
+                                                        className={errors.start_date ? 'border-red-500' : ''}
+                                                        disabled={isProcessing}
+                                                    />
+                                                    {errors.start_date && (
+                                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.start_date}</p>
+                                                    )}
+                                                </div>
+                                                
+                                                {showStartTime && (
+                                                    <div className="space-y-2">
+                                                        <Input 
+                                                            id="start_time" 
+                                                            type="time" 
+                                                            value={data.start_time}
+                                                            onChange={(e) => setData('start_time', e.target.value)}
+                                                            className={errors.start_time ? 'border-red-500' : ''}
+                                                            disabled={isProcessing || !data.start_date}
+                                                        />
+                                                        {errors.start_time && (
+                                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.start_time}</p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* End Date & Time */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-sm font-medium">End Date & Time</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Switch
+                                                        id="show-end-time"
+                                                        checked={showEndTime}
+                                                        onCheckedChange={setShowEndTime}
+                                                        disabled={isProcessing}
+                                                    />
+                                                    <Label htmlFor="show-end-time" className="text-sm text-gray-500 cursor-pointer">
+                                                        Add specific time
+                                                    </Label>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="grid gap-4 md:grid-cols-2">
+                                                <div className="space-y-2">
+                                                    <Input 
+                                                        id="end_date" 
+                                                        type="date" 
+                                                        value={data.end_date}
+                                                        onChange={(e) => setData('end_date', e.target.value)}
+                                                        min={data.start_date || new Date().toISOString().split('T')[0]}
+                                                        className={errors.end_date ? 'border-red-500' : ''}
+                                                        disabled={isProcessing}
+                                                    />
+                                                    {errors.end_date && (
+                                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.end_date}</p>
+                                                    )}
+                                                </div>
+                                                
+                                                {showEndTime && (
+                                                    <div className="space-y-2">
+                                                        <Input 
+                                                            id="end_time" 
+                                                            type="time" 
+                                                            value={data.end_time}
+                                                            onChange={(e) => setData('end_time', e.target.value)}
+                                                            className={errors.end_time ? 'border-red-500' : ''}
+                                                            disabled={isProcessing || !data.end_date}
+                                                        />
+                                                        {errors.end_time && (
+                                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.end_time}</p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <p className="text-sm text-gray-500">
+                                            {!data.start_date && !data.end_date && 'Leave dates empty for immediate and indefinite display'}
+                                            {data.start_date && !data.end_date && 'Announcement will start on selected date and continue indefinitely'}
+                                            {!data.start_date && data.end_date && 'Announcement will start immediately and end on selected date'}
+                                            {data.start_date && data.end_date && 'Announcement will be active between selected dates'}
+                                        </p>
+                                    </div>
+
+                                    <Separator />
+
+                                    <div className="flex items-center justify-between">
                                         <div className="space-y-0.5">
                                             <Label htmlFor="is_active">Active Status</Label>
                                             <p className="text-sm text-gray-500">
-                                                Set announcement as active/inactive
+                                                Announcement will be visible to residents when active
                                             </p>
                                         </div>
-                                        <Switch
+                                        <Switch 
                                             id="is_active"
                                             checked={data.is_active}
                                             onCheckedChange={(checked) => setData('is_active', checked)}
+                                            disabled={isProcessing}
                                         />
                                     </div>
                                 </CardContent>
                             </Card>
+                        </TabsContent>
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Calendar className="h-5 w-5" />
-                                        Schedule & Duration
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Set when the announcement should be displayed
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="start_date">Start Date (Optional)</Label>
-                                        <Input
-                                            id="start_date"
-                                            type="date"
-                                            value={data.start_date}
-                                            onChange={(e) => setData('start_date', e.target.value)}
-                                            className={errors.start_date ? 'border-red-300' : ''}
-                                        />
-                                        {errors.start_date && (
-                                            <p className="text-red-500 text-sm">{errors.start_date}</p>
-                                        )}
-                                    </div>
+                        {/* Audience Tab */}
+                        <TabsContent value="audience" className="space-y-6">
+                            <AudienceTarget
+                                value={{
+                                    audience_type: data.audience_type,
+                                    target_roles: data.target_roles,
+                                    target_puroks: data.target_puroks,
+                                    target_households: data.target_households,
+                                    target_businesses: data.target_businesses,
+                                    target_users: data.target_users,
+                                }}
+                                onChange={(field, value) => setData(field as keyof FormData, value)}
+                                roles={roles}
+                                puroks={puroks}
+                                households={households}
+                                businesses={businesses}
+                                users={users}
+                                errors={errors}
+                                disabled={isProcessing}
+                            />
+                        </TabsContent>
+                    </Tabs>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="end_date">End Date (Optional)</Label>
-                                        <Input
-                                            id="end_date"
-                                            type="date"
-                                            value={data.end_date}
-                                            onChange={(e) => setData('end_date', e.target.value)}
-                                            className={errors.end_date ? 'border-red-300' : ''}
-                                            min={data.start_date}
-                                        />
-                                        {errors.end_date && (
-                                            <p className="text-red-500 text-sm">{errors.end_date}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Clock className="h-4 w-4 text-blue-600" />
-                                            <h4 className="font-medium text-blue-800">Current Status</h4>
+                    {/* Live Preview */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Eye className="h-5 w-5" />
+                                Live Preview
+                            </CardTitle>
+                            <CardDescription>
+                                How the announcement will appear to targeted users
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="border rounded-lg p-6 bg-white shadow-sm dark:bg-gray-900">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className={`p-3 rounded-lg ${getTypeColor(data.type)}`}>
+                                            {(() => {
+                                                const IconComponent = getTypeIcon(data.type);
+                                                return <IconComponent className="h-5 w-5" />;
+                                            })()}
                                         </div>
-                                        <div className="text-sm text-blue-700 space-y-1">
-                                            <p>• Created: {new Date(announcement.created_at).toLocaleDateString()}</p>
-                                            <p>• Last Updated: {new Date(announcement.updated_at).toLocaleDateString()}</p>
-                                            <p>• Current Status: {announcement.is_active ? 'Active' : 'Inactive'}</p>
+                                        <div>
+                                            <h3 className="font-bold text-lg">
+                                                {data.title || "Announcement Title"}
+                                            </h3>
+                                            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-1">
+                                                <Calendar className="h-3 w-3" />
+                                                <span>Posted: {new Date().toLocaleDateString()}</span>
+                                                <span>•</span>
+                                                <span className={`font-medium ${getPriorityColor(data.priority)} px-2 py-1 rounded-full text-xs`}>
+                                                    {priorities[data.priority.toString()] || 'Normal'} Priority
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                </CardContent>
-                            </Card>
+                                    {data.is_active ? (
+                                        <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                            Active
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="secondary">Inactive</Badge>
+                                    )}
+                                </div>
+
+                                {/* Audience Badge */}
+                                <div className="mb-3 flex flex-wrap items-center gap-2">
+                                    <Badge variant="outline" className="flex items-center gap-1">
+                                        {(() => {
+                                            const IconComponent = getAudienceIcon(data.audience_type);
+                                            return <IconComponent className="h-3 w-3" />;
+                                        })()}
+                                        {audience_types[data.audience_type] || 'All Users'}
+                                    </Badge>
+                                    {data.audience_type !== 'all' && (
+                                        <Badge variant="secondary" className="text-xs">
+                                            {getAudienceCount()} {data.audience_type.replace('_', ' ')} selected
+                                        </Badge>
+                                    )}
+                                </div>
+
+                                <div className="border-t pt-4">
+                                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                                        {data.content || "Announcement content will appear here..."}
+                                    </p>
+                                </div>
+
+                                {(data.start_date || data.end_date) && (
+                                    <div className="mt-4 pt-4 border-t">
+                                        <div className="grid gap-4 md:grid-cols-2 text-sm">
+                                            {data.start_date && (
+                                                <div className="flex items-center gap-2">
+                                                    <Calendar className="h-4 w-4 text-gray-400" />
+                                                    <div>
+                                                        <div className="font-medium">Starts</div>
+                                                        <div className="text-gray-500">
+                                                            {formatDateTimePreview(data.start_date, data.start_time, showStartTime)}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {data.end_date && (
+                                                <div className="flex items-center gap-2">
+                                                    <Clock className="h-4 w-4 text-gray-400" />
+                                                    <div>
+                                                        <div className="font-medium">Ends</div>
+                                                        <div className="text-gray-500">
+                                                            {formatDateTimePreview(data.end_date, data.end_time, showEndTime)}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Form Actions */}
+                    <div className="flex items-center justify-between pt-6 border-t">
+                        <div>
+                            <Button 
+                                variant="ghost" 
+                                type="button" 
+                                onClick={handleReset}
+                                disabled={isProcessing}
+                            >
+                                Reset Changes
+                            </Button>
                         </div>
-
-                        <div className="flex justify-end gap-3 pt-4">
-                            <Link href={route('admin.announcements.index')}>
-                                <Button type="button" variant="outline" disabled={processing}>
+                        <div className="flex items-center gap-2">
+                            <Link href={route('admin.announcements.show', announcement.id)}>
+                                <Button variant="outline" type="button" disabled={isProcessing}>
                                     Cancel
                                 </Button>
                             </Link>
-                            <Button type="submit" disabled={processing}>
-                                {processing ? (
+                            <Button 
+                                type="submit" 
+                                disabled={isProcessing}
+                                className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
+                            >
+                                {isProcessing ? (
                                     <>
-                                        <span className="animate-spin mr-2">⏳</span>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                         Updating...
                                     </>
                                 ) : (
@@ -293,7 +1011,88 @@ export default function AnnouncementsEdit({ announcement, types, priorities }: P
                         </div>
                     </div>
                 </form>
-            </div>
-        </AppLayout>
+            </AppLayout>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                            <Trash2 className="h-5 w-5" />
+                            Delete Announcement
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this announcement? This action cannot be undone.
+                            This will permanently delete:
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4">
+                        <div className="bg-gray-50 p-4 rounded dark:bg-gray-800">
+                            <p className="font-medium">{announcement.title}</p>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Created: {new Date(announcement.created_at).toLocaleDateString()}
+                            </p>
+                        </div>
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={confirmDelete}
+                            className="bg-red-600 hover:bg-red-700"
+                            disabled={isProcessing}
+                        >
+                            {isProcessing ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                'Delete Announcement'
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Duplicate Confirmation Dialog */}
+            <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <Copy className="h-5 w-5" />
+                            Duplicate Announcement
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Create a copy of this announcement? The duplicate will be created with "(Copy)" appended to the title.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4">
+                        <div className="bg-gray-50 p-4 rounded dark:bg-gray-800">
+                            <p className="font-medium">{announcement.title}</p>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Will be copied to: {announcement.title} (Copy)
+                            </p>
+                        </div>
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={confirmDuplicate}
+                            className="bg-blue-600 hover:bg-blue-700"
+                            disabled={isProcessing}
+                        >
+                            {isProcessing ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Duplicating...
+                                </>
+                            ) : (
+                                'Create Duplicate'
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }

@@ -1,3 +1,8 @@
+// pages/admin/Announcements/Create.tsx
+
+import { useState, useEffect } from 'react';
+import { Link, useForm, usePage } from '@inertiajs/react';
+import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import AudienceTarget from '@/components/admin/announcements/AudienceTarget';
 import { 
     ArrowLeft,
     Save,
@@ -14,54 +24,150 @@ import {
     Calendar,
     Clock,
     Megaphone,
-    FileText,
     Zap,
     Eye,
     Settings,
     Wrench,
     Tag,
-    CalendarClock
+    CalendarClock,
+    Users,
+    Home,
+    MapPin,
+    Briefcase,
+    UserCog,
+    Globe,
+    Paperclip,
+    X,
+    Upload,
+    File,
+    FileImage,
+    FileText,
+    FileSpreadsheet,
+    FileArchive,
+    Loader2,
+    Trash2,
+    Download,
+    Maximize2,
+    Image as ImageIcon,
+    Link as LinkIcon,
+    Info
 } from 'lucide-react';
-import { Link, useForm } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
-import { PageProps } from '@/types';
+import { route } from 'ziggy-js';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
-interface AnnouncementFormData {
-    title: string;
-    content: string;
-    type: 'general' | 'important' | 'event' | 'maintenance' | 'other';
-    priority: number;
-    is_active: boolean;
-    start_date: string;
-    start_time: string;
-    end_date: string;
-    end_time: string;
-}
-
-interface CreateAnnouncementProps extends PageProps {
+interface CreateAnnouncementProps {
     types: Record<string, string>;
     priorities: Record<string, string>;
+    audience_types: Record<string, string>;
+    roles: Array<{ id: number; name: string }>;
+    puroks: Array<{ id: number; name: string }>;
+    households: Array<{ id: number; household_number: string; purok?: { name: string } }>;
+    businesses: Array<{ id: number; business_name: string; owner_name?: string }>;
+    users: Array<{ id: number; first_name: string; last_name: string; email: string; role?: { name: string } }>;
+    maxFileSize?: number;
+    allowedFileTypes?: string[];
 }
+
+interface Attachment {
+    id?: number;
+    file: File;
+    preview?: string;
+    name: string;
+    size: number;
+    type: string;
+    progress?: number;
+    error?: string;
+    isUploading?: boolean;
+    isImage?: boolean;
+}
+
+// Helper function to format file size
+const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+// Helper function to get file icon
+const getFileIcon = (file: File | Attachment) => {
+    const type = file.type;
+    const name = file.name;
+    
+    if (type.includes('image')) return FileImage;
+    if (type.includes('pdf')) return FileText;
+    if (type.includes('word') || name.endsWith('.doc') || name.endsWith('.docx')) return FileText;
+    if (type.includes('excel') || name.endsWith('.xls') || name.endsWith('.xlsx')) return FileSpreadsheet;
+    if (type.includes('zip') || type.includes('rar') || type.includes('7z')) return FileArchive;
+    return File;
+};
 
 export default function CreateAnnouncement({ 
     types, 
-    priorities 
+    priorities,
+    audience_types,
+    roles,
+    puroks,
+    households,
+    businesses,
+    users,
+    maxFileSize = 10,
+    allowedFileTypes = ['image/*', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv']
 }: CreateAnnouncementProps) {
-    const { data, setData, post, processing, errors, reset } = useForm<AnnouncementFormData>({
+    const { flash } = usePage().props as any;
+    const [activeTab, setActiveTab] = useState('content');
+    const [showStartTime, setShowStartTime] = useState(false);
+    const [showEndTime, setShowEndTime] = useState(false);
+    
+    // Attachment state - always initialized as empty array
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [isDragging, setIsDragging] = useState(false);
+    const [previewImage, setPreviewImage] = useState<Attachment | null>(null);
+    const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+
+    // Form state - attachments initialized as empty array
+    const { data, setData, post, processing, errors, reset } = useForm({
         title: '',
         content: '',
         type: 'general',
         priority: 0,
         is_active: true,
+        audience_type: 'all',
+        target_roles: [],
+        target_puroks: [],
+        target_households: [],
+        target_businesses: [],
+        target_users: [],
         start_date: '',
         start_time: '',
         end_date: '',
         end_time: '',
+        attachments: [] as File[], // Initialize as empty array
     });
 
-    // State for showing time fields
-    const [showStartTime, setShowStartTime] = useState(false);
-    const [showEndTime, setShowEndTime] = useState(false);
+    // Flash messages
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash]);
 
     // Auto-set end date to 30 days from start date
     useEffect(() => {
@@ -75,7 +181,276 @@ export default function CreateAnnouncement({
         }
     }, [data.start_date]);
 
-    // Auto-fill today's date if no start date
+    // Clean up preview URLs on unmount - with safe check
+    useEffect(() => {
+        return () => {
+            // Safe check for attachments array
+            if (Array.isArray(attachments) && attachments.length > 0) {
+                attachments.forEach(att => {
+                    if (att?.preview) {
+                        URL.revokeObjectURL(att.preview);
+                    }
+                });
+            }
+        };
+    }, [attachments]);
+
+    // Validate file before adding
+    const validateFile = (file: File): string | null => {
+        // Check file size
+        if (file.size > maxFileSize * 1024 * 1024) {
+            return `File size exceeds ${maxFileSize}MB limit`;
+        }
+
+        // Check file type if allowed types are specified
+        if (allowedFileTypes.length > 0) {
+            const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+            const isAllowed = allowedFileTypes.some(type => {
+                if (type.includes('/*')) {
+                    const mainType = type.split('/')[0];
+                    return file.type.startsWith(mainType);
+                }
+                return type === fileExt || type === file.type;
+            });
+            
+            if (!isAllowed) {
+                return `File type not allowed. Allowed: ${allowedFileTypes.join(', ')}`;
+            }
+        }
+
+        return null;
+    };
+
+    // Handle file selection
+    const handleFileSelect = (files: FileList | null) => {
+        if (!files) return;
+
+        const newAttachments: Attachment[] = [];
+        const newFiles: File[] = [];
+
+        Array.from(files).forEach(file => {
+            // Safe check for duplicates
+            if (Array.isArray(attachments) && attachments.some(att => att.name === file.name && att.size === file.size)) {
+                toast.error(`${file.name} is already added`);
+                return;
+            }
+
+            const error = validateFile(file);
+            
+            const attachment: Attachment = {
+                file,
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                isImage: file.type.startsWith('image/'),
+                error: error || undefined
+            };
+
+            if (file.type.startsWith('image/')) {
+                attachment.preview = URL.createObjectURL(file);
+            }
+
+            if (!error) {
+                newFiles.push(file);
+            }
+
+            newAttachments.push(attachment);
+        });
+
+        // Safe update with existing attachments
+        const currentAttachments = Array.isArray(attachments) ? attachments : [];
+        setAttachments([...currentAttachments, ...newAttachments]);
+        
+        // Safe update for form data
+        const currentFormAttachments = Array.isArray(data.attachments) ? data.attachments : [];
+        setData('attachments', [...currentFormAttachments, ...newFiles]);
+    };
+
+    // Handle file drop
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        handleFileSelect(e.dataTransfer.files);
+    };
+
+    // Handle drag events
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    // Remove attachment
+    const removeAttachment = (index: number) => {
+        // Safe update for attachments state
+        setAttachments(prev => {
+            const current = Array.isArray(prev) ? prev : [];
+            const newAttachments = [...current];
+            if (newAttachments[index]?.preview) {
+                URL.revokeObjectURL(newAttachments[index].preview!);
+            }
+            newAttachments.splice(index, 1);
+            return newAttachments;
+        });
+
+        // Safe update for form data
+        setData('attachments', prev => {
+            const current = Array.isArray(prev) ? prev : [];
+            return current.filter((_, i) => i !== index);
+        });
+    };
+
+    // Clear all attachments
+    const clearAttachments = () => {
+        // Clean up preview URLs
+        if (Array.isArray(attachments) && attachments.length > 0) {
+            attachments.forEach(att => {
+                if (att?.preview) {
+                    URL.revokeObjectURL(att.preview);
+                }
+            });
+        }
+        setAttachments([]);
+        setData('attachments', []);
+    };
+
+    // Validate form before submit
+    const validateForm = () => {
+        if (!data.title.trim()) {
+            toast.error('Title is required');
+            setActiveTab('content');
+            return false;
+        }
+        if (!data.content.trim()) {
+            toast.error('Content is required');
+            setActiveTab('content');
+            return false;
+        }
+        
+        // Check for attachment errors - safe check
+        if (Array.isArray(attachments) && attachments.length > 0) {
+            const hasErrors = attachments.some(att => att.error);
+            if (hasErrors) {
+                toast.error('Please fix attachment errors before publishing');
+                setActiveTab('attachments');
+                return false;
+            }
+        }
+
+        // Validate audience selections
+        switch (data.audience_type) {
+            case 'roles':
+                if (!Array.isArray(data.target_roles) || data.target_roles.length === 0) {
+                    toast.error('Please select at least one role');
+                    setActiveTab('audience');
+                    return false;
+                }
+                break;
+            case 'puroks':
+                if (!Array.isArray(data.target_puroks) || data.target_puroks.length === 0) {
+                    toast.error('Please select at least one purok');
+                    setActiveTab('audience');
+                    return false;
+                }
+                break;
+            case 'households':
+            case 'household_members':
+                if (!Array.isArray(data.target_households) || data.target_households.length === 0) {
+                    toast.error('Please select at least one household');
+                    setActiveTab('audience');
+                    return false;
+                }
+                break;
+            case 'businesses':
+                if (!Array.isArray(data.target_businesses) || data.target_businesses.length === 0) {
+                    toast.error('Please select at least one business');
+                    setActiveTab('audience');
+                    return false;
+                }
+                break;
+            case 'specific_users':
+                if (!Array.isArray(data.target_users) || data.target_users.length === 0) {
+                    toast.error('Please select at least one user');
+                    setActiveTab('audience');
+                    return false;
+                }
+                break;
+        }
+        
+        return true;
+    };
+
+    const handleSubmit = () => {
+        if (!validateForm()) return;
+
+        // Prepare FormData for submission with files
+        const formData = new FormData();
+        
+        // Add all form fields
+        formData.append('title', data.title);
+        formData.append('content', data.content);
+        formData.append('type', data.type);
+        formData.append('priority', data.priority.toString());
+        formData.append('is_active', data.is_active.toString());
+        formData.append('audience_type', data.audience_type);
+        
+        // Add array fields - with safe checks
+        if (Array.isArray(data.target_roles) && data.target_roles.length > 0) {
+            data.target_roles.forEach(id => formData.append('target_roles[]', id.toString()));
+        }
+        
+        if (Array.isArray(data.target_puroks) && data.target_puroks.length > 0) {
+            data.target_puroks.forEach(id => formData.append('target_puroks[]', id.toString()));
+        }
+        
+        if (Array.isArray(data.target_households) && data.target_households.length > 0) {
+            data.target_households.forEach(id => formData.append('target_households[]', id.toString()));
+        }
+        
+        if (Array.isArray(data.target_businesses) && data.target_businesses.length > 0) {
+            data.target_businesses.forEach(id => formData.append('target_businesses[]', id.toString()));
+        }
+        
+        if (Array.isArray(data.target_users) && data.target_users.length > 0) {
+            data.target_users.forEach(id => formData.append('target_users[]', id.toString()));
+        }
+        
+        // Add dates
+        if (data.start_date) formData.append('start_date', data.start_date);
+        if (showStartTime && data.start_time) formData.append('start_time', data.start_time);
+        if (data.end_date) formData.append('end_date', data.end_date);
+        if (showEndTime && data.end_time) formData.append('end_time', data.end_time);
+        
+        // Add attachments - with safe check
+        if (Array.isArray(data.attachments) && data.attachments.length > 0) {
+            data.attachments.forEach((file, index) => {
+                formData.append(`attachments[${index}]`, file);
+            });
+        }
+
+        // Submit using FormData
+        post(route('admin.announcements.store'), {
+            data: formData,
+            preserveScroll: true,
+            onSuccess: () => {
+                reset();
+                clearAttachments();
+                setShowStartTime(false);
+                setShowEndTime(false);
+                setActiveTab('content');
+                toast.success('Announcement created successfully');
+            },
+            onError: (errors) => {
+                console.error('Submission errors:', errors);
+                toast.error('Please check the form for errors');
+            }
+        });
+    };
+
     const handleAutoFillDate = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -92,52 +467,26 @@ export default function CreateAnnouncement({
             setData('end_date', formattedEndDate);
         }
         
-        // Auto-set time to current time if showing time
         if (showStartTime && !data.start_time) {
             const now = new Date();
             const hours = now.getHours().toString().padStart(2, '0');
             const minutes = now.getMinutes().toString().padStart(2, '0');
             setData('start_time', `${hours}:${minutes}`);
         }
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
         
-        // Prepare data for submission
-        const submissionData = {
-            ...data,
-            // If time is not enabled, set to null
-            start_time: showStartTime ? data.start_time : null,
-            end_time: showEndTime ? data.end_time : null,
-        };
-        
-        post('/admin/announcements/store', {
-            data: submissionData,
-            preserveScroll: true,
-            onSuccess: () => {
-                reset();
-            }
-        });
+        toast.success('Dates auto-filled');
     };
 
     const clearForm = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
         
-        reset({
-            title: '',
-            content: '',
-            type: 'general',
-            priority: 0,
-            is_active: true,
-            start_date: '',
-            start_time: '',
-            end_date: '',
-            end_time: '',
-        });
+        reset();
+        clearAttachments();
         setShowStartTime(false);
         setShowEndTime(false);
+        setActiveTab('content');
+        toast.info('Form cleared');
     };
 
     const handleToggleTime = (e: React.MouseEvent) => {
@@ -148,37 +497,28 @@ export default function CreateAnnouncement({
         setShowEndTime(!showEndTime);
     };
 
-    // Convert Record to array for Select component
-    const typeOptions = Object.entries(types || {}).map(([value, label]) => ({
-        value,
-        label
-    }));
-
-    const priorityOptions = Object.entries(priorities || {}).map(([value, label]) => ({
-        value: parseInt(value),
-        label
-    }));
-
-    // Calculate form completion percentage
-    const requiredFields = ['title', 'content', 'type', 'priority'];
-    const optionalFields = ['start_date', 'end_date'];
-
-    const completedRequired = requiredFields.filter(field => {
-        const value = data[field as keyof AnnouncementFormData];
-        if (field === 'priority') {
-            return value !== null && value !== undefined;
+    // Format date and time for preview
+    const formatDateTimePreview = (date: string, time: string, showTime: boolean) => {
+        if (!date) return 'Not set';
+        
+        const dateObj = new Date(date);
+        const formattedDate = dateObj.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        
+        if (showTime && time) {
+            const [hours, minutes] = time.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour % 12 || 12;
+            return `${formattedDate} at ${displayHour}:${minutes} ${ampm}`;
         }
-        return value !== '' && value !== null && value !== undefined;
-    }).length;
-
-    const completedOptional = optionalFields.filter(field => {
-        const value = data[field as keyof AnnouncementFormData];
-        return value !== '' && value !== null && value !== undefined;
-    }).length;
-
-    const totalProgress = Math.round(
-        ((completedRequired + completedOptional) / (requiredFields.length + optionalFields.length)) * 100
-    );
+        
+        return formattedDate;
+    };
 
     // Get priority color
     const getPriorityColor = (priority: number) => {
@@ -213,44 +553,43 @@ export default function CreateAnnouncement({
         }
     };
 
-    // Format date and time for preview
-    const formatDateTimePreview = (date: string, time: string, showTime: boolean) => {
-        if (!date) return '';
-        
-        const dateObj = new Date(date);
-        const formattedDate = dateObj.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-        
-        if (showTime && time) {
-            const [hours, minutes] = time.split(':');
-            const hour = parseInt(hours);
-            const ampm = hour >= 12 ? 'PM' : 'AM';
-            const displayHour = hour % 12 || 12;
-            return `${formattedDate} at ${displayHour}:${minutes} ${ampm}`;
+    // Get audience icon
+    const getAudienceIcon = (type: string) => {
+        switch (type) {
+            case 'roles': return Users;
+            case 'puroks': return MapPin;
+            case 'households': return Home;
+            case 'household_members': return Users;
+            case 'businesses': return Briefcase;
+            case 'specific_users': return UserCog;
+            default: return Globe;
         }
-        
-        return formattedDate;
     };
+
+    const typeOptions = Object.entries(types).map(([value, label]) => ({ value, label }));
+    const priorityOptions = Object.entries(priorities).map(([value, label]) => ({ 
+        value: parseInt(value), 
+        label 
+    }));
+
+    // Safe check for attachments count
+    const attachmentsCount = Array.isArray(attachments) ? attachments.length : 0;
 
     return (
         <AppLayout
             title="Create Announcement"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/admin/dashboard' },
-                { title: 'Announcements', href: '/admin/announcements' },
-                { title: 'Create Announcement', href: '/admin/announcements/create' }
+                { title: 'Dashboard', href: route('admin.dashboard') },
+                { title: 'Announcements', href: route('admin.announcements.index') },
+                { title: 'Create', href: route('admin.announcements.create') }
             ]}
         >
-            {/* Use a regular div instead of form for the wrapper */}
+            {/* Using div instead of form to prevent accidental submissions */}
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/admin/announcements">
+                        <Link href={route('admin.announcements.index')}>
                             <Button variant="ghost" size="sm" type="button">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back
@@ -259,34 +598,59 @@ export default function CreateAnnouncement({
                         <div>
                             <h1 className="text-3xl font-bold tracking-tight">Create New Announcement</h1>
                             <p className="text-gray-500 dark:text-gray-400">
-                                Publish a new announcement for barangay residents
+                                Create and publish announcements with attachments and targeted audience
                             </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button type="button" onClick={handleSubmit} disabled={processing}>
-                            <Save className="h-4 w-4 mr-2" />
+                        <Button 
+                            type="button" 
+                            onClick={handleSubmit} 
+                            disabled={processing} 
+                            className="bg-blue-600 hover:bg-blue-700"
+                        >
+                            {processing ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                                <Save className="h-4 w-4 mr-2" />
+                            )}
                             {processing ? 'Publishing...' : 'Publish Announcement'}
                         </Button>
                     </div>
                 </div>
 
-                {/* Error Messages */}
+                {/* Error Summary */}
                 {Object.keys(errors).length > 0 && (
                     <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
                         <p className="font-bold">Please fix the following errors:</p>
                         <ul className="list-disc list-inside mt-2">
                             {Object.entries(errors).map(([field, error]) => (
-                                <li key={field}><strong>{field.replace('_', ' ')}:</strong> {error}</li>
+                                <li key={field}>
+                                    <span className="font-medium">{field.replace(/_/g, ' ')}:</span> {error as string}
+                                </li>
                             ))}
                         </ul>
                     </div>
                 )}
 
-                <div className="grid gap-6 lg:grid-cols-3">
-                    {/* Left Column - Announcement Details */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Announcement Content */}
+                {/* Main Content Tabs */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                    <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+                        <TabsTrigger value="content" type="button">Content</TabsTrigger>
+                        <TabsTrigger value="attachments" type="button">
+                            Attachments
+                            {attachmentsCount > 0 && (
+                                <Badge variant="secondary" className="ml-2">
+                                    {attachmentsCount}
+                                </Badge>
+                            )}
+                        </TabsTrigger>
+                        <TabsTrigger value="settings" type="button">Settings</TabsTrigger>
+                        <TabsTrigger value="audience" type="button">Audience</TabsTrigger>
+                    </TabsList>
+
+                    {/* Content Tab */}
+                    <TabsContent value="content" className="space-y-6">
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
@@ -303,16 +667,16 @@ export default function CreateAnnouncement({
                                     <Input 
                                         id="title" 
                                         placeholder="e.g., Important: Water Service Interruption" 
-                                        required 
                                         value={data.title}
                                         onChange={(e) => setData('title', e.target.value)}
                                         className="text-lg font-medium"
+                                        maxLength={255}
                                     />
                                     {errors.title && (
                                         <p className="text-sm text-red-600">{errors.title}</p>
                                     )}
                                     <p className="text-sm text-gray-500">
-                                        Make the title clear and attention-grabbing
+                                        Make the title clear and attention-grabbing. {data.title.length}/255 characters
                                     </p>
                                 </div>
 
@@ -321,24 +685,239 @@ export default function CreateAnnouncement({
                                     <Textarea 
                                         id="content" 
                                         placeholder="Enter the full announcement details here..."
-                                        required 
                                         rows={8}
                                         value={data.content}
                                         onChange={(e) => setData('content', e.target.value)}
-                                        className="min-h-[200px]"
+                                        className="min-h-[200px] font-mono"
                                     />
                                     {errors.content && (
                                         <p className="text-sm text-red-600">{errors.content}</p>
                                     )}
                                     <div className="flex items-center justify-between text-sm text-gray-500">
-                                        <span>Supports basic formatting. Keep it clear and concise.</span>
-                                        <span>{data.content.length}/2000 characters</span>
+                                        <span>Supports plain text. Keep it clear and concise.</span>
+                                        <span>{data.content.length} characters</span>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
+                    </TabsContent>
 
-                        {/* Announcement Settings */}
+                    {/* Attachments Tab */}
+                    <TabsContent value="attachments" className="space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Paperclip className="h-5 w-5" />
+                                    Attachments (Optional)
+                                </CardTitle>
+                                <CardDescription>
+                                    Upload files, images, or documents to support your announcement
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                {/* Upload Area */}
+                                <div
+                                    className={`
+                                        border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer
+                                        ${isDragging 
+                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' 
+                                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900'
+                                        }
+                                    `}
+                                    onDrop={handleDrop}
+                                    onDragOver={handleDragOver}
+                                    onDragLeave={handleDragLeave}
+                                    onClick={() => document.getElementById('file-upload')?.click()}
+                                >
+                                    <input
+                                        type="file"
+                                        id="file-upload"
+                                        multiple
+                                        className="hidden"
+                                        onChange={(e) => handleFileSelect(e.target.files)}
+                                        accept={allowedFileTypes.join(',')}
+                                    />
+                                    
+                                    <div className="flex flex-col items-center gap-2 pointer-events-none">
+                                        <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900">
+                                            <Upload className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                                        </div>
+                                        <h3 className="font-semibold text-lg">
+                                            Drop files here or click to upload
+                                        </h3>
+                                        <p className="text-sm text-gray-500 max-w-md">
+                                            Drag and drop your files here, or click to browse
+                                        </p>
+                                        <div className="flex flex-wrap gap-2 justify-center mt-2 text-xs text-gray-500">
+                                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">Max size: {maxFileSize}MB</span>
+                                            {allowedFileTypes.slice(0, 3).map((type, i) => (
+                                                <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">{type}</span>
+                                            ))}
+                                            {allowedFileTypes.length > 3 && (
+                                                <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">+{allowedFileTypes.length - 3} more</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* File List - with safe check */}
+                                {Array.isArray(attachments) && attachments.length > 0 && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="font-semibold">
+                                                Selected Files ({attachments.length})
+                                            </h3>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={clearAttachments}
+                                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                            >
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Clear All
+                                            </Button>
+                                        </div>
+
+                                        <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                                            {attachments.map((attachment, index) => {
+                                                if (!attachment) return null;
+                                                
+                                                const FileIcon = getFileIcon(attachment);
+                                                
+                                                return (
+                                                    <div
+                                                        key={index}
+                                                        className={`
+                                                            flex items-center gap-3 p-3 border rounded-lg
+                                                            ${attachment.error 
+                                                                ? 'bg-red-50 border-red-200' 
+                                                                : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                            }
+                                                            transition-colors
+                                                        `}
+                                                    >
+                                                        {/* Thumbnail for images */}
+                                                        {attachment.isImage && attachment.preview ? (
+                                                            <div className="relative group flex-shrink-0">
+                                                                <img
+                                                                    src={attachment.preview}
+                                                                    alt={attachment.name}
+                                                                    className="h-12 w-12 rounded-lg object-cover border"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setPreviewImage(attachment);
+                                                                    }}
+                                                                    className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-lg transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                                                >
+                                                                    <Maximize2 className="h-4 w-4 text-white" />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+                                                                <FileIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                                                            </div>
+                                                        )}
+
+                                                        {/* File Info */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="font-medium text-sm truncate">
+                                                                    {attachment.name}
+                                                                </p>
+                                                                {attachment.error && (
+                                                                    <Badge variant="destructive" className="text-xs flex-shrink-0">
+                                                                        Error
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                                                <span>{formatFileSize(attachment.size)}</span>
+                                                                <span>•</span>
+                                                                <span className="truncate">
+                                                                    {attachment.type || 'Unknown type'}
+                                                                </span>
+                                                            </div>
+                                                            {attachment.error && (
+                                                                <p className="text-xs text-red-600 mt-1">
+                                                                    {attachment.error}
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Actions */}
+                                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                                            {attachment.isImage && attachment.preview && (
+                                                                <TooltipProvider>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="ghost"
+                                                                                size="icon"
+                                                                                className="h-8 w-8"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setPreviewImage(attachment);
+                                                                                }}
+                                                                            >
+                                                                                <Eye className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>Preview</TooltipContent>
+                                                                    </Tooltip>
+                                                                </TooltipProvider>
+                                                            )}
+                                                            <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                removeAttachment(index);
+                                                                            }}
+                                                                        >
+                                                                            <X className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent>Remove</TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Tips */}
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <h4 className="font-semibold text-blue-700 mb-2 flex items-center gap-2">
+                                        <Info className="h-4 w-4" />
+                                        Tips for attachments
+                                    </h4>
+                                    <ul className="space-y-1 text-sm text-blue-600">
+                                        <li>• Upload images to make announcements more visual</li>
+                                        <li>• Include PDF forms or documents residents might need</li>
+                                        <li>• Keep file sizes under {maxFileSize}MB for faster loading</li>
+                                        <li>• Use descriptive filenames (e.g., "meeting-minutes-2024.pdf")</li>
+                                        <li className="text-blue-400">• Attachments are optional - you can publish without them</li>
+                                    </ul>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Settings Tab */}
+                    <TabsContent value="settings" className="space-y-6">
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
@@ -355,9 +934,9 @@ export default function CreateAnnouncement({
                                         <Label htmlFor="type">Type *</Label>
                                         <Select 
                                             value={data.type}
-                                            onValueChange={(value: AnnouncementFormData['type']) => setData('type', value)}
+                                            onValueChange={(value: any) => setData('type', value)}
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger id="type">
                                                 <SelectValue placeholder="Select type" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -385,7 +964,7 @@ export default function CreateAnnouncement({
                                             value={data.priority.toString()}
                                             onValueChange={(value) => setData('priority', parseInt(value))}
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger id="priority">
                                                 <SelectValue placeholder="Select priority" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -406,6 +985,8 @@ export default function CreateAnnouncement({
                                     </div>
                                 </div>
 
+                                <Separator />
+
                                 <div className="space-y-4">
                                     <Label>Schedule</Label>
                                     
@@ -417,10 +998,7 @@ export default function CreateAnnouncement({
                                                 <Switch
                                                     id="show-start-time"
                                                     checked={showStartTime}
-                                                    onCheckedChange={(checked) => {
-                                                        setShowStartTime(checked);
-                                                    }}
-                                                    className="h-4 w-8"
+                                                    onCheckedChange={setShowStartTime}
                                                 />
                                                 <Label htmlFor="show-start-time" className="text-sm text-gray-500 cursor-pointer">
                                                     Add specific time
@@ -435,7 +1013,6 @@ export default function CreateAnnouncement({
                                                     type="date" 
                                                     value={data.start_date}
                                                     onChange={(e) => setData('start_date', e.target.value)}
-                                                    placeholder="Start date"
                                                 />
                                                 <p className="text-sm text-gray-500">
                                                     Leave empty to start immediately
@@ -450,9 +1027,6 @@ export default function CreateAnnouncement({
                                                         value={data.start_time}
                                                         onChange={(e) => setData('start_time', e.target.value)}
                                                     />
-                                                    <p className="text-sm text-gray-500">
-                                                        Announcement start time
-                                                    </p>
                                                 </div>
                                             )}
                                         </div>
@@ -466,10 +1040,7 @@ export default function CreateAnnouncement({
                                                 <Switch
                                                     id="show-end-time"
                                                     checked={showEndTime}
-                                                    onCheckedChange={(checked) => {
-                                                        setShowEndTime(checked);
-                                                    }}
-                                                    className="h-4 w-8"
+                                                    onCheckedChange={setShowEndTime}
                                                 />
                                                 <Label htmlFor="show-end-time" className="text-sm text-gray-500 cursor-pointer">
                                                     Add specific time
@@ -485,7 +1056,6 @@ export default function CreateAnnouncement({
                                                     value={data.end_date}
                                                     onChange={(e) => setData('end_date', e.target.value)}
                                                     min={data.start_date}
-                                                    placeholder="End date"
                                                 />
                                                 <p className="text-sm text-gray-500">
                                                     Leave empty for indefinite display
@@ -501,9 +1071,6 @@ export default function CreateAnnouncement({
                                                         onChange={(e) => setData('end_time', e.target.value)}
                                                         disabled={!data.end_date}
                                                     />
-                                                    <p className="text-sm text-gray-500">
-                                                        Announcement end time
-                                                    </p>
                                                 </div>
                                             )}
                                         </div>
@@ -533,7 +1100,9 @@ export default function CreateAnnouncement({
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between pt-2">
+                                <Separator />
+
+                                <div className="flex items-center justify-between">
                                     <div className="space-y-0.5">
                                         <Label htmlFor="is_active">Active Status</Label>
                                         <p className="text-sm text-gray-500">
@@ -543,230 +1112,165 @@ export default function CreateAnnouncement({
                                     <Switch 
                                         id="is_active"
                                         checked={data.is_active}
-                                        onCheckedChange={(checked) => {
-                                            setData('is_active', checked);
-                                        }}
+                                        onCheckedChange={(checked) => setData('is_active', checked)}
                                     />
                                 </div>
                             </CardContent>
                         </Card>
-                    </div>
+                    </TabsContent>
 
-                    {/* Right Column - Preview & Actions */}
-                    <div className="space-y-6">
-                        {/* Preview Card */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Eye className="h-5 w-5" />
-                                    Live Preview
-                                </CardTitle>
-                                <CardDescription>
-                                    How the announcement will appear to residents
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="border rounded-lg p-6 bg-white shadow-sm dark:bg-gray-900">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-3 rounded-lg ${getTypeColor(data.type)}`}>
-                                                <Bell className="h-5 w-5" />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-lg">
-                                                    {data.title || "Announcement Title"}
-                                                </h3>
-                                                <div className="flex items-center gap-2 text-sm text-gray-500">
-                                                    <Calendar className="h-3 w-3" />
-                                                    <span>Posted: {new Date().toLocaleDateString()}</span>
-                                                    <span>•</span>
-                                                    <span className={`font-medium ${getPriorityColor(data.priority)} px-2 py-1 rounded-full text-xs`}>
-                                                        {priorities[data.priority.toString()] || 'Normal'} Priority
-                                                    </span>
-                                                </div>
-                                            </div>
+                    {/* Audience Tab */}
+                    <TabsContent value="audience" className="space-y-6">
+                        <AudienceTarget
+                            value={{
+                                audience_type: data.audience_type,
+                                target_roles: data.target_roles || [],
+                                target_puroks: data.target_puroks || [],
+                                target_households: data.target_households || [],
+                                target_businesses: data.target_businesses || [],
+                                target_users: data.target_users || [],
+                            }}
+                            onChange={(field, value) => setData(field as any, value)}
+                            roles={roles}
+                            puroks={puroks}
+                            households={households}
+                            businesses={businesses}
+                            users={users}
+                            errors={errors}
+                        />
+                    </TabsContent>
+                </Tabs>
+
+                {/* Live Preview */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Eye className="h-5 w-5" />
+                            Live Preview
+                        </CardTitle>
+                        <CardDescription>
+                            How the announcement will appear to targeted users
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="border rounded-lg p-6 bg-white shadow-sm dark:bg-gray-900">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-3 rounded-lg ${getTypeColor(data.type)}`}>
+                                        {(() => {
+                                            const IconComponent = getTypeIcon(data.type);
+                                            return <IconComponent className="h-5 w-5" />;
+                                        })()}
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-lg">
+                                            {data.title || "Announcement Title"}
+                                        </h3>
+                                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                                            <Calendar className="h-3 w-3" />
+                                            <span>Posted: {new Date().toLocaleDateString()}</span>
+                                            <span>•</span>
+                                            <span className={`font-medium ${getPriorityColor(data.priority)} px-2 py-1 rounded-full text-xs`}>
+                                                {priorities[data.priority.toString()] || 'Normal'} Priority
+                                            </span>
                                         </div>
-                                        {data.is_active && (
-                                            <div className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                                                Active
+                                    </div>
+                                </div>
+                                {data.is_active && (
+                                    <div className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                        Active
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Audience Badge */}
+                            <div className="mb-3 flex items-center gap-2">
+                                <Badge variant="outline" className="flex items-center gap-1">
+                                    {(() => {
+                                        const IconComponent = getAudienceIcon(data.audience_type);
+                                        return <IconComponent className="h-3 w-3" />;
+                                    })()}
+                                    {audience_types[data.audience_type] || 'All Users'}
+                                </Badge>
+                                {data.audience_type !== 'all' && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {data.audience_type === 'roles' && (data.target_roles?.length || 0)} roles selected
+                                        {data.audience_type === 'puroks' && (data.target_puroks?.length || 0)} puroks selected
+                                        {data.audience_type === 'households' && (data.target_households?.length || 0)} households selected
+                                        {data.audience_type === 'household_members' && (data.target_households?.length || 0)} households selected
+                                        {data.audience_type === 'businesses' && (data.target_businesses?.length || 0)} businesses selected
+                                        {data.audience_type === 'specific_users' && (data.target_users?.length || 0)} users selected
+                                    </Badge>
+                                )}
+                            </div>
+
+                            <div className="border-t pt-4">
+                                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                                    {data.content || "Announcement content will appear here..."}
+                                </p>
+                            </div>
+
+                            {/* Attachments Preview - with safe check */}
+                            {Array.isArray(attachments) && attachments.length > 0 && (
+                                <div className="mt-4 pt-4 border-t">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Paperclip className="h-4 w-4 text-gray-400" />
+                                        <span className="text-sm font-medium">Attachments ({attachments.length})</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {attachments.slice(0, 5).map((attachment, index) => {
+                                            if (!attachment) return null;
+                                            const FileIcon = getFileIcon(attachment);
+                                            return (
+                                                <div
+                                                    key={index}
+                                                    className="flex items-center gap-2 px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-xs"
+                                                >
+                                                    <FileIcon className="h-3 w-3" />
+                                                    <span className="max-w-[100px] truncate">{attachment.name}</span>
+                                                </div>
+                                            );
+                                        })}
+                                        {attachments.length > 5 && (
+                                            <div className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-xs">
+                                                +{attachments.length - 5} more
                                             </div>
                                         )}
                                     </div>
-                                    <div className="border-t pt-4">
-                                        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                                            {data.content || "Announcement content will appear here..."}
-                                        </p>
-                                    </div>
-                                    {(data.start_date || data.end_date) && (
-                                        <div className="mt-4 pt-4 border-t">
-                                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                                {data.start_date && (
-                                                    <div className="flex items-center gap-2">
-                                                        <Calendar className="h-4 w-4 text-gray-400" />
-                                                        <div>
-                                                            <div className="font-medium">Starts</div>
-                                                            <div className="text-gray-500">
-                                                                {formatDateTimePreview(data.start_date, data.start_time, showStartTime)}
-                                                            </div>
-                                                        </div>
+                                </div>
+                            )}
+
+                            {(data.start_date || data.end_date) && (
+                                <div className="mt-4 pt-4 border-t">
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        {data.start_date && (
+                                            <div className="flex items-center gap-2">
+                                                <Calendar className="h-4 w-4 text-gray-400" />
+                                                <div>
+                                                    <div className="font-medium">Starts</div>
+                                                    <div className="text-gray-500">
+                                                        {formatDateTimePreview(data.start_date, data.start_time, showStartTime)}
                                                     </div>
-                                                )}
-                                                {data.end_date && (
-                                                    <div className="flex items-center gap-2">
-                                                        <Clock className="h-4 w-4 text-gray-400" />
-                                                        <div>
-                                                            <div className="font-medium">Ends</div>
-                                                            <div className="text-gray-500">
-                                                                {formatDateTimePreview(data.end_date, data.end_time, showEndTime)}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Form Summary */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Form Summary</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-3 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Required Fields:</span>
-                                        <span className={`font-medium ${completedRequired === requiredFields.length ? 'text-green-600' : 'text-amber-600'}`}>
-                                            {completedRequired}/{requiredFields.length} completed
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Optional Fields:</span>
-                                        <span className="font-medium">
-                                            {completedOptional}/{optionalFields.length} completed
-                                        </span>
-                                    </div>
-                                    <div className="pt-3 border-t">
-                                        <div className="flex items-center justify-between font-medium">
-                                            <span>Total Progress</span>
-                                            <span>{totalProgress}%</span>
-                                        </div>
-                                        <div className="h-2 bg-gray-200 rounded-full mt-1 overflow-hidden">
-                                            <div 
-                                                className={`h-full rounded-full transition-all duration-300 ${
-                                                    totalProgress === 100 ? 'bg-green-500' : 
-                                                    totalProgress >= 50 ? 'bg-blue-500' : 'bg-amber-500'
-                                                }`} 
-                                                style={{ width: `${totalProgress}%` }}
-                                            ></div>
-                                        </div>
-                                    </div>
-                                    <div className="mt-4 text-xs text-gray-500 space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                                            <span>Required fields completed</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                                            <span>Optional fields completed</span>
-                                        </div>
+                                        )}
+                                        {data.end_date && (
+                                            <div className="flex items-center gap-2">
+                                                <Clock className="h-4 w-4 text-gray-400" />
+                                                <div>
+                                                    <div className="font-medium">Ends</div>
+                                                    <div className="text-gray-500">
+                                                        {formatDateTimePreview(data.end_date, data.end_time, showEndTime)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Quick Actions */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Quick Actions</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                <Button 
-                                    variant="outline" 
-                                    className="w-full justify-start"
-                                    type="button"
-                                    onClick={handleAutoFillDate}
-                                >
-                                    <Zap className="h-4 w-4 mr-2" />
-                                    Auto-fill Dates & Time
-                                </Button>
-                                <Link href="/admin/announcements">
-                                    <Button variant="outline" className="w-full justify-start" type="button">
-                                        View All Announcements
-                                    </Button>
-                                </Link>
-                                <Button 
-                                    variant="outline" 
-                                    className="w-full justify-start" 
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                    }}
-                                >
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    Save as Template
-                                </Button>
-                            </CardContent>
-                        </Card>
-
-                        {/* Time Settings */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-sm flex items-center gap-2">
-                                    <CalendarClock className="h-4 w-4" />
-                                    Time Settings
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-sm">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-gray-600">Start Time:</span>
-                                    <span className={`font-medium ${showStartTime ? 'text-green-600' : 'text-gray-400'}`}>
-                                        {showStartTime ? 'Enabled' : 'Disabled'}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-gray-600">End Time:</span>
-                                    <span className={`font-medium ${showEndTime ? 'text-green-600' : 'text-gray-400'}`}>
-                                        {showEndTime ? 'Enabled' : 'Disabled'}
-                                    </span>
-                                </div>
-                                <div className="pt-2 border-t text-xs text-gray-500">
-                                    <p>• Time fields are optional</p>
-                                    <p>• Useful for event announcements</p>
-                                    <p>• Disabled by default</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Priority Guide */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-sm">Priority Guide</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2 text-sm">
-                                    {Object.entries(priorities || {}).map(([value, label]) => (
-                                        <div key={value} className="flex items-center justify-between">
-                                            <span className={`font-medium ${getPriorityColor(parseInt(value))}`}>
-                                                {label} ({value})
-                                            </span>
-                                            <span className="text-gray-500">
-                                                {parseInt(value) === 4 && 'Emergency alerts'}
-                                                {parseInt(value) === 3 && 'Important notices'}
-                                                {parseInt(value) === 2 && 'Regular updates'}
-                                                {parseInt(value) === 1 && 'Informational'}
-                                                {parseInt(value) === 0 && 'General news'}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* Form Actions */}
                 <div className="flex items-center justify-between pt-6 border-t">
@@ -780,18 +1284,48 @@ export default function CreateAnnouncement({
                         </Button>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Link href="/admin/announcements">
+                        <Link href={route('admin.announcements.index')}>
                             <Button variant="outline" type="button">
                                 Cancel
                             </Button>
                         </Link>
-                        <Button type="button" onClick={handleSubmit} disabled={processing} className="bg-blue-600 hover:bg-blue-700">
-                            <Save className="h-4 w-4 mr-2" />
+                        <Button 
+                            type="button" 
+                            onClick={handleSubmit} 
+                            disabled={processing} 
+                            className="bg-blue-600 hover:bg-blue-700"
+                        >
+                            {processing ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                                <Save className="h-4 w-4 mr-2" />
+                            )}
                             {processing ? 'Publishing...' : 'Publish Announcement'}
                         </Button>
                     </div>
                 </div>
             </div>
+
+            {/* Image Preview Dialog */}
+            <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+                <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                        <DialogTitle>{previewImage?.name || 'Image Preview'}</DialogTitle>
+                        <DialogDescription>
+                            {previewImage && formatFileSize(previewImage.size)}
+                        </DialogDescription>
+                    </DialogHeader>
+                    {previewImage?.preview && (
+                        <div className="mt-4 flex justify-center">
+                            <img
+                                src={previewImage.preview}
+                                alt={previewImage.name}
+                                className="max-w-full max-h-[60vh] object-contain rounded-lg"
+                            />
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

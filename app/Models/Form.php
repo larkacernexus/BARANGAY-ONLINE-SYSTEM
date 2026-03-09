@@ -86,7 +86,7 @@ class Form extends Model
 protected function downloadUrl(): Attribute
 {
     return Attribute::make(
-        get: fn () => route('forms.download', $this), // FIXED: Changed from admin.forms.download
+        get: fn () => route('admin.forms.download', $this), // FIXED: Changed from admin.forms.download
     );
 }
 

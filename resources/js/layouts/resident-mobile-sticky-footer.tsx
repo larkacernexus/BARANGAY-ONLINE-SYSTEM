@@ -37,25 +37,25 @@ const residentNavItems: NavItem[] = [
         icon: 'home', 
         label: 'Home', 
         href: '/resident/dashboard',
-        activePaths: ['/resident/dashboard', '/resident']
+        activePaths: ['/portal/resident/dashboard', '/portal/resident']
     },
     { 
         icon: 'file-text', 
         label: 'Docs', 
         href: '/resident/clearances',
-        activePaths: ['/resident/clearances', '/resident/clearances/create', '/resident/clearances/view']
+        activePaths: ['/portal/resident/clearances', '/resident/clearances/create', '/resident/clearances/view']
     },
     { 
         icon: 'message-square', 
         label: 'Help', 
-        href: '/resident/complaints',
-        activePaths: ['/resident/complaints', '/resident/complaints/create', '/resident/complaints/view']
+        href: '/portal/complaints',
+        activePaths: ['/portal/complaints', '/portal/complaints/create', '/portal/complaints/view']
     },
     { 
         icon: 'user', 
         label: 'Profile', 
         href: '/resident/profile',
-        activePaths: ['/resident/profile', '/resident/profile/edit', '/resident/settings']
+        activePaths: ['/portal/resident/profile', '/resident/profile/edit', '/resident/settings']
     },
 ];
 
@@ -129,10 +129,10 @@ const FloatingActionNavItem = ({ onClick, isOpen }: { onClick: () => void; isOpe
 // Quick Action Menu Component
 const QuickActionMenu = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
     const quickActions = [
-        { icon: CreditCard, label: 'Quick Pay', href: '/resident/payments/quick', color: 'from-emerald-500 to-teal-500' },
-        { icon: FileText, label: 'New Clearance', href: '/resident/clearances/create', color: 'from-blue-500 to-indigo-500' },
-        { icon: MessageSquare, label: 'File Complaint', href: '/resident/complaints/create', color: 'from-amber-500 to-orange-500' },
-        { icon: Calendar, label: 'Schedule', href: '/resident/calendar', color: 'from-purple-500 to-pink-500' },
+        { icon: CreditCard, label: 'Quick Pay', href: '/portal/resident/payments/quick', color: 'from-emerald-500 to-teal-500' },
+        { icon: FileText, label: 'New Clearance', href: '/portal/resident/clearances/create', color: 'from-blue-500 to-indigo-500' },
+        { icon: MessageSquare, label: 'File Complaint', href: '/portal/resident/complaints/create', color: 'from-amber-500 to-orange-500' },
+        { icon: Calendar, label: 'Schedule', href: '/portal/resident/calendar', color: 'from-purple-500 to-pink-500' },
     ];
 
     if (!isOpen) return null;

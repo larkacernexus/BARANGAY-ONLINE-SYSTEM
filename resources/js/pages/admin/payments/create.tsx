@@ -53,7 +53,7 @@ export default function CreatePayment() {
     const { 
         residents, 
         households, 
-        businesses = [], // ADDED with default
+        businesses = [],
         fees,
         feeTypes = [],
         discountRules = [],
@@ -69,16 +69,16 @@ export default function CreatePayment() {
     } = usePage<PageProps>().props;
     
     // Log the data to see what we're getting
-    console.log('🔍 Residents from props:', residents);
-    console.log('🔍 Households from props:', households);
-    console.log('🔍 Businesses from props:', businesses);
-    console.log('🔍 Clearance requests from props:', clearance_requests);
+    console.log('🔍 Residents from props:', residents?.length || 0);
+    console.log('🔍 Households from props:', households?.length || 0);
+    console.log('🔍 Businesses from props:', businesses?.length || 0);
+    console.log('🔍 Clearance requests from props:', clearance_requests?.length || 0);
     
     // ========== STATE DECLARATIONS ==========
     const [step, setStep] = useState<number>(1);
     const [selectedPayer, setSelectedPayer] = useState<Resident | Household | Business | ClearanceRequest | BackendFee | OutstandingFee | null>(null);
     
-    // ADDED: State for clearance requests of the selected payer
+    // State for clearance requests of the selected payer
     const [payerClearanceRequests, setPayerClearanceRequests] = useState<ClearanceRequest[]>([]);
     
     const [payerSource, setPayerSource] = useState<'residents' | 'households' | 'businesses' | 'clearance' | 'fees'>(() => {
@@ -116,12 +116,13 @@ export default function CreatePayment() {
     const [userModifiedPurpose, setUserModifiedPurpose] = useState<boolean>(false);
     const [isProcessingFee, setIsProcessingFee] = useState<boolean>(false);
     const [payerOutstandingFees, setPayerOutstandingFees] = useState<OutstandingFee[]>([]);
+    const [isLoadingClearances, setIsLoadingClearances] = useState<boolean>(false);
     
     const hasInitializedRef = useRef(false);
     const feePaymentProcessedRef = useRef(false);
-    // ADDED: Ref to track processed clearance IDs to prevent infinite loops
+    // Ref to track processed clearance IDs to prevent infinite loops
     const processedClearanceIdsRef = useRef<Set<number>>(new Set());
-    // ADDED: Ref to store clearance handler to avoid dependency issues
+    // Ref to store clearance handler to avoid dependency issues
     const handleClearanceRequestDirectlyRef = useRef<Function | null>(null);
     
     // ========== MEMOIZED VALUES THAT DON'T DEPEND ON data ==========
@@ -178,14 +179,11 @@ export default function CreatePayment() {
     // Find resident from residents array using data.payer_id
     const selectedResidentFromData = useMemo(() => {
         if (!data.payer_type || !data.payer_id) {
-            console.log('🔍 No payer type or ID in data');
             return null;
         }
         
         if (data.payer_type === 'resident' && residents) {
-            console.log('🔍 Looking for resident with ID:', data.payer_id);
             const found = residents.find((r: any) => r.id == data.payer_id);
-            console.log('🔍 Found resident:', found);
             return found || null;
         }
         return null;
@@ -196,9 +194,7 @@ export default function CreatePayment() {
         if (!data.payer_type || !data.payer_id) return null;
         
         if (data.payer_type === 'household' && households) {
-            console.log('🔍 Looking for household with ID:', data.payer_id);
             const found = households.find((h: any) => h.id == data.payer_id);
-            console.log('🔍 Found household:', found);
             return found || null;
         }
         return null;
@@ -209,9 +205,7 @@ export default function CreatePayment() {
         if (!data.payer_type || !data.payer_id) return null;
         
         if (data.payer_type === 'business' && businesses) {
-            console.log('🔍 Looking for business with ID:', data.payer_id);
             const found = businesses.find((b: any) => b.id == data.payer_id);
-            console.log('🔍 Found business:', found);
             return found || null;
         }
         return null;
@@ -232,43 +226,25 @@ export default function CreatePayment() {
 
     // Final selected resident - try multiple sources
     const finalSelectedResident = useMemo(() => {
-        console.log('🔍 Computing finalSelectedResident:', {
-            selectedResidentFromData,
-            isSelectedPayerResident,
-            selectedPayer: selectedPayer,
-            dataPayerType: data.payer_type,
-            dataPayerId: data.payer_id
-        });
-        
         // Priority 1: Resident found from data
         if (selectedResidentFromData) {
-            console.log('🔍 Using selectedResidentFromData');
             return selectedResidentFromData;
         }
         
         // Priority 2: Selected payer is a resident
         if (isSelectedPayerResident && selectedPayer) {
-            console.log('🔍 Using selectedPayer as resident');
             return selectedPayer as any;
         }
         
         // Priority 3: Try to find resident from residents array using data
         if (data.payer_type === 'resident' && data.payer_id && residents) {
-            console.log('🔍 Trying direct lookup from residents');
             return residents.find((r: any) => r.id == data.payer_id) || null;
         }
         
-        console.log('🔍 No resident found');
         return null;
     }, [selectedResidentFromData, isSelectedPayerResident, selectedPayer, data.payer_type, data.payer_id, residents]);
 
     const finalSelectedHousehold = useMemo(() => {
-        console.log('🔍 Computing finalSelectedHousehold:', {
-            selectedHouseholdFromData,
-            isSelectedPayerHousehold,
-            selectedPayer: selectedPayer
-        });
-        
         if (selectedHouseholdFromData) {
             return selectedHouseholdFromData;
         }
@@ -285,12 +261,6 @@ export default function CreatePayment() {
     }, [selectedHouseholdFromData, isSelectedPayerHousehold, selectedPayer, data.payer_type, data.payer_id, households]);
 
     const finalSelectedBusiness = useMemo(() => {
-        console.log('🔍 Computing finalSelectedBusiness:', {
-            selectedBusinessFromData,
-            isSelectedPayerBusiness,
-            selectedPayer: selectedPayer
-        });
-        
         if (selectedBusinessFromData) {
             return selectedBusinessFromData;
         }
@@ -480,49 +450,94 @@ export default function CreatePayment() {
         });
     }, []);
 
-    // ========== HELPER FUNCTION TO GET CLEARANCE REQUESTS FOR PAYER ==========
-    const getClearanceRequestsForPayer = useCallback((payerType: string, payerId: string | number): ClearanceRequest[] => {
-        if (!payerId) return [];
-        
-        if (payerType === 'resident') {
-            // Filter clearance requests for this resident
-            return clearance_requests.filter(cr => 
-                cr.resident_id == payerId && 
-                cr.can_be_paid && 
-                !cr.already_paid
-            );
-        } else if (payerType === 'household') {
-            // For households, we need to get all resident IDs in the household
-            const household = households.find(h => h.id == payerId);
-            if (!household || !household.members) return [];
-            
-            const residentIds = household.members.map((m: any) => m.resident_id).filter(Boolean);
-            
-            // Filter clearance requests for these residents
-            return clearance_requests.filter(cr => 
-                residentIds.includes(cr.resident_id) && 
-                cr.can_be_paid && 
-                !cr.already_paid
-            );
-        } else if (payerType === 'business') {
-            // For businesses, get clearance requests for the owner (if resident)
-            const business = businesses.find(b => b.id == payerId);
-            if (!business || !business.owner_id) return [];
-            
-            // Filter clearance requests for the owner
-            return clearance_requests.filter(cr => 
-                cr.resident_id == business.owner_id && 
-                cr.can_be_paid && 
-                !cr.already_paid
-            ).map(cr => ({
-                ...cr,
-                for_business_owner: true,
-                business_name: business.business_name,
-                business_id: business.id
-            }));
+    // ========== FUNCTION TO FETCH CLEARANCE REQUESTS FOR PAYER ==========
+    const fetchClearanceRequestsForPayer = useCallback(async (payerType: string, payerId: string | number) => {
+        if (!payerId) {
+            setPayerClearanceRequests([]);
+            return;
         }
         
-        return [];
+        setIsLoadingClearances(true);
+        
+        try {
+            // First, filter from already loaded clearance_requests
+            if (payerType === 'resident') {
+                // Filter clearance requests for this resident from props
+                const filtered = clearance_requests.filter((cr: ClearanceRequest) => 
+                    cr.resident_id == payerId && 
+                    cr.can_be_paid && 
+                    !cr.already_paid &&
+                    parseFloat(String(cr.fee_amount)) > 0
+                );
+                
+                console.log(`📋 Found ${filtered.length} clearance requests for resident ${payerId} from props`);
+                setPayerClearanceRequests(filtered);
+                
+            } else if (payerType === 'household') {
+                // For households, we need to get all resident IDs in the household
+                const household = households.find(h => h.id == payerId);
+                if (!household || !household.members) {
+                    setPayerClearanceRequests([]);
+                    return;
+                }
+                
+                const residentIds = household.members.map((m: any) => m.resident_id).filter(Boolean);
+                
+                // Filter clearance requests for these residents
+                const filtered = clearance_requests.filter((cr: ClearanceRequest) => 
+                    residentIds.includes(cr.resident_id) && 
+                    cr.can_be_paid && 
+                    !cr.already_paid &&
+                    parseFloat(String(cr.fee_amount)) > 0
+                );
+                
+                console.log(`📋 Found ${filtered.length} clearance requests for household ${payerId} (${residentIds.length} residents)`);
+                setPayerClearanceRequests(filtered);
+                
+            } else if (payerType === 'business') {
+                // For businesses, get clearance requests for the owner (if resident)
+                const business = businesses.find(b => b.id == payerId);
+                if (!business || !business.owner_id) {
+                    setPayerClearanceRequests([]);
+                    return;
+                }
+                
+                // Filter clearance requests for the owner
+                const filtered = clearance_requests.filter((cr: ClearanceRequest) => 
+                    cr.resident_id == business.owner_id && 
+                    cr.can_be_paid && 
+                    !cr.already_paid &&
+                    parseFloat(String(cr.fee_amount)) > 0
+                ).map(cr => ({
+                    ...cr,
+                    for_business_owner: true,
+                    business_name: business.business_name,
+                    business_id: business.id
+                }));
+                
+                console.log(`📋 Found ${filtered.length} clearance requests for business owner (resident ${business.owner_id})`);
+                setPayerClearanceRequests(filtered);
+                
+            } else {
+                setPayerClearanceRequests([]);
+            }
+            
+            // Optional: Also fetch from API if you want real-time data
+            // You can uncomment this if you want to fetch fresh data from the backend
+            /*
+            const response = await fetch(`/api/clearance-requests/payable?payer_type=${payerType}&payer_id=${payerId}`);
+            const data = await response.json();
+            if (data.success) {
+                setPayerClearanceRequests(data.data);
+            }
+            */
+            
+        } catch (error) {
+            console.error('Error fetching clearance requests:', error);
+            setPayerClearanceRequests([]);
+        } finally {
+            setIsLoadingClearances(false);
+        }
     }, [clearance_requests, households, businesses]);
 
     // ========== INITIALIZE HANDLERS ==========
@@ -532,14 +547,14 @@ export default function CreatePayment() {
         setSelectedPayer,
         setPayerSource,
         setPayerOutstandingFees,
-        setPayerClearanceRequests, // PASS THIS
+        setPayerClearanceRequests,
         outstandingFeesForTab,
         clearanceTypes,
         clearanceTypesDetails,
         clearance_requests: clearance_requests || [],
         clearance_request,
         checkDiscountEligibilityForFees,
-        getClearanceRequestsForPayer // PASS THIS
+        fetchClearanceRequestsForPayer // Pass this function
     });
 
     const feeHandlers = useFeeHandlers({
@@ -564,16 +579,15 @@ export default function CreatePayment() {
         setSelectedPayer,
         setPayerSource,
         setPayerOutstandingFees,
-        setPayerClearanceRequests, // PASS THIS
+        setPayerClearanceRequests,
         outstandingFeesForTab,
         clearanceTypes,
         clearanceTypesDetails,
         checkDiscountEligibilityForFees,
-        getClearanceRequestsForPayer // PASS THIS
+        fetchClearanceRequestsForPayer // Pass this function
     });
 
     // ========== UPDATE REF WHEN CLEARANCE HANDLER CHANGES ==========
-    // This prevents the effect from depending on the handler directly
     useEffect(() => {
         handleClearanceRequestDirectlyRef.current = clearanceHandlers.handleClearanceRequestDirectly;
     }, [clearanceHandlers.handleClearanceRequestDirectly]);
@@ -596,9 +610,8 @@ export default function CreatePayment() {
             const feesWithDiscountInfo = checkDiscountEligibilityForFees(residentOutstandingFees, resident);
             setPayerOutstandingFees(feesWithDiscountInfo);
             
-            // Get clearance requests for this resident
-            const clearanceReqs = getClearanceRequestsForPayer('resident', resident.id);
-            setPayerClearanceRequests(clearanceReqs);
+            // Fetch clearance requests for this resident
+            await fetchClearanceRequestsForPayer('resident', resident.id);
             
             const updatedData = {
                 ...data,
@@ -646,9 +659,8 @@ export default function CreatePayment() {
             
             setPayerOutstandingFees(businessOutstandingFees);
             
-            // Get clearance requests for this business owner
-            const clearanceReqs = getClearanceRequestsForPayer('business', business.id);
-            setPayerClearanceRequests(clearanceReqs);
+            // Fetch clearance requests for this business owner
+            fetchClearanceRequestsForPayer('business', business.id);
             
             const updatedData = {
                 ...data,
@@ -672,7 +684,7 @@ export default function CreatePayment() {
             // Add the specific fee
             feeHandlers.handleAddOutstandingFeeDirectly(fee);
         };
-    }, [data, setData, fees, feeTypes, feeHandlers, checkDiscountEligibilityForFees, payerHandlers, outstandingFeesForTab, getClearanceRequestsForPayer]);
+    }, [data, setData, fees, feeTypes, feeHandlers, checkDiscountEligibilityForFees, payerHandlers, outstandingFeesForTab, fetchClearanceRequestsForPayer]);
 
     const handleResidentPayerWithFee = useCallback(async (resident: Resident, fee: OutstandingFee) => {
         if (handleResidentPayerWithFeeRef.current) {
@@ -831,12 +843,11 @@ export default function CreatePayment() {
             
             setPayerOutstandingFees(payerFees);
             
-            // Also get clearance requests for this payer
-            const clearanceReqs = getClearanceRequestsForPayer(
+            // Also fetch clearance requests for this payer
+            await fetchClearanceRequestsForPayer(
                 pre_filled_data.payer_type, 
                 pre_filled_data.payer_id
             );
-            setPayerClearanceRequests(clearanceReqs);
         }
         
         setTimeout(() => {
@@ -857,7 +868,7 @@ export default function CreatePayment() {
         feeHandlers, 
         handleResidentPayerWithFee, 
         handleOutstandingFeePayer,
-        getClearanceRequestsForPayer,
+        fetchClearanceRequestsForPayer,
         setData
     ]);
 
@@ -950,7 +961,7 @@ export default function CreatePayment() {
         return () => {
             processedClearanceIdsRef.current.clear();
         };
-    }, [clearance_request, residents]); // REMOVED clearanceHandlers from dependencies
+    }, [clearance_request, residents]);
 
     // ========== MAIN INITIALIZATION EFFECT ==========
     useEffect(() => {
@@ -1093,14 +1104,15 @@ export default function CreatePayment() {
         
         // Create new payment item with CLEARANCE_REQUEST_ID in metadata
         const newItem: PaymentItem = {
-            id: `clearance-${clearanceRequest.id}-${Date.now()}`,
+            id: Date.now(), // Use numeric ID
+            fee_id: `clearance-${clearanceRequest.id}`,
             fee_name: clearanceRequest.clearance_type?.name || 'Barangay Clearance',
-            fee_code: clearanceRequest.reference_number || 'CLR',
-            description: clearanceRequest.purpose || 'Clearance Fee',
-            base_amount: clearanceRequest.fee_amount,
+            fee_code: clearanceRequest.reference_number || `CLR-${clearanceRequest.id}`,
+            base_amount: parseFloat(String(clearanceRequest.fee_amount)),
             surcharge: 0,
             penalty: 0,
-            total_amount: clearanceRequest.fee_amount,
+            discount: 0,
+            total_amount: parseFloat(String(clearanceRequest.fee_amount)),
             category: 'clearance',
             period_covered: '',
             months_late: 0,
@@ -1109,9 +1121,8 @@ export default function CreatePayment() {
                 clearance_request_id: clearanceRequest.id, // CRITICAL: This is what the backend looks for
                 clearance_type_id: clearanceRequest.clearance_type_id,
                 clearance_type_code: clearanceRequest.clearance_type?.code,
-            },
-            // Also include at top level for redundancy
-            clearance_request_id: clearanceRequest.id
+                reference_number: clearanceRequest.reference_number
+            }
         };
         
         // Update items
@@ -1261,7 +1272,7 @@ export default function CreatePayment() {
         
         setSelectedPayer(null);
         setPayerOutstandingFees([]);
-        setPayerClearanceRequests([]); // CLEAR CLEARANCE REQUESTS
+        setPayerClearanceRequests([]);
         setSelectedOutstandingFee(null);
         setShowLateSettings(false);
         setIsLatePayment(false);
@@ -1275,7 +1286,7 @@ export default function CreatePayment() {
         setIsProcessingFee(false);
         hasInitializedRef.current = false;
         feePaymentProcessedRef.current = false;
-        processedClearanceIdsRef.current.clear(); // Clear processed IDs on reset
+        processedClearanceIdsRef.current.clear();
     }
 
     // ========== RENDER ==========

@@ -25,36 +25,15 @@ class PortalMiddleware
             abort(403, 'No role assigned to your account.');
         }
         
-        // ROLES THAT CAN ACCESS RESIDENT PORTAL
-        $residentPortalRoles = [
-            'Household Head',        // Main resident role
-        ];
-        
-        // If user has an admin role, redirect them to admin dashboard
-        $adminRoles = [
-            'Administrator',
-            'Barangay Captain',
-            'Barangay Secretary',
-            'Barangay Treasurer',
-            'Barangay Kagawad',
-            'SK Chairman',
-            'SK Kagawad',
-            'Treasury Officer',
-            'Records Clerk',
-            'Clearance Officer',
-            'Viewer',
-            'Staff',
-        ];
-        
-        // If user is admin, redirect to admin dashboard
-        if (in_array($user->role->name, $adminRoles)) {
-            return redirect('/dashboard')
-                ->with('info', 'Welcome to the admin dashboard.');
+        // Check if user has a system role (is_system_role == 1)
+        // This assumes your roles table has an is_system_role column
+        if ($user->role->is_system_role == 1) {
+            abort(403, 'Admin users cannot access the resident portal. Please use the admin dashboard.');
         }
         
-        // Check if user is allowed in resident portal
-        if (!in_array($user->role->name, $residentPortalRoles)) {
-            abort(403, 'You do not have access to the resident portal. Your role: ' . $user->role->name);
+        // ONLY allow Household Head role
+        if ($user->role->name !== 'Household Head') {
+            abort(403, 'Access denied. Only Household Heads can access the resident portal. Your role: ' . $user->role->name);
         }
 
         return $next($request);

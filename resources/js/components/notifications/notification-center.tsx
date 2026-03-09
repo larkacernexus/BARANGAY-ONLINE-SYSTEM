@@ -1,4 +1,3 @@
-// components/notifications/notification-center.tsx
 import { Bell, CheckCircle2, X, User, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
@@ -23,7 +22,8 @@ interface Notification {
   formatted_amount?: string;
   fee_code?: string;
   fee_type?: string;
-  link: string;
+  link?: string;
+  action_url?: string;
 }
 
 // Notification Item Component
@@ -132,18 +132,49 @@ export function NotificationCenter({
     filter === 'all' || (filter === 'unread' && !n.read_at)
   );
 
+  // FIXED: Simplified navigation - trust the URL from backend!
   const handleNotificationClick = (notification: Notification) => {
-    if (notification.link && notification.link !== '#') {
-      router.visit(notification.link);
-    }
+    // Get the URL from multiple possible sources
+    const targetUrl = notification.link || notification.action_url || notification.data?.link || notification.data?.action_url;
+    
+    // Mark as read if unread
     if (!notification.read_at) {
       onMarkAsRead(notification.id);
     }
+    
+    // Navigate if we have a valid URL
+    if (targetUrl && targetUrl !== '#') {
+      console.log('Navigating to notification URL:', targetUrl);
+      
+      // Use Inertia for SPA navigation - NO MANIPULATION!
+      router.visit(targetUrl, {
+        preserveScroll: false,
+        preserveState: false,
+        onSuccess: () => {
+          console.log('Navigation successful to:', targetUrl);
+        },
+        onError: (errors) => {
+          console.error('Navigation failed:', errors);
+          // Fallback to window.location if Inertia fails
+          window.location.href = targetUrl;
+        }
+      });
+    } else {
+      console.warn('No valid URL for notification:', notification);
+    }
+    
+    // Close the notification panel
     onClose();
   };
 
   const handleMarkAllAsRead = () => {
     onMarkAllAsRead();
+  };
+
+  // Helper to check if notification has a valid link
+  const hasValidLink = (notification: Notification): boolean => {
+    const link = notification.link || notification.action_url || notification.data?.link || notification.data?.action_url;
+    return !!link && link !== '#';
   };
 
   return (
@@ -217,7 +248,12 @@ export function NotificationCenter({
             <>
               {filter === 'unread' && unreadCount > 0 && (
                 <div className="flex justify-end mb-2">
-                  <Button variant="ghost" size="sm" onClick={handleMarkAllAsRead}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleMarkAllAsRead}
+                    className="hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                  >
                     Mark all as read
                   </Button>
                 </div>
@@ -227,13 +263,23 @@ export function NotificationCenter({
                 {filteredNotifications.map((notification, index) => (
                   <div
                     key={notification.id}
-                    className="animate-slide-in-right"
+                    className={cn(
+                      "animate-slide-in-right transition-opacity",
+                      !hasValidLink(notification) && "opacity-50 cursor-not-allowed"
+                    )}
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <NotificationItem
                       notification={notification}
                       onClick={() => handleNotificationClick(notification)}
                     />
+                    
+                    {/* Debug info - remove in production */}
+                    {process.env.NODE_ENV === 'development' && !hasValidLink(notification) && (
+                      <p className="text-xs text-red-500 mt-1 px-4">
+                        ⚠️ No link configured for this notification
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -257,6 +303,37 @@ export function NotificationCenter({
           </p>
         </div>
       </SheetContent>
+
+      {/* Add missing animations */}
+      <style>{`
+        @keyframes slideInRight {
+          from {
+            opacity: 0;
+            transform: translateX(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        
+        .animate-slide-in-right {
+          animation: slideInRight 0.3s ease-out forwards;
+        }
+        
+        .animate-fade-in {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+      `}</style>
     </Sheet>
   );
 }

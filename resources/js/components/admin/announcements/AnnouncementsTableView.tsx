@@ -170,13 +170,13 @@ export default function AnnouncementsTableView({
                 </TableCell>
                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
                     <div className="flex items-center justify-end gap-1">
-                        <Link href={route('announcements.show', announcement.id)}>
+                        <Link href={route('admin.announcements.show', announcement.id)}>
                             <button className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                                 <Eye className="h-4 w-4" />
                             </button>
                         </Link>
                         
-                        <Link href={route('announcements.edit', announcement.id)}>
+                        <Link href={route('admin.announcements.edit', announcement.id)}>
                             <button className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                                 <Edit className="h-4 w-4" />
                             </button>

@@ -215,48 +215,232 @@ class ReceiptsController extends Controller
         ]);
     }
 
-    /**
-     * Store a newly created receipt
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'payment_id' => 'required|exists:payments,id',
-            'receipt_type' => 'required|in:official,clearance,certificate,fee',
-            'notes' => 'nullable|string|max:500',
-        ]);
+   /**
+ * Store a newly created receipt
+ */
+public function store(Request $request)
+{
+    // Log the incoming request for debugging
+    Log::info('Receipt store request received', [
+        'all_data' => $request->all(),
+        'has_receipt_number' => $request->has('receipt_number'),
+        'has_fee_breakdown' => $request->has('fee_breakdown'),
+        'wants_json' => $request->wantsJson(),
+        'method' => $request->method(),
+        'url' => $request->url()
+    ]);
 
+    // Check if this is a full receipt save from PrintableReceipt
+    if ($request->has('receipt_number') && $request->has('fee_breakdown')) {
+        Log::info('Processing full receipt save', ['data' => $request->except(['fee_breakdown'])]);
+        
+        // Validate full receipt data
         try {
-            DB::beginTransaction();
+            $validated = $request->validate([
+                'receipt_number' => 'required|string|unique:receipts,receipt_number',
+                'or_number' => 'nullable|string',
+                'receipt_type' => 'required|string',
+                'receipt_type_label' => 'required|string',
+                'payer_name' => 'required|string',
+                'payer_address' => 'nullable|string',
+                'payer_type' => 'nullable|in:resident,household',
+                'contact_number' => 'nullable|string',
+                'subtotal' => 'required|numeric',
+                'surcharge' => 'required|numeric',
+                'penalty' => 'required|numeric',
+                'discount' => 'required|numeric',
+                'total_amount' => 'required|numeric',
+                'amount_paid' => 'required|numeric',
+                'change_due' => 'required|numeric',
+                'payment_method' => 'required|string',
+                'payment_method_label' => 'required|string',
+                'reference_number' => 'nullable|string',
+                'payment_date' => 'required|string',
+                'issued_date' => 'required|string',
+                'issued_by' => 'required|string',
+                'fee_breakdown' => 'required|array',
+                'fee_breakdown.*.fee_name' => 'required|string',
+                'fee_breakdown.*.fee_code' => 'nullable|string',
+                'fee_breakdown.*.description' => 'nullable|string',
+                'fee_breakdown.*.base_amount' => 'required|numeric',
+                'fee_breakdown.*.surcharge' => 'nullable|numeric',
+                'fee_breakdown.*.penalty' => 'nullable|numeric',
+                'fee_breakdown.*.total_amount' => 'required|numeric',
+                'notes' => 'nullable|string',
+                'purpose' => 'nullable|string',
+                'collection_type' => 'nullable|string',
+                'remarks' => 'nullable|string',
+                'certificate_type' => 'nullable|string',
+                'certificate_type_display' => 'nullable|string',
+                'payment_id' => 'nullable|integer|exists:payments,id',
+                'clearance_request_id' => 'nullable|integer|exists:clearance_requests,id',
+                'metadata' => 'nullable|array'
+            ]);
 
-            $payment = Payment::with(['items', 'discounts.rule'])->findOrFail($validated['payment_id']);
-            
-            // Check if receipt already exists
-            $existingReceipt = Receipt::where('payment_id', $payment->id)->first();
-            if ($existingReceipt) {
-                return back()->withErrors(['payment_id' => 'A receipt already exists for this payment.']);
+            Log::info('Full receipt validation passed');
+
+            try {
+                DB::beginTransaction();
+                Log::info('Transaction started');
+
+                // Check if receipt with this number already exists
+                if (Receipt::where('receipt_number', $validated['receipt_number'])->exists()) {
+                    Log::warning('Receipt number already exists', ['receipt_number' => $validated['receipt_number']]);
+                    return response()->json([
+                        'success' => false,
+                        'errors' => ['receipt_number' => ['Receipt number already exists.']]
+                    ], 422);
+                }
+
+                // Create the receipt
+                $receipt = Receipt::create([
+                    'receipt_number' => $validated['receipt_number'],
+                    'or_number' => $validated['or_number'] ?? null,
+                    'receipt_type' => $validated['receipt_type'],
+                    'receipt_type_label' => $validated['receipt_type_label'],
+                    'payer_name' => $validated['payer_name'],
+                    'payer_address' => $validated['payer_address'] ?? null,
+                    'payer_type' => $validated['payer_type'] ?? null,
+                    'contact_number' => $validated['contact_number'] ?? null,
+                    'subtotal' => $validated['subtotal'],
+                    'surcharge' => $validated['surcharge'],
+                    'penalty' => $validated['penalty'],
+                    'discount' => $validated['discount'],
+                    'total_amount' => $validated['total_amount'],
+                    'amount_paid' => $validated['amount_paid'],
+                    'change_due' => $validated['change_due'],
+                    'payment_method' => $validated['payment_method'],
+                    'payment_method_label' => $validated['payment_method_label'],
+                    'reference_number' => $validated['reference_number'] ?? null,
+                    'payment_date' => Carbon::parse($validated['payment_date']),
+                    'issued_date' => Carbon::parse($validated['issued_date']),
+                    'issued_by' => $validated['issued_by'],
+                    'fee_breakdown' => $validated['fee_breakdown'],
+                    'notes' => $validated['notes'] ?? null,
+                    'purpose' => $validated['purpose'] ?? null,
+                    'collection_type' => $validated['collection_type'] ?? null,
+                    'remarks' => $validated['remarks'] ?? null,
+                    'certificate_type' => $validated['certificate_type'] ?? null,
+                    'certificate_type_display' => $validated['certificate_type_display'] ?? null,
+                    'payment_id' => $validated['payment_id'] ?? null,
+                    'clearance_request_id' => $validated['clearance_request_id'] ?? null,
+                    'metadata' => $validated['metadata'] ?? null,
+                ]);
+
+                Log::info('Receipt created', ['receipt_id' => $receipt->id, 'receipt_number' => $receipt->receipt_number]);
+
+                DB::commit();
+                Log::info('Transaction committed');
+
+                // If this is an API request (from PrintableReceipt), return JSON
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Receipt saved successfully',
+                        'receipt' => $this->formatReceipt($receipt)
+                    ], 201);
+                }
+
+                // Otherwise redirect to show page
+                return redirect()->route('admin.receipts.show', $receipt->id)
+                    ->with('success', 'Receipt saved successfully.');
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error('Failed to save receipt in transaction: ' . $e->getMessage(), [
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Failed to save receipt',
+                        'error' => $e->getMessage()
+                    ], 500);
+                }
+                
+                return back()->withErrors(['error' => 'Failed to save receipt. Please try again.']);
             }
-
-            // Create receipt from payment
-            $receipt = Receipt::createFromPayment($payment, $validated['receipt_type']);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Validation failed for full receipt', [
+                'errors' => $e->errors(),
+                'data' => $request->all()
+            ]);
             
-            if (!empty($validated['notes'])) {
-                $receipt->notes = $validated['notes'];
-                $receipt->save();
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $e->errors()
+                ], 422);
             }
-
-            DB::commit();
-
-            return redirect()->route('admin.receipts.show', $receipt->id)
-                ->with('success', 'Receipt generated successfully.');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to create receipt: ' . $e->getMessage());
             
-            return back()->withErrors(['error' => 'Failed to generate receipt. Please try again.']);
+            throw $e;
         }
     }
+    
+    // Original code for simple receipt creation from payment
+    Log::info('Processing simple receipt creation from payment', ['data' => $request->all()]);
+    
+    $validated = $request->validate([
+        'payment_id' => 'required|exists:payments,id',
+        'receipt_type' => 'required|in:official,clearance,certificate,fee',
+        'notes' => 'nullable|string|max:500',
+    ]);
+
+    try {
+        DB::beginTransaction();
+        Log::info('Transaction started for simple receipt', ['payment_id' => $validated['payment_id']]);
+
+        $payment = Payment::with(['items', 'discounts.rule'])->findOrFail($validated['payment_id']);
+        
+        // Check if receipt already exists
+        $existingReceipt = Receipt::where('payment_id', $payment->id)->first();
+        if ($existingReceipt) {
+            Log::warning('Receipt already exists for payment', [
+                'payment_id' => $payment->id,
+                'existing_receipt_id' => $existingReceipt->id
+            ]);
+            
+            DB::rollBack();
+            return back()->withErrors(['payment_id' => 'A receipt already exists for this payment.']);
+        }
+
+        Log::info('Creating receipt from payment', [
+            'payment_id' => $payment->id,
+            'receipt_type' => $validated['receipt_type']
+        ]);
+
+        // Create receipt from payment
+        $receipt = Receipt::createFromPayment($payment, $validated['receipt_type']);
+        
+        if (!empty($validated['notes'])) {
+            $receipt->notes = $validated['notes'];
+            $receipt->save();
+        }
+
+        DB::commit();
+        Log::info('Receipt created successfully', [
+            'receipt_id' => $receipt->id,
+            'receipt_number' => $receipt->receipt_number
+        ]);
+
+        return redirect()->route('admin.receipts.show', $receipt->id)
+            ->with('success', 'Receipt generated successfully.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Failed to create receipt from payment: ' . $e->getMessage(), [
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString(),
+            'payment_id' => $validated['payment_id'] ?? null
+        ]);
+        
+        return back()->withErrors(['error' => 'Failed to generate receipt. Please try again.']);
+    }
+}
 
     /**
      * Generate receipt from payment
@@ -459,7 +643,7 @@ class ReceiptsController extends Controller
     }
 
     /**
-     * Format receipt for API response - CRITICAL FIX for "toFixed is not a function" error
+     * Format receipt for API response
      */
     private function formatReceipt(Receipt $receipt)
     {

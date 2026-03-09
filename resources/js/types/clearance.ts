@@ -1,6 +1,10 @@
 // types/clearance.ts
 
 export interface ClearanceRequest {
+    amount_paid: number;
+    or_number: boolean;
+    payment_date(payment_date: any): import("react").ReactNode;
+    payment_status: string;
     id: number;
     resident_id: number;
     clearance_type_id: number;

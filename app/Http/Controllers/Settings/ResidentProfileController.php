@@ -8,6 +8,8 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -21,14 +23,28 @@ class ResidentProfileController extends Controller
     {
         $user = $request->user();
         
+        // Log profile view
+        Log::info('Resident profile viewed', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip()
+        ]);
+        
         // Load basic user relationships
         $user->load([
             'role',
-            'currentResident',  // Changed from 'resident' to 'currentResident'
+            'currentResident',
             'household'
         ]);
 
-        $resident = $user->currentResident;  // Changed from $user->resident
+        $resident = $user->currentResident;
+        
+        // Log resident data status
+        Log::debug('Resident data loaded', [
+            'user_id' => $user->id,
+            'has_resident' => !is_null($resident),
+            'has_household' => !is_null($user->household)
+        ]);
         
         // If resident exists, load their relationships
         if ($resident) {
@@ -58,8 +74,66 @@ class ResidentProfileController extends Controller
                         'is_head' => $member->is_head,
                     ];
                 })->values();
+                
+                Log::debug('Household data loaded', [
+                    'user_id' => $user->id,
+                    'household_id' => $user->household->id,
+                    'member_count' => $householdMembers->count()
+                ]);
             }
         }
+
+        // FIXED: Generate QR code URL as simple path, not full URL
+        $qrCodeUrl = null;
+        if ($user->qr_code_url) {
+            // If it's already a full URL (from old data), extract just the filename
+            if (filter_var($user->qr_code_url, FILTER_VALIDATE_URL)) {
+                $path = parse_url($user->qr_code_url, PHP_URL_PATH);
+                $filename = basename($path);
+                $qrCodeUrl = '/storage/qr-codes/' . $filename;
+            } 
+            // If it's a path with storage/ prefix, clean it
+            elseif (str_contains($user->qr_code_url, 'storage/')) {
+                $filename = basename($user->qr_code_url);
+                $qrCodeUrl = '/storage/qr-codes/' . $filename;
+            }
+            // If it's already the correct relative path (qr-codes/filename.png)
+            elseif (str_starts_with($user->qr_code_url, 'qr-codes/')) {
+                $qrCodeUrl = '/storage/' . $user->qr_code_url;
+            }
+            // Fallback
+            else {
+                $qrCodeUrl = '/storage/' . $user->qr_code_url;
+            }
+            
+            Log::info('QR code data fetched for user', [
+                'user_id' => $user->id,
+                'qr_code_exists' => true,
+                'qr_code_url' => $qrCodeUrl,
+                'original_path' => $user->qr_code_url,
+                'qr_login_token_exists' => !is_null($user->login_qr_code),
+                'qr_login_token' => $user->login_qr_code ? substr($user->login_qr_code, 0, 8) . '...' : null,
+                'qr_login_generated_at' => $user->login_qr_code_generated_at,
+                'qr_login_expires_at' => $user->login_qr_code_expires_at,
+                'qr_login_used_count' => $user->login_qr_code_used_count,
+                'is_expired' => $user->login_qr_code_expires_at ? now()->gt($user->login_qr_code_expires_at) : false,
+            ]);
+        } else {
+            Log::info('No QR code found for user', [
+                'user_id' => $user->id,
+                'qr_code_url_field' => $user->qr_code_url,
+                'login_qr_code_field' => $user->login_qr_code ? 'exists' : 'null'
+            ]);
+        }
+
+        // Log QR code status summary
+        Log::debug('QR code status summary', [
+            'user_id' => $user->id,
+            'has_qr_code' => !is_null($user->qr_code_url) && !is_null($user->login_qr_code),
+            'qr_code_url_generated' => !is_null($qrCodeUrl),
+            'qr_token_exists' => !is_null($user->login_qr_code),
+            'qr_expires_at' => $user->login_qr_code_expires_at,
+        ]);
 
         return Inertia::render('residentsettings/profile', [
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
@@ -77,6 +151,11 @@ class ResidentProfileController extends Controller
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
                 'full_name' => $user->full_name,
+                
+                // QR CODE FIELDS - Using simple path
+                'qr_login_token' => $user->login_qr_code,
+                'qr_code_url' => $qrCodeUrl, // This will be like '/storage/qr-codes/17_1772948368.png'
+                
                 'role' => $user->role ? [
                     'id' => $user->role->id,
                     'name' => $user->role->name,
@@ -172,19 +251,54 @@ class ResidentProfileController extends Controller
     {
         $user = $request->user();
         
+        Log::info('Resident profile edit form viewed', [
+            'user_id' => $user->id,
+            'ip' => $request->ip()
+        ]);
+        
         // Load basic user relationships
         $user->load([
             'role',
-            'currentResident',  // Changed from 'resident' to 'currentResident'
+            'currentResident',
             'household'
         ]);
 
-        $resident = $user->currentResident;  // Changed from $user->resident
+        $resident = $user->currentResident;
         
         // If resident exists, load their relationships
         if ($resident) {
             $resident->load([
                 'purok',
+            ]);
+        }
+
+        // FIXED: Generate QR code URL as simple path
+        $qrCodeUrl = null;
+        if ($user->qr_code_url) {
+            // If it's already a full URL (from old data), extract just the filename
+            if (filter_var($user->qr_code_url, FILTER_VALIDATE_URL)) {
+                $path = parse_url($user->qr_code_url, PHP_URL_PATH);
+                $filename = basename($path);
+                $qrCodeUrl = '/storage/qr-codes/' . $filename;
+            } 
+            // If it's a path with storage/ prefix, clean it
+            elseif (str_contains($user->qr_code_url, 'storage/')) {
+                $filename = basename($user->qr_code_url);
+                $qrCodeUrl = '/storage/qr-codes/' . $filename;
+            }
+            // If it's already the correct relative path (qr-codes/filename.png)
+            elseif (str_starts_with($user->qr_code_url, 'qr-codes/')) {
+                $qrCodeUrl = '/storage/' . $user->qr_code_url;
+            }
+            // Fallback
+            else {
+                $qrCodeUrl = '/storage/' . $user->qr_code_url;
+            }
+            
+            Log::debug('QR code data loaded in edit form', [
+                'user_id' => $user->id,
+                'qr_code_url' => $qrCodeUrl,
+                'original_path' => $user->qr_code_url
             ]);
         }
 
@@ -202,6 +316,11 @@ class ResidentProfileController extends Controller
                 'status' => $user->status,
                 'email_verified_at' => $user->email_verified_at,
                 'full_name' => $user->full_name,
+                
+                // QR CODE FIELDS - Using simple path
+                'qr_login_token' => $user->login_qr_code,
+                'qr_code_url' => $qrCodeUrl, // This will be like '/storage/qr-codes/17_1772948368.png'
+                
                 'role' => $user->role ? [
                     'id' => $user->role->id,
                     'name' => $user->role->name,
@@ -255,6 +374,11 @@ class ResidentProfileController extends Controller
     {
         $user = $request->user();
 
+        Log::info('Profile update initiated', [
+            'user_id' => $user->id,
+            'ip' => $request->ip()
+        ]);
+
         $validated = $request->validate([
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
@@ -263,6 +387,11 @@ class ResidentProfileController extends Controller
         ]);
 
         if ($user->email !== $validated['email']) {
+            Log::info('Email changed, resetting verification', [
+                'user_id' => $user->id,
+                'old_email' => $user->email,
+                'new_email' => $validated['email']
+            ]);
             $user->forceFill(['email_verified_at' => null]);
         }
 
@@ -274,7 +403,7 @@ class ResidentProfileController extends Controller
         ])->save();
 
         // Also update the resident record if it exists
-        $resident = $user->currentResident;  // Changed from $user->resident
+        $resident = $user->currentResident;
         if ($resident) {
             // Validate resident-specific fields if provided
             $residentValidated = $request->validate([
@@ -294,8 +423,14 @@ class ResidentProfileController extends Controller
 
             if (!empty($residentValidated['resident'])) {
                 $resident->update($residentValidated['resident']);
+                Log::info('Resident record updated', [
+                    'user_id' => $user->id,
+                    'resident_id' => $resident->id
+                ]);
             }
         }
+
+        Log::info('Profile updated successfully', ['user_id' => $user->id]);
 
         return redirect()->route('resident.profile.show')->with('status', 'profile-updated');
     }
@@ -311,9 +446,27 @@ class ResidentProfileController extends Controller
 
         $user = $request->user();
 
-        // If user has a resident record, we might want to handle it
-        // For now, just delete the user and let cascade handle it if set up
+        Log::warning('Account deletion initiated', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip()
+        ]);
+
+        // Delete QR code image if exists using Storage facade
+        if ($user->qr_code_url) {
+            Log::info('Deleting QR code image during account deletion', [
+                'user_id' => $user->id,
+                'qr_code_path' => $user->qr_code_url
+            ]);
+            Storage::disk('public')->delete($user->qr_code_url);
+        }
+
         $user->delete();
+
+        Log::info('Account deleted successfully', [
+            'user_id' => $user->id,
+            'email' => $user->email
+        ]);
 
         Auth::logout();
 
@@ -325,16 +478,23 @@ class ResidentProfileController extends Controller
 
     /**
      * Send email verification notification.
-     * This is the only action allowed for residents on their profile.
      */
     public function sendVerificationEmail(Request $request): RedirectResponse
     {
-        if ($request->user()->hasVerifiedEmail()) {
+        $user = $request->user();
+
+        if ($user->hasVerifiedEmail()) {
+            Log::info('Email already verified', ['user_id' => $user->id]);
             return redirect()->route('resident.profile.show')
                 ->with('status', 'already-verified');
         }
 
-        $request->user()->sendEmailVerificationNotification();
+        $user->sendEmailVerificationNotification();
+        
+        Log::info('Verification email sent', [
+            'user_id' => $user->id,
+            'email' => $user->email
+        ]);
 
         return back()->with('status', 'verification-link-sent');
     }

@@ -1,5 +1,4 @@
-// resources/js/Pages/Fees/Show.tsx
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -9,7 +8,6 @@ import { Separator } from '@/components/ui/separator';
 import {
     ArrowLeft,
     Download,
-    Printer,
     FileText,
     CheckCircle,
     Clock,
@@ -25,7 +23,6 @@ import {
     History,
     Edit,
     Trash2,
-    Copy,
     Mail,
     Phone,
     MapPin,
@@ -33,24 +30,25 @@ import {
     Shield,
     TrendingUp,
     FileSignature,
-    Eye,
-    FileCode,
     Tag,
     Percent,
     Calculator,
-    FileSearch,
     CreditCard,
-    ShieldAlert,
-    Receipt,
-    Hash,
-    FileDigit,
-    Building2,
-    Users,
     AlertTriangle,
     Bell,
-    Loader2
+    Eye,
+    FileDown,
+    Printer
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
+import PrintableReceipt from '@/components/admin/receipts/PrintableReceipt';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from '@/components/ui/dialog';
 
 interface Fee {
     id: number;
@@ -95,7 +93,6 @@ interface Fee {
     updated_at: string;
     cancelled_at?: string;
     
-    // Relations
     fee_type?: {
         id: number;
         code: string;
@@ -159,20 +156,6 @@ interface Fee {
         zone?: string;
     };
     
-    payment_history?: Array<{
-        id: number;
-        amount: string;
-        description: string;
-        payment_date: string | null;
-        or_number: string | null;
-        payment_method: string | null;
-        reference_number: string | null;
-        status: string;
-        notes: string | null;
-        received_by: string;
-        created_at: string;
-    }>;
-    
     issued_by_user?: {
         id: number;
         name: string;
@@ -195,6 +178,35 @@ interface Fee {
     };
 }
 
+interface PaymentDiscount {
+    id: number;
+    rule_name: string;
+    discount_type: string | null;
+    amount: number;
+    formatted_amount: string;
+    id_number: string | null;
+    verified_by: string;
+}
+
+interface PaymentHistory {
+    id: number;
+    amount: number;
+    formatted_amount: string;
+    subtotal: number;
+    formatted_subtotal: string;
+    discounts: PaymentDiscount[];
+    total_discount: number;
+    formatted_total_discount: string;
+    description: string;
+    payment_date: string | null;
+    or_number: string | null;
+    payment_method: string | null;
+    reference_number: string | null;
+    status: string;
+    received_by: string;
+    created_at: string | null;
+}
+
 interface RelatedFee {
     id: number;
     fee_code: string;
@@ -211,7 +223,6 @@ interface Permissions {
     can_record_payment: boolean;
     can_cancel: boolean;
     can_waive: boolean;
-    can_print: boolean;
     can_view_audit?: boolean;
     can_approve?: boolean;
     can_collect?: boolean;
@@ -220,26 +231,40 @@ interface Permissions {
 interface FeesShowProps {
     fee: Fee;
     related_fees?: RelatedFee[];
+    payment_history?: PaymentHistory[];
     permissions?: Permissions;
 }
 
 export default function FeesShow({
     fee,
     related_fees = [],
+    payment_history = [],
     permissions = {
         can_edit: false,
         can_delete: false,
         can_record_payment: false,
         can_cancel: false,
-        can_waive: false,
-        can_print: false
+        can_waive: false
     }
 }: FeesShowProps) {
     const [isProcessing, setIsProcessing] = useState(false);
-    const [isPrinting, setIsPrinting] = useState(false);
+    const [showReceiptPreview, setShowReceiptPreview] = useState(false);
+    const [selectedPayment, setSelectedPayment] = useState<PaymentHistory | null>(null);
     const [activeTab, setActiveTab] = useState<'details' | 'computation' | 'requirements' | 'history'>('details');
+    const [isPrinting, setIsPrinting] = useState(false);
+    const receiptRef = useRef<HTMLDivElement>(null);
 
-    // Format date - EXACT SAME as Clearance page
+    // Debug effect to check when receipt renders
+    useEffect(() => {
+        if (showReceiptPreview && receiptRef.current) {
+            console.log('✅ Receipt rendered successfully');
+            console.log('Receipt content length:', receiptRef.current.innerHTML.length);
+        } else if (showReceiptPreview && !receiptRef.current) {
+            console.log('⏳ Waiting for receipt to render...');
+        }
+    }, [showReceiptPreview, selectedPayment]);
+
+    // Format date
     const formatDate = (dateString?: string): string => {
         if (!dateString) return 'Not set';
         try {
@@ -273,7 +298,7 @@ export default function FeesShow({
         }
     };
 
-    // Get status badge variant - SIMILAR pattern as Clearance
+    // Get status badge variant
     const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" | "success" => {
         const variants: Record<string, "default" | "secondary" | "destructive" | "outline" | "success"> = {
             'pending': 'secondary',
@@ -288,7 +313,7 @@ export default function FeesShow({
         return variants[status] || 'outline';
     };
 
-    // Get status icon - SIMILAR pattern as Clearance
+    // Get status icon
     const getStatusIcon = (status: string) => {
         const icons: Record<string, JSX.Element> = {
             'pending': <Clock className="h-4 w-4 text-amber-500" />,
@@ -444,16 +469,11 @@ export default function FeesShow({
         return Math.min(100, Math.max(0, Math.round(progress * 100) / 100));
     };
 
-    // Handle actions - SIMILAR pattern as Clearance
-    const handlePrint = () => {
-        setIsPrinting(true);
-        router.get(`/admin/fees/${fee.id}/print`, {}, {
-            onFinish: () => setIsPrinting(false)
-        });
-    };
-
-    const handleDownload = () => {
-        router.get(`/admin/fees/${fee.id}/download`);
+    // Handle actions
+    const handleDownloadCertificate = () => {
+        if (fee.certificate_number) {
+            window.open(`/admin/fees/${fee.id}/certificate/download`, '_blank');
+        }
     };
 
     const handleRecordPayment = () => {
@@ -473,7 +493,7 @@ export default function FeesShow({
     const handleApprove = () => {
         if (confirm('Approve this fee?')) {
             setIsProcessing(true);
-            router.post(`   /fees/${fee.id}/approve`, {}, {
+            router.post(`/admin/fees/${fee.id}/approve`, {}, {
                 onSuccess: () => setIsProcessing(false),
                 onError: () => setIsProcessing(false)
             });
@@ -520,6 +540,159 @@ export default function FeesShow({
 
     const handleEdit = () => {
         router.visit(`/admin/fees/${fee.id}/edit`);
+    };
+
+    // Handle viewing receipt
+    const handleViewReceipt = (payment: PaymentHistory) => {
+        console.log('Opening receipt for payment:', payment);
+        const receiptData = generateReceiptData(payment);
+        console.log('Generated receipt data:', receiptData);
+        setSelectedPayment(payment);
+        setShowReceiptPreview(true);
+    };
+
+    // Handle downloading receipt as PDF (server-side)
+    const handleDownloadReceipt = (payment: PaymentHistory) => {
+        const url = `/admin/payments/${payment.id}/receipt?action=download`;
+        window.open(url, '_blank');
+    };
+
+    // Handle printing receipt
+    const handlePrintReceipt = () => {
+        if (!receiptRef.current) {
+            console.error('Receipt ref is null');
+            alert('Receipt not ready. Please try again.');
+            return;
+        }
+
+        setIsPrinting(true);
+        
+        try {
+            // Get the receipt content
+            const receiptContent = receiptRef.current.innerHTML;
+            
+            // Create a new window for printing
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert('Please allow pop-ups to print the receipt');
+                setIsPrinting(false);
+                return;
+            }
+
+            // Get all styles from the document
+            const styles = Array.from(document.styleSheets)
+                .map(sheet => {
+                    try {
+                        return Array.from(sheet.cssRules || [])
+                            .map(rule => rule.cssText)
+                            .join('');
+                    } catch (e) {
+                        return '';
+                    }
+                })
+                .join('');
+
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Payment Receipt - ${selectedPayment?.or_number || 'Receipt'}</title>
+                    <style>
+                        ${styles}
+                        body { 
+                            font-family: Arial, sans-serif; 
+                            padding: 20px; 
+                            background: white;
+                            margin: 0;
+                        }
+                        .print\\:hidden { display: none; }
+                        .no-print { display: none; }
+                        @media print {
+                            body { print-color-adjust: exact; }
+                            .print\\:hidden { display: none !important; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${receiptContent}
+                    <div class="no-print" style="text-align: center; margin-top: 20px; padding: 20px;">
+                        <button onclick="window.print()" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                            Print Receipt
+                        </button>
+                        <button onclick="window.close()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                            Close
+                        </button>
+                    </div>
+                    <script>
+                        // Auto-trigger print dialog after a short delay
+                        setTimeout(function() {
+                            window.print();
+                        }, 500);
+                    </script>
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+        } catch (error) {
+            console.error('Error printing receipt:', error);
+            alert('Failed to print receipt. Please try again.');
+        } finally {
+            setIsPrinting(false);
+        }
+    };
+
+    // Simple print using browser's print dialog
+    const handleSimplePrint = () => {
+        if (!receiptRef.current) {
+            alert('Receipt not ready');
+            return;
+        }
+        window.print();
+    };
+
+    // Generate receipt data for PrintableReceipt
+    const generateReceiptData = (payment: PaymentHistory) => {
+        return {
+            id: payment.id,
+            receipt_number: `RCP-${payment.or_number || payment.id}-${new Date().getFullYear()}`,
+            or_number: payment.or_number,
+            receipt_type: 'payment',
+            receipt_type_label: 'OFFICIAL RECEIPT',
+            payer_name: payerInfo.name,
+            payer_address: payerInfo.address || 'N/A',
+            subtotal: payment.subtotal || payment.amount,
+            surcharge: fee.surcharge_amount || 0,
+            penalty: fee.penalty_amount || 0,
+            discount: payment.total_discount || 0,
+            total_amount: payment.amount,
+            amount_paid: payment.amount,
+            change_due: 0,
+            formatted_subtotal: payment.formatted_subtotal || formatCurrency(payment.subtotal || payment.amount),
+            formatted_surcharge: formatCurrency(fee.surcharge_amount || 0),
+            formatted_penalty: formatCurrency(fee.penalty_amount || 0),
+            formatted_discount: payment.formatted_total_discount || formatCurrency(payment.total_discount || 0),
+            formatted_total: payment.formatted_amount || formatCurrency(payment.amount),
+            formatted_amount_paid: payment.formatted_amount || formatCurrency(payment.amount),
+            formatted_change: '₱0.00',
+            payment_method: payment.payment_method || 'cash',
+            payment_method_label: (payment.payment_method || 'cash').toUpperCase(),
+            reference_number: payment.reference_number,
+            formatted_payment_date: payment.payment_date || formatDate(new Date().toISOString()),
+            formatted_issued_date: formatDate(new Date().toISOString()),
+            issued_by: payment.received_by || 'System',
+            fee_breakdown: [
+                {
+                    fee_name: fee.fee_type?.name || 'Fee',
+                    fee_code: fee.fee_code,
+                    base_amount: fee.base_amount,
+                    total_amount: payment.subtotal || payment.amount
+                }
+            ],
+            notes: payment.description || '',
+            payment_id: payment.id,
+            clearance_request_id: null
+        };
     };
 
     // Copy reference number to clipboard
@@ -588,7 +761,7 @@ export default function FeesShow({
             ]}
         >
             <div className="space-y-6">
-                {/* Header with Actions - EXACT SAME structure as Clearance */}
+                {/* Header with Actions */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link href="/admin/fees">
@@ -598,7 +771,7 @@ export default function FeesShow({
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight">Fee</h1>
+                            <h1 className="text-2xl font-bold tracking-tight">Fee Details</h1>
                             <div className="flex items-center gap-2 mt-1">
                                 <Badge variant={getStatusVariant(fee.status)} className="flex items-center gap-1">
                                     {getStatusIcon(fee.status)}
@@ -624,7 +797,6 @@ export default function FeesShow({
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        {/* Always show Edit button for admin */}
                         <Button 
                             variant="outline"
                             onClick={handleEdit}
@@ -633,13 +805,6 @@ export default function FeesShow({
                             Edit
                         </Button>
 
-                        {permissions.can_print && (
-                            <Button onClick={handlePrint} disabled={isPrinting}>
-                                <Printer className="h-4 w-4 mr-2" />
-                                {isPrinting ? 'Printing...' : 'Print Receipt'}
-                            </Button>
-                        )}
-                        
                         {permissions.can_delete && ['pending', 'partially_paid'].includes(fee.status) && (
                             <Button variant="outline" onClick={handleDelete} className="text-red-600">
                                 <Trash2 className="h-4 w-4 mr-2" />
@@ -649,21 +814,21 @@ export default function FeesShow({
                     </div>
                 </div>
 
-                {/* Status Banner - SIMILAR to Clearance */}
-                {fee.status === 'paid' && validityStatus && (
+                {/* Status Banner - For paid fees with certificate */}
+                {fee.status === 'paid' && validityStatus && fee.certificate_number && (
                     <Card className={`border-l-4 ${validityStatus.color.includes('green') ? 'border-l-green-500' : validityStatus.color.includes('amber') ? 'border-l-amber-500' : 'border-l-red-500'}`}>
                         <CardContent className="p-4">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <Shield className={`h-5 w-5 ${validityStatus.color}`} />
                                     <div>
-                                        <p className="font-medium">Fee Status</p>
+                                        <p className="font-medium">Certificate Status</p>
                                         <p className={`text-sm ${validityStatus.color}`}>
-                                            {validityStatus.text} • Paid on {formatDate(fee.payment_date)} • Valid until {formatDate(fee.valid_until)}
+                                            {validityStatus.text} • Issued on {formatDate(fee.payment_date)} • Certificate #{fee.certificate_number}
                                         </p>
                                     </div>
                                 </div>
-                                <Button variant="outline" size="sm" onClick={handleDownload}>
+                                <Button variant="outline" size="sm" onClick={handleDownloadCertificate}>
                                     <Download className="h-4 w-4 mr-2" />
                                     Download Certificate
                                 </Button>
@@ -672,7 +837,7 @@ export default function FeesShow({
                     </Card>
                 )}
 
-                {/* Overdue Warning Banner - NEW for Fees */}
+                {/* Overdue Warning Banner */}
                 {isOverdue() && (
                     <Card className="border-l-4 border-l-red-500">
                         <CardContent className="p-4">
@@ -695,11 +860,11 @@ export default function FeesShow({
                     </Card>
                 )}
 
-                {/* Main Content - EXACT SAME grid structure as Clearance */}
+                {/* Main Content */}
                 <div className="grid gap-6 md:grid-cols-3">
-                    {/* Left Column - Fee Details with Tabs - EXACT SAME structure */}
+                    {/* Left Column - Fee Details with Tabs */}
                     <div className="md:col-span-2 space-y-6">
-                        {/* Tab Navigation - EXACT SAME styling */}
+                        {/* Tab Navigation */}
                         <div className="border-b border-gray-200">
                             <nav className="flex space-x-8">
                                 <button
@@ -737,13 +902,18 @@ export default function FeesShow({
                                     }`}
                                 >
                                     Payment History
+                                    {payment_history.length > 0 && (
+                                        <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">
+                                            {payment_history.length}
+                                        </span>
+                                    )}
                                 </button>
                             </nav>
                         </div>
 
-                        {/* Tab Content - EXACT SAME structure */}
+                        {/* Tab Content */}
                         <div className="pt-2">
-                            {/* Details Tab - SIMILAR structure to Clearance */}
+                            {/* Details Tab */}
                             {activeTab === 'details' && (
                                 <div className="space-y-6">
                                     <Card>
@@ -1028,18 +1198,6 @@ export default function FeesShow({
                                                     </div>
                                                 </div>
 
-                                                {/* Computation Formula */}
-                                                {fee.fee_type?.amount_type === 'formula' && fee.fee_type.computation_formula && (
-                                                    <div className="pt-4 border-t">
-                                                        <p className="text-sm font-medium text-gray-500 mb-2">Computation Formula</p>
-                                                        <div className="bg-gray-50 p-4 rounded-lg">
-                                                            <code className="text-sm font-mono text-gray-700">
-                                                                {fee.fee_type.computation_formula}
-                                                            </code>
-                                                        </div>
-                                                    </div>
-                                                )}
-
                                                 {/* Detailed Computation */}
                                                 {computationDetails && (
                                                     <div className="pt-4 border-t">
@@ -1058,98 +1216,96 @@ export default function FeesShow({
                             )}
 
                             {/* Requirements Tab */}
-                           {activeTab === 'requirements' && (
-                            <div>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <FileCheck className="h-5 w-5" />
-                                        Requirements
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Requirements for this fee type and submitted documents
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-6">
-                                        {/* Fee Type Requirements */}
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-500 mb-3">Fee Type Requirements</p>
-                                            {(() => {
-                                                // Safely get requirements array
-                                                const requirements = fee.fee_type?.requirements;
-                                                let requirementsArray: string[] = [];
-                                                
-                                                if (requirements) {
-                                                    if (Array.isArray(requirements)) {
-                                                        requirementsArray = requirements;
-                                                    } else if (typeof requirements === 'string') {
-                                                        try {
-                                                            const parsed = JSON.parse(requirements);
-                                                            requirementsArray = Array.isArray(parsed) ? parsed : [];
-                                                        } catch {
-                                                            requirementsArray = [];
+                            {activeTab === 'requirements' && (
+                                <div>
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="flex items-center gap-2">
+                                                <FileCheck className="h-5 w-5" />
+                                                Requirements
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Requirements for this fee type and submitted documents
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-6">
+                                                {/* Fee Type Requirements */}
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-500 mb-3">Fee Type Requirements</p>
+                                                    {(() => {
+                                                        const requirements = fee.fee_type?.requirements;
+                                                        let requirementsArray: string[] = [];
+                                                        
+                                                        if (requirements) {
+                                                            if (Array.isArray(requirements)) {
+                                                                requirementsArray = requirements;
+                                                            } else if (typeof requirements === 'string') {
+                                                                try {
+                                                                    const parsed = JSON.parse(requirements);
+                                                                    requirementsArray = Array.isArray(parsed) ? parsed : [];
+                                                                } catch {
+                                                                    requirementsArray = [];
+                                                                }
+                                                            }
                                                         }
-                                                    }
-                                                }
-                                                
-                                                if (requirementsArray.length > 0) {
-                                                    return (
-                                                        <ul className="space-y-2">
-                                                            {requirementsArray.map((req: string, index: number) => (
-                                                                <li key={index} className="flex items-center gap-2">
-                                                                    <FileText className="h-4 w-4 text-gray-400" />
-                                                                    <span className="text-sm">{req}</span>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    );
-                                                }
-                                                return <p className="text-gray-500 text-sm">No requirements specified for this fee type.</p>;
-                                            })()}
-                                        </div>
+                                                        
+                                                        if (requirementsArray.length > 0) {
+                                                            return (
+                                                                <ul className="space-y-2">
+                                                                    {requirementsArray.map((req: string, index: number) => (
+                                                                        <li key={index} className="flex items-center gap-2">
+                                                                            <FileText className="h-4 w-4 text-gray-400" />
+                                                                            <span className="text-sm">{req}</span>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            );
+                                                        }
+                                                        return <p className="text-gray-500 text-sm">No requirements specified for this fee type.</p>;
+                                                    })()}
+                                                </div>
 
-                                        {/* Submitted Requirements */}
-                                        <div className="pt-4 border-t">
-                                            <p className="text-sm font-medium text-gray-500 mb-3">Submitted Requirements</p>
-                                            {(() => {
-                                                // Safely get submitted requirements array
-                                                const submittedReqs = fee.requirements_submitted;
-                                                let submittedRequirementsArray: string[] = [];
-                                                
-                                                if (submittedReqs) {
-                                                    if (Array.isArray(submittedReqs)) {
-                                                        submittedRequirementsArray = submittedReqs;
-                                                    } else if (typeof submittedReqs === 'string') {
-                                                        try {
-                                                            const parsed = JSON.parse(submittedReqs);
-                                                            submittedRequirementsArray = Array.isArray(parsed) ? parsed : [];
-                                                        } catch {
-                                                            submittedRequirementsArray = [];
+                                                {/* Submitted Requirements */}
+                                                <div className="pt-4 border-t">
+                                                    <p className="text-sm font-medium text-gray-500 mb-3">Submitted Requirements</p>
+                                                    {(() => {
+                                                        const submittedReqs = fee.requirements_submitted;
+                                                        let submittedRequirementsArray: string[] = [];
+                                                        
+                                                        if (submittedReqs) {
+                                                            if (Array.isArray(submittedReqs)) {
+                                                                submittedRequirementsArray = submittedReqs;
+                                                            } else if (typeof submittedReqs === 'string') {
+                                                                try {
+                                                                    const parsed = JSON.parse(submittedReqs);
+                                                                    submittedRequirementsArray = Array.isArray(parsed) ? parsed : [];
+                                                                } catch {
+                                                                    submittedRequirementsArray = [];
+                                                                }
+                                                            }
                                                         }
-                                                    }
-                                                }
-                                                
-                                                if (submittedRequirementsArray.length > 0) {
-                                                    return (
-                                                        <ul className="space-y-2">
-                                                            {submittedRequirementsArray.map((req: string, index: number) => (
-                                                                <li key={index} className="flex items-center gap-2">
-                                                                    <CheckCircle className="h-4 w-4 text-green-500" />
-                                                                    <span className="text-sm">{req}</span>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    );
-                                                }
-                                                return <p className="text-gray-500 text-sm">No requirements submitted for this fee.</p>;
-                                            })()}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
+                                                        
+                                                        if (submittedRequirementsArray.length > 0) {
+                                                            return (
+                                                                <ul className="space-y-2">
+                                                                    {submittedRequirementsArray.map((req: string, index: number) => (
+                                                                        <li key={index} className="flex items-center gap-2">
+                                                                            <CheckCircle className="h-4 w-4 text-green-500" />
+                                                                            <span className="text-sm">{req}</span>
+                                                                        </li>
+                                                                    ))}
+                                                                </ul>
+                                                            );
+                                                        }
+                                                        return <p className="text-gray-500 text-sm">No requirements submitted for this fee.</p>;
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            )}
 
                             {/* Payment History Tab */}
                             {activeTab === 'history' && (
@@ -1165,37 +1321,121 @@ export default function FeesShow({
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent>
-                                            {fee.payment_history && fee.payment_history.length > 0 ? (
-                                                <div className="space-y-4">
-                                                    {fee.payment_history.map((payment) => (
-                                                        <div key={payment.id} className="flex gap-3 pb-4 border-l-2 border-gray-200 last:border-l-0 last:pb-0">
-                                                            <div className="flex-shrink-0 w-6 h-6 -ml-3 mt-0.5 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center">
-                                                                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <div className="flex items-center justify-between">
-                                                                    <p className="font-medium">{formatCurrency(payment.amount)}</p>
-                                                                    <p className="text-xs text-gray-500">{formatDateTime(payment.payment_date || payment.created_at)}</p>
+                                            {payment_history && payment_history.length > 0 ? (
+                                                <div className="space-y-6">
+                                                    {payment_history.map((payment) => (
+                                                        <div key={payment.id} className="space-y-4">
+                                                            {/* Main Payment Entry */}
+                                                            <div className="flex gap-3 pb-4 border-l-2 border-gray-200">
+                                                                <div className="flex-shrink-0 w-6 h-6 -ml-3 mt-0.5 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center">
+                                                                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                                                                 </div>
-                                                                <p className="text-sm text-gray-600 mt-1">{payment.description}</p>
-                                                                <div className="flex items-center gap-2 mt-2">
-                                                                    {payment.or_number && (
+                                                                <div className="flex-1">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <p className="font-medium">{payment.formatted_amount || formatCurrency(payment.amount)}</p>
+                                                                            <div className="flex items-center gap-1">
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    className="h-6 px-2 text-xs"
+                                                                                    onClick={() => handleViewReceipt(payment)}
+                                                                                >
+                                                                                    <Eye className="h-3 w-3 mr-1" />
+                                                                                    View
+                                                                                </Button>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    className="h-6 px-2 text-xs"
+                                                                                    onClick={() => handleDownloadReceipt(payment)}
+                                                                                >
+                                                                                    <FileDown className="h-3 w-3 mr-1" />
+                                                                                    PDF
+                                                                                </Button>
+                                                                            </div>
+                                                                        </div>
+                                                                        <p className="text-xs text-gray-500">{formatDateTime(payment.payment_date || payment.created_at)}</p>
+                                                                    </div>
+                                                                    <p className="text-sm text-gray-600 mt-1">{payment.description}</p>
+                                                                    
+                                                                    {/* Payment Details */}
+                                                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                                                        {payment.or_number && (
+                                                                            <Badge variant="outline" className="text-xs">
+                                                                                OR#: {payment.or_number}
+                                                                            </Badge>
+                                                                        )}
+                                                                        {payment.payment_method && (
+                                                                            <Badge variant="outline" className="text-xs">
+                                                                                {payment.payment_method.toUpperCase()}
+                                                                            </Badge>
+                                                                        )}
+                                                                        {payment.reference_number && (
+                                                                            <Badge variant="outline" className="text-xs">
+                                                                                Ref: {payment.reference_number}
+                                                                            </Badge>
+                                                                        )}
                                                                         <Badge variant="outline" className="text-xs">
-                                                                            OR#: {payment.or_number}
+                                                                            By {payment.received_by}
                                                                         </Badge>
+                                                                    </div>
+
+                                                                    {/* Discounts Section */}
+                                                                    {payment.discounts && payment.discounts.length > 0 && (
+                                                                        <div className="mt-3 bg-green-50 p-3 rounded-lg">
+                                                                            <p className="text-xs font-medium text-green-700 mb-2">Applied Discounts</p>
+                                                                            <div className="space-y-2">
+                                                                                {payment.discounts.map((discount) => (
+                                                                                    <div key={discount.id} className="flex justify-between items-center text-sm">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <span className="text-green-600">●</span>
+                                                                                            <span className="text-gray-700">{discount.rule_name}</span>
+                                                                                        </div>
+                                                                                        <div className="text-right">
+                                                                                            <span className="font-medium text-green-700">
+                                                                                                - {discount.formatted_amount || formatCurrency(discount.amount)}
+                                                                                            </span>
+                                                                                            {discount.id_number && (
+                                                                                                <span className="block text-xs text-gray-500">
+                                                                                                    ID: {discount.id_number}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                                {payment.total_discount > 0 && (
+                                                                                    <div className="pt-2 border-t border-green-200 flex justify-between items-center">
+                                                                                        <span className="text-sm font-medium text-gray-700">Total Discount</span>
+                                                                                        <span className="text-sm font-bold text-green-700">
+                                                                                            - {payment.formatted_total_discount || formatCurrency(payment.total_discount)}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
                                                                     )}
-                                                                    {payment.payment_method && (
-                                                                        <Badge variant="outline" className="text-xs">
-                                                                            {payment.payment_method.toUpperCase()}
-                                                                        </Badge>
+
+                                                                    {/* Subtotal and Total Breakdown */}
+                                                                    {payment.subtotal > 0 && (
+                                                                        <div className="mt-3 text-xs text-gray-500 space-y-1">
+                                                                            <div className="flex justify-between">
+                                                                                <span>Subtotal:</span>
+                                                                                <span>{payment.formatted_subtotal || formatCurrency(payment.subtotal)}</span>
+                                                                            </div>
+                                                                            {payment.total_discount > 0 && (
+                                                                                <div className="flex justify-between text-green-600">
+                                                                                    <span>Discounts:</span>
+                                                                                    <span>- {payment.formatted_total_discount || formatCurrency(payment.total_discount)}</span>
+                                                                                </div>
+                                                                            )}
+                                                                            <div className="flex justify-between font-medium text-gray-700 pt-1 border-t border-gray-200">
+                                                                                <span>Total Paid:</span>
+                                                                                <span>{payment.formatted_amount || formatCurrency(payment.amount)}</span>
+                                                                            </div>
+                                                                        </div>
                                                                     )}
-                                                                    <Badge variant="outline" className="text-xs">
-                                                                        By {payment.received_by}
-                                                                    </Badge>
                                                                 </div>
-                                                                {payment.notes && (
-                                                                    <p className="text-sm text-gray-500 mt-2">{payment.notes}</p>
-                                                                )}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -1216,7 +1456,7 @@ export default function FeesShow({
                         </div>
                     </div>
 
-                    {/* Right Column - Status & Actions - EXACT SAME structure as Clearance */}
+                    {/* Right Column - Status & Actions */}
                     <div className="space-y-6">
                         {/* Status Summary */}
                         <Card>
@@ -1326,7 +1566,7 @@ export default function FeesShow({
                             </CardContent>
                         </Card>
 
-                        {/* Actions Panel - SIMILAR structure to Clearance */}
+                        {/* Actions Panel */}
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
@@ -1413,7 +1653,7 @@ export default function FeesShow({
                             </CardContent>
                         </Card>
 
-                        {/* Quick Info - EXACT SAME structure as Clearance */}
+                        {/* Quick Info */}
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-sm font-medium">Quick Information</CardTitle>
@@ -1444,6 +1684,63 @@ export default function FeesShow({
                     </div>
                 </div>
             </div>
+
+            {/* Receipt Preview Dialog - Only for Payments */}
+            <Dialog open={showReceiptPreview} onOpenChange={setShowReceiptPreview}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Payment Receipt</DialogTitle>
+                        <DialogDescription>
+                            View, print, or save the official receipt for this payment.
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex justify-end gap-2 mb-4 print:hidden">
+                        <Button 
+                            variant="outline" 
+                            onClick={handleSimplePrint}
+                            disabled={isPrinting}
+                        >
+                            <Printer className="h-4 w-4 mr-2" />
+                            Print
+                        </Button>
+                        <Button 
+                            variant="default" 
+                            onClick={handlePrintReceipt}
+                            disabled={isPrinting}
+                        >
+                            {isPrinting ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Preparing...
+                                </>
+                            ) : (
+                                <>
+                                    <FileDown className="h-4 w-4 mr-2" />
+                                    Print & Download
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                    
+                    {selectedPayment && (
+                        <PrintableReceipt
+                            ref={receiptRef}
+                            receipt={generateReceiptData(selectedPayment)}
+                            barangay={{
+                                name: 'Barangay Management System',
+                                address: 'City of San Fernando, La Union',
+                            }}
+                            copyType="original"
+                            showSaveButton={true}
+                            onSave={() => {
+                                setShowReceiptPreview(false);
+                            }}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

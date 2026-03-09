@@ -496,7 +496,7 @@ export default function PaymentShow({
             <ResidentLayout
                 breadcrumbs={[
                     { title: 'Dashboard', href: '/portal/dashboard' },
-                    { title: 'My Payments', href: '/portal/my-payments' },
+                    { title: 'My Payments', href: '/portal/payments' },
                     { title: 'Error', href: '#' }
                 ]}
             >
@@ -508,7 +508,7 @@ export default function PaymentShow({
                         icon={AlertCircle}
                         action={{
                             label: "Back to Payments",
-                            onClick: () => router.get('/my-payments')
+                            onClick: () => router.get('/payments')
                         }}
                     />
                 </div>
@@ -521,7 +521,7 @@ export default function PaymentShow({
             <ResidentLayout
                 breadcrumbs={[
                     { title: 'Dashboard', href: '/portal/dashboard' },
-                    { title: 'My Payments', href: '/portal/my-payments' }
+                    { title: 'My Payments', href: '/portal/payments' }
                 ]}
             >
                 <div className="min-h-[50vh] flex items-center justify-center px-4">
@@ -532,7 +532,7 @@ export default function PaymentShow({
                         icon={Receipt}
                         action={{
                             label: "Back to Payments",
-                            onClick: () => router.get('/my-payments')
+                            onClick: () => router.get('/payments')
                         }}
                     />
                 </div>
@@ -559,7 +559,7 @@ export default function PaymentShow({
         }
 
         // Use the PDF view route
-        router.get(route('portal.resident.payments.receipt.view', payment.id), {}, {
+        router.get(route('portal.my.payments.receipt.view', payment.id), {}, {
             preserveState: false,
             onSuccess: () => {
                 setIsPrinting(false);
@@ -577,7 +577,7 @@ export default function PaymentShow({
         setIsDownloadingReceipt(true);
         
         // Use the download route
-        window.location.href = route('portal.resident.payments.receipt.download', payment.id);
+        window.location.href = route('portal.resident.my.payments.receipt.download', payment.id);
         
         // Reset loading state after a delay
         setTimeout(() => {
@@ -588,7 +588,7 @@ export default function PaymentShow({
     const handleSaveReceipt = () => {
         setIsSavingReceipt(true);
         
-        router.post(route('portal.resident.payments.receipt.save', payment.id), {
+        router.post(route('portal.resident.my.payments.receipt.save', payment.id), {
             receipt_number: `RCP-${payment.or_number}-${new Date().getFullYear()}`,
             or_number: payment.or_number,
             receipt_type: payment.collection_type || 'payment',
@@ -663,7 +663,7 @@ export default function PaymentShow({
     };
 
     const handleEdit = () => {
-        router.get(`/portal/my-payments/${payment.id}/edit`);
+        router.get(`/portal/payments/${payment.id}/edit`);
     };
 
     const handleDelete = () => {
@@ -672,7 +672,7 @@ export default function PaymentShow({
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Payment deleted successfully');
-                router.get('/my-payments');
+                router.get('/payments');
             },
             onError: () => {
                 toast.error('Failed to delete payment');
@@ -899,7 +899,7 @@ export default function PaymentShow({
         <ResidentLayout
             breadcrumbs={[
                 { title: 'Dashboard', href: '/portal/dashboard' },
-                { title: 'My Payments', href: '/portal/my-payments' },
+                { title: 'My Payments', href: '/portal/payments' },
                 { title: `OR #${payment.or_number}`, href: '#' }
             ]}
             hideMobileFooter={isMobile}
@@ -913,7 +913,7 @@ export default function PaymentShow({
                             subtitle="Payment Receipt"
                             referenceNumber={payment.reference_number || payment.or_number}
                             onCopyReference={copyOrNumber}
-                            onBack={() => router.get('/my-payments')}
+                            onBack={() => router.get('/payments')}
                             showSticky={showStickyActions}
                             actions={
                                 <DropdownMenu>
@@ -1066,7 +1066,7 @@ export default function PaymentShow({
                 {!isMobile && (
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                         <div className="flex items-start gap-4">
-                            <Link href="/portal/my-payments">
+                            <Link href="/portal/payments">
                                 <Button variant="ghost" size="sm" className="gap-2 rounded-xl">
                                     <ArrowLeft className="h-4 w-4" />
                                     Back
@@ -2103,7 +2103,7 @@ export default function PaymentShow({
                                             return (
                                                 <Link
                                                     key={related.id}
-                                                    href={`/portal/my-payments/${related.id}`}
+                                                    href={`/portal/payments/${related.id}`}
                                                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
                                                 >
                                                     <div className={cn(
@@ -2173,7 +2173,7 @@ export default function PaymentShow({
                     
                     <div className="mt-4">
                         <iframe 
-                            src={route('portal.resident.payments.receipt.view', payment.id)} 
+                            src={route('portal.my.payments.receipt.view', payment.id)} 
                             className="w-full h-[600px] border-0 rounded-lg"
                             title="Receipt Preview"
                         />

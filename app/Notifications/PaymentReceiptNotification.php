@@ -1,93 +1,71 @@
 <?php
+// app/Notifications/PaymentReceiptNotification.php
 
 namespace App\Notifications;
 
 use App\Models\Payment;
+use App\Models\Receipt;
+use App\Models\Resident;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
-use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Messages\DatabaseMessage;
 
-class PaymentReceiptNotification extends Notification implements ShouldQueue
+class PaymentReceiptNotification extends Notification
 {
     use Queueable;
 
-    public $payment;
+    protected $payment;
+    protected $receipt;
 
-    /**
-     * Create a new notification instance.
-     */
-    public function __construct(Payment $payment)
+    public function __construct(Payment $payment, Receipt $receipt)
     {
         $this->payment = $payment;
+        $this->receipt = $receipt;
     }
 
-    /**
-     * Get the notification's delivery channels.
-     */
-    public function via(object $notifiable): array
+    public function via($notifiable): array
     {
-        return ['mail', 'database'];
+        return ['database'];
     }
 
-    /**
-     * Get the mail representation of the notification.
-     */
-    public function toMail(object $notifiable): MailMessage
+    public function toArray($notifiable): array
     {
-        $subject = 'Payment Receipt - OR# ' . $this->payment->or_number;
+        $payerName = $this->payment->payer_name;
+        $amount = number_format($this->payment->amount_paid, 2);
         
-        return (new MailMessage)
-            ->subject($subject)
-            ->greeting('Payment Confirmed!')
-            ->line('Thank you for your payment. Here are your payment details:')
-            ->line('')
-            ->line('**PAYMENT RECEIPT**')
-            ->line('OR Number: **' . $this->payment->or_number . '**')
-            ->line('Date: ' . $this->payment->payment_date->format('F d, Y h:i A'))
-            ->line('Payer: ' . $this->payment->payer_name)
-            ->line('Payment Method: ' . $this->payment->payment_method_display)
-            ->line('')
-            ->line('**PAYMENT BREAKDOWN**')
-            ->line('Subtotal: ₱' . number_format($this->payment->subtotal, 2))
-            ->line('Surcharge: ₱' . number_format($this->payment->surcharge, 2))
-            ->line('Penalty: ₱' . number_format($this->payment->penalty, 2))
-            ->line('Discount: -₱' . number_format($this->payment->discount, 2))
-            ->line('────────────────────')
-            ->line('**Total Paid: ₱' . number_format($this->payment->total_amount, 2) . '**')
-            ->line('')
-            ->line('**ITEMS PAID:**')
-            ->when($this->payment->items->isNotEmpty(), function ($mail) {
-                foreach ($this->payment->items as $item) {
-                    $mail->line('• ' . $item->fee_name . ': ₱' . number_format($item->total_amount, 2));
-                }
-            })
-            ->line('')
-            ->line('**Payment Status:** ✅ Completed')
-            ->line('Recorded by: ' . $this->payment->recorded_by_user_name)
-            ->line('')
-            ->line('This receipt serves as official confirmation of your payment.')
-            ->action('View Receipt', url('/payments/' . $this->payment->id . '/receipt'))
-            ->salutation('Thank you for your payment.');
-    }
-
-    /**
-     * Get the array representation for database storage.
-     */
-    public function toDatabase(object $notifiable): array
-    {
+        // Get resident name if available
+        $residentName = null;
+        if ($this->payment->payer_type === 'resident' && $this->payment->payer_id) {
+            $resident = Resident::find($this->payment->payer_id);
+            $residentName = $resident ? $resident->full_name : null;
+        }
+        
         return [
+            'type' => 'receipt',
+            'action' => 'generated',
+            'receipt_id' => $this->receipt->id,
+            'receipt_number' => $this->receipt->receipt_number,
+            'receipt_type' => $this->receipt->type,
             'payment_id' => $this->payment->id,
-            'title' => 'Payment Receipt',
-            'message' => 'Payment confirmed for OR# ' . $this->payment->or_number . ' - Amount: ₱' . number_format($this->payment->total_amount, 2),
             'or_number' => $this->payment->or_number,
-            'amount' => $this->payment->total_amount,
-            'payer_name' => $this->payment->payer_name,
-            'type' => 'payment_receipt',
-            'action_url' => '/payments/' . $this->payment->id,
-            'icon' => 'receipt',
-            'color' => 'success',
+            'payer_id' => $this->payment->payer_id,
+            'payer_type' => $this->payment->payer_type,
+            'payer_name' => $payerName,
+            'resident_name' => $residentName ?? $payerName,
+            'amount' => $this->payment->amount_paid,
+            'formatted_amount' => '₱' . $amount,
+            'total_amount' => $this->payment->total_amount,
+            'formatted_total' => '₱' . number_format($this->payment->total_amount, 2),
+            'payment_method' => $this->payment->payment_method,
+            'purpose' => $this->payment->purpose,
+            'message' => "Your receipt #{$this->receipt->receipt_number} for ₱{$amount} is ready",
+            'title' => 'Payment Receipt Generated',
+            'is_fee_notification' => true,
+            'created_at' => now()->toDateTimeString(),
+            // FIXED: Portal link for residents
+            'url' => '/portal/receipts/' . $this->receipt->id,
+            'link' => '/portal/receipts/' . $this->receipt->id,
+            'action_url' => '/portal/receipts/' . $this->receipt->id,
+            // REMOVED target_roles and excluded_roles - they're for residents now!
         ];
     }
 }

@@ -416,7 +416,7 @@ const getRoute = (name: string, params?: any) => {
     
     const fallbacks: Record<string, any> = {
         'payments.index': '/admin/payments',
-        'payments.edit': (id: number) => `/admin/payments/${id}/edit`,
+        // 'payments.edit': (id: number) => `/admin/payments/${id}/edit`,
         'residents.show': (id: number) => `/admin/residents/${id}`,
         'households.show': (id: number) => `/admin/households/${id}`,
         'clearance-requests.show': (id: number) => `/admin/clearances/${id}`,
@@ -825,12 +825,12 @@ export default function PaymentShow() {
                                 <Printer className="h-4 w-4 mr-2" />
                                 Print Receipt
                             </Button>
-                            <Link href={getRoute('payments.edit', payment.id)}>
+                            {/* <Link href={getRoute('payments.edit', payment.id)}>
                                 <Button size="sm">
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit Payment
                                 </Button>
-                            </Link>
+                            </Link> */}
                         </div>
                     </div>
 
