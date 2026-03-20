@@ -140,7 +140,7 @@ export const ModernFormGridCard = ({
           </div>
 
           {/* Details Card */}
-          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 mb-3 space-y-2">
+          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 mb-3 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-500">Downloads</span>
               <span className="text-lg font-bold text-gray-900 dark:text-white">

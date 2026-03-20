@@ -89,7 +89,7 @@ export function ClearanceTypeStep({
                                 onChange={(e) => {
                                     setCategoryFilter(e.target.value);
                                 }}
-                                className="flex-1 h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                className="flex-1 h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
                             >
                                 {categories.map(cat => (
                                     <option key={cat} value={cat}>
@@ -164,7 +164,7 @@ export function ClearanceTypeStep({
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                                            <div className={`p-2 rounded-lg flex-shrink-0 ${dataClearanceTypeId === type.id.toString() ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                                            <div className={`p-2 rounded-lg flex-shrink-0 ${dataClearanceTypeId === type.id.toString() ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-900'}`}>
                                                 <FileCheck className={`h-5 w-5 ${dataClearanceTypeId === type.id.toString() ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`} />
                                             </div>
                                             <div className="min-w-0 flex-1">
@@ -173,7 +173,7 @@ export function ClearanceTypeStep({
                                                         {type.name}
                                                     </h3>
                                                     {type.category && (
-                                                        <Badge variant="outline" className="text-xs bg-gray-50 dark:bg-gray-800">
+                                                        <Badge variant="outline" className="text-xs bg-gray-50 dark:bg-gray-900">
                                                             {type.category}
                                                         </Badge>
                                                     )}
@@ -244,7 +244,7 @@ export function ClearanceTypeStep({
                                     onClick={() => onClearanceTypeChange(type.id.toString())}
                                 >
                                     <div className="flex items-start justify-between mb-2">
-                                        <div className={`p-2 rounded-lg ${dataClearanceTypeId === type.id.toString() ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                                        <div className={`p-2 rounded-lg ${dataClearanceTypeId === type.id.toString() ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-900'}`}>
                                             <FileCheck className={`h-5 w-5 ${dataClearanceTypeId === type.id.toString() ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`} />
                                         </div>
                                         {dataClearanceTypeId === type.id.toString() ? (
@@ -375,15 +375,15 @@ export function ClearanceTypeStep({
                         </Button>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-                        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+                        <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
                             <div className="font-medium">Processing</div>
                             <div className="text-gray-600 dark:text-gray-400">{selectedClearance.processing_days} days</div>
                         </div>
-                        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+                        <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
                             <div className="font-medium">Validity</div>
                             <div className="text-gray-600 dark:text-gray-400">{selectedClearance.validity_days} days</div>
                         </div>
-                        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+                        <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
                             <div className="font-medium">Documents</div>
                             <div className={selectedClearance.document_types?.some(doc => doc.is_required) ? 'text-red-600' : 'text-green-600'}>
                                 {selectedClearance.document_types?.filter(doc => doc.is_required).length || 0} required

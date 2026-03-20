@@ -14,7 +14,7 @@ class DiscountRule extends Model
         'code',
         'name',
         'description',
-        'discount_type', // SENIOR, PWD, SOLO_PARENT, INDIGENT, VETERAN, etc.
+        'discount_type', // Will be mapped to privilege codes
         'value_type', // percentage or fixed
         'discount_value', // e.g., 20 for 20%, or 50 for fixed amount
         'maximum_discount_amount', // maximum discount amount (for percentage)
@@ -31,6 +31,8 @@ class DiscountRule extends Model
         'is_active',
         'sort_order',
         'notes',
+        // DYNAMIC: Map to privilege IDs
+        'privilege_id', // Link to privileges table
     ];
 
     protected $casts = [
@@ -52,28 +54,12 @@ class DiscountRule extends Model
         'formatted_value',
         'status',
         'is_expired',
+        'type_label',
+        'privilege_code', // DYNAMIC: Get from linked privilege
     ];
 
-    const DISCOUNT_TYPES = [
-        'SENIOR' => 'Senior Citizen',
-        'PWD' => 'Person with Disability',
-        'SOLO_PARENT' => 'Solo Parent',
-        'INDIGENT' => 'Indigent',
-        'VETERAN' => 'Veteran',
-        'STUDENT' => 'Student',
-        'EMPLOYEE' => 'Employee',
-        'MEMBER' => 'Organization Member',
-        'EARLY_BIRD' => 'Early Bird',
-        'LOYALTY' => 'Loyalty Discount',
-        'BULK' => 'Bulk Discount',
-        'PROMO' => 'Promotional',
-        'OTHER' => 'Other',
-    ];
-
-    const VALUE_TYPES = [
-        'percentage' => 'Percentage',
-        'fixed' => 'Fixed Amount',
-    ];
+    // REMOVED: Hardcoded DISCOUNT_TYPES constant
+    // REMOVED: Hardcoded VALUE_TYPES constant
 
     // Relationships
     public function feeTypes()
@@ -102,6 +88,28 @@ class DiscountRule extends Model
         return $this->hasMany(PaymentDiscount::class);
     }
 
+    /**
+     * Link to privilege - DYNAMIC
+     */
+    public function privilege()
+    {
+        return $this->belongsTo(Privilege::class);
+    }
+
+    /**
+     * Get all privileges for reference
+     */
+    public function getAllPrivileges()
+    {
+        return Cache::remember('all_privileges_for_discounts', 3600, function () {
+            return Privilege::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'description'])
+                ->keyBy('code')
+                ->toArray();
+        });
+    }
+
     // Scopes
     public function scopeActive($query)
     {
@@ -119,6 +127,14 @@ class DiscountRule extends Model
     public function scopeByType($query, $type)
     {
         return $query->where('discount_type', $type);
+    }
+
+    /**
+     * Scope by privilege ID
+     */
+    public function scopeByPrivilege($query, $privilegeId)
+    {
+        return $query->where('privilege_id', $privilegeId);
     }
 
     public function scopeApplicableTo($query, $applicableTo)
@@ -157,7 +173,6 @@ class DiscountRule extends Model
         if ($this->value_type === 'percentage') {
             $discount = $amount * ($this->discount_value / 100);
             
-            // Apply maximum discount if set
             if ($this->maximum_discount_amount && $discount > $this->maximum_discount_amount) {
                 $discount = $this->maximum_discount_amount;
             }
@@ -168,14 +183,15 @@ class DiscountRule extends Model
         return round($discount, 2);
     }
 
+    /**
+     * Check if discount is applicable to resident - DYNAMIC using privileges
+     */
     public function isApplicableToResident(Resident $resident): bool
     {
-        // Check if discount is active
         if (!$this->is_active) {
             return false;
         }
 
-        // Check effective/expiry dates
         if ($this->effective_date && $this->effective_date->isFuture()) {
             return false;
         }
@@ -184,33 +200,97 @@ class DiscountRule extends Model
             return false;
         }
 
-        // Check based on discount type
-        switch ($this->discount_type) {
-            case 'SENIOR':
-                return $resident->is_senior ?? false;
-            case 'PWD':
-                return $resident->is_pwd ?? false;
-            case 'SOLO_PARENT':
-                return $resident->is_solo_parent ?? false;
-            case 'INDIGENT':
-                return $resident->is_indigent ?? false;
-            case 'VETERAN':
-                return $resident->is_veteran ?? false;
-            case 'STUDENT':
-                return $resident->is_student ?? false;
-            default:
-                return true;
+        // If linked to a specific privilege, check if resident has it
+        if ($this->privilege_id) {
+            return $resident->residentPrivileges()
+                ->where('privilege_id', $this->privilege_id)
+                ->whereNotNull('verified_at')
+                ->exists();
         }
+
+        // Fallback to discount_type for backward compatibility
+        if ($this->discount_type) {
+            return $resident->residentPrivileges()
+                ->whereHas('privilege', function($q) {
+                    $q->where('code', $this->discount_type);
+                })
+                ->whereNotNull('verified_at')
+                ->exists();
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if resident has the required ID number for this discount
+     */
+    public function residentHasIdNumber(Resident $resident): bool
+    {
+        if (!$this->requires_verification) {
+            return true;
+        }
+
+        // If linked to privilege, check for ID number
+        if ($this->privilege_id) {
+            return $resident->residentPrivileges()
+                ->where('privilege_id', $this->privilege_id)
+                ->whereNotNull('id_number')
+                ->where('id_number', '!=', '')
+                ->exists();
+        }
+
+        // Fallback to discount_type
+        if ($this->discount_type) {
+            return $resident->residentPrivileges()
+                ->whereHas('privilege', function($q) {
+                    $q->where('code', $this->discount_type);
+                })
+                ->whereNotNull('id_number')
+                ->where('id_number', '!=', '')
+                ->exists();
+        }
+
+        return false;
+    }
+
+    /**
+     * Get resident's ID number for this discount
+     */
+    public function getResidentIdNumber(Resident $resident): ?string
+    {
+        if (!$this->requires_verification) {
+            return null;
+        }
+
+        // If linked to privilege, get ID number
+        if ($this->privilege_id) {
+            $rp = $resident->residentPrivileges()
+                ->where('privilege_id', $this->privilege_id)
+                ->first();
+                
+            return $rp?->id_number;
+        }
+
+        // Fallback to discount_type
+        if ($this->discount_type) {
+            $rp = $resident->residentPrivileges()
+                ->whereHas('privilege', function($q) {
+                    $q->where('code', $this->discount_type);
+                })
+                ->first();
+                
+            return $rp?->id_number;
+        }
+
+        return null;
     }
 
     public function canCombineWith(DiscountRule $otherRule): bool
     {
-        // If this rule is not stackable, it can't combine with any
         if (!$this->stackable) {
             return false;
         }
 
-        // Check exclusive_with list
         if (!empty($this->exclusive_with)) {
             if (in_array($otherRule->discount_type, $this->exclusive_with)) {
                 return false;
@@ -254,8 +334,126 @@ class DiscountRule extends Model
         return $this->expiry_date && $this->expiry_date->isPast();
     }
 
+    /**
+     * Get privilege code if linked - DYNAMIC
+     */
+    public function getPrivilegeCodeAttribute(): ?string
+    {
+        if ($this->relationLoaded('privilege') && $this->privilege) {
+            return $this->privilege->code;
+        }
+        
+        if ($this->privilege_id) {
+            $privilege = Privilege::find($this->privilege_id);
+            return $privilege?->code;
+        }
+
+        return $this->discount_type;
+    }
+
+    /**
+     * Get type label dynamically from privilege
+     */
     public function getTypeLabelAttribute(): string
     {
-        return self::DISCOUNT_TYPES[$this->discount_type] ?? $this->discount_type;
+        if ($this->relationLoaded('privilege') && $this->privilege) {
+            return $this->privilege->name;
+        }
+
+        if ($this->privilege_id) {
+            $privilege = Privilege::find($this->privilege_id);
+            if ($privilege) {
+                return $privilege->name;
+            }
+        }
+
+        // Fallback: try to format the discount_type
+        return ucwords(strtolower(str_replace('_', ' ', $this->discount_type ?? 'Unknown')));
+    }
+
+    /**
+     * Get applicable privileges from database
+     */
+    public static function getApplicableDiscountTypes(): array
+    {
+        $privileges = Privilege::where('is_active', true)
+            ->orderBy('name')
+            ->get(['code', 'name']);
+
+        $types = [];
+        foreach ($privileges as $p) {
+            $types[$p->code] = $p->name;
+        }
+
+        return $types;
+    }
+
+    /**
+     * Get all discount rules with their linked privileges
+     */
+    public static function getActiveWithPrivileges()
+    {
+        return self::with('privilege')
+            ->active()
+            ->priorityOrder()
+            ->get()
+            ->map(function ($rule) {
+                $rule->privilege_name = $rule->privilege?->name ?? 
+                    ucwords(strtolower(str_replace('_', ' ', $rule->discount_type ?? 'Unknown')));
+                $rule->privilege_code = $rule->privilege?->code ?? $rule->discount_type;
+                return $rule;
+            });
+    }
+
+    /**
+     * Create a discount rule for a privilege
+     */
+    public static function createForPrivilege(Privilege $privilege, array $data = []): self
+    {
+        $defaults = [
+            'code' => $privilege->code,
+            'name' => $privilege->name . ' Discount',
+            'description' => $privilege->description ?? 'Discount for ' . $privilege->name,
+            'discount_type' => $privilege->code,
+            'privilege_id' => $privilege->id,
+            'value_type' => 'percentage',
+            'discount_value' => $privilege->default_discount_percentage ?? 0,
+            'requires_verification' => $privilege->requires_verification,
+            'verification_document' => $privilege->requires_verification ? 'Government ID' : null,
+            'is_active' => $privilege->is_active,
+        ];
+
+        return self::create(array_merge($defaults, $data));
+    }
+
+    /**
+     * Sync discount rules with privileges
+     */
+    public static function syncWithPrivileges(): void
+    {
+        $privileges = Privilege::where('is_active', true)->get();
+
+        foreach ($privileges as $privilege) {
+            $rule = self::where('privilege_id', $privilege->id)->first();
+            
+            if (!$rule) {
+                self::createForPrivilege($privilege);
+            } else {
+                $rule->update([
+                    'code' => $privilege->code,
+                    'name' => $privilege->name . ' Discount',
+                    'description' => $privilege->description ?? $rule->description,
+                    'discount_type' => $privilege->code,
+                    'discount_value' => $privilege->default_discount_percentage ?? $rule->discount_value,
+                    'requires_verification' => $privilege->requires_verification,
+                    'is_active' => $privilege->is_active,
+                ]);
+            }
+        }
+
+        // Deactivate rules for inactive privileges
+        self::whereNotNull('privilege_id')
+            ->whereNotIn('privilege_id', $privileges->pluck('id'))
+            ->update(['is_active' => false]);
     }
 }

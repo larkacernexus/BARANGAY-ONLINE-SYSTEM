@@ -148,7 +148,7 @@ export default function PaymentsBulkActions({
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 mb-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 mb-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 {/* Left side: Selection info */}
                 <div className="flex items-center gap-3">
@@ -229,7 +229,7 @@ export default function PaymentsBulkActions({
                                     </>
                                 )}
                             </Button>
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                                 <div className="py-1">
                                     <button
                                         onClick={onSelectAllOnPage}
@@ -300,7 +300,7 @@ export default function PaymentsBulkActions({
                                 </Button>
                                 
                                 {showBulkActions && (
-                                    <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+                                    <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
                                         <div className="p-2">
                                             <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">
                                                 BULK ACTIONS

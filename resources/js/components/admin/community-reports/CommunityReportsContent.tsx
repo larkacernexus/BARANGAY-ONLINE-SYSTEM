@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -13,18 +12,14 @@ import {
     List, 
     Grid3X3, 
     Plus,
-    RefreshCw,
-    Smartphone,
-    CheckSquare,
-    Square
+    Smartphone
 } from 'lucide-react';
-import CommunityReportRow from './CommunityReportRow';
-import CommunityReportExpandedRow from './CommunityReportExpandedRow';
+import CommunityReportsTableView from './CommunityReportsTableView';
 import CommunityReportsGridView from './CommunityReportsGridView';
 import CommunityReportBulkActions from './CommunityReportBulkActions';
 import { useEffect, useState, useRef } from 'react';
-import { SelectAllFloat } from '@/components/adminui/select-all-float'; // ADD THIS IMPORT
-import { GridSelectionSummary } from '@/components/adminui/grid-selection-summary'; // ADD THIS IMPORT
+import { SelectAllFloat } from '@/components/adminui/select-all-float';
+import { GridSelectionSummary } from '@/components/adminui/grid-selection-summary';
 
 interface CommunityReportsContentProps {
     reports: CommunityReport[];
@@ -64,7 +59,6 @@ interface CommunityReportsContentProps {
     setShowBulkAssignDialog?: (show: boolean) => void;
     selectionStats?: any;
     selectionMode?: 'page' | 'filtered' | 'all';
-    // ADD THESE NEW PROPS FOR SELECTION MANAGEMENT
     onSelectAllFiltered?: () => void;
     onSelectAll?: () => void;
     onClearSelection?: () => void;
@@ -108,7 +102,6 @@ export default function CommunityReportsContent({
     setShowBulkAssignDialog = () => {},
     selectionStats = null,
     selectionMode = 'page',
-    // NEW PROPS WITH DEFAULT VALUES
     onSelectAllFiltered = () => {},
     onSelectAll = () => {},
     onClearSelection = () => {}
@@ -145,10 +138,6 @@ export default function CommunityReportsContent({
         if (!newBulkMode) {
             onClearSelection();
         }
-    };
-
-    const getSortIcon = (column: string) => {
-        return null;
     };
 
     const handleViewDetails = (report: CommunityReport) => {
@@ -201,12 +190,12 @@ export default function CommunityReportsContent({
         totalEstimatedAffected: 0
     };
 
-    // Mobile-optimized empty state
+    // Mobile-optimized empty state with dark mode
     const EmptyState = () => (
-        <div className="flex flex-col items-center justify-center py-8 text-center px-4">
-            <FileText className="h-12 w-12 text-gray-300 mb-3" />
-            <h3 className="text-base font-medium text-gray-900 mb-1">No reports found</h3>
-            <p className="text-sm text-gray-500 mb-4">
+        <div className="flex flex-col items-center justify-center py-8 text-center px-4 dark:bg-gray-900">
+            <FileText className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
+            <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-1">No reports found</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 {hasActiveFilters
                     ? 'Try changing your filters.'
                     : 'No community reports yet.'}
@@ -217,13 +206,16 @@ export default function CommunityReportsContent({
                         variant="outline"
                         onClick={onClearFilters}
                         size={isMobile ? "sm" : "default"}
-                        className={isMobile ? "h-8 text-xs" : ""}
+                        className={`${isMobile ? "h-8 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900`}
                     >
                         Clear Filters
                     </Button>
                 )}
                 <Link href="/admin/community-reports/create">
-                    <Button size={isMobile ? "sm" : "default"} className={isMobile ? "h-8 text-xs" : ""}>
+                    <Button 
+                        size={isMobile ? "sm" : "default"} 
+                        className={`${isMobile ? "h-8 text-xs" : ""} dark:bg-blue-600 dark:hover:bg-blue-700`}
+                    >
                         <Plus className={`${isMobile ? "h-3 w-3" : "h-4 w-4"} mr-1`} />
                         {isMobile ? "New" : "New Report"}
                     </Button>
@@ -265,7 +257,7 @@ export default function CommunityReportsContent({
                 />
             )}
 
-            {/* Floating Select All for Grid View - Similar to ClearancesContent */}
+            {/* Floating Select All for Grid View */}
             {viewMode === 'grid' && 
              reports.length > 0 && 
              selectedReports.length < reports.length && 
@@ -279,14 +271,14 @@ export default function CommunityReportsContent({
                 />
             )}
 
-            {/* Main Content Card */}
-            <Card className="overflow-hidden border shadow-sm">
-                <CardHeader className={`flex flex-row items-center justify-between ${isMobile ? 'pb-2 px-3' : 'pb-3 border-b'}`}>
+            {/* Main Content Card with dark mode */}
+            <Card className="overflow-hidden border shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <CardHeader className={`flex flex-row items-center justify-between ${isMobile ? 'pb-2 px-3' : 'pb-3 border-b dark:border-gray-800'}`}>
                     <div className="flex items-center gap-3">
-                        <CardTitle className={`${isMobile ? 'text-base' : 'text-lg sm:text-xl'}`}>
+                        <CardTitle className={`${isMobile ? 'text-base' : 'text-lg sm:text-xl'} dark:text-gray-100`}>
                             {isMobile ? 'Reports' : 'Community Reports'}
                             {selectedReports.length > 0 && currentBulkMode && (
-                                <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 dark:text-blue-300 dark:bg-blue-900/30 px-2 py-0.5 rounded">
                                     {selectedReports.length} sel.
                                 </span>
                             )}
@@ -300,33 +292,37 @@ export default function CommunityReportsContent({
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className={`h-8 w-8 p-0 ${viewMode === 'table' ? 'bg-gray-100' : ''}`}
+                                            className={`h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-900 ${viewMode === 'table' ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' : ''}`}
                                             onClick={() => setViewMode('table')}
                                         >
                                             <List className="h-4 w-4" />
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent>Table view</TooltipContent>
+                                    <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
+                                        Table view
+                                    </TooltipContent>
                                 </Tooltip>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className={`h-8 w-8 p-0 ${viewMode === 'grid' ? 'bg-gray-100' : ''}`}
+                                            className={`h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-900 ${viewMode === 'grid' ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' : ''}`}
                                             onClick={() => setViewMode('grid')}
                                         >
                                             <Grid3X3 className="h-4 w-4" />
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent>Grid view</TooltipContent>
+                                    <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
+                                        Grid view
+                                    </TooltipContent>
                                 </Tooltip>
                             </div>
                         )}
                         
-                        {/* Mobile indicator */}
+                        {/* Mobile indicator with dark mode */}
                         {isMobile && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
                                 <Smartphone className="h-3 w-3 mr-1" />
                                 Mobile
                             </Badge>
@@ -335,17 +331,17 @@ export default function CommunityReportsContent({
                     
                     {/* Bulk mode toggle - simplified on mobile */}
                     <div className="flex items-center gap-2">
-                        {/* Grid view select all checkbox - Similar to ClearancesContent */}
+                        {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && currentBulkMode && reports.length > 0 && (
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="select-all-grid"
                                     checked={areAllOnPageSelected}
                                     onCheckedChange={onSelectAllOnPage}
-                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
                                     disabled={isPerformingBulkAction}
                                 />
-                                <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap">
+                                <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
                                     {areAllOnPageSelected ? 'Deselect Page' : 'Select Page'}
                                 </Label>
                             </div>
@@ -359,17 +355,17 @@ export default function CommunityReportsContent({
                                             <Switch
                                                 checked={currentBulkMode}
                                                 onCheckedChange={handleBulkModeToggle}
-                                                className="data-[state=checked]:bg-blue-600"
+                                                className="data-[state=checked]:bg-blue-600 dark:data-[state=checked]:bg-blue-600"
                                                 disabled={isPerformingBulkAction}
                                             />
-                                            <Label htmlFor="bulk-mode" className="text-sm font-medium cursor-pointer whitespace-nowrap">
+                                            <Label htmlFor="bulk-mode" className="text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
                                                 Bulk Mode
                                             </Label>
                                         </div>
                                     </TooltipTrigger>
-                                    <TooltipContent>
+                                    <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                         <p>Toggle bulk selection mode</p>
-                                        <p className="text-xs text-gray-500">Ctrl+Shift+B • Ctrl+A to select</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Ctrl+Shift+B • Ctrl+A to select</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </div>
@@ -381,7 +377,11 @@ export default function CommunityReportsContent({
                                 variant={currentBulkMode ? "default" : "outline"}
                                 size="sm"
                                 onClick={handleBulkModeToggle}
-                                className="h-8 px-2 text-xs"
+                                className={`h-8 px-2 text-xs dark:border-gray-700 ${
+                                    currentBulkMode 
+                                        ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
+                                        : 'dark:text-gray-300 dark:hover:bg-gray-900'
+                                }`}
                                 disabled={isPerformingBulkAction}
                             >
                                 {currentBulkMode ? "Bulk On" : "Bulk"}
@@ -390,174 +390,48 @@ export default function CommunityReportsContent({
                         
                         {/* Page info - simplified on mobile */}
                         {!isMobile && totalPages > 1 && (
-                            <div className="text-sm text-gray-500 hidden sm:block">
+                            <div className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
                                 Page {currentPage} of {totalPages}
                             </div>
                         )}
                         
                         {isMobile && totalPages > 1 && (
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
                                 {currentPage}/{totalPages}
                             </div>
                         )}
                     </div>
                 </CardHeader>
                 
-                <CardContent className="p-0">
+                <CardContent className="p-0 dark:bg-gray-900">
                     {reports.length === 0 ? (
                         <EmptyState />
                     ) : viewMode === 'table' && !isMobile ? (
                         // TABLE VIEW (desktop only)
-                        <>
-                            <div className="overflow-x-auto">
-                                <div className="min-w-full inline-block align-middle">
-                                    <div className="overflow-hidden">
-                                        <Table className="min-w-full">
-                                            <TableHeader className="bg-gray-50">
-                                                <TableRow>
-                                                    {currentBulkMode && (
-                                                        <TableHead className="px-4 py-3 text-center w-12">
-                                                            <div className="flex items-center justify-center">
-                                                                <Checkbox
-                                                                    checked={isSelectAll && reports.length > 0}
-                                                                    onCheckedChange={onSelectAllOnPage}
-                                                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                                                                    disabled={isPerformingBulkAction}
-                                                                />
-                                                            </div>
-                                                        </TableHead>
-                                                    )}
-                                                    <TableHead 
-                                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] cursor-pointer hover:bg-gray-100"
-                                                        onClick={() => onSort('report_number')}
-                                                    >
-                                                        <div className="flex items-center gap-1">
-                                                            Report ID
-                                                            {getSortIcon('report_number')}
-                                                        </div>
-                                                    </TableHead>
-                                                    <TableHead 
-                                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px] cursor-pointer hover:bg-gray-100"
-                                                        onClick={() => onSort('title')}
-                                                    >
-                                                        <div className="flex items-center gap-1">
-                                                            Title & Details
-                                                            {getSortIcon('title')}
-                                                        </div>
-                                                    </TableHead>
-                                                    <TableHead 
-                                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] cursor-pointer hover:bg-gray-100"
-                                                        onClick={() => onSort('priority')}
-                                                    >
-                                                        <div className="flex items-center gap-1">
-                                                            Priority & Status
-                                                            {getSortIcon('priority')}
-                                                        </div>
-                                                    </TableHead>
-                                                    <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px]">
-                                                        Timeline & Impact
-                                                    </TableHead>
-                                                    <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
-                                                        Reporter & Assignment
-                                                    </TableHead>
-                                                    <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 min-w-[100px]">
-                                                        Actions
-                                                    </TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody className="divide-y divide-gray-200">
-                                                {reports.map((report) => {
-                                                    const isSelected = selectedReports.includes(report.id);
-                                                    const isExpanded = expandedReport === report.id;
-                                                    
-                                                    return (
-                                                        <>
-                                                            <CommunityReportRow
-                                                                key={report.id}
-                                                                report={report}
-                                                                isBulkMode={currentBulkMode}
-                                                                isSelected={isSelected}
-                                                                isExpanded={isExpanded}
-                                                                windowWidth={windowWidth}
-                                                                safeStatuses={safeStatuses}
-                                                                safePriorities={safePriorities}
-                                                                safeUrgencies={safeUrgencies}
-                                                                onItemSelect={onItemSelect}
-                                                                onDelete={onDelete}
-                                                                onCopyToClipboard={onCopyToClipboard}
-                                                                onToggleExpand={toggleReportExpansion}
-                                                                onMarkResolved={onMarkResolved}
-                                                            />
-                                                            
-                                                            {isExpanded && (
-                                                                <CommunityReportExpandedRow
-                                                                    report={report}
-                                                                    isBulkMode={currentBulkMode}
-                                                                />
-                                                            )}
-                                                        </>
-                                                    );
-                                                })}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Pagination for Table View */}
-                            {totalPages > 1 && (
-                                <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-4 pt-4 px-4 border-t">
-                                    <div className="text-sm text-gray-500">
-                                        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} results
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-                                            disabled={currentPage === 1}
-                                            className="h-8"
-                                        >
-                                            ← Prev
-                                        </Button>
-                                        <div className="flex items-center gap-1">
-                                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                                let pageNum;
-                                                if (totalPages <= 5) {
-                                                    pageNum = i + 1;
-                                                } else if (currentPage <= 3) {
-                                                    pageNum = i + 1;
-                                                } else if (currentPage >= totalPages - 2) {
-                                                    pageNum = totalPages - 4 + i;
-                                                } else {
-                                                    pageNum = currentPage - 2 + i;
-                                                }
-                                                return (
-                                                    <Button
-                                                        key={pageNum}
-                                                        variant={currentPage === pageNum ? "default" : "outline"}
-                                                        size="sm"
-                                                        onClick={() => onPageChange(pageNum)}
-                                                        className="h-8 w-8 p-0"
-                                                    >
-                                                        {pageNum}
-                                                    </Button>
-                                                );
-                                            })}
-                                        </div>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-                                            disabled={currentPage === totalPages}
-                                            className="h-8"
-                                        >
-                                            Next →
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </>
+                        <CommunityReportsTableView
+                            reports={reports}
+                            isBulkMode={currentBulkMode}
+                            selectedReports={selectedReports}
+                            isSelectAll={isSelectAll}
+                            expandedReport={expandedReport}
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={totalItems}
+                            itemsPerPage={itemsPerPage}
+                            isPerformingBulkAction={isPerformingBulkAction}
+                            safeStatuses={safeStatuses}
+                            safePriorities={safePriorities}
+                            safeUrgencies={safeUrgencies}
+                            windowWidth={windowWidth}
+                            onSelectAllOnPage={onSelectAllOnPage}
+                            onItemSelect={onItemSelect}
+                            onDelete={onDelete}
+                            onCopyToClipboard={onCopyToClipboard}
+                            onSort={onSort}
+                            onPageChange={onPageChange}
+                            toggleReportExpansion={toggleReportExpansion}
+                            onMarkResolved={onMarkResolved}
+                        />
                     ) : (
                         // GRID VIEW (mobile & desktop)
                         <>
@@ -577,7 +451,7 @@ export default function CommunityReportsContent({
                                 isMobile={isMobile}
                             />
                             
-                            {/* Grid Selection Summary - Similar to ClearancesContent */}
+                            {/* Grid Selection Summary */}
                             {viewMode === 'grid' && currentBulkMode && selectedReports.length > 0 && (
                                 <GridSelectionSummary
                                     selectedCount={selectedReports.length}
@@ -585,14 +459,14 @@ export default function CommunityReportsContent({
                                     isSelectAll={areAllOnPageSelected}
                                     onSelectAll={onSelectAllOnPage}
                                     onClearSelection={onClearSelection}
-                                    className="mt-4 mx-4"
+                                    className="mt-4 mx-4 dark:text-gray-300"
                                 />
                             )}
                             
-                            {/* Simplified pagination for grid view */}
+                            {/* Simplified pagination for grid view with dark mode */}
                             {totalPages > 1 && (
-                                <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-3 items-center justify-between ${isMobile ? 'p-3' : 'mt-4 pt-4 px-4 border-t'}`}>
-                                    <div className={`text-gray-500 ${isMobile ? 'text-xs mb-2' : 'text-sm'}`}>
+                                <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-3 items-center justify-between ${isMobile ? 'p-3' : 'mt-4 pt-4 px-4 border-t dark:border-gray-800'}`}>
+                                    <div className={`text-gray-500 dark:text-gray-400 ${isMobile ? 'text-xs mb-2' : 'text-sm'}`}>
                                         Page {currentPage} of {totalPages}
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -601,7 +475,7 @@ export default function CommunityReportsContent({
                                             size={isMobile ? "sm" : "default"}
                                             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                                             disabled={currentPage === 1}
-                                            className={isMobile ? "h-8 px-3 text-xs" : ""}
+                                            className={`${isMobile ? "h-8 px-3 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50`}
                                         >
                                             {isMobile ? "←" : "Previous"}
                                         </Button>
@@ -625,7 +499,11 @@ export default function CommunityReportsContent({
                                                         variant={currentPage === pageNum ? "default" : "outline"}
                                                         size={isMobile ? "sm" : "default"}
                                                         onClick={() => onPageChange(pageNum)}
-                                                        className={isMobile ? "h-8 w-8 p-0 text-xs" : "h-8 w-8 p-0"}
+                                                        className={`${isMobile ? "h-8 w-8 p-0 text-xs" : "h-8 w-8 p-0"} ${
+                                                            currentPage === pageNum 
+                                                                ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
+                                                                : 'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900'
+                                                        }`}
                                                     >
                                                         {pageNum}
                                                     </Button>
@@ -638,7 +516,7 @@ export default function CommunityReportsContent({
                                             size={isMobile ? "sm" : "default"}
                                             onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
                                             disabled={currentPage === totalPages}
-                                            className={isMobile ? "h-8 px-3 text-xs" : ""}
+                                            className={`${isMobile ? "h-8 px-3 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50`}
                                         >
                                             {isMobile ? "→" : "Next"}
                                         </Button>

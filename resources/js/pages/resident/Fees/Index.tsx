@@ -559,7 +559,7 @@ export default function MyFees() {
 
                             {/* View Toggle */}
                             {!selectMode && tabHasData && (
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
                                     <Button
                                         variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                         size="sm"
@@ -668,7 +668,7 @@ export default function MyFees() {
                                         </TableHeader>
                                         <TableBody>
                                             {currentFees.map((fee) => (
-                                                <TableRow key={`table-${fee.id}`} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+                                                <TableRow key={`table-${fee.id}`} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                                                     {selectMode && (
                                                         <TableCell>
                                                             <input

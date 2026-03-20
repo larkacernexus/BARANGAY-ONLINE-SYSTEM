@@ -219,7 +219,7 @@ function FullScreenFormViewer({
                         variant="ghost"
                         size="sm"
                         onClick={onClose}
-                        className="text-gray-300 hover:text-white hover:bg-gray-800 p-2"
+                        className="text-gray-300 hover:text-white hover:bg-gray-900 p-2"
                     >
                         <X className="h-5 w-5" />
                     </Button>
@@ -245,7 +245,7 @@ function FullScreenFormViewer({
                             size="sm"
                             onClick={handleZoomOut}
                             disabled={zoom <= 25}
-                            className="h-7 w-7 p-0 text-gray-300 hover:text-white hover:bg-gray-800"
+                            className="h-7 w-7 p-0 text-gray-300 hover:text-white hover:bg-gray-900"
                             title="Zoom Out (Ctrl -)"
                         >
                             <ZoomOut className="h-3 w-3" />
@@ -258,7 +258,7 @@ function FullScreenFormViewer({
                             size="sm"
                             onClick={handleZoomIn}
                             disabled={zoom >= 300}
-                            className="h-7 w-7 p-0 text-gray-300 hover:text-white hover:bg-gray-800"
+                            className="h-7 w-7 p-0 text-gray-300 hover:text-white hover:bg-gray-900"
                             title="Zoom In (Ctrl +)"
                         >
                             <ZoomIn className="h-3 w-3" />
@@ -267,7 +267,7 @@ function FullScreenFormViewer({
                             variant="ghost"
                             size="sm"
                             onClick={handleZoomReset}
-                            className="h-7 w-7 p-0 text-gray-300 hover:text-white hover:bg-gray-800"
+                            className="h-7 w-7 p-0 text-gray-300 hover:text-white hover:bg-gray-900"
                             title="Reset Zoom (Ctrl 0)"
                         >
                             <RotateCw className="h-3 w-3" />
@@ -280,7 +280,7 @@ function FullScreenFormViewer({
                         variant="ghost"
                         size="sm"
                         onClick={handlePrint}
-                        className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800"
+                        className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-900"
                         title="Print (Ctrl+P)"
                     >
                         <Printer className="h-4 w-4" />
@@ -290,7 +290,7 @@ function FullScreenFormViewer({
                         variant="ghost"
                         size="sm"
                         onClick={handleDownload}
-                        className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-800"
+                        className="h-8 w-8 p-0 text-gray-300 hover:text-white hover:bg-gray-900"
                         title="Download"
                     >
                         <Download className="h-4 w-4" />
@@ -357,13 +357,13 @@ function FullScreenFormViewer({
                 ) : (
                     <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
                         <div className="text-center p-8 max-w-md space-y-6">
-                            <div className="inline-block p-6 rounded-full bg-gray-800">
+                            <div className="inline-block p-6 rounded-full bg-gray-900">
                                 <FileText className="h-16 w-16 text-gray-400" />
                             </div>
                             <div className="space-y-2">
                                 <h3 className="text-xl font-semibold text-white">{form.title}</h3>
                                 <div className="flex flex-col items-center gap-1 text-gray-300">
-                                    <span className="px-3 py-1 bg-gray-800 rounded-full text-sm">
+                                    <span className="px-3 py-1 bg-gray-900 rounded-full text-sm">
                                         {form.file_name.split('.').pop()?.toUpperCase() || 'FILE'}
                                     </span>
                                     <span className="text-sm">{formatFileSize(form.file_size)}</span>
@@ -380,7 +380,7 @@ function FullScreenFormViewer({
                                 <Button
                                     onClick={onClose}
                                     variant="outline"
-                                    className="w-full gap-2 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+                                    className="w-full gap-2 border-gray-700 text-gray-300 hover:bg-gray-900 hover:text-white"
                                 >
                                     <ArrowLeft className="h-4 w-4" />
                                     Back to Form View

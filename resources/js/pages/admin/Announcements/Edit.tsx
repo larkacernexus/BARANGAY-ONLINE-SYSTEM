@@ -402,11 +402,11 @@ export default function EditAnnouncement({
 
     const getPriorityColor = (priority: number): string => {
         switch (priority) {
-            case 4: return 'text-red-600 bg-red-50 border-red-200 dark:bg-red-950 dark:text-red-400';
-            case 3: return 'text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-950 dark:text-orange-400';
-            case 2: return 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400';
-            case 1: return 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950 dark:text-blue-400';
-            default: return 'text-gray-600 bg-gray-50 border-gray-200 dark:bg-gray-800 dark:text-gray-400';
+            case 4: return 'text-red-600 bg-red-50 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800';
+            case 3: return 'text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-950 dark:text-orange-400 dark:border-orange-800';
+            case 2: return 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400 dark:border-yellow-800';
+            case 1: return 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800';
+            default: return 'text-gray-600 bg-gray-50 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-700';
         }
     };
 
@@ -415,7 +415,7 @@ export default function EditAnnouncement({
             case 'important': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
             case 'event': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
             case 'maintenance': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
-            case 'other': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+            case 'other': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
             default: return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
         }
     };
@@ -478,13 +478,13 @@ export default function EditAnnouncement({
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <Link href={route('admin.announcements.show', announcement.id)}>
-                                <Button variant="ghost" size="sm" type="button">
+                                <Button variant="ghost" size="sm" type="button" className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
                                 </Button>
                             </Link>
                             <div>
-                                <h1 className="text-3xl font-bold tracking-tight">Edit Announcement</h1>
+                                <h1 className="text-3xl font-bold tracking-tight dark:text-white">Edit Announcement</h1>
                                 <p className="text-gray-500 dark:text-gray-400">
                                     Update announcement details and audience targeting
                                 </p>
@@ -496,6 +496,7 @@ export default function EditAnnouncement({
                                 variant="outline" 
                                 onClick={handleDuplicate}
                                 disabled={isProcessing}
+                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700"
                             >
                                 <Copy className="h-4 w-4 mr-2" />
                                 Duplicate
@@ -512,7 +513,7 @@ export default function EditAnnouncement({
                             <Button 
                                 type="submit" 
                                 disabled={isProcessing}
-                                className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
+                                className="bg-blue-600 hover:bg-blue-700 min-w-[140px] dark:bg-blue-600 dark:hover:bg-blue-700"
                             >
                                 {isProcessing ? (
                                     <>
@@ -556,27 +557,27 @@ export default function EditAnnouncement({
 
                     {/* Main Content Tabs */}
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                        <TabsList className="grid grid-cols-3 w-full max-w-md">
-                            <TabsTrigger value="content" type="button">Content</TabsTrigger>
+                        <TabsList className="grid grid-cols-3 w-full max-w-md ">
+                            <TabsTrigger value="content" type="button" >Content</TabsTrigger>
                             <TabsTrigger value="settings" type="button">Settings</TabsTrigger>
                             <TabsTrigger value="audience" type="button">Audience</TabsTrigger>
                         </TabsList>
 
                         {/* Content Tab */}
                         <TabsContent value="content" className="space-y-6">
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
                                         <Megaphone className="h-5 w-5" />
                                         Announcement Content
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="dark:text-gray-400">
                                         What residents will see when viewing this announcement
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="title">
+                                        <Label htmlFor="title" className="dark:text-gray-300">
                                             Title <span className="text-red-500">*</span>
                                         </Label>
                                         <Input 
@@ -584,7 +585,7 @@ export default function EditAnnouncement({
                                             placeholder="e.g., Important: Water Service Interruption" 
                                             value={data.title}
                                             onChange={(e) => setData('title', e.target.value)}
-                                            className={`text-lg font-medium ${errors.title ? 'border-red-500' : ''}`}
+                                            className={`text-lg font-medium ${errors.title ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                             maxLength={255}
                                             disabled={isProcessing}
                                         />
@@ -592,17 +593,17 @@ export default function EditAnnouncement({
                                             <p className="text-sm text-red-600 dark:text-red-400">{errors.title}</p>
                                         )}
                                         <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-500">
+                                            <span className="text-gray-500 dark:text-gray-400">
                                                 Make the title clear and attention-grabbing
                                             </span>
-                                            <span className={data.title.length > 200 ? 'text-orange-500' : 'text-gray-500'}>
+                                            <span className={data.title.length > 200 ? 'text-orange-500 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'}>
                                                 {data.title.length}/255 characters
                                             </span>
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="content">
+                                        <Label htmlFor="content" className="dark:text-gray-300">
                                             Content <span className="text-red-500">*</span>
                                         </Label>
                                         <Textarea 
@@ -611,17 +612,17 @@ export default function EditAnnouncement({
                                             rows={8}
                                             value={data.content}
                                             onChange={(e) => setData('content', e.target.value)}
-                                            className={`min-h-[200px] font-mono ${errors.content ? 'border-red-500' : ''}`}
+                                            className={`min-h-[200px] font-mono ${errors.content ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                             disabled={isProcessing}
                                         />
                                         {errors.content && (
                                             <p className="text-sm text-red-600 dark:text-red-400">{errors.content}</p>
                                         )}
                                         <div className="flex items-center justify-between text-sm">
-                                            <span className="text-gray-500">
+                                            <span className="text-gray-500 dark:text-gray-400">
                                                 Supports plain text. Keep it clear and concise.
                                             </span>
-                                            <span className={data.content.length > 1000 ? 'text-orange-500' : 'text-gray-500'}>
+                                            <span className={data.content.length > 1000 ? 'text-orange-500 dark:text-orange-400' : 'text-gray-500 dark:text-gray-400'}>
                                                 {data.content.length} characters
                                             </span>
                                         </div>
@@ -632,20 +633,20 @@ export default function EditAnnouncement({
 
                         {/* Settings Tab */}
                         <TabsContent value="settings" className="space-y-6">
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
                                         <Settings className="h-5 w-5" />
                                         Announcement Settings
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="dark:text-gray-400">
                                         Configure how and when the announcement appears to users
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div className="space-y-2">
-                                            <Label htmlFor="type">
+                                            <Label htmlFor="type" className="dark:text-gray-300">
                                                 Type <span className="text-red-500">*</span>
                                             </Label>
                                             <Select 
@@ -653,14 +654,14 @@ export default function EditAnnouncement({
                                                 onValueChange={(value) => setData('type', value)}
                                                 disabled={isProcessing}
                                             >
-                                                <SelectTrigger id="type" className={errors.type ? 'border-red-500' : ''}>
+                                                <SelectTrigger id="type" className={`${errors.type ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
                                                     <SelectValue placeholder="Select type" />
                                                 </SelectTrigger>
-                                                <SelectContent>
+                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                     {typeOptions.map((type) => {
                                                         const IconComponent = getTypeIcon(type.value);
                                                         return (
-                                                            <SelectItem key={type.value} value={type.value}>
+                                                            <SelectItem key={type.value} value={type.value} className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">
                                                                 <div className="flex items-center gap-2">
                                                                     <IconComponent className="h-4 w-4" />
                                                                     {type.label}
@@ -676,7 +677,7 @@ export default function EditAnnouncement({
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label htmlFor="priority">
+                                            <Label htmlFor="priority" className="dark:text-gray-300">
                                                 Priority Level <span className="text-red-500">*</span>
                                             </Label>
                                             <Select 
@@ -684,12 +685,12 @@ export default function EditAnnouncement({
                                                 onValueChange={(value) => setData('priority', parseInt(value, 10))}
                                                 disabled={isProcessing}
                                             >
-                                                <SelectTrigger id="priority" className={errors.priority ? 'border-red-500' : ''}>
+                                                <SelectTrigger id="priority" className={`${errors.priority ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
                                                     <SelectValue placeholder="Select priority" />
                                                 </SelectTrigger>
-                                                <SelectContent>
+                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                     {priorityOptions.map((priority) => (
-                                                        <SelectItem key={priority.value} value={priority.value.toString()}>
+                                                        <SelectItem key={priority.value} value={priority.value.toString()} className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">
                                                             <div className="flex items-center gap-2">
                                                                 <span className={`px-2 py-1 rounded text-xs ${getPriorityColor(priority.value)}`}>
                                                                     {priority.label}
@@ -705,17 +706,18 @@ export default function EditAnnouncement({
                                         </div>
                                     </div>
 
-                                    <Separator />
+                                    <Separator className="dark:bg-gray-700" />
 
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
-                                            <Label className="text-base font-medium">Schedule Settings</Label>
+                                            <Label className="text-base font-medium dark:text-gray-300">Schedule Settings</Label>
                                             <Button 
                                                 type="button" 
                                                 variant="outline" 
                                                 size="sm"
                                                 onClick={handleToggleTimes}
                                                 disabled={isProcessing}
+                                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                             >
                                                 <CalendarClock className="h-4 w-4 mr-2" />
                                                 {showStartTime || showEndTime ? 'Disable Times' : 'Enable Times'}
@@ -725,15 +727,16 @@ export default function EditAnnouncement({
                                         {/* Start Date & Time */}
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between">
-                                                <Label className="text-sm font-medium">Start Date & Time</Label>
+                                                <Label className="text-sm font-medium dark:text-gray-300">Start Date & Time</Label>
                                                 <div className="flex items-center gap-2">
                                                     <Switch
                                                         id="show-start-time"
                                                         checked={showStartTime}
                                                         onCheckedChange={setShowStartTime}
                                                         disabled={isProcessing}
+                                                        className="dark:data-[state=checked]:bg-blue-600"
                                                     />
-                                                    <Label htmlFor="show-start-time" className="text-sm text-gray-500 cursor-pointer">
+                                                    <Label htmlFor="show-start-time" className="text-sm text-gray-500 cursor-pointer dark:text-gray-400">
                                                         Add specific time
                                                     </Label>
                                                 </div>
@@ -747,7 +750,7 @@ export default function EditAnnouncement({
                                                         value={data.start_date}
                                                         onChange={(e) => setData('start_date', e.target.value)}
                                                         min={new Date().toISOString().split('T')[0]}
-                                                        className={errors.start_date ? 'border-red-500' : ''}
+                                                        className={`${errors.start_date ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                                         disabled={isProcessing}
                                                     />
                                                     {errors.start_date && (
@@ -762,7 +765,7 @@ export default function EditAnnouncement({
                                                             type="time" 
                                                             value={data.start_time}
                                                             onChange={(e) => setData('start_time', e.target.value)}
-                                                            className={errors.start_time ? 'border-red-500' : ''}
+                                                            className={`${errors.start_time ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                                             disabled={isProcessing || !data.start_date}
                                                         />
                                                         {errors.start_time && (
@@ -776,15 +779,16 @@ export default function EditAnnouncement({
                                         {/* End Date & Time */}
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between">
-                                                <Label className="text-sm font-medium">End Date & Time</Label>
+                                                <Label className="text-sm font-medium dark:text-gray-300">End Date & Time</Label>
                                                 <div className="flex items-center gap-2">
                                                     <Switch
                                                         id="show-end-time"
                                                         checked={showEndTime}
                                                         onCheckedChange={setShowEndTime}
                                                         disabled={isProcessing}
+                                                        className="dark:data-[state=checked]:bg-blue-600"
                                                     />
-                                                    <Label htmlFor="show-end-time" className="text-sm text-gray-500 cursor-pointer">
+                                                    <Label htmlFor="show-end-time" className="text-sm text-gray-500 cursor-pointer dark:text-gray-400">
                                                         Add specific time
                                                     </Label>
                                                 </div>
@@ -798,7 +802,7 @@ export default function EditAnnouncement({
                                                         value={data.end_date}
                                                         onChange={(e) => setData('end_date', e.target.value)}
                                                         min={data.start_date || new Date().toISOString().split('T')[0]}
-                                                        className={errors.end_date ? 'border-red-500' : ''}
+                                                        className={`${errors.end_date ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                                         disabled={isProcessing}
                                                     />
                                                     {errors.end_date && (
@@ -813,7 +817,7 @@ export default function EditAnnouncement({
                                                             type="time" 
                                                             value={data.end_time}
                                                             onChange={(e) => setData('end_time', e.target.value)}
-                                                            className={errors.end_time ? 'border-red-500' : ''}
+                                                            className={`${errors.end_time ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                                             disabled={isProcessing || !data.end_date}
                                                         />
                                                         {errors.end_time && (
@@ -824,7 +828,7 @@ export default function EditAnnouncement({
                                             </div>
                                         </div>
 
-                                        <p className="text-sm text-gray-500">
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
                                             {!data.start_date && !data.end_date && 'Leave dates empty for immediate and indefinite display'}
                                             {data.start_date && !data.end_date && 'Announcement will start on selected date and continue indefinitely'}
                                             {!data.start_date && data.end_date && 'Announcement will start immediately and end on selected date'}
@@ -832,12 +836,12 @@ export default function EditAnnouncement({
                                         </p>
                                     </div>
 
-                                    <Separator />
+                                    <Separator className="dark:bg-gray-700" />
 
                                     <div className="flex items-center justify-between">
                                         <div className="space-y-0.5">
-                                            <Label htmlFor="is_active">Active Status</Label>
-                                            <p className="text-sm text-gray-500">
+                                            <Label htmlFor="is_active" className="dark:text-gray-300">Active Status</Label>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
                                                 Announcement will be visible to residents when active
                                             </p>
                                         </div>
@@ -846,6 +850,7 @@ export default function EditAnnouncement({
                                             checked={data.is_active}
                                             onCheckedChange={(checked) => setData('is_active', checked)}
                                             disabled={isProcessing}
+                                            className="dark:data-[state=checked]:bg-blue-600"
                                         />
                                     </div>
                                 </CardContent>
@@ -876,18 +881,18 @@ export default function EditAnnouncement({
                     </Tabs>
 
                     {/* Live Preview */}
-                    <Card>
+                    <Card className="dark:bg-gray-900 dark:border-gray-700">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
+                            <CardTitle className="flex items-center gap-2 dark:text-white">
                                 <Eye className="h-5 w-5" />
                                 Live Preview
                             </CardTitle>
-                            <CardDescription>
+                            <CardDescription className="dark:text-gray-400">
                                 How the announcement will appear to targeted users
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="border rounded-lg p-6 bg-white shadow-sm dark:bg-gray-900">
+                            <div className="border rounded-lg p-6 bg-white shadow-sm dark:bg-gray-900 dark:border-gray-700">
                                 <div className="flex items-start justify-between mb-4">
                                     <div className="flex items-start gap-3">
                                         <div className={`p-3 rounded-lg ${getTypeColor(data.type)}`}>
@@ -897,10 +902,10 @@ export default function EditAnnouncement({
                                             })()}
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-lg">
+                                            <h3 className="font-bold text-lg dark:text-white">
                                                 {data.title || "Announcement Title"}
                                             </h3>
-                                            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-1">
+                                            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-1 dark:text-gray-400">
                                                 <Calendar className="h-3 w-3" />
                                                 <span>Posted: {new Date().toLocaleDateString()}</span>
                                                 <span>•</span>
@@ -915,13 +920,13 @@ export default function EditAnnouncement({
                                             Active
                                         </Badge>
                                     ) : (
-                                        <Badge variant="secondary">Inactive</Badge>
+                                        <Badge variant="secondary" className="dark:bg-gray-700 dark:text-gray-300">Inactive</Badge>
                                     )}
                                 </div>
 
                                 {/* Audience Badge */}
                                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                                    <Badge variant="outline" className="flex items-center gap-1">
+                                    <Badge variant="outline" className="flex items-center gap-1 dark:border-gray-700 dark:text-gray-300">
                                         {(() => {
                                             const IconComponent = getAudienceIcon(data.audience_type);
                                             return <IconComponent className="h-3 w-3" />;
@@ -929,27 +934,27 @@ export default function EditAnnouncement({
                                         {audience_types[data.audience_type] || 'All Users'}
                                     </Badge>
                                     {data.audience_type !== 'all' && (
-                                        <Badge variant="secondary" className="text-xs">
+                                        <Badge variant="secondary" className="text-xs dark:bg-gray-700 dark:text-gray-300">
                                             {getAudienceCount()} {data.audience_type.replace('_', ' ')} selected
                                         </Badge>
                                     )}
                                 </div>
 
-                                <div className="border-t pt-4">
+                                <div className="border-t dark:border-gray-700 pt-4">
                                     <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                                         {data.content || "Announcement content will appear here..."}
                                     </p>
                                 </div>
 
                                 {(data.start_date || data.end_date) && (
-                                    <div className="mt-4 pt-4 border-t">
+                                    <div className="mt-4 pt-4 border-t dark:border-gray-700">
                                         <div className="grid gap-4 md:grid-cols-2 text-sm">
                                             {data.start_date && (
                                                 <div className="flex items-center gap-2">
-                                                    <Calendar className="h-4 w-4 text-gray-400" />
+                                                    <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                     <div>
-                                                        <div className="font-medium">Starts</div>
-                                                        <div className="text-gray-500">
+                                                        <div className="font-medium dark:text-gray-300">Starts</div>
+                                                        <div className="text-gray-500 dark:text-gray-400">
                                                             {formatDateTimePreview(data.start_date, data.start_time, showStartTime)}
                                                         </div>
                                                     </div>
@@ -957,10 +962,10 @@ export default function EditAnnouncement({
                                             )}
                                             {data.end_date && (
                                                 <div className="flex items-center gap-2">
-                                                    <Clock className="h-4 w-4 text-gray-400" />
+                                                    <Clock className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                     <div>
-                                                        <div className="font-medium">Ends</div>
-                                                        <div className="text-gray-500">
+                                                        <div className="font-medium dark:text-gray-300">Ends</div>
+                                                        <div className="text-gray-500 dark:text-gray-400">
                                                             {formatDateTimePreview(data.end_date, data.end_time, showEndTime)}
                                                         </div>
                                                     </div>
@@ -974,27 +979,28 @@ export default function EditAnnouncement({
                     </Card>
 
                     {/* Form Actions */}
-                    <div className="flex items-center justify-between pt-6 border-t">
+                    <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
                         <div>
                             <Button 
                                 variant="ghost" 
                                 type="button" 
                                 onClick={handleReset}
                                 disabled={isProcessing}
+                                className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
                             >
                                 Reset Changes
                             </Button>
                         </div>
                         <div className="flex items-center gap-2">
                             <Link href={route('admin.announcements.show', announcement.id)}>
-                                <Button variant="outline" type="button" disabled={isProcessing}>
+                                <Button variant="outline" type="button" disabled={isProcessing} className="dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700">
                                     Cancel
                                 </Button>
                             </Link>
                             <Button 
                                 type="submit" 
                                 disabled={isProcessing}
-                                className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
+                                className="bg-blue-600 hover:bg-blue-700 min-w-[140px] dark:bg-blue-600 dark:hover:bg-blue-700"
                             >
                                 {isProcessing ? (
                                     <>
@@ -1015,30 +1021,30 @@ export default function EditAnnouncement({
 
             {/* Delete Confirmation Dialog */}
             <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <AlertDialogContent>
+                <AlertDialogContent className="dark:bg-gray-900 dark:border-gray-700">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                        <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
                             <Trash2 className="h-5 w-5" />
                             Delete Announcement
                         </AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogDescription className="dark:text-gray-400">
                             Are you sure you want to delete this announcement? This action cannot be undone.
                             This will permanently delete:
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="py-4">
-                        <div className="bg-gray-50 p-4 rounded dark:bg-gray-800">
-                            <p className="font-medium">{announcement.title}</p>
-                            <p className="text-sm text-gray-500 mt-1">
+                        <div className="bg-gray-50 p-4 rounded dark:bg-gray-900">
+                            <p className="font-medium dark:text-white">{announcement.title}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                 Created: {new Date(announcement.created_at).toLocaleDateString()}
                             </p>
                         </div>
                     </div>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isProcessing} className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">Cancel</AlertDialogCancel>
                         <AlertDialogAction 
                             onClick={confirmDelete}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
                             disabled={isProcessing}
                         >
                             {isProcessing ? (
@@ -1056,29 +1062,29 @@ export default function EditAnnouncement({
 
             {/* Duplicate Confirmation Dialog */}
             <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
-                <AlertDialogContent>
+                <AlertDialogContent className="dark:bg-gray-900 dark:border-gray-700">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertDialogTitle className="flex items-center gap-2 dark:text-white">
                             <Copy className="h-5 w-5" />
                             Duplicate Announcement
                         </AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogDescription className="dark:text-gray-400">
                             Create a copy of this announcement? The duplicate will be created with "(Copy)" appended to the title.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="py-4">
-                        <div className="bg-gray-50 p-4 rounded dark:bg-gray-800">
-                            <p className="font-medium">{announcement.title}</p>
-                            <p className="text-sm text-gray-500 mt-1">
+                        <div className="bg-gray-50 p-4 rounded dark:bg-gray-900">
+                            <p className="font-medium dark:text-white">{announcement.title}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                 Will be copied to: {announcement.title} (Copy)
                             </p>
                         </div>
                     </div>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isProcessing} className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">Cancel</AlertDialogCancel>
                         <AlertDialogAction 
                             onClick={confirmDuplicate}
-                            className="bg-blue-600 hover:bg-blue-700"
+                            className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700"
                             disabled={isProcessing}
                         >
                             {isProcessing ? (

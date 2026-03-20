@@ -17,7 +17,7 @@ export function ModernPaymentSummary({ due, paid, balance, className, showCompac
         return (
             <Card className={cn("border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50", className)}>
                 <div className="p-4 grid grid-cols-3 gap-2">
-                    <div className="text-center p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                    <div className="text-center p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                         <p className="text-[10px] text-gray-500">Due</p>
                         <p className="text-sm font-bold">{formatCurrency(due)}</p>
                     </div>
@@ -44,7 +44,7 @@ export function ModernPaymentSummary({ due, paid, balance, className, showCompac
             <div className="p-6 space-y-4">
                 <h3 className="font-semibold text-lg">Payment Summary</h3>
                 <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                         <span className="text-sm text-gray-600 dark:text-gray-400">Total Due</span>
                         <span className="font-bold text-lg">{formatCurrency(due)}</span>
                     </div>

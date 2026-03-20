@@ -740,7 +740,7 @@ export default function RevenueReport() {
         <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[...Array(4)].map((_, i) => (
-                    <div key={i} className="bg-gray-100 dark:bg-gray-800 rounded-xl p-5 animate-pulse">
+                    <div key={i} className="bg-gray-100 dark:bg-gray-900 rounded-xl p-5 animate-pulse">
                         <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
                         <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
                     </div>
@@ -823,7 +823,7 @@ export default function RevenueReport() {
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                                 autoRefresh
                                     ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                    : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                             }`}
                         >
                             <RefreshCw className={`h-4 w-4 ${autoRefresh ? 'animate-spin' : ''}`} />
@@ -848,7 +848,7 @@ export default function RevenueReport() {
                         <button
                             key={index}
                             onClick={action.action}
-                            className="px-3 py-2 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            className="px-3 py-2 text-sm font-medium bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                         >
                             {action.label}
                         </button>
@@ -856,7 +856,7 @@ export default function RevenueReport() {
                 </div>
 
                 {/* Search and Filter Bar */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1">
                             <div className="relative">
@@ -866,7 +866,7 @@ export default function RevenueReport() {
                                     placeholder="Search periods, amounts..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 />
                             </div>
                         </div>
@@ -874,7 +874,7 @@ export default function RevenueReport() {
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setShowDatePicker(!showDatePicker)}
-                                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900"
                             >
                                 <Calendar className="h-4 w-4" />
                                 Date Range
@@ -883,7 +883,7 @@ export default function RevenueReport() {
                             <button
                                 onClick={fetchData}
                                 disabled={isLoading}
-                                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900 disabled:opacity-50"
                             >
                                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                                 Refresh Data
@@ -910,7 +910,7 @@ export default function RevenueReport() {
                                     disabled={isLoading}
                                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${period === p 
                                         ? 'bg-primary-600 text-white' 
-                                        : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800'
+                                        : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-900'
                                     } disabled:opacity-50 disabled:cursor-not-allowed capitalize`}
                                 >
                                     {p === 'custom' ? 'Custom Range' : p.charAt(0).toUpperCase() + p.slice(1)}
@@ -942,7 +942,7 @@ export default function RevenueReport() {
                                         type="date"
                                         value={dateRange.start}
                                         onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                                     />
                                 </div>
                                 <div>
@@ -953,14 +953,14 @@ export default function RevenueReport() {
                                         type="date"
                                         value={dateRange.end}
                                         onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                                     />
                                 </div>
                             </div>
                             <div className="flex justify-end gap-2 mt-4">
                                 <button
                                     onClick={() => setShowDatePicker(false)}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -1024,7 +1024,7 @@ export default function RevenueReport() {
                 {/* Stats Grid with Enhanced Metrics */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     {/* Total Revenue Card */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
@@ -1057,7 +1057,7 @@ export default function RevenueReport() {
                     </div>
 
                     {/* Transactions Card */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Transactions</p>
@@ -1090,7 +1090,7 @@ export default function RevenueReport() {
                     </div>
 
                     {/* Peak Performance Card */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Peak Period</p>
@@ -1118,7 +1118,7 @@ export default function RevenueReport() {
                     </div>
 
                     {/* Consistency Card */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md transition-shadow">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Consistency</p>
@@ -1151,7 +1151,7 @@ export default function RevenueReport() {
 
                 {/* Insights & Recommendations */}
                 {insights.length > 0 && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
                                 <Info className="h-5 w-5 text-primary-600 dark:text-primary-400" />
@@ -1195,7 +1195,7 @@ export default function RevenueReport() {
                 )}
 
                 {/* Revenue Chart Section - Enhanced */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -1217,7 +1217,7 @@ export default function RevenueReport() {
                                     onClick={() => setChartType('bar')}
                                     className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                         chartType === 'bar'
-                                            ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                                            ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
                                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                                     }`}
                                 >
@@ -1227,7 +1227,7 @@ export default function RevenueReport() {
                                     onClick={() => setChartType('line')}
                                     className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                                         chartType === 'line'
-                                            ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                                            ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
                                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                                     }`}
                                 >
@@ -1263,7 +1263,7 @@ export default function RevenueReport() {
                                             prev === 'full' ? 'short' : 
                                             prev === 'short' ? 'compact' : 'full'
                                         )}
-                                        className="px-3 py-1.5 text-sm font-medium bg-gray-200 dark:bg-gray-800 rounded-md hover:bg-gray-300 dark:hover:bg-gray-700"
+                                        className="px-3 py-1.5 text-sm font-medium bg-gray-200 dark:bg-gray-900 rounded-md hover:bg-gray-300 dark:hover:bg-gray-700"
                                     >
                                         {currencyDisplay === 'full' ? '₱1,234.56' :
                                          currencyDisplay === 'short' ? '₱1.2K' : '1.2K'}
@@ -1488,7 +1488,7 @@ export default function RevenueReport() {
                 </div>
 
                 {/* Payment Methods Breakdown */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -1517,7 +1517,7 @@ export default function RevenueReport() {
                                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                                         visiblePaymentMethods.has(method.payment_method) || visiblePaymentMethods.size === 0
                                             ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 line-through'
+                                            : 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 line-through'
                                     }`}
                                 >
                                     {method.displayName}

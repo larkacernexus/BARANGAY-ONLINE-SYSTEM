@@ -747,7 +747,7 @@ export default function RequestClearance() {
 
                                 <div className="border rounded-lg p-2 space-y-2 max-h-60 overflow-y-auto">
                                     <div
-                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg cursor-pointer border border-blue-100 bg-blue-50"
+                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg cursor-pointer border border-blue-100 bg-blue-50"
                                         onClick={() => {
                                             setSelectedResident(resident);
                                             setData('resident_id', resident.id.toString());
@@ -768,7 +768,7 @@ export default function RequestClearance() {
                                         .map(member => (
                                             <div
                                                 key={member.id}
-                                                className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg cursor-pointer border"
+                                                className="p-3 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg cursor-pointer border"
                                                 onClick={() => handleSelectResident(member)}
                                             >
                                                 <div className="font-medium">{member.full_name}</div>
@@ -786,7 +786,7 @@ export default function RequestClearance() {
                                             {searchResults.map(member => (
                                                 <div
                                                     key={member.id}
-                                                    className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg cursor-pointer border border-amber-100 bg-amber-50"
+                                                    className="p-3 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg cursor-pointer border border-amber-100 bg-amber-50"
                                                     onClick={() => handleSelectResident(member)}
                                                 >
                                                     <div className="font-medium">{member.full_name}</div>

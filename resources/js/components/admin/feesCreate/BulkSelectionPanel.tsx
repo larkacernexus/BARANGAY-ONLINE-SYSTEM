@@ -1,3 +1,5 @@
+// components/admin/feesCreate/BulkSelectionPanel.tsx
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,18 +30,19 @@ import {
     List,
     Eye,
     EyeOff,
-    RefreshCw
+    RefreshCw,
+    Award
 } from 'lucide-react';
-import { Resident, Household } from '@/types/fees';
-import { useState } from 'react';
+import { Resident, Household, Privilege } from '@/types/fees';
+import { useState, useMemo } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getEligibilityBadges } from '@/admin-utils/fees/discount-display-utils';
 
 interface BulkSelectionPanelProps {
     bulkType: 'residents' | 'households' | 'custom';
     residents: Resident[];
     households: Household[];
     puroks: string[];
+    allPrivileges?: Privilege[]; // Added
     selectedResidentIds: (string | number)[];
     selectedHouseholdIds: (string | number)[];
     customPayers: Array<{
@@ -73,6 +76,7 @@ export default function BulkSelectionPanel({
     residents,
     households,
     puroks,
+    allPrivileges = [],
     selectedResidentIds,
     selectedHouseholdIds,
     customPayers,
@@ -108,15 +112,75 @@ export default function BulkSelectionPanel({
         setExpandedItems(newExpanded);
     };
 
+    // Dynamically get resident badges from privileges
     const getResidentBadges = (resident: Resident) => {
-        return getEligibilityBadges(resident);
+        const badges = [];
+        
+        if (resident.privileges && resident.privileges.length > 0) {
+            resident.privileges.forEach((rp: any) => {
+                // Find matching privilege for icon/color
+                const privilegeDef = allPrivileges.find(p => p.code === rp.code);
+                
+                badges.push({
+                    code: rp.code,
+                    label: rp.name,
+                    icon: getPrivilegeIcon(rp.code),
+                    color: getPrivilegeColor(rp.code),
+                    id_number: rp.id_number
+                });
+            });
+        }
+        
+        return badges;
+    };
+
+    // Helper to get privilege icon
+    const getPrivilegeIcon = (code: string): string => {
+        const icons: Record<string, string> = {
+            'SC': '👴',
+            'OSP': '👴',
+            'PWD': '♿',
+            'SP': '👨‍👧',
+            'IND': '🏠',
+            '4PS': '📦',
+            'IP': '🌿',
+            'FRM': '🌾',
+            'FSH': '🎣',
+            'OFW': '✈️',
+            'SCH': '📚',
+            'UNE': '💼',
+        };
+        return icons[code] || '🎫';
+    };
+
+    // Helper to get privilege color
+    const getPrivilegeColor = (code: string): string => {
+        const colors: Record<string, string> = {
+            'SC': 'bg-blue-100 text-blue-800 border-blue-200',
+            'OSP': 'bg-blue-100 text-blue-800 border-blue-200',
+            'PWD': 'bg-purple-100 text-purple-800 border-purple-200',
+            'SP': 'bg-green-100 text-green-800 border-green-200',
+            'IND': 'bg-orange-100 text-orange-800 border-orange-200',
+            '4PS': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+            'IP': 'bg-teal-100 text-teal-800 border-teal-200',
+            'FRM': 'bg-brown-100 text-brown-800 border-brown-200',
+            'FSH': 'bg-cyan-100 text-cyan-800 border-cyan-200',
+            'OFW': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+            'SCH': 'bg-pink-100 text-pink-800 border-pink-200',
+            'UNE': 'bg-gray-100 text-gray-800 border-gray-200',
+        };
+        return colors[code] || 'bg-gray-100 text-gray-800 border-gray-200';
+    };
+
+    // Filter residents by discount eligibility (dynamically using privileges)
+    const isDiscountEligible = (resident: Resident): boolean => {
+        if (!filterDiscountEligible) return true;
+        return (resident.privileges && resident.privileges.length > 0) || false;
     };
 
     const getSelectionStats = () => {
         if (bulkType === 'residents') {
-            const eligibleCount = residents.filter(r => 
-                r.is_senior || r.is_pwd || r.is_solo_parent || r.is_indigent
-            ).length;
+            const eligibleCount = residents.filter(r => r.privileges && r.privileges.length > 0).length;
             const selectedCount = applyToAllResidents ? residents.length : selectedResidentIds.length;
             return { 
                 total: residents.length, 
@@ -205,7 +269,7 @@ export default function BulkSelectionPanel({
                         </div>
                         {bulkType === 'residents' && (
                             <div className="rounded-lg bg-blue-50 p-3">
-                                <div className="text-xs font-medium text-blue-600 uppercase tracking-wider">Eligible</div>
+                                <div className="text-xs font-medium text-blue-600 uppercase tracking-wider">With Privileges</div>
                                 <div className="text-2xl font-bold text-blue-700">{stats.eligible}</div>
                             </div>
                         )}
@@ -289,7 +353,7 @@ export default function BulkSelectionPanel({
                                 {bulkType === 'residents' && (
                                     <div className="space-y-2">
                                         <Label className="flex items-center gap-2 text-sm">
-                                            <UserCheck className="h-4 w-4" />
+                                            <Award className="h-4 w-4" />
                                             Quick Filters
                                         </Label>
                                         <div className="flex flex-wrap gap-2">
@@ -300,8 +364,8 @@ export default function BulkSelectionPanel({
                                                 onClick={() => setData('filter_discount_eligible', !filterDiscountEligible)}
                                                 className="h-9"
                                             >
-                                                <UserCheck className="mr-2 h-4 w-4" />
-                                                Discount Eligible Only
+                                                <Award className="mr-2 h-4 w-4" />
+                                                With Privileges Only
                                             </Button>
                                         </div>
                                     </div>
@@ -440,9 +504,14 @@ export default function BulkSelectionPanel({
                                                                         <div className="flex gap-1">
                                                                             {badges.slice(0, 2).map((badge, idx) => (
                                                                                 <Badge key={idx} className={`text-xs ${badge.color}`}>
-                                                                                    {badge.icon}
+                                                                                    {badge.icon} {badge.label}
                                                                                 </Badge>
                                                                             ))}
+                                                                            {badges.length > 2 && (
+                                                                                <Badge variant="outline" className="text-xs">
+                                                                                    +{badges.length - 2}
+                                                                                </Badge>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                     <div className="text-xs text-gray-600 mt-1">
@@ -464,6 +533,15 @@ export default function BulkSelectionPanel({
                                                                     {household.contact_number && ` • ${household.contact_number}`}
                                                                     {household.member_count && ` • ${household.member_count} members`}
                                                                 </div>
+                                                                {household.head_privileges && household.head_privileges.length > 0 && (
+                                                                    <div className="mt-2 flex gap-1">
+                                                                        {household.head_privileges.slice(0, 2).map((p: any, idx: number) => (
+                                                                            <Badge key={idx} variant="outline" className="text-xs bg-purple-50">
+                                                                                {p.name}
+                                                                            </Badge>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         ))
                                                 }
@@ -510,96 +588,108 @@ export default function BulkSelectionPanel({
                                                         </Button>
                                                     </div>
                                                 ) : viewMode === 'list' ? (
-                                                    residents.map((resident) => {
-                                                        const isSelected = selectedResidentIds.includes(resident.id.toString());
-                                                        const badges = getResidentBadges(resident);
-                                                        const isExpanded = expandedItems.has(resident.id.toString());
+                                                    residents
+                                                        .filter(r => isDiscountEligible(r))
+                                                        .map((resident) => {
+                                                            const isSelected = selectedResidentIds.includes(resident.id.toString());
+                                                            const badges = getResidentBadges(resident);
+                                                            const isExpanded = expandedItems.has(resident.id.toString());
 
-                                                        return (
-                                                            <div
-                                                                key={resident.id}
-                                                                className={`p-4 transition-all hover:bg-gray-50 ${
-                                                                    isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : ''
-                                                                }`}
-                                                            >
-                                                                <div className="flex items-start justify-between">
-                                                                    <div className="flex items-start space-x-3">
-                                                                        <Checkbox
-                                                                            checked={isSelected}
-                                                                            onCheckedChange={() => toggleResidentSelection(resident.id)}
-                                                                            className="mt-1 h-4 w-4"
-                                                                        />
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <div className="flex items-center gap-2 mb-1">
-                                                                                <div className="font-semibold truncate">
-                                                                                    {resident.full_name}
+                                                            return (
+                                                                <div
+                                                                    key={resident.id}
+                                                                    className={`p-4 transition-all hover:bg-gray-50 ${
+                                                                        isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : ''
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex items-start justify-between">
+                                                                        <div className="flex items-start space-x-3">
+                                                                            <Checkbox
+                                                                                checked={isSelected}
+                                                                                onCheckedChange={() => toggleResidentSelection(resident.id)}
+                                                                                className="mt-1 h-4 w-4"
+                                                                            />
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <div className="flex items-center gap-2 mb-1">
+                                                                                    <div className="font-semibold truncate">
+                                                                                        {resident.full_name}
+                                                                                    </div>
+                                                                                    <div className="flex flex-wrap gap-1">
+                                                                                        {badges.map((badge, idx) => (
+                                                                                            <TooltipProvider key={idx}>
+                                                                                                <Tooltip>
+                                                                                                    <TooltipTrigger asChild>
+                                                                                                        <Badge 
+                                                                                                            variant="outline"
+                                                                                                            className={`text-xs px-2 py-0.5 cursor-help ${badge.color}`}
+                                                                                                        >
+                                                                                                            <span className="mr-1 text-xs">{badge.icon}</span>
+                                                                                                            <span className="text-xs">{badge.label}</span>
+                                                                                                        </Badge>
+                                                                                                    </TooltipTrigger>
+                                                                                                    <TooltipContent>
+                                                                                                        <p>ID: {badge.id_number || 'Not provided'}</p>
+                                                                                                    </TooltipContent>
+                                                                                                </Tooltip>
+                                                                                            </TooltipProvider>
+                                                                                        ))}
+                                                                                    </div>
                                                                                 </div>
-                                                                                <div className="flex flex-wrap gap-1">
-                                                                                    {badges.map((badge, idx) => (
-                                                                                        <Badge 
-                                                                                            key={idx} 
-                                                                                            variant="outline"
-                                                                                            className={`text-xs px-2 py-0.5 ${badge.color}`}
-                                                                                        >
-                                                                                            <span className="mr-1 text-xs">{badge.icon}</span>
-                                                                                            <span className="text-xs">{badge.label}</span>
-                                                                                        </Badge>
-                                                                                    ))}
+                                                                                
+                                                                                <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
+                                                                                    {resident.contact_number && (
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <Phone className="h-3 w-3 flex-shrink-0" />
+                                                                                            <span className="truncate">{resident.contact_number}</span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {resident.purok && (
+                                                                                        <div className="flex items-center gap-1">
+                                                                                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                                                                                            <span>Purok {resident.purok}</span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {resident.age && (
+                                                                                        <div>
+                                                                                            <span className="font-medium">Age:</span> {resident.age}
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {resident.gender && (
+                                                                                        <div>
+                                                                                            <span className="font-medium">Gender:</span> {resident.gender}
+                                                                                        </div>
+                                                                                    )}
                                                                                 </div>
-                                                                            </div>
-                                                                            
-                                                                            <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
-                                                                                {resident.contact_number && (
-                                                                                    <div className="flex items-center gap-1">
-                                                                                        <Phone className="h-3 w-3 flex-shrink-0" />
-                                                                                        <span className="truncate">{resident.contact_number}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {resident.purok && (
-                                                                                    <div className="flex items-center gap-1">
-                                                                                        <MapPin className="h-3 w-3 flex-shrink-0" />
-                                                                                        <span>Purok {resident.purok}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {resident.age && (
-                                                                                    <div>
-                                                                                        <span className="font-medium">Age:</span> {resident.age}
-                                                                                    </div>
-                                                                                )}
-                                                                                {resident.gender && (
-                                                                                    <div>
-                                                                                        <span className="font-medium">Gender:</span> {resident.gender}
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
 
-                                                                            {isExpanded && resident.address && (
-                                                                                <div className="mt-3 rounded bg-gray-100 p-3 text-xs">
-                                                                                    <div className="font-medium mb-1">Complete Address:</div>
-                                                                                    <div className="text-gray-700">{resident.address}</div>
-                                                                                </div>
-                                                                            )}
+                                                                                {isExpanded && resident.address && (
+                                                                                    <div className="mt-3 rounded bg-gray-100 p-3 text-xs">
+                                                                                        <div className="font-medium mb-1">Complete Address:</div>
+                                                                                        <div className="text-gray-700">{resident.address}</div>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1">
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                onClick={() => toggleExpand(resident.id.toString())}
+                                                                                className="h-7 w-7 p-0"
+                                                                            >
+                                                                                {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                                                            </Button>
                                                                         </div>
                                                                     </div>
-                                                                    <div className="flex items-center gap-1">
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() => toggleExpand(resident.id.toString())}
-                                                                            className="h-7 w-7 p-0"
-                                                                        >
-                                                                            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                                                        </Button>
-                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        );
-                                                    })
+                                                            );
+                                                        })
                                                 ) : (
                                                     // Grid View for Residents
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3">
-                                                        {residents.map((resident) => {
+                                                        {residents
+                                                            .filter(r => isDiscountEligible(r))
+                                                            .map((resident) => {
                                                             const isSelected = selectedResidentIds.includes(resident.id.toString());
                                                             const badges = getResidentBadges(resident);
 
@@ -708,6 +798,17 @@ export default function BulkSelectionPanel({
                                                                                     </div>
                                                                                 )}
                                                                             </div>
+
+                                                                            {/* Show head's privileges if any */}
+                                                                            {household.head_privileges && household.head_privileges.length > 0 && (
+                                                                                <div className="mt-2 flex gap-1">
+                                                                                    {household.head_privileges.map((p: any, idx: number) => (
+                                                                                        <Badge key={idx} variant="outline" className="text-xs bg-purple-50">
+                                                                                            {p.name}
+                                                                                        </Badge>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
 
                                                                             {isExpanded && household.address && (
                                                                                 <div className="mt-3 rounded bg-gray-100 p-3 text-xs">

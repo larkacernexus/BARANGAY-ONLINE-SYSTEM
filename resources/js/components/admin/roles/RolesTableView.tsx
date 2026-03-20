@@ -56,7 +56,7 @@ export default function RolesTableView({
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <Table className="min-w-full">
-                        <TableHeader className="bg-gray-50 dark:bg-gray-800">
+                        <TableHeader className="bg-gray-50 dark:bg-gray-900">
                             <TableRow>
                                 {isBulkMode && (
                                     <TableHead className="px-4 py-3 text-center w-12">
@@ -84,7 +84,7 @@ export default function RolesTableView({
                                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                                     Created
                                 </TableHead>
-                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[80px]">
+                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[80px]">
                                     Actions
                                 </TableHead>
                             </TableRow>
@@ -136,9 +136,9 @@ export default function RolesTableView({
                                         <>
                                             <TableRow 
                                                 key={role.id} 
-                                                className={`hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${
+                                                className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors ${
                                                     isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
-                                                } ${isExpanded ? 'bg-gray-50 dark:bg-gray-800/50' : ''}`}
+                                                } ${isExpanded ? 'bg-gray-50 dark:bg-gray-900/50' : ''}`}
                                                 onClick={(e) => {
                                                     if (isBulkMode && e.target instanceof HTMLElement && 
                                                         !e.target.closest('a') && 
@@ -234,7 +234,7 @@ export default function RolesTableView({
                                                             <DropdownMenuTrigger asChild>
                                                                 <Button 
                                                                     variant="ghost" 
-                                                                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900"
                                                                     onClick={(e) => e.stopPropagation()}
                                                                 >
                                                                     <span className="sr-only">Open menu</span>
@@ -340,7 +340,7 @@ export default function RolesTableView({
                                             
                                             {/* Expanded Row with Additional Details */}
                                             {isExpanded && (
-                                                <TableRow className="bg-gray-50 dark:bg-gray-800/30">
+                                                <TableRow className="bg-gray-50 dark:bg-gray-900/30">
                                                     <TableCell colSpan={isBulkMode ? 7 : 6} className="px-4 py-3">
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                             <div>
@@ -410,7 +410,7 @@ export default function RolesTableView({
                                                                 {role.users_count > 0 && (
                                                                     <div className="mt-4">
                                                                         <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Users with this Role</h4>
-                                                                        <div className="bg-white dark:bg-gray-800 border rounded p-2">
+                                                                        <div className="bg-white dark:bg-gray-900 border rounded p-2">
                                                                             <p className="text-sm text-gray-600 dark:text-gray-400">
                                                                                 This role is assigned to <span className="font-medium">{role.users_count} user(s)</span>.
                                                                             </p>

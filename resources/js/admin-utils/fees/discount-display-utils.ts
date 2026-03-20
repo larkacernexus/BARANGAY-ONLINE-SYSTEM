@@ -11,7 +11,7 @@
  * - Actual discount application requires ID verification at payment time
  */
 
-import { FeeType, DiscountRule, Resident, DiscountTypeCode } from '@/types/fees';
+import { FeeType, DiscountRule, Resident } from '@/types/fees';
 
 // ============================================
 // CORE UTILITY FUNCTIONS
@@ -102,64 +102,15 @@ export const getBulkCreationSummary = (
     return `You are about to create fees for ${count} ${typeLabel}.\n` +
            `• Total amount: ${formatCurrency(totalAmount)}\n` +
            `• Average per payer: ${formatCurrency(totalAmount / count)}\n\n` +
-           `Note: Discounts will be applied during payment upon ID verification, as required by Philippine law (RA 9994, RA 10754, RA 8972).\n\n` +
+           `Note: Discounts will be applied during payment upon ID verification.\n\n` +
            `Do you want to proceed?`;
 };
 
 // ============================================
-// PHILIPPINE DISCOUNT LAWS (Display Only)
+// DYNAMIC PRIVILEGE-BASED FUNCTIONS
 // ============================================
 
-export const PHILIPPINE_DISCOUNT_LAWS = {
-    SENIOR: {
-        code: 'RA 9994',
-        name: 'Expanded Senior Citizens Act of 2010',
-        maxPercentage: 20,
-        description: 'For senior citizens aged 60 and above',
-        requirements: ['Valid Senior Citizen ID', 'Age 60+'] as string[],
-        discountType: 'SENIOR' as DiscountTypeCode,
-    },
-    PWD: {
-        code: 'RA 10754',
-        name: 'Expanded PWD Benefits Act',
-        maxPercentage: 20,
-        description: 'For Persons With Disabilities',
-        requirements: ['Valid PWD ID'] as string[],
-        discountType: 'PWD' as DiscountTypeCode,
-    },
-    SOLO_PARENT: {
-        code: 'RA 8972',
-        name: 'Solo Parents Welfare Act of 2000',
-        maxPercentage: 10,
-        description: 'For solo parents',
-        requirements: ['Valid Solo Parent ID'] as string[],
-        discountType: 'SOLO_PARENT' as DiscountTypeCode,
-    },
-    INDIGENT: {
-        code: 'Local Ordinance',
-        name: 'Social Reform and Poverty Alleviation Act',
-        maxPercentage: 20,
-        description: 'For indigent families',
-        requirements: ['Certificate of Indigency'] as string[],
-        discountType: 'INDIGENT' as DiscountTypeCode,
-    },
-} as const;
-
-// ============================================
-// DISCOUNT DISPLAY FUNCTIONS
-// ============================================
-
-// Define badge type
-export type BadgeType = 'senior' | 'pwd' | 'solo_parent' | 'indigent' | 'veteran' | 'student';
-
-export interface EligibilityBadge {
-    label: string;
-    type: BadgeType;
-    icon: string;
-    color: string;
-}
-
-// Get active discount rules for display
+// Get all discount rules that are active
 export const getActiveDiscountsForDisplay = (
     discountRules: DiscountRule[] = []
 ): DiscountRule[] => {
@@ -172,7 +123,7 @@ export const getActiveDiscountsForDisplay = (
     ).sort((a, b) => a.priority - b.priority);
 };
 
-// Get discounts applicable to a fee type (MAIN FUNCTION YOU NEED)
+// Get discounts applicable to a fee type (DYNAMIC)
 export const getDiscountsForFeeType = (
     feeType: FeeType | null,
     discountRules: DiscountRule[] = []
@@ -186,150 +137,209 @@ export const getDiscountsForFeeType = (
     );
 };
 
-// ALIAS for backward compatibility - this fixes your import error!
+// ALIAS for backward compatibility
 export const getActiveDiscountsForFeeType = getDiscountsForFeeType;
 
-// Get discount note for special combinations
+// Get discount note for special combinations (DYNAMIC)
 export const getDiscountNote = (
     discountCodes: string[],
 ): { note: string; type: 'info' | 'warning' | 'error' } => {
+    // This can be extended based on your business rules
+    // For now, just check if there are multiple discounts
     if (discountCodes.length < 2) return { note: '', type: 'info' };
 
-    const hasSeniorDiscount = discountCodes.includes('SENIOR');
-    const hasPWDDiscount = discountCodes.includes('PWD');
-
-    if (hasSeniorDiscount && hasPWDDiscount) {
-        return {
-            note: 'Philippine Law (RA 9994 & RA 10754): Senior Citizen and PWD discounts cannot be combined cumulatively. Maximum discount applied: 20%.',
-            type: 'warning',
-        };
-    }
-
-    return { note: '', type: 'info' };
+    return {
+        note: 'Multiple discounts may not be combinable. Check local ordinances for stacking rules.',
+        type: 'warning',
+    };
 };
 
-// Get resident eligibility badges
-export const getEligibilityBadges = (resident: Resident | null): EligibilityBadge[] => {
+/**
+ * Get resident's active privileges - DYNAMIC
+ */
+export const getResidentPrivileges = (resident: Resident | null): any[] => {
+    if (!resident || !resident.privileges || !Array.isArray(resident.privileges)) {
+        return [];
+    }
+    
+    return resident.privileges.filter((p: any) => 
+        p.status === 'active' || p.status === 'expiring_soon'
+    );
+};
+
+/**
+ * Get resident eligibility badges from privileges - DYNAMIC
+ */
+export const getEligibilityBadges = (resident: Resident | null): Array<{
+    label: string;
+    type: string;
+    icon: string;
+    color: string;
+    code: string;
+}> => {
     if (!resident) return [];
     
-    const badges: EligibilityBadge[] = [];
+    const badges = [];
+    const privileges = getResidentPrivileges(resident);
     
-    if (resident.is_senior) {
+    // Generate badges from actual privileges
+    for (const priv of privileges) {
+        const code = priv.code || 'unknown';
         badges.push({
-            label: 'Senior Citizen',
-            type: 'senior',
-            icon: '👵',
-            color: 'bg-blue-100 text-blue-800 border-blue-200'
+            label: priv.name || code,
+            type: code.toLowerCase(),
+            icon: getPrivilegeIcon(code),
+            color: getPrivilegeColor(code),
+            code: code
         });
     }
-    if (resident.is_pwd) {
-        badges.push({
-            label: 'PWD',
-            type: 'pwd',
-            icon: '♿',
-            color: 'bg-green-100 text-green-800 border-green-200'
-        });
-    }
-    if (resident.is_solo_parent) {
-        badges.push({
-            label: 'Solo Parent',
-            type: 'solo_parent',
-            icon: '👨‍👧‍👦',
-            color: 'bg-pink-100 text-pink-800 border-pink-200'
-        });
-    }
-    if (resident.is_indigent) {
-        badges.push({
-            label: 'Indigent',
-            type: 'indigent',
-            icon: '🏠',
-            color: 'bg-amber-100 text-amber-800 border-amber-200'
-        });
-    }
-    if (resident.is_veteran) {
-        badges.push({
-            label: 'Veteran',
-            type: 'veteran',
-            icon: '🎖️',
-            color: 'bg-purple-100 text-purple-800 border-purple-200'
-        });
-    }
-    if (resident.is_student) {
-        badges.push({
-            label: 'Student',
-            type: 'student',
-            icon: '📚',
-            color: 'bg-teal-100 text-teal-800 border-teal-200'
-        });
+    
+    // Fallback to discount_eligibility_list if available
+    if (badges.length === 0 && resident.discount_eligibility_list) {
+        const eligibilityList = Array.isArray(resident.discount_eligibility_list) 
+            ? resident.discount_eligibility_list 
+            : [];
+            
+        for (const item of eligibilityList) {
+            badges.push({
+                label: item.label || 'Unknown',
+                type: item.type || 'unknown',
+                icon: '🎫',
+                color: 'bg-gray-100 text-gray-800 border-gray-200',
+                code: item.privilege_code || 'unknown'
+            });
+        }
     }
     
     return badges;
 };
 
-// Check if resident is eligible for a specific discount type
+/**
+ * Get icon for privilege code - DYNAMIC based on first character
+ */
+export const getPrivilegeIcon = (code: string): string => {
+    const firstChar = (code?.[0] || 'A').toUpperCase();
+    
+    const iconMap: Record<string, string> = {
+        'S': '👴',
+        'P': '♿',
+        'I': '🏠',
+        'F': '🌾',
+        'O': '✈️',
+        '4': '📦',
+        'U': '💼',
+        'A': '🎫',
+        'B': '🎫',
+        'C': '🎫',
+        'D': '🎫',
+        'E': '🎫',
+    };
+    
+    return iconMap[firstChar] || '🎫';
+};
+
+/**
+ * Get color for privilege code - DYNAMIC based on first character
+ */
+export const getPrivilegeColor = (code: string): string => {
+    const firstChar = (code?.[0] || 'A').toUpperCase().charCodeAt(0);
+    const colorIndex = firstChar % 8;
+    
+    const colors = [
+        'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400',
+        'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400',
+        'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400',
+        'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400',
+        'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400',
+        'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400',
+        'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400',
+        'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400',
+    ];
+    
+    return colors[colorIndex] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-400';
+};
+
+/**
+ * Check if resident is eligible for a specific discount type - DYNAMIC
+ */
 export const isResidentEligibleForDiscount = (
     resident: Resident | null,
-    discountType: DiscountTypeCode
+    discountType: string
 ): boolean => {
     if (!resident) return false;
     
-    switch (discountType) {
-        case 'SENIOR':
-            return resident.is_senior === true;
-        case 'PWD':
-            return resident.is_pwd === true;
-        case 'SOLO_PARENT':
-            return resident.is_solo_parent === true;
-        case 'INDIGENT':
-            return resident.is_indigent === true;
-        case 'VETERAN':
-            return resident.is_veteran === true;
-        case 'STUDENT':
-            return resident.is_student === true;
-        default:
-            return false;
+    // Check privileges
+    const privileges = getResidentPrivileges(resident);
+    const hasPrivilege = privileges.some((p: any) => 
+        p.code?.toLowerCase() === discountType.toLowerCase()
+    );
+    
+    if (hasPrivilege) return true;
+    
+    // Check discount_eligibility_list
+    if (resident.discount_eligibility_list) {
+        const eligibilityList = Array.isArray(resident.discount_eligibility_list) 
+            ? resident.discount_eligibility_list 
+            : [];
+            
+        return eligibilityList.some((item: any) => 
+            item.type?.toLowerCase() === discountType.toLowerCase() ||
+            item.privilege_code?.toLowerCase() === discountType.toLowerCase()
+        );
     }
+    
+    return false;
 };
 
-// Get all discount types a resident is eligible for
+/**
+ * Get all discount types a resident is eligible for - DYNAMIC
+ */
 export const getResidentEligibleDiscountTypes = (
     resident: Resident | null
-): DiscountTypeCode[] => {
+): string[] => {
     if (!resident) return [];
     
-    const eligible: DiscountTypeCode[] = [];
+    const eligibleTypes: string[] = [];
     
-    if (resident.is_senior) eligible.push('SENIOR');
-    if (resident.is_pwd) eligible.push('PWD');
-    if (resident.is_solo_parent) eligible.push('SOLO_PARENT');
-    if (resident.is_indigent) eligible.push('INDIGENT');
-    if (resident.is_veteran) eligible.push('VETERAN');
-    if (resident.is_student) eligible.push('STUDENT');
-    
-    return eligible;
-};
-
-// Get Philippine legal basis for discount
-export const getPhilippineLegalBasis = (discountType: DiscountTypeCode): string => {
-    switch (discountType) {
-        case 'SENIOR':
-            return 'RA 9994 (Expanded Senior Citizens Act)';
-        case 'PWD':
-            return 'RA 10754 (Expanded PWD Benefits Act)';
-        case 'SOLO_PARENT':
-            return 'RA 8972 (Solo Parents Welfare Act)';
-        case 'INDIGENT':
-            return 'Local Ordinance (Indigent Assistance)';
-        case 'VETERAN':
-            return 'RA 6948 (Veterans Benefits)';
-        case 'STUDENT':
-            return 'Local Ordinance (Student Discount)';
-        default:
-            return 'Local Ordinance';
+    // Get from privileges
+    const privileges = getResidentPrivileges(resident);
+    for (const priv of privileges) {
+        if (priv.code) {
+            eligibleTypes.push(priv.code);
+        }
     }
+    
+    // Get from discount_eligibility_list
+    if (resident.discount_eligibility_list) {
+        const eligibilityList = Array.isArray(resident.discount_eligibility_list) 
+            ? resident.discount_eligibility_list 
+            : [];
+            
+        for (const item of eligibilityList) {
+            if (item.type && !eligibleTypes.includes(item.type)) {
+                eligibleTypes.push(item.type);
+            }
+            if (item.privilege_code && !eligibleTypes.includes(item.privilege_code)) {
+                eligibleTypes.push(item.privilege_code);
+            }
+        }
+    }
+    
+    return eligibleTypes;
 };
 
-// Format discount rule for display
+/**
+ * Get Philippine legal basis for discount - DYNAMIC (can be extended)
+ */
+export const getPhilippineLegalBasis = (discountType: string): string => {
+    // This could be stored in the database and fetched dynamically
+    // For now, return a generic message
+    return 'Applicable Philippine Laws and Local Ordinances';
+};
+
+/**
+ * Format discount rule for display - DYNAMIC
+ */
 export const formatDiscountRuleForDisplay = (rule: DiscountRule): {
     code: string;
     name: string;
@@ -339,14 +349,11 @@ export const formatDiscountRuleForDisplay = (rule: DiscountRule): {
     requirements?: string[];
 } => {
     const isPercentage = rule.value_type === 'percentage';
-    const lawInfo = PHILIPPINE_DISCOUNT_LAWS[rule.discount_type as keyof typeof PHILIPPINE_DISCOUNT_LAWS];
     
     let requirements: string[] | undefined = undefined;
     
     if (rule.verification_document) {
         requirements = [rule.verification_document];
-    } else if (lawInfo?.requirements) {
-        requirements = lawInfo.requirements;
     }
     
     return {
@@ -354,13 +361,64 @@ export const formatDiscountRuleForDisplay = (rule: DiscountRule): {
         name: rule.name,
         percentage: isPercentage ? rule.discount_value : 0,
         legalBasis: getPhilippineLegalBasis(rule.discount_type),
-        description: rule.description || lawInfo?.description || '',
+        description: rule.description || '',
         requirements,
     };
 };
 
+/**
+ * Get discount percentage from resident and fee type - DYNAMIC
+ */
+export const getDiscountPercentage = (
+    resident: Resident | null,
+    discountType: string
+): number => {
+    if (!resident) return 0;
+    
+    // Try to get from privileges
+    const privileges = getResidentPrivileges(resident);
+    for (const priv of privileges) {
+        if (priv.code?.toLowerCase() === discountType.toLowerCase()) {
+            return priv.discount_percentage || 0;
+        }
+    }
+    
+    // Try to get from discount_eligibility_list
+    if (resident.discount_eligibility_list) {
+        const eligibilityList = Array.isArray(resident.discount_eligibility_list) 
+            ? resident.discount_eligibility_list 
+            : [];
+            
+        for (const item of eligibilityList) {
+            if (item.type?.toLowerCase() === discountType.toLowerCase() ||
+                item.privilege_code?.toLowerCase() === discountType.toLowerCase()) {
+                return item.percentage || 0;
+            }
+        }
+    }
+    
+    return 0;
+};
+
+/**
+ * Check if resident has ID number for a privilege
+ */
+export const hasPrivilegeIdNumber = (
+    resident: Resident | null,
+    privilegeCode: string
+): boolean => {
+    if (!resident || !resident.privileges) return false;
+    
+    const priv = resident.privileges.find((p: any) => 
+        p.code?.toLowerCase() === privilegeCode.toLowerCase()
+    );
+    
+    return !!(priv && priv.id_number);
+};
+
 // ============================================
-// NO NEED FOR ADDITIONAL EXPORT BLOCK
+// NO HARDCODED DISCOUNT TYPES
 // ============================================
-// The functions above are already exported with 'export const'
-// DO NOT add another export block at the bottom
+// Removed: PHILIPPINE_DISCOUNT_LAWS constant
+// Removed: Hardcoded badge types
+// Removed: Hardcoded icon mappings

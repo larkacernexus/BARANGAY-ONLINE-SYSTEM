@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { 
     Resident, 
     Household, 
-    Business, // ADDED
+    Business,
     ClearanceRequest, 
     BackendFee, 
     OutstandingFee, 
@@ -24,14 +24,16 @@ interface PayerHandlersProps {
     data: PaymentFormData;
     setData: (data: any) => void;
     setSelectedPayer: (payer: any) => void;
-    setPayerSource: (source: 'residents' | 'households' | 'businesses' | 'clearance' | 'fees') => void; // UPDATED
+    setPayerSource: (source: 'residents' | 'households' | 'businesses' | 'clearance' | 'fees') => void;
     setPayerOutstandingFees: (fees: OutstandingFee[]) => void;
+    setPayerClearanceRequests?: (requests: ClearanceRequest[]) => void; // ADDED
     outstandingFeesForTab: OutstandingFee[];
     clearanceTypes: Record<string, string>;
     clearanceTypesDetails: any[];
     clearance_requests?: ClearanceRequest[];
     clearance_request?: ClearanceRequest | null;
     checkDiscountEligibilityForFees: (fees: OutstandingFee[], resident: Resident) => OutstandingFee[];
+    fetchClearanceRequestsForPayer?: (type: string, id: string | number) => Promise<void>; // ADDED
 }
 
 export function usePayerHandlers({
@@ -40,12 +42,14 @@ export function usePayerHandlers({
     setSelectedPayer,
     setPayerSource,
     setPayerOutstandingFees,
+    setPayerClearanceRequests, // ADDED
     outstandingFeesForTab,
     clearanceTypes,
     clearanceTypesDetails,
     clearance_requests = [],
     clearance_request,
-    checkDiscountEligibilityForFees
+    checkDiscountEligibilityForFees,
+    fetchClearanceRequestsForPayer // ADDED
 }: PayerHandlersProps) {
     
     const handleResidentPayer = useCallback((resident: Resident) => {
@@ -65,13 +69,31 @@ export function usePayerHandlers({
         const feesWithDiscountInfo = checkDiscountEligibilityForFees(residentOutstandingFees, resident);
         setPayerOutstandingFees(feesWithDiscountInfo);
         
+        // Filter clearance requests for this resident - but DON'T auto-add them
         const residentClearanceRequests = clearance_requests.filter(cr => 
             cr.resident_id == resident.id && 
             cr.can_be_paid && 
             !cr.already_paid
         );
         
-        const hasClearanceRequests = residentClearanceRequests.length > 0;
+        console.log('📋 Found clearance requests for resident:', {
+            count: residentClearanceRequests.length,
+            requests: residentClearanceRequests.map(cr => ({
+                id: cr.id,
+                reference: cr.reference_number,
+                amount: cr.fee_amount
+            }))
+        });
+        
+        // Set clearance requests in state if the function exists
+        if (setPayerClearanceRequests) {
+            setPayerClearanceRequests(residentClearanceRequests);
+        }
+        
+        // Fetch additional clearance requests if needed
+        if (fetchClearanceRequestsForPayer) {
+            fetchClearanceRequestsForPayer('resident', resident.id);
+        }
         
         const updatedData = {
             ...data,
@@ -82,62 +104,22 @@ export function usePayerHandlers({
             address: resident.address || '',
             household_number: resident.household_number || '',
             purok: resident.purok || '',
+            // DON'T auto-add clearance items
+            items: [],
+            subtotal: 0,
+            total_amount: 0,
+            clearance_request_id: undefined,
+            clearance_type: '',
+            clearance_type_id: '',
+            clearance_code: ''
         };
-        
-        if (hasClearanceRequests && !clearance_request) {
-            const firstRequest = residentClearanceRequests[0];
-            const clearanceTypeCode = firstRequest.clearance_type?.code || 'BRGY_CLEARANCE';
-            const clearanceTypeDetail = clearanceTypesDetails.find(
-                type => type.code === clearanceTypeCode
-            );
-            
-            const feeAmount = parseAmount(firstRequest.fee_amount);
-                
-            const clearanceFeeItem = {
-                id: Date.now(),
-                fee_id: `clearance-${firstRequest.id}`,
-                fee_name: clearanceTypeDetail?.name || clearanceTypes[clearanceTypeCode] || 'Clearance Fee',
-                fee_code: clearanceTypeCode,
-                description: firstRequest.specific_purpose || firstRequest.purpose || 'Clearance Fee',
-                base_amount: feeAmount,
-                surcharge: 0,
-                penalty: 0,
-                discount: 0,
-                total_amount: feeAmount,
-                category: 'clearance',
-                period_covered: '',
-                months_late: 0,
-                metadata: {
-                    is_clearance_fee: true,
-                    clearance_request_id: firstRequest.id,
-                    clearance_type_id: clearanceTypeDetail?.id || firstRequest.clearance_type_id,
-                    clearance_type_code: clearanceTypeCode,
-                }
-            };
-            
-            updatedData.clearance_request_id = firstRequest.id;
-            updatedData.clearance_type = clearanceTypeCode;
-            updatedData.clearance_type_id = clearanceTypeDetail?.id || firstRequest.clearance_type_id;
-            updatedData.clearance_code = clearanceTypeCode;
-            updatedData.purpose = clearanceTypeDetail?.name || clearanceTypes[clearanceTypeCode] || 'Clearance Fee';
-            updatedData.items = [clearanceFeeItem];
-            updatedData.subtotal = feeAmount;
-            updatedData.total_amount = feeAmount;
-            
-            console.log('✅ Auto-selected clearance request');
-        } else {
-            updatedData.items = [];
-            updatedData.subtotal = 0;
-            updatedData.total_amount = 0;
-            if (!clearance_request) {
-                updatedData.clearance_request_id = undefined;
-            }
-        }
         
         setData(updatedData);
         setSelectedPayer(resident);
         setPayerSource('residents');
-    }, [data, setData, setSelectedPayer, setPayerSource, outstandingFeesForTab, clearance_requests, clearance_request, clearanceTypes, clearanceTypesDetails, checkDiscountEligibilityForFees]);
+        
+        console.log('✅ Resident payer processed - clearance requests available for manual selection');
+    }, [data, setData, setSelectedPayer, setPayerSource, outstandingFeesForTab, clearance_requests, clearance_request, clearanceTypes, clearanceTypesDetails, checkDiscountEligibilityForFees, setPayerClearanceRequests, fetchClearanceRequestsForPayer]);
 
     const handleHouseholdPayer = useCallback((household: Household) => {
         console.log('🏠 Handling household payer:', {
@@ -153,6 +135,11 @@ export function usePayerHandlers({
         );
         
         setPayerOutstandingFees(householdOutstandingFees);
+        
+        // Fetch clearance requests for household members
+        if (fetchClearanceRequestsForPayer) {
+            fetchClearanceRequestsForPayer('household', household.id);
+        }
         
         const updatedData = {
             ...data,
@@ -172,9 +159,8 @@ export function usePayerHandlers({
         setData(updatedData);
         setSelectedPayer(household);
         setPayerSource('households');
-    }, [data, setData, setSelectedPayer, setPayerSource, outstandingFeesForTab]);
+    }, [data, setData, setSelectedPayer, setPayerSource, outstandingFeesForTab, fetchClearanceRequestsForPayer]);
 
-    // ========== ADDED: Business Payer Handler ==========
     const handleBusinessPayer = useCallback((business: Business) => {
         console.log('🏢 Handling business payer:', {
             businessId: business.id,
@@ -189,6 +175,11 @@ export function usePayerHandlers({
         );
         
         setPayerOutstandingFees(businessOutstandingFees);
+        
+        // Fetch clearance requests for business owner
+        if (fetchClearanceRequestsForPayer) {
+            fetchClearanceRequestsForPayer('business', business.id);
+        }
         
         const updatedData = {
             ...data,
@@ -210,7 +201,7 @@ export function usePayerHandlers({
         setPayerSource('businesses');
         
         console.log('✅ Business payer processed');
-    }, [data, setData, setSelectedPayer, setPayerSource, outstandingFeesForTab]);
+    }, [data, setData, setSelectedPayer, setPayerSource, outstandingFeesForTab, fetchClearanceRequestsForPayer]);
 
     const handleClearanceTabPayer = useCallback((clearancePayer: ClearanceRequest, residents?: Resident[]) => {
         console.log('📋 Handling clearance tab payer:', {
@@ -249,29 +240,8 @@ export function usePayerHandlers({
                                clearancePayer.clearance_type_id;
         
         const feeAmount = parseAmount(clearancePayer.fee_amount);
-            
-        const clearanceFeeItem = {
-            id: Date.now(),
-            fee_id: `clearance-${clearancePayer.id}`,
-            fee_name: clearanceTypeName,
-            fee_code: clearanceTypeCode,
-            description: clearancePayer.specific_purpose || clearancePayer.purpose || 'Clearance Fee',
-            base_amount: feeAmount,
-            surcharge: 0,
-            penalty: 0,
-            discount: 0,
-            total_amount: feeAmount,
-            category: 'clearance',
-            period_covered: '',
-            months_late: 0,
-            metadata: {
-                is_clearance_fee: true,
-                clearance_request_id: clearancePayer.id,
-                clearance_type_id: clearanceTypeId,
-                clearance_type_code: clearanceTypeCode,
-            }
-        };
         
+        // DON'T auto-add the clearance item - just set the data and let user add it in Step 2
         const updatedData = {
             ...data,
             payer_type: 'resident',
@@ -286,12 +256,13 @@ export function usePayerHandlers({
             clearance_type_id: clearanceTypeId,
             clearance_code: clearanceTypeCode,
             clearance_request_id: clearancePayer.id,
-            items: [clearanceFeeItem],
-            subtotal: feeAmount,
-            total_amount: feeAmount,
+            // Don't auto-add to items
+            items: [],
+            subtotal: 0,
+            total_amount: 0,
         };
         
-        console.log('✅ Clearance tab payer processed');
+        console.log('✅ Clearance tab payer processed - clearance available for manual addition');
         
         setData(updatedData);
         setSelectedPayer(clearancePayer);
@@ -305,7 +276,12 @@ export function usePayerHandlers({
         
         const feesWithDiscountInfo = checkDiscountEligibilityForFees(residentOutstandingFees, residentPayer);
         setPayerOutstandingFees(feesWithDiscountInfo);
-    }, [data, setData, setSelectedPayer, setPayerSource, clearanceTypes, clearanceTypesDetails, outstandingFeesForTab, checkDiscountEligibilityForFees]);
+        
+        // Set clearance requests in state if the function exists
+        if (setPayerClearanceRequests) {
+            setPayerClearanceRequests([clearancePayer]);
+        }
+    }, [data, setData, setSelectedPayer, setPayerSource, clearanceTypes, clearanceTypesDetails, outstandingFeesForTab, checkDiscountEligibilityForFees, setPayerClearanceRequests]);
 
     const handleBackendFeePayer = useCallback((backendFee: BackendFee) => {
         console.log('💰 Handling backend fee payer:', {
@@ -343,7 +319,7 @@ export function usePayerHandlers({
                 payer_type: backendFee.payer_type || 'resident',
                 payer_id: backendFee.payer_type === 'resident' ? backendFee.resident_id : 
                          backendFee.payer_type === 'household' ? backendFee.household_id : 
-                         backendFee.payer_type === 'business' ? backendFee.business_id : // ADDED
+                         backendFee.payer_type === 'business' ? backendFee.business_id :
                          backendFee.id,
                 original_fee_data: {
                     base_amount: baseAmount,
@@ -360,7 +336,7 @@ export function usePayerHandlers({
         const payerType = backendFee.payer_type || 'resident';
         let payerId = backendFee.payer_type === 'resident' ? backendFee.resident_id : 
                      backendFee.payer_type === 'household' ? backendFee.household_id : 
-                     backendFee.payer_type === 'business' ? backendFee.business_id : // ADDED
+                     backendFee.payer_type === 'business' ? backendFee.business_id :
                      backendFee.id;
         
         const updatedData = {
@@ -490,7 +466,7 @@ export function usePayerHandlers({
     return {
         handleResidentPayer,
         handleHouseholdPayer,
-        handleBusinessPayer, // ADDED
+        handleBusinessPayer,
         handleClearanceTabPayer,
         handleBackendFeePayer,
         handleOutstandingFeePayer,

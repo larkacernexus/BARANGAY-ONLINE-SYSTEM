@@ -130,17 +130,17 @@ const getMethodColor = (method: string): string => {
         case 'PUT': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
         case 'PATCH': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
         case 'DELETE': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     }
 };
 
 const getStatusCodeColor = (code: number | null): string => {
-    if (!code) return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+    if (!code) return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     if (code >= 200 && code < 300) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
     if (code >= 300 && code < 400) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
     if (code >= 400 && code < 500) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
     if (code >= 500) return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-    return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+    return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
 };
 
 const truncateText = (text: string | null, length: number = 50): string => {
@@ -417,7 +417,7 @@ export default function AccessLogs({
                                     value={userId}
                                     onChange={(e) => handleFilter('user_id', e.target.value)}
                                     disabled={isLoading}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="">All Users</option>
                                     {users.map((user) => (
@@ -436,7 +436,7 @@ export default function AccessLogs({
                                     value={actionType}
                                     onChange={(e) => handleFilter('action_type', e.target.value)}
                                     disabled={isLoading}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="">All Actions</option>
                                     {action_types
@@ -457,7 +457,7 @@ export default function AccessLogs({
                                     value={method}
                                     onChange={(e) => handleFilter('method', e.target.value)}
                                     disabled={isLoading}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="">All Methods</option>
                                     {methods
@@ -478,7 +478,7 @@ export default function AccessLogs({
                                     value={statusCode}
                                     onChange={(e) => handleFilter('status_code', e.target.value)}
                                     disabled={isLoading}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="">All Status Codes</option>
                                     {status_codes
@@ -499,7 +499,7 @@ export default function AccessLogs({
                                     value={sensitive}
                                     onChange={(e) => handleFilter('sensitive', e.target.value)}
                                     disabled={isLoading}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="">All Actions</option>
                                     <option value="true">Sensitive Only</option>
@@ -548,7 +548,7 @@ export default function AccessLogs({
                                     value={perPage}
                                     onChange={(e) => handleFilter('per_page', e.target.value)}
                                     disabled={isLoading}
-                                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                 >
                                     <option value="10">10</option>
                                     <option value="25">25</option>
@@ -578,7 +578,7 @@ export default function AccessLogs({
                                 )}
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
-                                        <thead className="bg-gray-50 dark:bg-gray-800">
+                                        <thead className="bg-gray-50 dark:bg-gray-900">
                                             <tr>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                                     Timestamp
@@ -738,7 +738,7 @@ export default function AccessLogs({
             {/* Log Details Dialog */}
             {selectedLog && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
                         <div className="p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">

@@ -104,7 +104,7 @@ export function NotificationTabs({
     // Variant: Mobile - compact tabs for small screens
     if (variant === 'mobile') {
         return (
-            <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-900 rounded-lg">
                 <button
                     onClick={() => onTabChange('all')}
                     className={`
@@ -168,7 +168,7 @@ export function NotificationTabs({
     // Variant: Compact - smaller tabs with just icons on very small screens
     if (variant === 'compact') {
         return (
-            <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-lg w-fit">
+            <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-900 rounded-lg w-fit">
                 <button
                     onClick={() => onTabChange('all')}
                     className={`
@@ -250,7 +250,7 @@ export function NotificationTabs({
                                         group relative py-2 px-3 flex items-center gap-2 font-medium text-sm transition-all duration-200 rounded-lg whitespace-nowrap
                                         ${isActive 
                                             ? `bg-${tab.color}-50 text-${tab.color}-600 dark:bg-${tab.color}-900/30 dark:text-${tab.color}-400 ring-1 ring-${tab.color}-200 dark:ring-${tab.color}-800` 
-                                            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                                            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-900'
                                         }
                                     `}
                                 >
@@ -337,7 +337,7 @@ function NotificationTypeDropdown({ typeCounts, activeType, onTypeChange }: Noti
                     flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap
                     ${activeType 
                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800' 
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                     }
                 `}
             >
@@ -364,7 +364,7 @@ function NotificationTypeDropdown({ typeCounts, activeType, onTypeChange }: Noti
                         className="fixed inset-0 z-40"
                         onClick={() => setIsOpen(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                    <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                         <div className="p-2">
                             <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                 Filter by type

@@ -1,4 +1,5 @@
 import { FormCard } from './FormCard';
+import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { FileText } from 'lucide-react';
 import { router } from '@inertiajs/react';
@@ -30,41 +31,46 @@ export default function FormsGridView({
     hasActiveFilters,
     onClearFilters
 }: FormsGridViewProps) {
+    
+    const emptyState = (
+        <EmptyState
+            title="No forms found"
+            description={hasActiveFilters 
+                ? 'Try changing your filters or search criteria.'
+                : 'Get started by uploading a form.'}
+            icon={<FileText className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
+            hasFilters={hasActiveFilters}
+            onClearFilters={onClearFilters}
+            onCreateNew={() => router.get('/forms/create')}
+            createLabel="Upload Form"
+        />
+    );
+
     return (
-        <div className="p-4">
-            {forms.length === 0 ? (
-                <EmptyState
-                    title="No forms found"
-                    description={hasActiveFilters 
-                        ? 'Try changing your filters or search criteria.'
-                        : 'Get started by uploading a form.'}
-                    icon={<FileText className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
-                    hasFilters={hasActiveFilters}
-                    onClearFilters={onClearFilters}
-                    onCreateNew={() => router.get('/forms/create')}
-                    createLabel="Upload Form"
+        <GridLayout
+            isEmpty={forms.length === 0}
+            emptyState={emptyState}
+            gridCols={{ base: 1, sm: 2, lg: 3, xl: 4 }}
+            gap={{ base: '3', sm: '4' }}
+            padding="p-4"
+        >
+            {forms.map(form => (
+                <FormCard
+                    key={form.id}
+                    form={form}
+                    isSelected={selectedForms.includes(form.id)}
+                    isBulkMode={isBulkMode}
+                    isMobile={isMobile}
+                    onSelect={onItemSelect}
+                    onDelete={onDelete}
+                    onToggleStatus={onToggleStatus}
+                    onDownload={onDownload}
+                    truncateText={formUtils.truncateText}
+                    formatFileSize={formUtils.formatFileSize}
+                    getCategoryColor={formUtils.getCategoryColor}
+                    formatDateTime={formUtils.formatDateTime}
                 />
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-                    {forms.map(form => (
-                        <FormCard
-                            key={form.id}
-                            form={form}
-                            isSelected={selectedForms.includes(form.id)}
-                            isBulkMode={isBulkMode}
-                            isMobile={isMobile}
-                            onSelect={onItemSelect}
-                            onDelete={onDelete}
-                            onToggleStatus={onToggleStatus}
-                            onDownload={onDownload}
-                            truncateText={formUtils.truncateText}
-                            formatFileSize={formUtils.formatFileSize}
-                            getCategoryColor={formUtils.getCategoryColor}
-                            formatDateTime={formUtils.formatDateTime}
-                        />
-                    ))}
-                </div>
-            )}
-        </div>
+            ))}
+        </GridLayout>
     );
 }

@@ -324,7 +324,7 @@ export default function Privacy({
 
           {/* Main Tabs - Now only 3 tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 p-1 dark:bg-gray-800/50">
+            <TabsList className="grid w-full grid-cols-3 p-1 dark:bg-gray-900/50">
               <TabsTrigger value="my-data" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900">
                 My Data
               </TabsTrigger>
@@ -543,7 +543,7 @@ export default function Privacy({
                 <CardContent>
                   {!hasRealData ? (
                     <div className="text-center py-16">
-                      <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center text-gray-400 dark:text-gray-600 text-2xl">
+                      <div className="p-4 bg-gray-100 dark:bg-gray-900 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center text-gray-400 dark:text-gray-600 text-2xl">
                         💾
                       </div>
                       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Data Available</h3>
@@ -651,7 +651,7 @@ export default function Privacy({
                   )}
                 </CardContent>
                 {hasRealData && (
-                  <CardFooter className="border-t bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-800 px-6 py-4">
+                  <CardFooter className="border-t bg-gray-50/50 dark:bg-gray-900/50 dark:border-gray-800 px-6 py-4">
                     <div className="flex items-center justify-between w-full">
                       <p className="text-sm text-muted-foreground dark:text-gray-500 flex items-center gap-2">
                         <span>ℹ️</span>
@@ -662,7 +662,7 @@ export default function Privacy({
                         size="sm"
                         onClick={() => handleRequestCorrection('personal-info')}
                         disabled={correctionLoading}
-                        className="dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                        className="dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                       >
                         {correctionLoading ? (
                           <span className="mr-2 animate-spin">⏳</span>
@@ -696,7 +696,7 @@ export default function Privacy({
                     <div className="rounded-lg border dark:border-gray-800 overflow-hidden">
                       <Table>
                         <TableHeader>
-                          <TableRow className="bg-gray-50 dark:bg-gray-800/50">
+                          <TableRow className="bg-gray-50 dark:bg-gray-900/50">
                             <TableHead className="dark:text-gray-400">Name</TableHead>
                             <TableHead className="dark:text-gray-400">Relationship</TableHead>
                             <TableHead className="dark:text-gray-400">Age</TableHead>
@@ -739,7 +739,7 @@ export default function Privacy({
                 <CardContent>
                   {accessLogs.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16">
-                      <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full w-16 h-16 flex items-center justify-center text-gray-400 dark:text-gray-600 text-2xl mb-4">
+                      <div className="p-4 bg-gray-100 dark:bg-gray-900 rounded-full w-16 h-16 flex items-center justify-center text-gray-400 dark:text-gray-600 text-2xl mb-4">
                         📋
                       </div>
                       <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Access Records</h3>
@@ -750,7 +750,7 @@ export default function Privacy({
                   ) : (
                     <div className="space-y-4">
                       {accessLogs.map((log) => (
-                        <div key={log.id} className="p-4 rounded-lg border dark:border-gray-800 hover:bg-accent/50 dark:hover:bg-gray-800/50 transition-colors">
+                        <div key={log.id} className="p-4 rounded-lg border dark:border-gray-800 hover:bg-accent/50 dark:hover:bg-gray-900/50 transition-colors">
                           <div className="flex items-start gap-4">
                             <Avatar className="h-10 w-10 ring-2 ring-purple-100 dark:ring-purple-900">
                               <AvatarFallback className="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
@@ -779,7 +779,7 @@ export default function Privacy({
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
                                   {log.dataAccessed?.map((item, index) => (
-                                    <Badge key={index} variant="secondary" className="text-xs dark:bg-gray-800 dark:text-gray-300">
+                                    <Badge key={index} variant="secondary" className="text-xs dark:bg-gray-900 dark:text-gray-300">
                                       {item}
                                     </Badge>
                                   ))}
@@ -792,7 +792,7 @@ export default function Privacy({
                     </div>
                   )}
                 </CardContent>
-                <CardFooter className="border-t bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-800">
+                <CardFooter className="border-t bg-gray-50/50 dark:bg-gray-900/50 dark:border-gray-800">
                   <div className="flex items-center gap-2 w-full">
                     <span className="text-muted-foreground dark:text-gray-500">ℹ️</span>
                     <p className="text-sm text-muted-foreground dark:text-gray-500">
@@ -824,7 +824,7 @@ export default function Privacy({
                   <CardContent>
                     {documents.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-16">
-                        <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full w-16 h-16 flex items-center justify-center text-gray-400 dark:text-gray-600 text-2xl mb-4">
+                        <div className="p-4 bg-gray-100 dark:bg-gray-900 rounded-full w-16 h-16 flex items-center justify-center text-gray-400 dark:text-gray-600 text-2xl mb-4">
                           📄
                         </div>
                         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Documents</h3>
@@ -836,7 +836,7 @@ export default function Privacy({
                       <div className="rounded-lg border dark:border-gray-800 overflow-hidden">
                         <Table>
                           <TableHeader>
-                            <TableRow className="bg-gray-50 dark:bg-gray-800/50">
+                            <TableRow className="bg-gray-50 dark:bg-gray-900/50">
                               <TableHead className="dark:text-gray-400">Document</TableHead>
                               <TableHead className="dark:text-gray-400">Date Issued</TableHead>
                               <TableHead className="dark:text-gray-400">Reference #</TableHead>
@@ -855,7 +855,7 @@ export default function Privacy({
                                 </TableCell>
                                 <TableCell className="dark:text-gray-300">{doc.dateIssued}</TableCell>
                                 <TableCell>
-                                  <code className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                                  <code className="text-xs bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded">
                                     {doc.referenceNumber}
                                   </code>
                                 </TableCell>
@@ -875,7 +875,7 @@ export default function Privacy({
                                     variant="ghost" 
                                     size="sm"
                                     onClick={() => handleViewDocument(doc.id)}
-                                    className="dark:text-gray-400 dark:hover:bg-gray-800"
+                                    className="dark:text-gray-400 dark:hover:bg-gray-900"
                                   >
                                     <span className="mr-2">👁️</span>
                                     View
@@ -927,7 +927,7 @@ export default function Privacy({
                       </Button>
                     </div>
                   </CardContent>
-                  <CardFooter className="border-t bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-800">
+                  <CardFooter className="border-t bg-gray-50/50 dark:bg-gray-900/50 dark:border-gray-800">
                     <div className="flex items-center gap-1 w-full">
                       <span className="text-xs text-muted-foreground dark:text-gray-500">⏱️</span>
                       <p className="text-xs text-muted-foreground dark:text-gray-500">

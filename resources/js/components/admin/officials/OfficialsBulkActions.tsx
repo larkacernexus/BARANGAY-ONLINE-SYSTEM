@@ -4,13 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
     FileSpreadsheet,
-    Edit,
     Trash2,
     Layers,
     PackageCheck,
     PackageX,
     ClipboardCopy,
-    X,
     CheckCircle,
     XCircle,
     ShieldCheck,
@@ -24,6 +22,8 @@ import {
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { SelectionMode, SelectionStats } from '@/admin-utils/officialsUtils';
+import { router } from '@inertiajs/react';
+import { toast } from 'sonner';
 
 interface OfficialsBulkActionsProps {
     selectedOfficials: number[];
@@ -56,16 +56,44 @@ export default function OfficialsBulkActions({
     onCopySelectedData,
     setShowBulkDeleteDialog
 }: OfficialsBulkActionsProps) {
-    const [showSelectionOptions, setShowSelectionOptions] = useState(false);
     const [showBulkActions, setShowBulkActions] = useState(false);
-    const selectionRef = useRef<HTMLDivElement>(null);
     const bulkActionRef = useRef<HTMLDivElement>(null);
+
+    // SINGLE FUNCTION FOR ALL BULK STATUS UPDATES
+    const handleBulkStatusUpdate = (status: 'active' | 'inactive' | 'former' | 'current') => {
+        if (selectedOfficials.length === 0) {
+            toast.error('Please select at least one official');
+            return;
+        }
+
+        router.post('/admin/officials/bulk-status', {
+            ids: selectedOfficials,
+            status: status, // THIS MATCHES WHAT THE CONTROLLER EXPECTS
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                const messages = {
+                    active: 'activated',
+                    inactive: 'deactivated',
+                    former: 'marked as former',
+                    current: 'marked as current'
+                };
+                toast.success(`Officials ${messages[status]} successfully`);
+                onClearSelection();
+                setShowBulkActions(false);
+            },
+            onError: (errors: any) => {
+                console.error('Bulk status update error:', errors);
+                toast.error('Failed to update officials status');
+            }
+        });
+    };
 
     return (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4 shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-full border">
+                    <div className="flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-1.5 rounded-full border">
                         <PackageCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         <span className="font-medium text-sm">
                             {selectedOfficials.length} selected
@@ -110,7 +138,7 @@ export default function OfficialsBulkActions({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => onBulkOperation('export')}
+                                    onClick={() => onBulkOperation('export_csv')}
                                     className="h-8"
                                     disabled={isPerformingBulkAction}
                                 >
@@ -119,7 +147,7 @@ export default function OfficialsBulkActions({
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                                Export selected officials
+                                Export selected officials as CSV
                             </TooltipContent>
                         </Tooltip>
                         
@@ -160,48 +188,60 @@ export default function OfficialsBulkActions({
                         </Button>
                         
                         {showBulkActions && (
-                            <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-white dark:bg-gray-800 border rounded-md shadow-lg">
+                            <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-white dark:bg-gray-900 border rounded-md shadow-lg">
                                 <div className="p-2">
                                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">
                                         BULK ACTIONS
                                     </div>
+                                    
+                                    {/* ALL BUTTONS USE THE SAME FUNCTION WITH DIFFERENT STATUS VALUES */}
                                     <Button
                                         variant="ghost"
                                         className="w-full justify-start h-8 text-sm"
-                                        onClick={() => onBulkOperation('make_current')}
+                                        onClick={() => handleBulkStatusUpdate('current')}
                                     >
                                         <CheckCircle className="h-3.5 w-3.5 mr-2" />
                                         Mark as Current
                                     </Button>
+                                    
                                     <Button
                                         variant="ghost"
                                         className="w-full justify-start h-8 text-sm"
-                                        onClick={() => onBulkOperation('make_former')}
+                                        onClick={() => handleBulkStatusUpdate('former')}
                                     >
                                         <XCircle className="h-3.5 w-3.5 mr-2" />
                                         Mark as Former
                                     </Button>
+                                    
+                                    <div className="border-t my-1"></div>
+                                    
                                     <Button
                                         variant="ghost"
                                         className="w-full justify-start h-8 text-sm"
-                                        onClick={() => onBulkOperation('activate')}
+                                        onClick={() => handleBulkStatusUpdate('active')}
                                     >
                                         <ShieldCheck className="h-3.5 w-3.5 mr-2" />
-                                        Activate
+                                        Activate All
                                     </Button>
+                                    
                                     <Button
                                         variant="ghost"
                                         className="w-full justify-start h-8 text-sm"
-                                        onClick={() => onBulkOperation('deactivate')}
+                                        onClick={() => handleBulkStatusUpdate('inactive')}
                                     >
                                         <ShieldOff className="h-3.5 w-3.5 mr-2" />
-                                        Deactivate
+                                        Deactivate All
                                     </Button>
+                                    
                                     <div className="border-t my-1"></div>
+                                    
                                     <Button
                                         variant="ghost"
                                         className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        onClick={() => setShowBulkDeleteDialog(true)}
+                                        onClick={() => {
+                                            setShowBulkDeleteDialog(true);
+                                            setShowBulkActions(false);
+                                        }}
                                     >
                                         <Trash2 className="h-3.5 w-3.5 mr-2" />
                                         Delete Selected
@@ -229,27 +269,19 @@ export default function OfficialsBulkActions({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                         <div className="flex items-center gap-2">
                             <Users className="h-3.5 w-3.5 text-blue-500" />
-                            <span>
-                                {selectionStats.total} officials
-                            </span>
+                            <span>{selectionStats.total} officials</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-                            <span>
-                                {selectionStats.current} current
-                            </span>
+                            <span>{selectionStats.current} current</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <ShieldCheck className="h-3.5 w-3.5 text-purple-500" />
-                            <span>
-                                {selectionStats.regular} regular
-                            </span>
+                            <span>{selectionStats.regular} regular</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <Phone className="h-3.5 w-3.5 text-teal-500" />
-                            <span>
-                                {selectionStats.hasContact} with contact
-                            </span>
+                            <span>{selectionStats.hasContact} with contact</span>
                         </div>
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">

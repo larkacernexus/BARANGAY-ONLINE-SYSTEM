@@ -27,7 +27,7 @@ export function ActionDropdown({
             <DropdownMenuTrigger asChild>
                 <Button 
                     variant="ghost" 
-                    className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900"
                 >
                     <span className="sr-only">Open menu</span>
                     {triggerIcon}

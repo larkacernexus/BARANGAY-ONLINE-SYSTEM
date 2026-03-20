@@ -213,7 +213,7 @@ export function ResidentSidebar({ className }: { className?: string }) {
                             "flex items-center justify-center rounded-lg transition-all duration-200 flex-shrink-0",
                             isCollapsed 
                               ? "h-10 w-10 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200/50 dark:border-blue-800/30" 
-                              : "h-8 w-8 bg-gray-100 dark:bg-gray-800 rounded-md group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
+                              : "h-8 w-8 bg-gray-100 dark:bg-gray-900 rounded-md group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
                           )}>
                             <item.icon className={cn(
                               "transition-colors",
@@ -275,7 +275,7 @@ export function ResidentSidebar({ className }: { className?: string }) {
                               isCollapsed ? "h-10 w-10" : "h-8 w-8",
                               active 
                                 ? "bg-blue-100 dark:bg-blue-800/30 text-blue-600 dark:text-blue-400" 
-                                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
+                                : "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
                             )}>
                               <item.icon className={cn(
                                 isCollapsed ? "h-4 w-4" : "h-3.5 w-3.5"
@@ -337,7 +337,7 @@ export function ResidentSidebar({ className }: { className?: string }) {
                               isCollapsed ? "h-10 w-10" : "h-8 w-8",
                               active 
                                 ? "bg-blue-100 dark:bg-blue-800/30 text-blue-600 dark:text-blue-400" 
-                                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
+                                : "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
                             )}>
                               <item.icon className={cn(
                                 isCollapsed ? "h-4 w-4" : "h-3.5 w-3.5"
@@ -392,7 +392,7 @@ export function ResidentSidebar({ className }: { className?: string }) {
             <div className="mt-auto pt-4 w-full">
               <div className="rounded-xl border border-gray-200/50 dark:border-gray-800/50 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-950 p-4 w-full">
                 <div className="flex items-center gap-2.5 mb-3">
-                  <div className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 flex-shrink-0">
+                  <div className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-900 flex-shrink-0">
                     <Building className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                   </div>
                   <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider truncate">

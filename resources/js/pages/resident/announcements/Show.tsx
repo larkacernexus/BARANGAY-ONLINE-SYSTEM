@@ -839,18 +839,18 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, r
                                                     </div>
 
                                                     <div className="grid grid-cols-2 gap-2">
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Posted</p>
                                                             <p className="text-xs">{formatRelativeTime(announcement.created_at)}</p>
                                                         </div>
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Views</p>
                                                             <p className="text-xs">{announcement.views_count?.toLocaleString() || 0}</p>
                                                         </div>
                                                     </div>
 
                                                     {announcement.author && (
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500 mb-1">Author</p>
                                                             <div className="flex items-center gap-2">
                                                                 <Avatar className="h-6 w-6">
@@ -871,7 +871,7 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, r
                                                     {(announcement.start_date || announcement.end_date) && (
                                                         <div className="space-y-2">
                                                             {announcement.start_date && (
-                                                                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                                     <p className="text-[10px] text-gray-500">Starts</p>
                                                                     <p className="text-xs">{formatDate(announcement.start_date)}</p>
                                                                     {announcement.start_time && (
@@ -880,7 +880,7 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, r
                                                                 </div>
                                                             )}
                                                             {announcement.end_date && (
-                                                                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                                     <p className="text-[10px] text-gray-500">Ends</p>
                                                                     <p className="text-xs">{formatDate(announcement.end_date)}</p>
                                                                     {announcement.end_time && (
@@ -1052,7 +1052,7 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, r
                                                             return (
                                                                 <div
                                                                     key={attachment.id}
-                                                                    className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors group"
+                                                                    className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors group"
                                                                 >
                                                                     <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 flex items-center justify-center flex-shrink-0">
                                                                         <FileIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
@@ -1146,7 +1146,7 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, r
                                                             href={`/portal/resident-announcements/${related.id}`}
                                                             className="block"
                                                         >
-                                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
+                                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
                                                                 <div className="flex gap-3">
                                                                     <div className={`h-10 w-10 rounded-lg ${relatedTypeConfig.color} flex items-center justify-center flex-shrink-0`}>
                                                                         <relatedTypeConfig.icon className="h-5 w-5" />
@@ -1315,28 +1315,28 @@ export default function AnnouncementShow({ announcement, relatedAnnouncements, r
                             {/* Contact Information */}
                             <ModernCard title="Contact Information" icon={MessageSquare} iconColor="from-purple-500 to-purple-600">
                                 <div className="space-y-3">
-                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <Building className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div>
                                             <p className="font-medium text-sm">Barangay Hall</p>
                                             <p className="text-xs text-gray-500">Mon-Fri, 8AM-5PM</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <Phone className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div>
                                             <p className="font-medium text-sm">Emergency Hotline</p>
                                             <p className="text-xs text-gray-500">(02) 8888-9999</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div>
                                             <p className="font-medium text-sm">Email</p>
                                             <p className="text-xs text-gray-500">barangay@example.com</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div>
                                             <p className="font-medium text-sm">Location</p>

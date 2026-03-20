@@ -211,7 +211,7 @@ export const ModernPaymentCard = ({
 
               {/* Breakdown */}
               {((payment.surcharge || 0) > 0 || (payment.penalty || 0) > 0 || (payment.discount || 0) > 0) && (
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 space-y-1.5 mt-2">
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 space-y-1.5 mt-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
                     <span className="font-medium">{payment.formatted_subtotal}</span>

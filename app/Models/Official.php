@@ -12,8 +12,8 @@ class Official extends Model
 
     protected $fillable = [
         'resident_id',
-        'position',
-        'committee',
+        'position_id',
+        'committee_id',
         'term_start',
         'term_end',
         'status',
@@ -24,6 +24,7 @@ class Official extends Model
         'achievements',
         'photo_path',
         'is_regular',
+        'user_id',
     ];
 
     protected $casts = [
@@ -35,15 +36,34 @@ class Official extends Model
 
     protected $appends = [
         'photo_url',
+        'position_name',
+        'committee_name',
         'full_position',
         'is_current',
         'term_duration',
+        'position_code',
+        'committee_code',
     ];
 
-    // Relationships
+    // Relationships - RENAME THESE to avoid conflict with old columns
+    public function positionData()
+    {
+        return $this->belongsTo(Position::class, 'position_id');
+    }
+
+    public function committeeData()
+    {
+        return $this->belongsTo(Committee::class, 'committee_id');
+    }
+
     public function resident()
     {
         return $this->belongsTo(Resident::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     // Accessors
@@ -60,19 +80,75 @@ class Official extends Model
         return asset('storage/' . $this->photo_path);
     }
 
+    public function getPositionNameAttribute()
+    {
+        // Check if relationship is loaded and exists
+        if ($this->relationLoaded('positionData') && $this->positionData) {
+            return $this->positionData->name;
+        }
+        
+        // Fallback to the old position column if it exists
+        if (isset($this->attributes['position'])) {
+            return $this->attributes['position'];
+        }
+        
+        return 'No Position';
+    }
+
+    public function getPositionCodeAttribute()
+    {
+        if ($this->relationLoaded('positionData') && $this->positionData) {
+            return $this->positionData->code;
+        }
+        
+        return null;
+    }
+
+    public function getCommitteeNameAttribute()
+    {
+        if ($this->relationLoaded('committeeData') && $this->committeeData) {
+            return $this->committeeData->name;
+        }
+        
+        if (isset($this->attributes['committee'])) {
+            return $this->attributes['committee'];
+        }
+        
+        return null;
+    }
+
+    public function getCommitteeCodeAttribute()
+    {
+        if ($this->relationLoaded('committeeData') && $this->committeeData) {
+            return $this->committeeData->code;
+        }
+        
+        return null;
+    }
+
     public function getFullPositionAttribute()
     {
-        $positions = [
-            'captain' => 'Barangay Captain',
-            'kagawad' => 'Barangay Kagawad',
-            'secretary' => 'Barangay Secretary',
-            'treasurer' => 'Barangay Treasurer',
-            'sk_chairman' => 'SK Chairman',
-            'sk_kagawad' => 'SK Kagawad',
-            'secretary_treasurer' => 'Secretary-Treasurer',
-        ];
+        if ($this->relationLoaded('positionData') && $this->positionData) {
+            $positionName = $this->positionData->name;
+            
+            if ($this->committeeData) {
+                return "{$positionName} - {$this->committeeData->name}";
+            }
+            
+            return $positionName;
+        }
         
-        return $positions[$this->position] ?? ucfirst(str_replace('_', ' ', $this->position));
+        if (isset($this->attributes['position'])) {
+            $positionName = $this->attributes['position'];
+            
+            if (isset($this->attributes['committee'])) {
+                return "{$positionName} - {$this->attributes['committee']}";
+            }
+            
+            return $positionName;
+        }
+        
+        return 'N/A';
     }
 
     public function getIsCurrentAttribute()
@@ -128,19 +204,45 @@ class Official extends Model
         return $query->where('is_regular', false);
     }
 
-    public function scopeByPosition($query, $position)
+    public function scopeByPosition($query, $positionId)
     {
-        return $query->where('position', $position);
+        return $query->where('position_id', $positionId);
+    }
+
+    public function scopeByPositionCode($query, $code)
+    {
+        return $query->whereHas('positionData', function ($q) use ($code) {
+            $q->where('code', $code);
+        });
+    }
+
+    public function scopeByCommittee($query, $committeeId)
+    {
+        return $query->where('committee_id', $committeeId);
+    }
+
+    public function scopeByCommitteeCode($query, $code)
+    {
+        return $query->whereHas('committeeData', function ($q) use ($code) {
+            $q->where('code', $code);
+        });
     }
 
     public function scopeSearch($query, $search)
     {
-        return $query->whereHas('resident', function ($q) use ($search) {
-            $q->where('first_name', 'like', "%{$search}%")
-              ->orWhere('last_name', 'like', "%{$search}%")
-              ->orWhere('middle_name', 'like', "%{$search}%");
-        })->orWhere('position', 'like', "%{$search}%")
-          ->orWhere('committee', 'like', "%{$search}%");
+        return $query->where(function ($q) use ($search) {
+            $q->whereHas('resident', function ($r) use ($search) {
+                $r->where('first_name', 'like', "%{$search}%")
+                  ->orWhere('last_name', 'like', "%{$search}%")
+                  ->orWhere('middle_name', 'like', "%{$search}%");
+            })->orWhereHas('positionData', function ($p) use ($search) {
+                $p->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
+            })->orWhereHas('committeeData', function ($c) use ($search) {
+                $c->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
+            });
+        });
     }
 
     // Helper methods
@@ -157,5 +259,31 @@ class Official extends Model
     public function getEmailAttribute($value)
     {
         return $value ?: ($this->resident ? $this->resident->email : null);
+    }
+
+    // Check if this official is a Kagawad
+    public function isKagawad()
+    {
+        return $this->positionData && $this->positionData->isKagawad();
+    }
+
+    // Get all committees this official is part of
+    public function getAllCommittees()
+    {
+        if (!$this->positionData) {
+            return collect();
+        }
+
+        $committees = collect();
+        
+        // Add primary committee from official
+        if ($this->committeeData) {
+            $committees->push($this->committeeData);
+        }
+        
+        // Add additional committees from position
+        $committees = $committees->merge($this->positionData->additionalCommittees());
+        
+        return $committees->unique('id');
     }
 }

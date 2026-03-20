@@ -23,7 +23,7 @@ export function KeyboardShortcuts({
     children
 }: KeyboardShortcutsProps) {
     return (
-        <div className={`bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border ${className}`}>
+        <div className={`bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border ${className}`}>
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <KeyRound className="h-4 w-4 text-gray-500" />

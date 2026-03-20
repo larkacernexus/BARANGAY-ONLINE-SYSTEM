@@ -17,7 +17,8 @@ import {
   MapPin,
   Home as HomeIcon,
   ExternalLink,
-  X
+  X,
+  Shield
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { type ReactNode, useState, useEffect, useRef } from 'react';
@@ -32,7 +33,17 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import axios from 'axios';
 import { NotificationCenter } from '@/components/notifications/notification-center';
 
-// Types for resident data from residents table
+// Types for privilege data
+interface PrivilegeType {
+  id: number;
+  code: string;
+  name: string;
+  id_number?: string;
+  status?: string;
+  expires_at?: string;
+}
+
+// Updated ResidentType with dynamic privileges
 interface ResidentType {
   id: number;
   first_name: string;
@@ -43,15 +54,19 @@ interface ResidentType {
   email?: string;
   phone?: string;
   birth_date?: string;
-  is_senior?: boolean;
-  is_pwd?: boolean;
-  is_solo_parent?: boolean;
-  is_indigent?: boolean;
   is_voter?: boolean;
   occupation?: string;
+  
+  // DYNAMIC: Privileges array
+  privileges?: PrivilegeType[];
+  privileges_count?: number;
+  has_privileges?: boolean;
+  
+  // DYNAMIC: Individual privilege flags
+  [key: string]: any;
 }
 
-// Types for household member
+// Updated HouseholdMemberType with dynamic privileges
 interface HouseholdMemberType {
   id: number;
   resident_id: number;
@@ -71,14 +86,16 @@ interface HouseholdMemberType {
   religion?: string;
   is_head: boolean;
   relationship_to_head?: string;
-  is_senior?: boolean;
-  is_pwd?: boolean;
-  is_solo_parent?: boolean;
-  is_indigent?: boolean;
   is_voter?: boolean;
   avatar?: string;
-  has_special_classification?: boolean;
-  discount_eligibilities?: any[];
+  
+  // DYNAMIC: Privilege data
+  privileges?: PrivilegeType[];
+  privileges_count?: number;
+  has_privileges?: boolean;
+  
+  // DYNAMIC: Individual privilege flags
+  [key: string]: any;
 }
 
 // Types for household data
@@ -99,6 +116,10 @@ interface HouseholdType {
   has_electricity?: boolean;
   has_internet?: boolean;
   has_vehicle?: boolean;
+  
+  // Head resident's privileges
+  head_privileges?: PrivilegeType[];
+  has_discount_eligible_head?: boolean;
 }
 
 // Notification interface
@@ -119,7 +140,7 @@ interface Notification {
   link: string;
 }
 
-// Updated ResidentUserType to include notifications
+// Updated ResidentUserType with all privileges
 interface ResidentUserType {
   id: number;
   name: string;
@@ -140,13 +161,19 @@ interface ResidentUserType {
   household?: HouseholdType;
   notifications?: Notification[];
   unread_notifications_count?: number;
+  avatar?: string;
+  
+  // DYNAMIC: All privileges for reference
+  all_privileges?: PrivilegeType[];
 }
 
-interface PageProps extends Inertia.PageProps {
+interface PageProps {
   auth?: {
     user?: ResidentUserType;
   };
   currentModule?: string;
+  allPrivileges?: PrivilegeType[]; // All privileges from database
+  [key: string]: any;
 }
 
 interface ResidentSidebarHeaderProps {
@@ -156,37 +183,96 @@ interface ResidentSidebarHeaderProps {
   headerActions?: ReactNode;
 }
 
+// ========== DYNAMIC HELPER FUNCTIONS ==========
+
+/**
+ * Get privilege icon based on code
+ */
+const getPrivilegeIcon = (code: string): string => {
+  const firstChar = (code?.[0] || 'A').toUpperCase();
+  
+  const iconMap: Record<string, string> = {
+    'S': '👴',
+    'P': '♿',
+    'I': '🏠',
+    'F': '🌾',
+    'O': '✈️',
+    '4': '📦',
+    'U': '💼',
+    'A': '🎫',
+    'B': '🎫',
+    'C': '🎫',
+    'D': '🎫',
+    'E': '🎫',
+  };
+  
+  return iconMap[firstChar] || '🎫';
+};
+
+/**
+ * Get privilege color based on code hash
+ */
+const getPrivilegeColor = (code: string): string => {
+  const firstChar = (code?.[0] || 'A').toUpperCase().charCodeAt(0);
+  const colorIndex = firstChar % 8;
+  
+  const colors = [
+    'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+    'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
+    'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400',
+    'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+  ];
+  
+  return colors[colorIndex] || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-400';
+};
+
+/**
+ * Get resident's active privileges
+ */
+const getActivePrivileges = (resident: ResidentType | undefined): PrivilegeType[] => {
+  if (!resident || !resident.privileges) return [];
+  
+  return resident.privileges.filter((p: PrivilegeType) => 
+    p.status === 'active' || p.status === 'expiring_soon'
+  );
+};
+
+/**
+ * Get resident's privilege badges
+ */
+const getPrivilegeBadges = (resident: ResidentType | undefined): Array<{ code: string; name: string; icon: string; color: string }> => {
+  if (!resident) return [];
+  
+  const activePrivileges = getActivePrivileges(resident);
+  
+  return activePrivileges.map(p => ({
+    code: p.code,
+    name: p.name,
+    icon: getPrivilegeIcon(p.code),
+    color: getPrivilegeColor(p.code)
+  }));
+};
+
 // Helper function to get full name from resident
 const getResidentFullName = (resident: ResidentType | undefined): string => {
-  if (!resident) return 'Family Head';
-  
+  if (!resident) return '';
   let fullName = resident.first_name || '';
-  
-  if (resident.middle_name) {
-    fullName += ` ${resident.middle_name}`;
-  }
-  
+  if (resident.middle_name) fullName += ` ${resident.middle_name}`;
   fullName += ` ${resident.last_name || ''}`;
-  
-  if (resident.suffix) {
-    fullName += ` ${resident.suffix}`;
-  }
-  
-  return fullName.trim() || 'Family Head';
+  if (resident.suffix) fullName += ` ${resident.suffix}`;
+  return fullName.trim();
 };
 
 // Helper function to get initials from resident
 const getResidentInitials = (resident: ResidentType | undefined): string => {
   if (!resident) return 'FH';
-  
   const firstInitial = resident.first_name ? resident.first_name[0] : '';
   const lastInitial = resident.last_name ? resident.last_name[0] : '';
-  
-  if (firstInitial && lastInitial) {
-    return `${firstInitial}${lastInitial}`.toUpperCase();
-  }
-  
-  return 'FH';
+  return (firstInitial + lastInitial).toUpperCase() || 'FH';
 };
 
 // Modern Search Component
@@ -213,17 +299,14 @@ const SearchBar = ({ onSearch }: { onSearch: (query: string) => void }) => {
   return (
     <div className="relative">
       {isOpen ? (
-        <form
-          onSubmit={handleSubmit}
-          className="relative animate-slide-in"
-        >
+        <form onSubmit={handleSubmit} className="relative animate-slide-in">
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search fees, documents..."
-            className="w-48 lg:w-64 pl-10 pr-10 py-2 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            className="w-48 lg:w-64 pl-10 pr-10 py-2 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <button
@@ -237,7 +320,7 @@ const SearchBar = ({ onSearch }: { onSearch: (query: string) => void }) => {
       ) : (
         <button
           onClick={() => setIsOpen(true)}
-          className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative group"
+          className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors relative group"
         >
           <Search className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-500 transition-colors" />
           <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -247,7 +330,58 @@ const SearchBar = ({ onSearch }: { onSearch: (query: string) => void }) => {
   );
 };
 
-// Modern User Menu Component
+// Privilege Badges Component - DYNAMIC
+const PrivilegeBadges = ({ privileges }: { privileges: PrivilegeType[] }) => {
+  if (!privileges || privileges.length === 0) return null;
+  
+  // Show only first 3, rest in tooltip
+  const visiblePrivileges = privileges.slice(0, 3);
+  const remainingCount = privileges.length - 3;
+  
+  return (
+    <div className="flex items-center gap-1">
+      {visiblePrivileges.map((p, idx) => (
+        <TooltipProvider key={idx}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "px-1.5 py-0.5 text-xs cursor-help",
+                  getPrivilegeColor(p.code)
+                )}
+              >
+                <span className="mr-1">{getPrivilegeIcon(p.code)}</span>
+                {p.name}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{p.name}</p>
+              {p.id_number && <p className="text-xs">ID: {p.id_number}</p>}
+              {p.expires_at && <p className="text-xs">Expires: {new Date(p.expires_at).toLocaleDateString()}</p>}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ))}
+      {remainingCount > 0 && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" className="px-1.5 py-0.5 text-xs cursor-help bg-gray-100">
+                +{remainingCount}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{privileges.slice(3).map(p => p.name).join(', ')}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  );
+};
+
+// User Menu Component - DYNAMIC with privileges
 const UserMenu = ({ 
   user, 
   residentData, 
@@ -276,11 +410,13 @@ const UserMenu = ({
   const userName = getResidentFullName(residentData) || user?.name || 'Family Head';
   const userInitials = getResidentInitials(residentData);
   const userAvatar = residentData?.avatar || user?.avatar;
+  
+  // Get resident's privileges
+  const privileges = getPrivilegeBadges(residentData);
 
   const getAvatarUrl = () => {
     if (!userAvatar) return undefined;
-    if (userAvatar.startsWith('http')) return userAvatar;
-    if (userAvatar.startsWith('/')) return userAvatar;
+    if (userAvatar.startsWith('http') || userAvatar.startsWith('/')) return userAvatar;
     return `/storage/${userAvatar}`;
   };
 
@@ -291,7 +427,6 @@ const UserMenu = ({
     inactive: 'bg-gray-500'
   };
 
-  // Get household head name
   const householdHead = householdMembers?.find(m => m.is_head);
   const householdHeadName = householdHead?.full_name || userName;
 
@@ -300,7 +435,7 @@ const UserMenu = ({
       <DropdownMenuTrigger asChild>
         <Button 
           variant="ghost" 
-          className="flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full pl-2 pr-3 py-1.5 transition-all duration-200 h-auto group"
+          className="flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-full pl-2 pr-3 py-1.5 transition-all duration-200 h-auto group"
         >
           <div className="relative">
             <Avatar className="h-9 w-9 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 transition-all group-hover:ring-blue-500">
@@ -329,6 +464,20 @@ const UserMenu = ({
               <span className="flex-shrink-0">•</span>
               <span className="truncate">Purok {purok}</span>
             </div>
+            
+            {/* DYNAMIC: Show privilege icons in compact form */}
+            {privileges.length > 0 && (
+              <div className="flex items-center gap-1 mt-1">
+                {privileges.slice(0, 2).map((p, idx) => (
+                  <span key={idx} className="text-xs" title={p.name}>
+                    {p.icon}
+                  </span>
+                ))}
+                {privileges.length > 2 && (
+                  <span className="text-xs text-gray-500">+{privileges.length - 2}</span>
+                )}
+              </div>
+            )}
           </div>
           
           <ChevronDown className={cn(
@@ -339,7 +488,6 @@ const UserMenu = ({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-96 p-2 max-w-[calc(100vw-2rem)]">
-        {/* User Info Card */}
         <div className="px-3 py-4 mb-2 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl">
           <div className="flex items-start gap-3">
             <Avatar className="h-12 w-12 ring-2 ring-blue-500/20 flex-shrink-0">
@@ -350,10 +498,10 @@ const UserMenu = ({
             </Avatar>
             
             <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-gray-900 dark:text-white truncate" title={userName}>
+              <h4 className="font-semibold text-gray-900 dark:text-white truncate">
                 {userName}
               </h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate" title={user?.email}>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                 {user?.email}
               </p>
               
@@ -367,26 +515,38 @@ const UserMenu = ({
                   <span className="truncate">Purok {purok}</span>
                 </Badge>
               </div>
+              
+              {/* DYNAMIC: Show all privileges */}
+              {privileges.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {privileges.map((p, idx) => (
+                    <Badge 
+                      key={idx} 
+                      className={cn("text-xs px-2 py-0.5", p.color)}
+                    >
+                      {p.icon} {p.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Quick Stats */}
           <div className="grid grid-cols-2 gap-2 mt-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center hover:shadow-md transition-shadow min-w-0">
+            <div className="bg-white dark:bg-gray-900 rounded-lg p-2 text-center hover:shadow-md transition-shadow min-w-0">
               <Users className="h-4 w-4 mx-auto mb-1 text-blue-500" />
               <p className="text-xs text-gray-500 truncate">Household</p>
               <p className="text-sm font-semibold">{householdMembersCount} members</p>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center hover:shadow-md transition-shadow min-w-0">
-              <Award className="h-4 w-4 mx-auto mb-1 text-purple-500" />
-              <p className="text-xs text-gray-500 truncate">Status</p>
-              <p className="text-sm font-semibold capitalize truncate">{membershipStatus}</p>
+            <div className="bg-white dark:bg-gray-900 rounded-lg p-2 text-center hover:shadow-md transition-shadow min-w-0">
+              <Shield className="h-4 w-4 mx-auto mb-1 text-purple-500" />
+              <p className="text-xs text-gray-500 truncate">Privileges</p>
+              <p className="text-sm font-semibold">{privileges.length}</p>
             </div>
           </div>
 
-          {/* Household Summary */}
           {householdData && (
-            <div className="mt-3 p-2 bg-white/50 dark:bg-gray-800/50 rounded-lg">
+            <div className="mt-3 p-2 bg-white/50 dark:bg-gray-900/50 rounded-lg">
               <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Household #{householdData.household_number}
               </p>
@@ -395,13 +555,18 @@ const UserMenu = ({
                 {householdData.has_internet && <span>🌐 Internet</span>}
                 {householdData.has_vehicle && <span>🚗 Vehicle</span>}
               </div>
+              {householdData.head_privileges && householdData.head_privileges.length > 0 && (
+                <div className="mt-2 text-xs text-gray-500">
+                  <span className="font-medium">Head's privileges:</span>{' '}
+                  {householdData.head_privileges.map(p => p.name).join(', ')}
+                </div>
+              )}
             </div>
           )}
         </div>
 
         <DropdownMenuSeparator />
 
-        {/* Menu Items */}
         <DropdownMenuItem onClick={onHousehold} className="rounded-lg py-2 cursor-pointer hover:scale-[1.02] transition-transform">
           <Users className="mr-3 h-4 w-4 text-gray-500 flex-shrink-0" />
           <div className="flex-1 min-w-0">
@@ -443,7 +608,7 @@ const UserMenu = ({
   );
 };
 
-// Modern Theme Toggle Component
+// Theme Toggle Component
 const ThemeToggle = () => {
   const [isDark, setIsDark] = useState(false);
 
@@ -451,7 +616,6 @@ const ThemeToggle = () => {
     const savedTheme = localStorage.getItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const shouldBeDark = savedTheme === 'dark' || (!savedTheme && systemPrefersDark);
-    
     setIsDark(shouldBeDark);
     document.documentElement.classList.toggle('dark', shouldBeDark);
   }, []);
@@ -471,21 +635,15 @@ const ThemeToggle = () => {
         <TooltipTrigger asChild>
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative group"
+            className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors relative group"
           >
             <div className="transition-transform duration-300 hover:rotate-12">
-              {isDark ? (
-                <Sun className="h-5 w-5 text-amber-500" />
-              ) : (
-                <Moon className="h-5 w-5 text-gray-700" />
-              )}
+              {isDark ? <Sun className="h-5 w-5 text-amber-500" /> : <Moon className="h-5 w-5 text-gray-700" />}
             </div>
             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
         </TooltipTrigger>
-        <TooltipContent>
-          <p>Toggle {isDark ? 'light' : 'dark'} mode</p>
-        </TooltipContent>
+        <TooltipContent><p>Toggle {isDark ? 'light' : 'dark'} mode</p></TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
@@ -499,20 +657,15 @@ export function ResidentSidebarHeader({
 }: ResidentSidebarHeaderProps) {
   const { props } = usePage<PageProps>();
   
-  // Get user data from auth
   const user = props?.auth?.user;
   const residentData = user?.resident;
   const householdMembers = user?.household_members || [];
   const householdData = user?.household;
   
-  // Get notifications from auth.user
   const notifications = (user?.notifications || []) as Notification[];
   const unreadCount = user?.unread_notifications_count || notifications.filter(n => !n.read_at).length;
   
-  // Get household members count
   const householdMembersCount = user?.household_members_count || householdMembers.length || 0;
-  
-  // Get unit and purok
   const unitNumber = user?.unit_number || householdData?.household_number || 'Not Assigned';
   const purok = user?.purok || householdData?.purok || 'Not Assigned';
 
@@ -523,38 +676,30 @@ export function ResidentSidebarHeader({
   const [localNotifications, setLocalNotifications] = useState<Notification[]>(notifications);
   const [localUnreadCount, setLocalUnreadCount] = useState(unreadCount);
 
-  // Update local state when props change
   useEffect(() => {
     setLocalNotifications(notifications);
     setLocalUnreadCount(unreadCount);
-    console.log('Notifications updated:', notifications);
   }, [notifications, unreadCount]);
 
   const handleSearch = (query: string) => {
     if (query.trim()) {
-      router.visit(route('search', { q: query }));
+      try {
+        router.visit(route('search', { q: query }));
+      } catch (e) {
+        router.visit(`/portal/search?q=${encodeURIComponent(query)}`);
+      }
     }
   };
 
-  const handleLogout = () => {
-    router.post(route('logout'));
-  };
-
+  const handleLogout = () => router.post(route('logout'));
   const goToHouseholdMembers = () => {
-    router.get(route('resident.profile.show'), {
-      tab: 'members'
-    }, {
-      preserveScroll: true
-    });
+    router.get(route('resident.profile.show'), { tab: 'members' }, { preserveScroll: true });
     setIsNotificationsOpen(false);
   };
-
   const goToProfile = () => {
     router.visit(route('resident.profile.show'));
     setIsNotificationsOpen(false);
   };
-
-  // Navigate to all notifications page
   const goToAllNotifications = () => {
     router.visit('/portal/notifications');
     setIsNotificationsOpen(false);
@@ -562,149 +707,89 @@ export function ResidentSidebarHeader({
 
   const markAsRead = async (notificationId: string) => {
     try {
-      console.log('Marking notification as read:', notificationId);
-      
-      // Use the correct endpoint with the parameter name 'id' as expected by the controller
-const response = await axios.patch(`/portal/notifications/${notificationId}/mark-as-read`);
-      
-      console.log('Mark as read response:', response.data);
-      
+      const response = await axios.patch(`/portal/notifications/${notificationId}/mark-as-read`);
       if (response.data.success) {
-        // Update local state optimistically
-        setLocalNotifications(prev =>
-          prev.map(n =>
-            n.id === notificationId ? { ...n, read_at: response.data.read_at || new Date().toISOString() } : n
-          )
-        );
+        setLocalNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read_at: response.data.read_at || new Date().toISOString() } : n));
         setLocalUnreadCount(prev => Math.max(0, prev - 1));
-        
-        // Also refresh from server to ensure consistency
-        router.reload({ 
-          only: ['auth.user.notifications', 'auth.user.unread_notifications_count'],
-          preserveState: true,
-          preserveScroll: true
-        });
+        router.reload({ only: ['auth.user.notifications', 'auth.user.unread_notifications_count'], preserveState: true, preserveScroll: true });
       }
-    } catch (error) {
-      console.error('Failed to mark notification as read:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('Response:', error.response?.data);
-        console.error('Status:', error.response?.status);
-      }
-    }
+    } catch (error) { console.error('Failed to mark as read:', error); }
   };
 
   const markAllAsRead = async () => {
     try {
-      console.log('Marking all notifications as read');
-      
-      // Use the correct endpoint
       const response = await axios.post('/portal/notifications/mark-all-as-read');
-      
-      console.log('Mark all as read response:', response.data);
-      
       if (response.data.success) {
-        // Update local state optimistically
-        setLocalNotifications(prev =>
-          prev.map(n => ({ ...n, read_at: new Date().toISOString() }))
-        );
+        setLocalNotifications(prev => prev.map(n => ({ ...n, read_at: new Date().toISOString() })));
         setLocalUnreadCount(0);
-        
-        // Refresh from server
-        router.reload({ 
-          only: ['auth.user.notifications', 'auth.user.unread_notifications_count'],
-          preserveState: true,
-          preserveScroll: true
-        });
+        router.reload({ only: ['auth.user.notifications', 'auth.user.unread_notifications_count'], preserveState: true, preserveScroll: true });
       }
-    } catch (error) {
-      console.error('Failed to mark all as read:', error);
-    }
+    } catch (error) { console.error('Failed to mark all as read:', error); }
   };
 
   return (
     <>
-      <header 
-        className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-800 px-4 md:px-6 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60 supports-[backdrop-filter]:dark:bg-gray-900/60 animate-slide-down"
-      >
+      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-800 px-4 md:px-6 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl animate-slide-down">
         <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
           <SidebarTrigger className="-ml-1" />
-          
           <div className="flex flex-col min-w-0 flex-1">
             {breadcrumbs.length > 0 && (
               <div className="hidden md:flex items-center gap-2 animate-fade-in" style={{ animationDelay: '100ms' }}>
                 <Breadcrumbs breadcrumbs={breadcrumbs} />
               </div>
             )}
-            
             {(title || description) && (
               <div className="min-w-0 animate-fade-in" style={{ animationDelay: '200ms' }}>
-                {title && (
-                  <h1 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white truncate">
-                    {title}
-                  </h1>
-                )}
-                {description && (
-                  <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 truncate">
-                    {description}
-                  </p>
-                )}
+                {title && <h1 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white truncate">{title}</h1>}
+                {description && <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 truncate">{description}</p>}
               </div>
             )}
-            
             <div className="hidden md:flex items-center gap-2 mt-1 animate-fade-in" style={{ animationDelay: '300ms' }}>
-              <Badge variant="secondary" className="gap-1 text-xs">
-                <HomeIcon className="h-3 w-3" />
-                Unit {unitNumber}
-              </Badge>
-              <Badge variant="secondary" className="gap-1 text-xs">
-                <MapPin className="h-3 w-3" />
-                Purok {purok}
-              </Badge>
-              {user?.is_household_head && (
-                <Badge variant="default" className="gap-1 text-xs bg-gradient-to-r from-blue-500 to-blue-600">
-                  <Award className="h-3 w-3" />
-                  Family Head
-                </Badge>
+              <Badge variant="secondary" className="gap-1 text-xs"><HomeIcon className="h-3 w-3" />Unit {unitNumber}</Badge>
+              <Badge variant="secondary" className="gap-1 text-xs"><MapPin className="h-3 w-3" />Purok {purok}</Badge>
+              {user?.is_household_head && <Badge variant="default" className="gap-1 text-xs bg-gradient-to-r from-blue-500 to-blue-600"><Award className="h-3 w-3" />Family Head</Badge>}
+              
+              {/* DYNAMIC: Show privilege icons in header */}
+              {residentData && residentData.privileges && residentData.privileges.length > 0 && (
+                <div className="flex items-center gap-1 ml-2">
+                  {residentData.privileges.slice(0, 3).map((p, idx) => (
+                    <TooltipProvider key={idx}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-xs cursor-help">{getPrivilegeIcon(p.code)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{p.name}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ))}
+                </div>
               )}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-1 md:gap-2">
-          {/* Search */}
           <SearchBar onSearch={handleSearch} />
-
-          {/* Theme Toggle */}
           <ThemeToggle />
-
-          {/* Help Button */}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button 
-                  className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative group"
-                  onClick={() => setIsInstructionsOpen(true)}
-                >
+                <button className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors relative group" onClick={() => setIsInstructionsOpen(true)}>
                   <HelpCircle className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-500 transition-colors" />
                   <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>
-                <p>Help & Instructions</p>
-              </TooltipContent>
+              <TooltipContent><p>Help & Instructions</p></TooltipContent>
             </Tooltip>
           </TooltipProvider>
 
-          {/* Notifications */}
           <div className="relative">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button 
-                    className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative group"
-                    onClick={() => setIsNotificationsOpen(true)}
-                  >
+                  <button className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors relative group" onClick={() => setIsNotificationsOpen(true)}>
                     <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-500 transition-colors" />
                     {localUnreadCount > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 h-5 w-5 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 animate-scale-in">
@@ -714,144 +799,44 @@ const response = await axios.patch(`/portal/notifications/${notificationId}/mark
                     <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>Notifications</p>
-                </TooltipContent>
+                <TooltipContent><p>Notifications</p></TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
 
-          {/* User Menu */}
           <UserMenu
-            user={user}
-            residentData={residentData}
-            householdData={householdData}
-            householdMembers={householdMembers}
-            unitNumber={unitNumber}
-            purok={purok}
-            householdMembersCount={householdMembersCount}
-            onLogout={handleLogout}
-            onProfile={goToProfile}
-            onHousehold={goToHouseholdMembers}
+            user={user} residentData={residentData} householdData={householdData}
+            householdMembers={householdMembers} unitNumber={unitNumber} purok={purok}
+            householdMembersCount={householdMembersCount} onLogout={handleLogout}
+            onProfile={goToProfile} onHousehold={goToHouseholdMembers}
           />
-
-          {/* Header Actions */}
-          {headerActions && (
-            <div className="hidden md:flex ml-2">
-              {headerActions}
-            </div>
-          )}
+          {headerActions && <div className="hidden md:flex ml-2">{headerActions}</div>}
         </div>
       </header>
 
-      {/* Notification Center */}
       <NotificationCenter
-        notifications={localNotifications}
-        unreadCount={localUnreadCount}
-        isOpen={isNotificationsOpen}
-        onClose={() => setIsNotificationsOpen(false)}
-        onMarkAsRead={markAsRead}
-        onMarkAllAsRead={markAllAsRead}
+        notifications={localNotifications} unreadCount={localUnreadCount}
+        isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)}
+        onMarkAsRead={markAsRead} onMarkAllAsRead={markAllAsRead}
         onViewAll={goToAllNotifications}
       />
 
-      {/* Instructions Modal */}
       <InstructionsModal
-        isOpen={isInstructionsOpen}
-        onClose={() => setIsInstructionsOpen(false)}
-        module={currentModule}
-        title="Family Head Guide"
-        showQuickGuide={true}
-        userRole="family-head"
+        isOpen={isInstructionsOpen} onClose={() => setIsInstructionsOpen(false)}
+        module={currentModule} title="Family Head Guide" showQuickGuide={true} userRole="family-head"
       />
 
-      {/* CSS Animations */}
       <style>{`
-        @keyframes slideDown {
-          from {
-            transform: translateY(-100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateX(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
-        @keyframes slideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        @keyframes scaleIn {
-          from {
-            transform: scale(0);
-          }
-          to {
-            transform: scale(1);
-          }
-        }
-
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
-
-        .animate-slide-down {
-          animation: slideDown 0.3s ease-out forwards;
-        }
-
-        .animate-slide-in {
-          animation: slideIn 0.2s ease-out forwards;
-        }
-
-        .animate-slide-in-right {
-          opacity: 0;
-          animation: slideInRight 0.3s ease-out forwards;
-        }
-
-        .animate-fade-in {
-          opacity: 0;
-          animation: fadeIn 0.3s ease-out forwards;
-        }
-
-        .animate-scale-in {
-          animation: scaleIn 0.2s ease-out forwards;
-        }
-
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
+        @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleIn { from { transform: scale(0); } to { transform: scale(1); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-slide-down { animation: slideDown 0.3s ease-out forwards; }
+        .animate-slide-in { animation: slideIn 0.2s ease-out forwards; }
+        .animate-fade-in { opacity: 0; animation: fadeIn 0.3s ease-out forwards; }
+        .animate-scale-in { animation: scaleIn 0.2s ease-out forwards; }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
       `}</style>
     </>
   );

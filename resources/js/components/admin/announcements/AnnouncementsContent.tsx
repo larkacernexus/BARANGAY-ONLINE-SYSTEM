@@ -231,13 +231,13 @@ export default function AnnouncementsContent({
                 />
             )}
 
-            {/* Announcements List/Grid View */}
-            <Card className="overflow-hidden border border-gray-200 dark:border-gray-700">
-                <CardHeader className="flex flex-row items-center justify-between pb-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-800/50">
+            {/* Announcements List/Grid View with dark mode */}
+            <Card className="overflow-hidden border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
-                            <Megaphone className="h-5 w-5 text-gray-500" />
-                            <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">
+                            <Megaphone className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                            <CardTitle className="text-base sm:text-lg md:text-xl font-semibold dark:text-gray-100">
                                 Announcements List
                                 {selectedAnnouncements.length > 0 && isBulkMode && (
                                     <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
@@ -260,9 +260,9 @@ export default function AnnouncementsContent({
                                     id="select-all-grid"
                                     checked={isSelectAll}
                                     onCheckedChange={onSelectAllOnPage}
-                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
                                 />
-                                <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap">
+                                <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
                                     {isSelectAll ? 'Deselect Page' : 'Select Page'}
                                 </Label>
                             </div>
@@ -278,14 +278,14 @@ export default function AnnouncementsContent({
                                                 id="bulk-mode"
                                                 checked={isBulkMode}
                                                 onCheckedChange={handleBulkModeToggle}
-                                                className="data-[state=checked]:bg-blue-600 h-5 w-9"
+                                                className="data-[state=checked]:bg-blue-600 h-5 w-9 dark:data-[state=checked]:bg-blue-600"
                                             />
-                                            <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap">
+                                            <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
                                                 Bulk Mode
                                             </Label>
                                         </div>
                                     </TooltipTrigger>
-                                    <TooltipContent>
+                                    <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                         <p>Toggle bulk selection mode (Ctrl+Shift+B)</p>
                                     </TooltipContent>
                                 </Tooltip>
@@ -298,11 +298,11 @@ export default function AnnouncementsContent({
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                    {/* Empty State */}
+                <CardContent className="p-0 dark:bg-gray-900">
+                    {/* Empty State with dark mode */}
                     {announcements.length === 0 ? (
                         <EmptyState
-                            icon={<Megaphone className="h-12 w-12 text-gray-400" />}
+                            icon={<Megaphone className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
                             title="No announcements found"
                             description={hasActiveFilters 
                                 ? "No announcements match your current filters. Try adjusting your search or filters."
@@ -311,7 +311,7 @@ export default function AnnouncementsContent({
                                 label: "Clear Filters",
                                 onClick: onClearFilters
                             } : undefined}
-                            className="py-12 sm:py-16"
+                            className="py-12 sm:py-16 dark:bg-gray-900"
                         />
                     ) : (
                         <>
@@ -355,7 +355,7 @@ export default function AnnouncementsContent({
                                 />
                             )}
 
-                            {/* Grid Selection Summary */}
+                            {/* Grid Selection Summary with dark mode */}
                             {viewMode === 'grid' && isBulkMode && selectedAnnouncements.length > 0 && (
                                 <GridSelectionSummary
                                     selectedCount={selectedAnnouncements.length}
@@ -363,11 +363,11 @@ export default function AnnouncementsContent({
                                     isSelectAll={isSelectAll}
                                     onSelectAll={onSelectAllOnPage}
                                     onClearSelection={onClearSelection}
-                                    className="mt-4 mx-4"
+                                    className="mt-4 mx-4 dark:text-gray-300"
                                 />
                             )}
 
-                            {/* Pagination */}
+                            {/* Pagination with dark mode */}
                             {totalPages > 1 && (
                                 <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
                                     <Pagination

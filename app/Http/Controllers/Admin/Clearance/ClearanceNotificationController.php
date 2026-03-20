@@ -4,76 +4,154 @@ namespace App\Http\Controllers\Admin\Clearance;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClearanceRequest;
-use Illuminate\Http\Request;
+use App\Models\User;
+use App\Models\Document;
+use App\Notifications\ClearanceRequestCreated;
+use App\Notifications\ClearanceStatusUpdated;
+use App\Notifications\ClearancePaymentNotification;
+use App\Notifications\ClearanceDocumentNotification;
 use Illuminate\Support\Facades\Log;
-use App\Http\Controllers\Admin\Clearance\Traits\ClearanceNotificationTrait;
 
-class ClearanceNotificationController extends Controller
+class ClearanceNotificationController extends BaseClearanceController
 {
-    use ClearanceNotificationTrait;
-
     /**
-     * Resend payment notification.
+     * Send notifications when clearance request is created.
      */
-    public function resendPaymentNotification(ClearanceRequest $clearance)
+    public function sendCreatedNotifications(ClearanceRequest $clearance, $payer, string $payerType): void
     {
         try {
-            if (!$clearance->payment) {
-                return redirect()->back()->with('error', 'No payment found for this clearance.');
+            Log::info('Sending clearance created notifications', [
+                'clearance_id' => $clearance->id,
+                'reference' => $clearance->reference_number
+            ]);
+
+            $payerUsers = $this->getPayerUsers($payer, $payerType);
+            
+            foreach ($payerUsers as $user) {
+                $user->notify(new ClearanceRequestCreated($clearance, 'created', 'payer'));
             }
 
-            $this->sendPaymentNotification($clearance, $clearance->payment, 'received');
+            $admins = User::whereHas('role', fn($q) => $q->whereIn('name', ['admin', 'super-admin', 'treasurer', 'secretary']))
+                ->where('status', 'active')
+                ->get();
 
-            return redirect()->back()->with('success', 'Payment notification resent successfully.');
+            foreach ($admins as $admin) {
+                $admin->notify(new ClearanceRequestCreated($clearance, 'created', 'admin'));
+            }
+
+            Log::info('Clearance created notifications completed');
 
         } catch (\Exception $e) {
-            Log::error('Failed to resend payment notification', [
+            Log::error('Failed to send clearance created notifications', [
                 'clearance_id' => $clearance->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-            
-            return redirect()->back()->with('error', 'Failed to resend payment notification.');
         }
     }
 
     /**
-     * Resend status notification.
+     * Send notification when clearance status changes.
      */
-    public function resendStatusNotification(ClearanceRequest $clearance)
+    public function sendStatusNotification(ClearanceRequest $clearance, string $oldStatus, string $newStatus, ?string $remarks = null): void
     {
         try {
-            $this->sendClearanceStatusNotification($clearance, $clearance->status, $clearance->status, 'Manual resend');
+            Log::info('Sending clearance status notification', [
+                'clearance_id' => $clearance->id,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus
+            ]);
 
-            return redirect()->back()->with('success', 'Status notification resent successfully.');
+            $payerUsers = $this->getPayerUsersFromClearance($clearance);
+            
+            foreach ($payerUsers as $user) {
+                $user->notify(new ClearanceStatusUpdated($clearance, $oldStatus, $newStatus, $remarks));
+            }
+
+            if (in_array($newStatus, ['pending_payment', 'processing', 'approved', 'issued'])) {
+                $admins = User::whereHas('role', fn($q) => $q->whereIn('name', ['admin', 'super-admin', 'treasurer', 'secretary']))
+                    ->where('status', 'active')
+                    ->get();
+
+                foreach ($admins as $admin) {
+                    $admin->notify(new ClearanceStatusUpdated($clearance, $oldStatus, $newStatus, $remarks));
+                }
+            }
 
         } catch (\Exception $e) {
-            Log::error('Failed to resend status notification', [
+            Log::error('Failed to send clearance status notifications', [
                 'clearance_id' => $clearance->id,
                 'error' => $e->getMessage()
             ]);
-            
-            return redirect()->back()->with('error', 'Failed to resend status notification.');
         }
     }
 
     /**
-     * Test notification (admin only).
+     * Send payment notification for clearance.
      */
-    public function testNotification(ClearanceRequest $clearance)
+    public function sendPaymentNotification(ClearanceRequest $clearance, $payment, string $action = 'received'): void
     {
-        if (!auth()->user()->isAdministrator()) {
-            return redirect()->back()->with('error', 'Unauthorized.');
-        }
-
         try {
-            // Send test notification to current user
-            auth()->user()->notify(new \App\Notifications\ClearanceRequestCreated($clearance, 'test', 'admin'));
+            $payerUsers = $this->getPayerUsersFromClearance($clearance);
+            
+            foreach ($payerUsers as $user) {
+                $user->notify(new ClearancePaymentNotification($clearance, $payment, $action));
+            }
 
-            return redirect()->back()->with('success', 'Test notification sent.');
+            $admins = User::whereHas('role', fn($q) => $q->whereIn('name', ['admin', 'super-admin', 'treasurer']))
+                ->where('status', 'active')
+                ->get();
+
+            foreach ($admins as $admin) {
+                $admin->notify(new ClearancePaymentNotification($clearance, $payment, $action));
+            }
+
+            Log::info('Payment notification sent', [
+                'clearance_id' => $clearance->id,
+                'payment_id' => $payment->id,
+                'action' => $action
+            ]);
 
         } catch (\Exception $e) {
-            Log::error('Test notification failed', ['error' => $e->getMessage()]);
-            return redirect()->back()->with('error', 'Test notification failed.');
+            Log::error('Failed to send payment notification', [
+                'clearance_id' => $clearance->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Send document notification for clearance.
+     */
+    public function sendDocumentNotification(ClearanceRequest $clearance, Document $document, string $action = 'uploaded', ?string $remarks = null): void
+    {
+        try {
+            $admins = User::whereHas('role', fn($q) => $q->whereIn('name', ['admin', 'super-admin', 'secretary']))
+                ->where('status', 'active')
+                ->get();
+
+            foreach ($admins as $admin) {
+                $admin->notify(new ClearanceDocumentNotification($clearance, $document, $action, $remarks));
+            }
+
+            if (in_array($action, ['verified', 'rejected'])) {
+                $payerUsers = $this->getPayerUsersFromClearance($clearance);
+                
+                foreach ($payerUsers as $user) {
+                    $user->notify(new ClearanceDocumentNotification($clearance, $document, $action, $remarks));
+                }
+            }
+
+            Log::info('Document notification sent', [
+                'clearance_id' => $clearance->id,
+                'document_id' => $document->id,
+                'action' => $action
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send document notification', [
+                'clearance_id' => $clearance->id,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 }

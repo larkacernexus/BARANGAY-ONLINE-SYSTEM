@@ -20,7 +20,7 @@ export function StatCard({
     className = '' 
 }: StatCardProps) {
     return (
-        <div className={`bg-white dark:bg-gray-800 rounded-lg border p-4 sm:p-6 ${className}`}>
+        <div className={`bg-white dark:bg-gray-900 rounded-lg border p-4 sm:p-6 ${className}`}>
             <div className="flex items-start justify-between">
                 <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">

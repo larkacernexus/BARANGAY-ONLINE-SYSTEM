@@ -81,7 +81,7 @@ export const ModernPaymentTable = ({
             const MethodIcon = methodConfig?.icon;
 
             return (
-              <TableRow key={payment.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+              <TableRow key={payment.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                 {selectMode && (
                   <TableCell>
                     <input

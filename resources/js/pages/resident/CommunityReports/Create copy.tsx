@@ -967,7 +967,7 @@ export default function CommunityReport() {
                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mb-1 ${
                                                 activeStep === step.id 
                                                     ? 'bg-blue-600 text-white' 
-                                                    : 'bg-gray-200 dark:bg-gray-800'
+                                                    : 'bg-gray-200 dark:bg-gray-900'
                                             }`}>
                                                 {step.id}
                                             </div>
@@ -1109,7 +1109,7 @@ export default function CommunityReport() {
                                                                                         ? 'from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20' 
                                                                                         : 'from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20'
                                                                                 } ring-2 ring-blue-500/20`
-                                                                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                                                                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50'
                                                                         }`}
                                                                         onClick={() => handleTypeSelect(type.id)}
                                                                     >
@@ -1118,7 +1118,7 @@ export default function CommunityReport() {
                                                                                 <div className={`p-2.5 rounded-lg flex-shrink-0 mt-0.5 ${
                                                                                     isSelected 
                                                                                         ? (activeTab === 'issues' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-purple-100 dark:bg-purple-900/30')
-                                                                                        : 'bg-gray-100 dark:bg-gray-800'
+                                                                                        : 'bg-gray-100 dark:bg-gray-900'
                                                                                 }`}>
                                                                                     <Icon className={`h-5 w-5 ${
                                                                                         isSelected 
@@ -1183,7 +1183,7 @@ export default function CommunityReport() {
                                                             })}
                                                             {/* Fill empty slots in pair */}
                                                             {pair.filter(type => type && !isOtherType(type)).length < 2 && (
-                                                                <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 min-h-[120px] bg-gray-50/50 dark:bg-gray-800/30 flex items-center justify-center">
+                                                                <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 min-h-[120px] bg-gray-50/50 dark:bg-gray-900/30 flex items-center justify-center">
                                                                     <div className="text-center text-gray-400 dark:text-gray-500">
                                                                         <div className="text-sm">No more items</div>
                                                                     </div>
@@ -1226,7 +1226,7 @@ export default function CommunityReport() {
                                                                                     <div className={`p-2.5 rounded-lg flex-shrink-0 mt-0.5 ${
                                                                                         isSelected 
                                                                                             ? 'bg-amber-100 dark:bg-amber-900/30'
-                                                                                            : 'bg-gray-100 dark:bg-gray-800'
+                                                                                            : 'bg-gray-100 dark:bg-gray-900'
                                                                                     }`}>
                                                                                         <Icon className={`h-5 w-5 ${
                                                                                             isSelected 
@@ -1289,7 +1289,7 @@ export default function CommunityReport() {
                                                                 })}
                                                                 {/* Fill empty slots in pair */}
                                                                 {pair.filter(type => type && isOtherType(type)).length < 2 && (
-                                                                    <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 min-h-[120px] bg-gray-50/50 dark:bg-gray-800/30 flex items-center justify-center">
+                                                                    <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 min-h-[120px] bg-gray-50/50 dark:bg-gray-900/30 flex items-center justify-center">
                                                                         <div className="text-center text-gray-400 dark:text-gray-500">
                                                                             <div className="text-sm">No other options</div>
                                                                         </div>
@@ -1387,17 +1387,17 @@ export default function CommunityReport() {
                                                 </Button>
                                             </div>
                                             <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-                                                <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+                                                <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
                                                     <div className="font-medium">Resolution Time</div>
                                                     <div className="text-gray-600 dark:text-gray-400">{selectedType.resolution_days} days</div>
                                                 </div>
-                                                <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+                                                <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
                                                     <div className="font-medium">Evidence</div>
                                                     <div className={selectedType.requires_evidence ? 'text-red-600' : 'text-green-600'}>
                                                         {selectedType.requires_evidence ? 'Required' : 'Optional'}
                                                     </div>
                                                 </div>
-                                                <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+                                                <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
                                                     <div className="font-medium">Anonymous</div>
                                                     <div className={selectedType.allows_anonymous ? 'text-green-600' : 'text-gray-600'}>
                                                         {selectedType.allows_anonymous ? 'Allowed' : 'Not allowed'}
@@ -1857,7 +1857,7 @@ export default function CommunityReport() {
                                                                                 <div className="flex items-start justify-between">
                                                                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                                                                         <div className={`w-10 h-10 rounded flex items-center justify-center flex-shrink-0 ${
-                                                                                            isImage ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800'
+                                                                                            isImage ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-900'
                                                                                         }`}>
                                                                                             <FileIcon className={`h-5 w-5 ${
                                                                                                 isImage ? 'text-blue-500' : 'text-gray-500'
@@ -1883,7 +1883,7 @@ export default function CommunityReport() {
                                                                                 {isImage && file.preview && (
                                                                                     <div className="mt-3">
                                                                                         <div 
-                                                                                            className="relative aspect-video rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer"
+                                                                                            className="relative aspect-video rounded-md overflow-hidden bg-gray-100 dark:bg-gray-900 cursor-pointer"
                                                                                             onClick={() => openPreview(file.preview!, file.type, file.name)}
                                                                                         >
                                                                                             <img 
@@ -1936,7 +1936,7 @@ export default function CommunityReport() {
                                                                                 <div className="flex items-start justify-between">
                                                                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                                                                         <div className={`w-10 h-10 rounded flex items-center justify-center flex-shrink-0 ${
-                                                                                            isImage ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800'
+                                                                                            isImage ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-900'
                                                                                         }`}>
                                                                                             <FileIcon className={`h-5 w-5 ${
                                                                                                 isImage ? 'text-blue-500' : 'text-gray-500'
@@ -1962,7 +1962,7 @@ export default function CommunityReport() {
                                                                                 {isImage && file.preview && (
                                                                                     <div className="mt-3">
                                                                                         <div 
-                                                                                            className="relative aspect-video rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer"
+                                                                                            className="relative aspect-video rounded-md overflow-hidden bg-gray-100 dark:bg-gray-900 cursor-pointer"
                                                                                             onClick={() => openPreview(file.preview, file.type, file.name)}
                                                                                         >
                                                                                             <img 
@@ -2076,7 +2076,7 @@ export default function CommunityReport() {
                                             <CardContent className="p-4 lg:p-6">
                                                 <h3 className="font-medium mb-4 text-lg">Report Summary</h3>
                                                 <div className="space-y-3">
-                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                                         <span className="text-gray-600 dark:text-gray-400">Type</span>
                                                         <div className="flex items-center gap-2">
                                                             {selectedType && (() => {
@@ -2086,21 +2086,21 @@ export default function CommunityReport() {
                                                             <span className="font-medium">{selectedType?.name}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                                         <span className="text-gray-600 dark:text-gray-400">Title</span>
                                                         <span className="font-medium">{data.title}</span>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                                         <span className="text-gray-600 dark:text-gray-400">Location</span>
                                                         <span className="font-medium">{data.location}</span>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                                         <span className="text-gray-600 dark:text-gray-400">Date & Time</span>
                                                         <span className="font-medium">
                                                             {data.incident_date} {data.incident_time && 'at'} {data.incident_time}
                                                         </span>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                                         <span className="text-gray-600 dark:text-gray-400">Urgency</span>
                                                         <Badge 
                                                             variant="outline"
@@ -2113,13 +2113,13 @@ export default function CommunityReport() {
                                                             {data.urgency.charAt(0).toUpperCase() + data.urgency.slice(1)}
                                                         </Badge>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                                         <span className="text-gray-600 dark:text-gray-400">Attachments</span>
                                                         <span className="font-medium">
                                                             {files.length + existingFiles.length} files
                                                         </span>
                                                     </div>
-                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                                         <span className="text-gray-600 dark:text-gray-400">Reported By</span>
                                                         <div className="flex items-center gap-2">
                                                             <span className="font-medium">
@@ -2134,13 +2134,13 @@ export default function CommunityReport() {
                                                         </div>
                                                     </div>
                                                     {!anonymous && data.reporter_contact && (
-                                                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                                             <span className="text-gray-600 dark:text-gray-400">Contact</span>
                                                             <span className="font-medium">{data.reporter_contact}</span>
                                                         </div>
                                                     )}
                                                     {currentDraftId && (
-                                                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                                             <span className="text-gray-600 dark:text-gray-400">Draft Status</span>
                                                             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                                                                 <Save className="h-3 w-3 mr-1" />

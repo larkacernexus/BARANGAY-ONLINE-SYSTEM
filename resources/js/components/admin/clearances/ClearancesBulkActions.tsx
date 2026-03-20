@@ -141,7 +141,7 @@ export default function ClearancesBulkActions({
     const bulkActions = customBulkActions || defaultBulkActions;
 
     return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 mb-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 mb-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 {/* Left side: Selection info */}
                 <div className="flex items-center gap-3">
@@ -228,7 +228,7 @@ export default function ClearancesBulkActions({
                                     </>
                                 )}
                             </Button>
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                            <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                                 <div className="py-1">
                                     <button
                                         onClick={onSelectAllOnPage}
@@ -291,7 +291,7 @@ export default function ClearancesBulkActions({
                                 >
                                     More...
                                 </Button>
-                                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                                     <div className="py-1">
                                         {bulkActions.secondary.map((action, index) => (
                                             <button

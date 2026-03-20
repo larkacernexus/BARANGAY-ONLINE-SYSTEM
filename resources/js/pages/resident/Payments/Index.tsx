@@ -821,7 +821,7 @@ export default function MyPayments() {
 
                             {/* View Toggle */}
                             {!selectMode && tabHasData && (
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
                                     <Button
                                         variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                         size="sm"
@@ -941,7 +941,7 @@ export default function MyPayments() {
                                         </TableHeader>
                                         <TableBody>
                                             {currentPayments.map((payment) => (
-                                                <TableRow key={`table-${payment.id}`} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+                                                <TableRow key={`table-${payment.id}`} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                                                     {selectMode && (
                                                         <TableCell>
                                                             <input
@@ -1005,7 +1005,7 @@ export default function MyPayments() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300">
                                                             {getPaymentMethodDisplay(payment.payment_method)}
                                                         </span>
                                                     </TableCell>
@@ -1015,7 +1015,7 @@ export default function MyPayments() {
                                                             payment.status === 'paid' || payment.status === 'completed' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "",
                                                             payment.status === 'pending' ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "",
                                                             payment.status === 'overdue' ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "",
-                                                            payment.status === 'cancelled' ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400" : "",
+                                                            payment.status === 'cancelled' ? "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-400" : "",
                                                         )}>
                                                             {payment.status === 'paid' || payment.status === 'completed' ? 'Paid' :
                                                              payment.status === 'pending' ? 'Pending' :

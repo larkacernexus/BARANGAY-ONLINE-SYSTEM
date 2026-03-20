@@ -357,7 +357,7 @@ class PurokController extends Controller
 
         $purok->update($data);
 
-        return redirect()->route('puroks.show', $purok)
+        return redirect()->route('admin.puroks.show', $purok)
             ->with('success', 'Purok updated successfully!');
     }
 

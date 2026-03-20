@@ -67,38 +67,7 @@ export default function RolePermissions() {
         return safeNormalizeData(role_permissions);
     }, [role_permissions]);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/admin/role-permissions', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== initialFilters?.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, initialFilters?.search]);
+ 
 
     // Handle window resize
     useEffect(() => {

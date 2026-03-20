@@ -27,7 +27,7 @@ export function ApplicantInfo({ resident }: ApplicantInfoProps) {
             <CardContent className="p-3 lg:p-4 pt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 lg:gap-3">
                     {/* Name - Full width on mobile, half on desktop */}
-                    <div className="sm:col-span-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2.5">
+                    <div className="sm:col-span-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2.5">
                         <div className="flex items-center gap-2">
                             <User className="h-3 w-3 text-gray-500 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
@@ -40,7 +40,7 @@ export function ApplicantInfo({ resident }: ApplicantInfoProps) {
                     </div>
                     
                     {/* Contact Number */}
-                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2.5">
+                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2.5">
                         <div className="flex items-center gap-2">
                             <Phone className="h-3 w-3 text-gray-500 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
@@ -53,7 +53,7 @@ export function ApplicantInfo({ resident }: ApplicantInfoProps) {
                     </div>
                     
                     {/* Address - Full width on mobile, half on desktop */}
-                    <div className="sm:col-span-2 lg:col-span-1 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2.5">
+                    <div className="sm:col-span-2 lg:col-span-1 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2.5">
                         <div className="flex items-start gap-2">
                             <MapPin className="h-3 w-3 text-gray-500 mt-0.5 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
@@ -67,7 +67,7 @@ export function ApplicantInfo({ resident }: ApplicantInfoProps) {
                     
                     {/* Purok - Optional */}
                     {resident.purok_name && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2.5">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2.5">
                             <div className="flex items-center gap-2">
                                 <Home className="h-3 w-3 text-gray-500 flex-shrink-0" />
                                 <div className="flex-1 min-w-0">

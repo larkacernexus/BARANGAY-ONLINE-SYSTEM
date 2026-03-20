@@ -222,7 +222,7 @@ export default function Show({ receipt, clearance }: Props) {
                     <div className="flex items-center gap-4">
                         <Link
                             href={route('receipts.index')}
-                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg transition-colors"
                         >
                             <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                         </Link>
@@ -253,17 +253,17 @@ export default function Show({ receipt, clearance }: Props) {
                                 </button>
                                 <button
                                     onClick={handleDownload}
-                                    className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
                                 >
                                     <Download className="h-4 w-4" />
                                     Download PDF
                                 </button>
                                 <div className="relative group">
-                                    <button className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors">
+                                    <button className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors">
                                         <Send className="h-4 w-4" />
                                         Send
                                     </button>
-                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 hidden group-hover:block z-50">
+                                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 hidden group-hover:block z-50">
                                         <button
                                             onClick={() => setShowEmailModal(true)}
                                             className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-lg"
@@ -321,7 +321,7 @@ export default function Show({ receipt, clearance }: Props) {
                     {/* Left Column - Receipt Details */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Receipt Info Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Receipt Information
@@ -413,7 +413,7 @@ export default function Show({ receipt, clearance }: Props) {
                         </div>
 
                         {/* Fee Breakdown Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Fee Breakdown
@@ -514,7 +514,7 @@ export default function Show({ receipt, clearance }: Props) {
 
                         {/* Discount Breakdown (if any) */}
                         {receipt.discount_breakdown && receipt.discount_breakdown.length > 0 && (
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                         Discount Details
@@ -557,7 +557,7 @@ export default function Show({ receipt, clearance }: Props) {
                     {/* Right Column - Payer & Payment Summary */}
                     <div className="space-y-6">
                         {/* Payer Information */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Payer Information
@@ -581,7 +581,7 @@ export default function Show({ receipt, clearance }: Props) {
 
                         {/* Clearance Information (if applicable) */}
                         {clearance && (
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                                 <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                         Clearance Information
@@ -623,7 +623,7 @@ export default function Show({ receipt, clearance }: Props) {
                         )}
 
                         {/* Payment Summary */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Payment Summary
@@ -680,7 +680,7 @@ export default function Show({ receipt, clearance }: Props) {
                         </div>
 
                         {/* Related Links */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Related Links
@@ -691,7 +691,7 @@ export default function Show({ receipt, clearance }: Props) {
                                     {receipt.payment_id && (
                                         <Link
                                             href={route('admin.payments.show', receipt.payment_id)}
-                                            className="block p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                            className="block p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                                         >
                                             <p className="font-medium text-gray-900 dark:text-white">View Payment</p>
                                             <p className="text-sm text-gray-500 dark:text-gray-400">View the associated payment</p>
@@ -700,7 +700,7 @@ export default function Show({ receipt, clearance }: Props) {
                                     {clearance && (
                                         <Link
                                             href={route('admin.clearances.show', clearance.id)}
-                                            className="block p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                            className="block p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                                         >
                                             <p className="font-medium text-gray-900 dark:text-white">View Clearance Request</p>
                                             <p className="text-sm text-gray-500 dark:text-gray-400">View the associated clearance</p>
@@ -708,7 +708,7 @@ export default function Show({ receipt, clearance }: Props) {
                                     )}
                                     <Link
                                         href={route('receipts.index')}
-                                        className="block p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        className="block p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                                     >
                                         <p className="font-medium text-gray-900 dark:text-white">All Receipts</p>
                                         <p className="text-sm text-gray-500 dark:text-gray-400">Back to receipts list</p>
@@ -723,7 +723,7 @@ export default function Show({ receipt, clearance }: Props) {
             {/* Void Modal */}
             {showVoidModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-md w-full">
                         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Void Receipt</h3>
                         </div>
@@ -772,7 +772,7 @@ export default function Show({ receipt, clearance }: Props) {
             {/* Email Modal */}
             {showEmailModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-md w-full">
                         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Send Receipt via Email</h3>
                         </div>

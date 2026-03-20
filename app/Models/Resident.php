@@ -32,37 +32,23 @@ class Resident extends Model
         'education',
         'religion',
         'is_voter',
-        'is_pwd',
-        'is_senior',
-        'is_solo_parent',
-        'is_indigent',
         'place_of_birth',
         'remarks',
         'status',
         'photo_path',
-        'senior_id_number',
-        'pwd_id_number',
-        'solo_parent_id_number',
-        'indigent_id_number',
-        'discount_eligibilities',
     ];
 
     protected $casts = [
         'is_voter' => 'boolean',
-        'is_pwd' => 'boolean',
-        'is_senior' => 'boolean',
-        'is_solo_parent' => 'boolean',
-        'is_indigent' => 'boolean',
         'birth_date' => 'date',
         'age' => 'integer',
-        'discount_eligibilities' => 'array',
     ];
 
     protected $appends = [
         'full_name',
         'purok_name',
-        'discount_eligibility_list',
-        'has_special_classification',
+        'privileges_list',
+        'active_privileges_list',
     ];
 
     // ========== ACTIVITY LOG CONFIGURATION ==========
@@ -88,10 +74,6 @@ class Resident extends Model
                 'education',
                 'religion',
                 'is_voter',
-                'is_pwd',
-                'is_senior',
-                'is_solo_parent',
-                'is_indigent',
                 'place_of_birth',
                 'remarks',
                 'status',
@@ -189,6 +171,27 @@ class Resident extends Model
         return $this->hasMany(ResidentDocument::class, 'resident_id');
     }
 
+    /**
+     * Get the resident privileges for this resident
+     */
+    public function residentPrivileges(): HasMany
+    {
+        return $this->hasMany(ResidentPrivilege::class);
+    }
+
+    /**
+     * Get active resident privileges
+     */
+    public function activeResidentPrivileges(): HasMany
+    {
+        return $this->hasMany(ResidentPrivilege::class)
+                    ->whereNotNull('verified_at')
+                    ->where(function($query) {
+                        $query->whereNull('expires_at')
+                              ->orWhere('expires_at', '>', now());
+                    });
+    }
+
     // ========== ACCESSORS ==========
 
     public function getFullNameAttribute(): string
@@ -242,56 +245,163 @@ class Resident extends Model
         return !empty($this->photo_path);
     }
 
-    public function getDiscountEligibilityListAttribute(): array
+    /**
+     * Get formatted list of all privileges with details
+     */
+    public function getPrivilegesListAttribute(): array
     {
-        $eligibilities = [];
-        
-        if ($this->is_senior || $this->isSenior()) {
-            $eligibilities[] = [
-                'type' => 'senior',
-                'label' => 'Senior Citizen',
-                'percentage' => 20,
-                'id_number' => $this->senior_id_number,
-                'has_id' => !empty($this->senior_id_number),
-            ];
-        }
-        
-        if ($this->is_pwd) {
-            $eligibilities[] = [
-                'type' => 'pwd',
-                'label' => 'Person with Disability',
-                'percentage' => 20,
-                'id_number' => $this->pwd_id_number,
-                'has_id' => !empty($this->pwd_id_number),
-            ];
-        }
-        
-        if ($this->is_solo_parent) {
-            $eligibilities[] = [
-                'type' => 'solo_parent',
-                'label' => 'Solo Parent',
-                'percentage' => 10,
-                'id_number' => $this->solo_parent_id_number,
-                'has_id' => !empty($this->solo_parent_id_number),
-            ];
-        }
-        
-        if ($this->is_indigent) {
-            $eligibilities[] = [
-                'type' => 'indigent',
-                'label' => 'Indigent',
-                'percentage' => 25,
-                'id_number' => $this->indigent_id_number,
-                'has_id' => !empty($this->indigent_id_number),
-            ];
-        }
-        
-        return $eligibilities;
+        return $this->residentPrivileges()
+            ->with('privilege')
+            ->get()
+            ->map(function ($residentPrivilege) {
+                $privilege = $residentPrivilege->privilege;
+                return [
+                    'id' => $privilege->id,
+                    'name' => $privilege->name,
+                    'code' => $privilege->code,
+                    'description' => $privilege->description,
+                    'is_active' => $privilege->is_active,
+                    'id_number' => $residentPrivilege->id_number,
+                    'verified_at' => $residentPrivilege->verified_at,
+                    'expires_at' => $residentPrivilege->expires_at,
+                    'remarks' => $residentPrivilege->remarks,
+                    'status' => $this->getPrivilegeStatus($residentPrivilege),
+                ];
+            })
+            ->toArray();
     }
 
-    public function getHasSpecialClassificationAttribute(): bool
+    /**
+     * Get formatted list of active privileges
+     */
+    public function getActivePrivilegesListAttribute(): array
     {
-        return $this->is_senior || $this->is_pwd || $this->is_solo_parent || $this->is_indigent;
+        return $this->activeResidentPrivileges()
+            ->with('privilege')
+            ->get()
+            ->map(function ($residentPrivilege) {
+                $privilege = $residentPrivilege->privilege;
+                return [
+                    'id' => $privilege->id,
+                    'name' => $privilege->name,
+                    'code' => $privilege->code,
+                    'discount_percentage' => $privilege->discount_percentage,
+                    'id_number' => $residentPrivilege->id_number,
+                    'expires_at' => $residentPrivilege->expires_at,
+                ];
+            })
+            ->toArray();
+    }
+
+    /**
+     * Helper to determine privilege status
+     */
+    private function getPrivilegeStatus($residentPrivilege): string
+    {
+        if (!$residentPrivilege->verified_at) {
+            return 'pending';
+        }
+        
+        if ($residentPrivilege->expires_at && $residentPrivilege->expires_at->isPast()) {
+            return 'expired';
+        }
+        
+        if ($residentPrivilege->expires_at && $residentPrivilege->expires_at->diffInDays(now()) <= 30) {
+            return 'expiring_soon';
+        }
+        
+        return 'active';
+    }
+
+    /**
+     * Check if resident has a specific privilege by code
+     */
+    public function hasPrivilege(string $code): bool
+    {
+        return $this->residentPrivileges()
+            ->whereHas('privilege', function($q) use ($code) {
+                $q->where('code', $code);
+            })
+            ->exists();
+    }
+
+    /**
+     * Check if resident has active specific privilege by code
+     */
+    public function hasActivePrivilege(string $code): bool
+    {
+        return $this->activeResidentPrivileges()
+            ->whereHas('privilege', function($q) use ($code) {
+                $q->where('code', $code);
+            })
+            ->exists();
+    }
+
+    /**
+     * Get privilege ID number if exists
+     */
+    public function getPrivilegeIdNumber(string $code): ?string
+    {
+        $residentPrivilege = $this->residentPrivileges()
+            ->whereHas('privilege', function($q) use ($code) {
+                $q->where('code', $code);
+            })
+            ->first();
+            
+        return $residentPrivilege ? $residentPrivilege->id_number : null;
+    }
+
+    /**
+     * Get all privileges assigned to this resident (returns collection of Privilege models)
+     */
+    public function getPrivilegesAttribute()
+    {
+        return $this->residentPrivileges()
+            ->with('privilege')
+            ->get()
+            ->pluck('privilege');
+    }
+
+    /**
+     * Get active privileges (returns collection of Privilege models)
+     */
+    public function getActivePrivilegesAttribute()
+    {
+        return $this->activeResidentPrivileges()
+            ->with('privilege')
+            ->get()
+            ->pluck('privilege');
+    }
+
+    // Legacy methods for backward compatibility
+    public function isSenior(): bool
+    {
+        return $this->hasActivePrivilege('SC') || $this->hasActivePrivilege('OSP') || $this->age >= 60;
+    }
+
+    public function isPwd(): bool
+    {
+        return $this->hasActivePrivilege('PWD');
+    }
+
+    public function isSoloParent(): bool
+    {
+        return $this->hasActivePrivilege('SP');
+    }
+
+    public function isIndigent(): bool
+    {
+        return $this->hasActivePrivilege('IND');
+    }
+
+    public function is4PsBeneficiary(): bool
+    {
+        return $this->hasActivePrivilege('4PS');
+    }
+
+    public function isIndigenousPeople(): bool
+    {
+        return $this->hasActivePrivilege('IP');
     }
 
     // ========== BUSINESS LOGIC METHODS ==========
@@ -312,33 +422,6 @@ class Resident extends Model
     {
         $membership = $this->householdMemberships()->first();
         return $membership ? $membership->relationship_to_head : null;
-    }
-
-    public function isSenior(): bool
-    {
-        if ($this->is_senior === true) {
-            return true;
-        }
-        
-        if (!$this->birth_date) {
-            return false;
-        }
-        return $this->birth_date->age >= 60;
-    }
-
-    public function isPwd(): bool
-    {
-        return $this->is_pwd === true;
-    }
-
-    public function isSoloParent(): bool
-    {
-        return $this->is_solo_parent === true;
-    }
-
-    public function isIndigent(): bool
-    {
-        return $this->is_indigent === true;
     }
 
     public function hasUserAccount(): bool
@@ -488,28 +571,76 @@ class Resident extends Model
         });
     }
 
+    /**
+     * Scope residents with a specific privilege
+     */
+    public function scopeWithPrivilege($query, string $code)
+    {
+        return $query->whereHas('residentPrivileges.privilege', function ($q) use ($code) {
+            $q->where('code', $code);
+        });
+    }
+
+    /**
+     * Scope residents with active specific privilege
+     */
+    public function scopeWithActivePrivilege($query, string $code)
+    {
+        return $query->whereHas('residentPrivileges', function ($q) use ($code) {
+            $q->whereNotNull('verified_at')
+              ->where(function($q2) {
+                  $q2->whereNull('expires_at')
+                     ->orWhere('expires_at', '>', now());
+              })
+              ->whereHas('privilege', function($q3) use ($code) {
+                  $q3->where('code', $code);
+              });
+        });
+    }
+
+    /**
+     * Scope seniors (for backward compatibility)
+     */
     public function scopeIsSenior($query)
     {
-        return $query->where('is_senior', true)
-            ->orWhere(function ($q) {
-                $q->whereNotNull('birth_date')
+        return $query->where(function($q) {
+            $q->whereHas('residentPrivileges.privilege', function ($q2) {
+                $q2->whereIn('code', ['SC', 'OSP']);
+            })->orWhere(function ($q3) {
+                $q3->whereNotNull('birth_date')
                   ->whereRaw('TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) >= 60');
             });
+        });
     }
 
+    /**
+     * Scope PWDs
+     */
     public function scopeIsPwd($query)
     {
-        return $query->where('is_pwd', true);
+        return $query->whereHas('residentPrivileges.privilege', function ($q) {
+            $q->where('code', 'PWD');
+        });
     }
 
+    /**
+     * Scope solo parents
+     */
     public function scopeIsSoloParent($query)
     {
-        return $query->where('is_solo_parent', true);
+        return $query->whereHas('residentPrivileges.privilege', function ($q) {
+            $q->where('code', 'SP');
+        });
     }
 
+    /**
+     * Scope indigent residents
+     */
     public function scopeIsIndigent($query)
     {
-        return $query->where('is_indigent', true);
+        return $query->whereHas('residentPrivileges.privilege', function ($q) {
+            $q->where('code', 'IND');
+        });
     }
 
     public function scopeSearch($query, $search)
@@ -531,28 +662,6 @@ class Resident extends Model
             $q->where('created_at', '>=', now()->subDays($days));
         });
     }
-
-    // Add to RELATIONSHIPS section
-        public function businesses(): HasMany
-        {
-            return $this->hasMany(Business::class, 'owner_id');
-        }
-
-        // Add to ACCESSORS section
-        public function getBusinessCountAttribute(): int
-        {
-            return $this->businesses()->count();
-        }
-
-        public function getIsBusinessOwnerAttribute(): bool
-        {
-            return $this->businesses()->exists();
-        }
-
-        public function getActiveBusinessesAttribute()
-        {
-            return $this->businesses()->where('status', 'active')->get();
-        }
 
     public function activities()
     {

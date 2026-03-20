@@ -747,7 +747,7 @@ function ModernPasswordForm({ document, error, onSubmit, isVerifying }: {
                             <Button 
                                 type="button" 
                                 variant="outline" 
-                                className="w-full border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 py-6"
+                                className="w-full border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-900 py-6"
                             >
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back
@@ -984,7 +984,7 @@ function ModernMobileDetails({ document }: { document: Document }) {
                                     Reference Number
                                 </p>
                                 <div className="flex items-center gap-2">
-                                    <code className="flex-1 font-mono text-sm bg-white dark:bg-gray-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <code className="flex-1 font-mono text-sm bg-white dark:bg-gray-900 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700">
                                         {document.reference_number || 'N/A'}
                                     </code>
                                     {document.reference_number && (
@@ -1838,7 +1838,7 @@ function ModernDesktopSidebar({ document, relatedDocuments, onFullscreen, onDown
                     >
                         <Maximize2 className="h-4 w-4" />
                         Fullscreen View
-                        <kbd className="ml-auto text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">F11</kbd>
+                        <kbd className="ml-auto text-xs bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded">F11</kbd>
                     </Button>
                     
                     {canDownload && !document.security_options?.restrict_download && (

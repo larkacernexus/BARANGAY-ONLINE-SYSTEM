@@ -65,179 +65,323 @@ class FeeShowController extends Controller
         }
     }
     
-    // Format fee for show view
-    private function formatFeeForShow(Fee $fee, $payer = null)
-    {
-        $formatted = [
-            'id' => $fee->id,
-            'fee_code' => $fee->fee_code,
-            'fee_type_id' => $fee->fee_type_id,
-            'payer_type' => $fee->payer_type,
-            'payer_id' => $fee->payer_id,
-            'payer_name' => $fee->payer_name,
-            'contact_number' => $fee->contact_number,
-            'address' => $fee->address,
-            'purok' => $fee->purok,
-            'zone' => $fee->zone,
-            'purpose' => $fee->purpose,
-            'issue_date' => $fee->issue_date ? Carbon::parse($fee->issue_date)->format('Y-m-d') : null,
-            'due_date' => $fee->due_date ? Carbon::parse($fee->due_date)->format('Y-m-d') : null,
-            'base_amount' => (float) $fee->base_amount,
-            'surcharge_amount' => (float) $fee->surcharge_amount,
-            'penalty_amount' => (float) $fee->penalty_amount,
-            'discount_amount' => (float) $fee->total_discounts,
-            'total_amount' => (float) $fee->total_amount,
-            'amount_paid' => (float) $fee->amount_paid,
-            'balance' => (float) $fee->balance,
-            'status' => $fee->status,
-            'status_display' => $this->getStatusLabel($fee->status),
-            'or_number' => $fee->or_number,
-            'certificate_number' => $fee->certificate_number,
-            'valid_from' => $fee->valid_from ? Carbon::parse($fee->valid_from)->format('Y-m-d') : null,
-            'valid_until' => $fee->valid_until ? Carbon::parse($fee->valid_until)->format('Y-m-d') : null,
-            'payment_date' => $fee->payment_date ? Carbon::parse($fee->payment_date)->format('Y-m-d') : null,
-            'payment_method' => $fee->payment_method,
-            'transaction_reference' => $fee->transaction_reference,
-            'property_description' => $fee->property_description,
-            'business_type' => $fee->business_type,
-            'area' => $fee->area,
-            'billing_period' => $fee->billing_period,
-            'period_start' => $fee->period_start ? Carbon::parse($fee->period_start)->format('Y-m-d') : null,
-            'period_end' => $fee->period_end ? Carbon::parse($fee->period_end)->format('Y-m-d') : null,
-            'computation_details' => $fee->computation_details,
-            'requirements_submitted' => $fee->requirements_submitted,
-            'remarks' => $fee->remarks,
-            'waiver_reason' => $fee->waiver_reason,
-            'created_at' => $fee->created_at ? Carbon::parse($fee->created_at)->toISOString() : null,
-            'updated_at' => $fee->updated_at ? Carbon::parse($fee->updated_at)->toISOString() : null,
-            'cancelled_at' => $fee->cancelled_at ? Carbon::parse($fee->cancelled_at)->toISOString() : null,
+  private function formatFeeForShow(Fee $fee, $payer = null)
+{
+    $formatted = [
+        'id' => $fee->id,
+        'fee_code' => $fee->fee_code,
+        'fee_type_id' => $fee->fee_type_id,
+        'payer_type' => $fee->payer_type,
+        'payer_id' => $fee->payer_id,
+        'payer_name' => $fee->payer_name,
+        'contact_number' => $fee->contact_number,
+        'address' => $fee->address,
+        'purok' => $fee->purok,
+        'zone' => $fee->zone,
+        'purpose' => $fee->purpose,
+        'issue_date' => $fee->issue_date ? Carbon::parse($fee->issue_date)->format('Y-m-d') : null,
+        'due_date' => $fee->due_date ? Carbon::parse($fee->due_date)->format('Y-m-d') : null,
+        'base_amount' => (float) $fee->base_amount,
+        'surcharge_amount' => (float) $fee->surcharge_amount,
+        'penalty_amount' => (float) $fee->penalty_amount,
+        'discount_amount' => (float) $fee->total_discounts,
+        'total_amount' => (float) $fee->total_amount,
+        'amount_paid' => (float) $fee->amount_paid,
+        'balance' => (float) $fee->balance,
+        'status' => $fee->status,
+        'status_display' => $this->getStatusLabel($fee->status),
+        'or_number' => $fee->or_number,
+        'certificate_number' => $fee->certificate_number,
+        'valid_from' => $fee->valid_from ? Carbon::parse($fee->valid_from)->format('Y-m-d') : null,
+        'valid_until' => $fee->valid_until ? Carbon::parse($fee->valid_until)->format('Y-m-d') : null,
+        'payment_date' => $fee->payment_date ? Carbon::parse($fee->payment_date)->format('Y-m-d') : null,
+        'payment_method' => $fee->payment_method,
+        'transaction_reference' => $fee->transaction_reference,
+        'property_description' => $fee->property_description,
+        'business_type' => $fee->business_type,
+        'area' => $fee->area,
+        'billing_period' => $fee->billing_period,
+        'period_start' => $fee->period_start ? Carbon::parse($fee->period_start)->format('Y-m-d') : null,
+        'period_end' => $fee->period_end ? Carbon::parse($fee->period_end)->format('Y-m-d') : null,
+        'computation_details' => $fee->computation_details,
+        'requirements_submitted' => $fee->requirements_submitted,
+        'remarks' => $fee->remarks,
+        'waiver_reason' => $fee->waiver_reason,
+        'created_at' => $fee->created_at ? Carbon::parse($fee->created_at)->toISOString() : null,
+        'updated_at' => $fee->updated_at ? Carbon::parse($fee->updated_at)->toISOString() : null,
+        'cancelled_at' => $fee->cancelled_at ? Carbon::parse($fee->cancelled_at)->toISOString() : null,
+    ];
+
+    // Add fee type information
+    if ($fee->feeType) {
+        $requirements = $this->safeArray($fee->feeType->requirements);
+        
+        $formatted['fee_type'] = [
+            'id' => $fee->feeType->id,
+            'code' => $fee->feeType->code,
+            'name' => $fee->feeType->name,
+            'description' => $fee->feeType->description,
+            'base_amount' => (float) $fee->feeType->base_amount,
+            'amount_type' => $fee->feeType->amount_type,
+            'is_discountable' => (bool) $fee->feeType->is_discountable,
+            'has_surcharge' => (bool) $fee->feeType->has_surcharge,
+            'surcharge_percentage' => (float) ($fee->feeType->surcharge_percentage ?? 0),
+            'has_penalty' => (bool) $fee->feeType->has_penalty,
+            'penalty_percentage' => (float) ($fee->feeType->penalty_percentage ?? 0),
+            'requirements' => $requirements,
+            'validity_days' => $fee->feeType->validity_days,
         ];
-
-        // Add fee type information
-        if ($fee->feeType) {
-            $requirements = $this->safeArray($fee->feeType->requirements);
-            
-            $formatted['fee_type'] = [
-                'id' => $fee->feeType->id,
-                'code' => $fee->feeType->code,
-                'name' => $fee->feeType->name,
-                'description' => $fee->feeType->description,
-                'base_amount' => (float) $fee->feeType->base_amount,
-                'amount_type' => $fee->feeType->amount_type,
-                'is_discountable' => (bool) $fee->feeType->is_discountable,
-                'has_surcharge' => (bool) $fee->feeType->has_surcharge,
-                'surcharge_percentage' => (float) ($fee->feeType->surcharge_percentage ?? 0),
-                'has_penalty' => (bool) $fee->feeType->has_penalty,
-                'penalty_percentage' => (float) ($fee->feeType->penalty_percentage ?? 0),
-                'requirements' => $requirements,
-                'validity_days' => $fee->feeType->validity_days,
-            ];
-        }
-
-        // Add resident information if payer is a resident
-        if ($payer && $payer instanceof Resident) {
-            $formatted['resident'] = [
-                'id' => $payer->id,
-                'name' => $payer->full_name ?? trim($payer->first_name . ' ' . $payer->last_name),
-                'full_name' => $payer->full_name ?? trim($payer->first_name . ' ' . $payer->last_name),
-                'birth_date' => $payer->birth_date ? Carbon::parse($payer->birth_date)->format('Y-m-d') : null,
-                'gender' => $payer->gender ?? null,
-                'occupation' => $payer->occupation ?? null,
-                'contact_number' => $payer->contact_number ?? null,
-                'email' => $payer->email ?? null,
-                'address' => $payer->address ?? null,
-                'purok' => $payer->purok ? $payer->purok->name : null,
-                'zone' => $payer->zone ?? null,
-                'profile_photo' => $payer->photo_url ?? null,
-                'is_senior' => $payer->is_senior ?? $payer->isSenior(),
-                'is_pwd' => $payer->is_pwd ?? false,
-                'is_solo_parent' => $payer->is_solo_parent ?? false,
-                'is_indigent' => $payer->is_indigent ?? false,
-            ];
-        }
-
-        // Add household information if payer is a household
-        if ($payer && $payer instanceof Household) {
-            $formatted['household'] = [
-                'id' => $payer->id,
-                'name' => $payer->household_number ?? 'Household',
-                'address' => $payer->address ?? null,
-                'household_head_name' => $payer->head_of_family ?? null,
-                'contact_number' => $payer->contact_number ?? null,
-                'purok' => $payer->purok ? $payer->purok->name : null,
-                'zone' => $payer->zone ?? null,
-            ];
-        }
-
-        // Add business information if payer is a business
-        if ($payer && $payer instanceof Business) {
-            $formatted['business'] = [
-                'id' => $payer->id,
-                'business_name' => $payer->business_name ?? null,
-                'owner_name' => $payer->owner_name ?? null,
-                'business_type' => $payer->business_type ?? null,
-                'address' => $payer->address ?? null,
-                'contact_number' => $payer->contact_number ?? null,
-                'email' => $payer->email ?? null,
-                'purok' => $payer->purok ? $payer->purok->name : null,
-                'zone' => $payer->zone ?? null,
-            ];
-        }
-
-        // Add user information
-        if ($fee->issuedBy) {
-            $formatted['issued_by_user'] = [
-                'id' => $fee->issuedBy->id,
-                'name' => trim(($fee->issuedBy->first_name ?? '') . ' ' . ($fee->issuedBy->last_name ?? '')),
-                'email' => $fee->issuedBy->email,
-                'role' => $fee->issuedBy->role ?? 'Staff',
-            ];
-        }
-
-        if ($fee->createdBy) {
-            $formatted['created_by_user'] = [
-                'id' => $fee->createdBy->id,
-                'name' => trim(($fee->createdBy->first_name ?? '') . ' ' . ($fee->createdBy->last_name ?? '')),
-                'email' => $fee->createdBy->email,
-                'role' => $fee->createdBy->role ?? 'Staff',
-            ];
-        }
-
-        // Check if approved_by and collected_by columns exist and are not null
-        if ($fee->approved_by) {
-            try {
-                $approvedBy = \App\Models\User::find($fee->approved_by);
-                if ($approvedBy) {
-                    $formatted['approved_by_user'] = [
-                        'id' => $approvedBy->id,
-                        'name' => trim(($approvedBy->first_name ?? '') . ' ' . ($approvedBy->last_name ?? '')),
-                        'email' => $approvedBy->email,
-                        'role' => $approvedBy->role ?? 'Staff',
-                    ];
-                }
-            } catch (\Exception $e) {
-                // Silently fail if user doesn't exist
-            }
-        }
-
-        if ($fee->collected_by) {
-            try {
-                $collectedBy = \App\Models\User::find($fee->collected_by);
-                if ($collectedBy) {
-                    $formatted['collected_by_user'] = [
-                        'id' => $collectedBy->id,
-                        'name' => trim(($collectedBy->first_name ?? '') . ' ' . ($collectedBy->last_name ?? '')),
-                        'email' => $collectedBy->email,
-                        'role' => $collectedBy->role ?? 'Staff',
-                    ];
-                }
-            } catch (\Exception $e) {
-                // Silently fail if user doesn't exist
-            }
-        }
-
-        return $formatted;
     }
+
+    // Add resident information if payer is a resident - WITH DYNAMIC PRIVILEGES
+    if ($payer && $payer instanceof Resident) {
+        // Make sure privileges are loaded
+        if (!$payer->relationLoaded('residentPrivileges')) {
+            $payer->load('residentPrivileges.privilege');
+        }
+        
+        // Get ALL active privileges dynamically
+        $activePrivileges = $payer->residentPrivileges
+            ->filter(function ($rp) {
+                return $rp->isActive();
+            })
+            ->map(function ($rp) {
+                $privilege = $rp->privilege;
+                return [
+                    'id' => $rp->id,
+                    'privilege_id' => $privilege->id,
+                    'code' => $privilege->code,
+                    'name' => $privilege->name,
+                    'id_number' => $rp->id_number,
+                    'discount_percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
+                    'verified_at' => $rp->verified_at?->toISOString(),
+                    'expires_at' => $rp->expires_at?->toISOString(),
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        // Build resident data with dynamic privileges
+        $residentData = [
+            'id' => $payer->id,
+            'name' => $payer->full_name ?? trim($payer->first_name . ' ' . $payer->last_name),
+            'full_name' => $payer->full_name ?? trim($payer->first_name . ' ' . $payer->last_name),
+            'first_name' => $payer->first_name,
+            'last_name' => $payer->last_name,
+            'middle_name' => $payer->middle_name,
+            'suffix' => $payer->suffix,
+            'birth_date' => $payer->birth_date ? Carbon::parse($payer->birth_date)->format('Y-m-d') : null,
+            'gender' => $payer->gender ?? null,
+            'occupation' => $payer->occupation ?? null,
+            'contact_number' => $payer->contact_number ?? null,
+            'email' => $payer->email ?? null,
+            'address' => $payer->address ?? null,
+            'purok' => $payer->purok ? $payer->purok->name : null,
+            'purok_id' => $payer->purok_id,
+            'zone' => $payer->zone ?? null,
+            'profile_photo' => $payer->photo_url ?? null,
+            
+            // DYNAMIC privilege data
+            'privileges' => $activePrivileges,
+            'privileges_count' => count($activePrivileges),
+            'has_privileges' => count($activePrivileges) > 0,
+            
+            // DYNAMIC discount eligibility list
+            'discount_eligibilities' => array_map(function($priv) {
+                return [
+                    'code' => $priv['code'],
+                    'name' => $priv['name'],
+                    'percentage' => $priv['discount_percentage'],
+                    'id_number' => $priv['id_number'],
+                    'has_id' => !empty($priv['id_number']),
+                ];
+            }, $activePrivileges),
+        ];
+        
+        // DYNAMICALLY create flags for EACH privilege
+        foreach ($activePrivileges as $priv) {
+            $code = strtolower($priv['code']);
+            $residentData["is_{$code}"] = true;
+            $residentData["has_{$code}"] = true;
+            $residentData["{$code}_id_number"] = $priv['id_number'];
+            $residentData["{$code}_discount"] = $priv['discount_percentage'];
+        }
+        
+        $formatted['resident'] = $residentData;
+    }
+
+    // Add household information if payer is a household
+    if ($payer && $payer instanceof Household) {
+        $formatted['household'] = [
+            'id' => $payer->id,
+            'name' => $payer->household_number ?? 'Household',
+            'address' => $payer->address ?? null,
+            'household_head_name' => $payer->head_of_family ?? null,
+            'contact_number' => $payer->contact_number ?? null,
+            'purok' => $payer->purok ? $payer->purok->name : null,
+            'zone' => $payer->zone ?? null,
+            
+            // Load head resident privileges if available
+            'head_privileges' => $this->getHeadPrivileges($payer),
+        ];
+    }
+
+    // Add business information if payer is a business
+    if ($payer && $payer instanceof Business) {
+        $formatted['business'] = [
+            'id' => $payer->id,
+            'business_name' => $payer->business_name ?? null,
+            'owner_name' => $payer->owner_name ?? null,
+            'business_type' => $payer->business_type ?? null,
+            'address' => $payer->address ?? null,
+            'contact_number' => $payer->contact_number ?? null,
+            'email' => $payer->email ?? null,
+            'purok' => $payer->purok ? $payer->purok->name : null,
+            'zone' => $payer->zone ?? null,
+            
+            // Load owner privileges if available
+            'owner_privileges' => $this->getOwnerPrivileges($payer),
+        ];
+    }
+
+    // Add user information
+    if ($fee->issuedBy) {
+        $formatted['issued_by_user'] = [
+            'id' => $fee->issuedBy->id,
+            'name' => trim(($fee->issuedBy->first_name ?? '') . ' ' . ($fee->issuedBy->last_name ?? '')),
+            'email' => $fee->issuedBy->email,
+            'role' => $fee->issuedBy->role ?? 'Staff',
+        ];
+    }
+
+    if ($fee->createdBy) {
+        $formatted['created_by_user'] = [
+            'id' => $fee->createdBy->id,
+            'name' => trim(($fee->createdBy->first_name ?? '') . ' ' . ($fee->createdBy->last_name ?? '')),
+            'email' => $fee->createdBy->email,
+            'role' => $fee->createdBy->role ?? 'Staff',
+        ];
+    }
+
+    // Check if approved_by and collected_by columns exist and are not null
+    if ($fee->approved_by) {
+        try {
+            $approvedBy = \App\Models\User::find($fee->approved_by);
+            if ($approvedBy) {
+                $formatted['approved_by_user'] = [
+                    'id' => $approvedBy->id,
+                    'name' => trim(($approvedBy->first_name ?? '') . ' ' . ($approvedBy->last_name ?? '')),
+                    'email' => $approvedBy->email,
+                    'role' => $approvedBy->role ?? 'Staff',
+                ];
+            }
+        } catch (\Exception $e) {
+            // Silently fail if user doesn't exist
+        }
+    }
+
+    if ($fee->collected_by) {
+        try {
+            $collectedBy = \App\Models\User::find($fee->collected_by);
+            if ($collectedBy) {
+                $formatted['collected_by_user'] = [
+                    'id' => $collectedBy->id,
+                    'name' => trim(($collectedBy->first_name ?? '') . ' ' . ($collectedBy->last_name ?? '')),
+                    'email' => $collectedBy->email,
+                    'role' => $collectedBy->role ?? 'Staff',
+                ];
+            }
+        } catch (\Exception $e) {
+            // Silently fail if user doesn't exist
+        }
+    }
+
+    return $formatted;
+}
+
+/**
+ * Helper method to get head of household's privileges
+ */
+private function getHeadPrivileges($household): array
+{
+    if (!$household->head_of_household) {
+        return [];
+    }
+    
+    try {
+        $headResident = \App\Models\Resident::with(['residentPrivileges.privilege'])
+            ->find($household->head_of_household->id);
+            
+        if (!$headResident) {
+            return [];
+        }
+        
+        $headPrivileges = $headResident->residentPrivileges
+            ->filter(function ($rp) {
+                return $rp->isActive();
+            })
+            ->map(function ($rp) {
+                $privilege = $rp->privilege;
+                return [
+                    'code' => $privilege->code,
+                    'name' => $privilege->name,
+                    'id_number' => $rp->id_number,
+                ];
+            })
+            ->values()
+            ->toArray();
+            
+        return $headPrivileges;
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::warning('Failed to load head privileges', [
+            'household_id' => $household->id,
+            'error' => $e->getMessage()
+        ]);
+        return [];
+    }
+}
+
+/**
+ * Helper method to get business owner's privileges
+ */
+private function getOwnerPrivileges($business): array
+{
+    if (!$business->owner_id) {
+        return [];
+    }
+    
+    try {
+        $owner = \App\Models\Resident::with(['residentPrivileges.privilege'])
+            ->find($business->owner_id);
+            
+        if (!$owner) {
+            return [];
+        }
+        
+        $ownerPrivileges = $owner->residentPrivileges
+            ->filter(function ($rp) {
+                return $rp->isActive();
+            })
+            ->map(function ($rp) {
+                $privilege = $rp->privilege;
+                return [
+                    'code' => $privilege->code,
+                    'name' => $privilege->name,
+                    'id_number' => $rp->id_number,
+                ];
+            })
+            ->values()
+            ->toArray();
+            
+        return $ownerPrivileges;
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::warning('Failed to load owner privileges', [
+            'business_id' => $business->id,
+            'error' => $e->getMessage()
+        ]);
+        return [];
+    }
+}
 
     // Helper function to safely convert data to array
     private function safeArray($data): array

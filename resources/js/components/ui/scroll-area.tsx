@@ -30,7 +30,7 @@ const ScrollBar = React.forwardRef<
     className={cn(
       "flex touch-none select-none transition-colors",
       "absolute top-0 right-0 z-50 w-2.5",
-      "hover:bg-gray-800/20 dark:hover:bg-gray-200/20",
+      "hover:bg-gray-900/20 dark:hover:bg-gray-200/20",
       className
     )}
     {...props}

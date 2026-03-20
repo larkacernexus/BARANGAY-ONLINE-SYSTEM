@@ -1,3 +1,4 @@
+// resources/js/pages/admin/positions/index.tsx
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
@@ -16,6 +17,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Import AdminUI components
 import PositionsHeader from '@/components/admin/positions/PositionsHeader';
+import PositionsStats from '@/components/admin/positions/PositionsStats';
 import PositionsFilters from '@/components/admin/positions/PositionsFilters';
 import PositionsContent from '@/components/admin/positions/PositionsContent';
 import PositionsDialogs from '@/components/admin/positions/PositionsDialogs';
@@ -107,39 +109,7 @@ export default function PositionsIndex({
         }
     }, [flash]);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/admin/positions', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== filters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, filters.search]);
-
+ 
     // Filter positions
     const filteredPositions = useMemo(() => {
         return positionUtils.filterPositions({
@@ -148,6 +118,19 @@ export default function PositionsIndex({
             filters: filtersState
         });
     }, [positions.data, search, filtersState]);
+
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        return {
+            total: filteredPositions.length,
+            active: filteredPositions.filter(p => p.is_active).length,
+            requires_account: filteredPositions.filter(p => p.requires_account).length,
+            kagawad_count: filteredPositions.filter(p => p.code?.startsWith('KAG')).length,
+            inactive: filteredPositions.filter(p => !p.is_active).length,
+            assigned: filteredPositions.filter(p => p.officials_count > 0).length,
+            unassigned: filteredPositions.filter(p => p.officials_count === 0).length
+        };
+    }, [filteredPositions]);
 
     // Pagination
     const totalItems = filteredPositions.length;
@@ -240,8 +223,8 @@ export default function PositionsIndex({
 
     const handleSelectAll = () => {
         if (confirm(`This will select ALL ${positions.total || 0} positions. This action may take a moment.`)) {
-            const pageIds = paginatedPositions.map(position => position.id);
-            setSelectedPositions(pageIds);
+            const allIds = positions.data.map(p => p.id);
+            setSelectedPositions(allIds);
             setSelectionMode('all');
         }
     };
@@ -285,22 +268,7 @@ export default function PositionsIndex({
         try {
             switch (operation) {
                 case 'delete':
-                    if (confirm(`Are you sure you want to delete ${selectedPositions.length} selected position(s)?`)) {
-                        await router.post('/admin/positions/bulk-action', {
-                            action: 'delete',
-                            position_ids: selectedPositions,
-                        }, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                setSelectedPositions([]);
-                                setShowBulkDeleteDialog(false);
-                                toast.success('Positions deleted successfully');
-                            },
-                            onError: () => {
-                                toast.error('Failed to delete positions');
-                            }
-                        });
-                    }
+                    setShowBulkDeleteDialog(true);
                     break;
 
                 case 'activate':
@@ -311,7 +279,7 @@ export default function PositionsIndex({
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedPositions([]);
-                            toast.success('Positions activated successfully');
+                            toast.success(`${selectedPositions.length} positions activated successfully`);
                         },
                         onError: () => {
                             toast.error('Failed to activate positions');
@@ -327,7 +295,7 @@ export default function PositionsIndex({
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedPositions([]);
-                            toast.success('Positions deactivated successfully');
+                            toast.success(`${selectedPositions.length} positions deactivated successfully`);
                         },
                         onError: () => {
                             toast.error('Failed to deactivate positions');
@@ -336,23 +304,7 @@ export default function PositionsIndex({
                     break;
 
                 case 'toggle_account':
-                    const requiresAccount = bulkEditValue === 'enable';
-                    await router.post('/admin/positions/bulk-action', {
-                        action: 'toggle_account',
-                        position_ids: selectedPositions,
-                        requires_account: requiresAccount
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setSelectedPositions([]);
-                            setBulkEditValue('');
-                            setShowBulkStatusDialog(false);
-                            toast.success('Position account requirement updated successfully');
-                        },
-                        onError: () => {
-                            toast.error('Failed to update position account requirement');
-                        }
-                    });
+                    setShowBulkStatusDialog(true);
                     break;
 
                 case 'export':
@@ -394,50 +346,27 @@ export default function PositionsIndex({
                     document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
                     
-                    toast.success('Export completed successfully');
+                    toast.success(`${selectedPositions.length} positions exported successfully`);
+                    setSelectedPositions([]);
                     break;
 
                 case 'print':
-                    // Open print preview for each selected position
                     selectedPositions.forEach(id => {
                         window.open(`/admin/positions/${id}/print`, '_blank');
                     });
                     toast.success(`${selectedPositions.length} position(s) opened for printing`);
+                    setSelectedPositions([]);
                     break;
 
                 case 'generate_report':
                     const idsParam = selectedPositions.join(',');
                     window.open(`/admin/positions/report?ids=${idsParam}`, '_blank');
                     toast.success(`Generating report for ${selectedPositions.length} position(s)`);
+                    setSelectedPositions([]);
                     break;
 
                 case 'copy_data':
-                    // Copy selected data to clipboard
-                    if (selectedPositionsData.length === 0) {
-                        toast.error('No data to copy');
-                        return;
-                    }
-                    
-                    const data = selectedPositionsData.map(position => ({
-                        'Code': position.code || 'N/A',
-                        'Name': position.name || 'N/A',
-                        'Committee': position.committee?.name || 'N/A',
-                        'Order': position.order,
-                        'Officials': position.officials_count || 0,
-                        'Account Required': position.requires_account ? 'Yes' : 'No',
-                        'Status': position.is_active ? 'Active' : 'Inactive',
-                    }));
-                    
-                    const csvData = [
-                        Object.keys(data[0]).join(','),
-                        ...data.map(row => Object.values(row).join(','))
-                    ].join('\n');
-                    
-                    navigator.clipboard.writeText(csvData).then(() => {
-                        toast.success('Data copied to clipboard');
-                    }).catch(() => {
-                        toast.error('Failed to copy to clipboard');
-                    });
+                    handleCopySelectedData();
                     break;
 
                 default:
@@ -447,6 +376,66 @@ export default function PositionsIndex({
         } catch (error) {
             console.error('Bulk operation error:', error);
             toast.error('An error occurred during the bulk operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkAccountToggle = async () => {
+        if (!bulkEditValue) {
+            toast.error('Please select an option');
+            return;
+        }
+
+        setIsPerformingBulkAction(true);
+
+        try {
+            const requiresAccount = bulkEditValue === 'enable';
+            await router.post('/admin/positions/bulk-action', {
+                action: 'toggle_account',
+                position_ids: selectedPositions,
+                requires_account: requiresAccount
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedPositions([]);
+                    setBulkEditValue('');
+                    setShowBulkStatusDialog(false);
+                    toast.success(`${selectedPositions.length} position account requirements updated successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to update position account requirements');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk account toggle error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/positions/bulk-action', {
+                action: 'delete',
+                position_ids: selectedPositions,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedPositions([]);
+                    setShowBulkDeleteDialog(false);
+                    toast.success(`${selectedPositions.length} positions deleted successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to delete positions');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            toast.error('An error occurred during the operation.');
         } finally {
             setIsPerformingBulkAction(false);
         }
@@ -469,11 +458,34 @@ export default function PositionsIndex({
     };
 
     const handleSort = (column: string) => {
+        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
+        
         setFiltersState(prev => ({
             ...prev,
             sort_by: column as any,
-            sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc'
+            sort_order: newOrder
         }));
+        
+        // Trigger server-side sort update
+        const params = {
+            ...filtersState,
+            sort_by: column,
+            sort_order: newOrder,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/positions', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearFilters = () => {
@@ -484,6 +496,19 @@ export default function PositionsIndex({
             sort_by: 'order',
             sort_order: 'asc'
         });
+        
+        // Trigger server-side filter clear
+        router.get('/admin/positions', {
+            search: '',
+            status: 'all',
+            requires_account: 'all',
+            sort_by: 'order',
+            sort_order: 'asc'
+        }, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearSelection = () => {
@@ -492,18 +517,61 @@ export default function PositionsIndex({
     };
 
     const handleCopySelectedData = () => {
-        handleBulkOperation('copy_data');
+        if (selectedPositionsData.length === 0) {
+            toast.error('No data to copy');
+            return;
+        }
+        
+        const data = selectedPositionsData.map(position => ({
+            'Code': position.code || 'N/A',
+            'Name': position.name || 'N/A',
+            'Committee': position.committee?.name || 'N/A',
+            'Order': position.order,
+            'Officials': position.officials_count || 0,
+            'Account Required': position.requires_account ? 'Yes' : 'No',
+            'Status': position.is_active ? 'Active' : 'Inactive',
+        }));
+        
+        const csvData = [
+            Object.keys(data[0]).join(','),
+            ...data.map(row => Object.values(row).join(','))
+        ].join('\n');
+        
+        navigator.clipboard.writeText(csvData).then(() => {
+            toast.success(`${selectedPositionsData.length} records copied to clipboard`);
+        }).catch(() => {
+            toast.error('Failed to copy to clipboard');
+        });
     };
 
     const updateFilter = (key: keyof PositionFilters, value: string) => {
         setFiltersState(prev => ({ ...prev, [key]: value }));
+        
+        // Trigger server-side filter update
+        const params = {
+            ...filtersState,
+            [key]: value,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/positions', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const hasActiveFilters = 
         search || 
         filtersState.status !== 'all' ||
-        filtersState.requires_account !== 'all' ||
-        filtersState.sort_by !== 'order';
+        filtersState.requires_account !== 'all';
 
     return (
         <AppLayout
@@ -521,10 +589,21 @@ export default function PositionsIndex({
                         isMobile={isMobile}
                     />
 
+                    {/* Separate Stats Component */}
+                    <PositionsStats 
+                        globalStats={stats}
+                        filteredStats={filteredStats}
+                        isLoading={isPerformingBulkAction}
+                    />
+
                     <PositionsFilters
-                        stats={stats}
+                        // Remove stats prop
                         search={search}
                         setSearch={setSearch}
+                        onSearchChange={(value) => {
+                            setSearch(value);
+                            debouncedSearch(value);
+                        }}
                         filtersState={filtersState}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
@@ -536,11 +615,12 @@ export default function PositionsIndex({
                         startIndex={startIndex}
                         endIndex={endIndex}
                         searchInputRef={searchInputRef}
+                        isLoading={isPerformingBulkAction}
                     />
 
                     <PositionsContent
                         positions={paginatedPositions}
-                        stats={stats}
+                        // Remove stats prop
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -574,7 +654,7 @@ export default function PositionsIndex({
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <KeyRound className="h-4 w-4 text-gray-500" />
@@ -607,6 +687,10 @@ export default function PositionsIndex({
                                     <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
                                     <span>Exit/clear</span>
                                 </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+F</kbd>
+                                    <span>Focus search</span>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -620,7 +704,8 @@ export default function PositionsIndex({
                 setShowBulkStatusDialog={setShowBulkStatusDialog}
                 isPerformingBulkAction={isPerformingBulkAction}
                 selectedPositions={selectedPositions}
-                handleBulkOperation={handleBulkOperation}
+                handleBulkOperation={handleBulkDelete}
+                handleBulkAccountToggle={handleBulkAccountToggle}
                 selectionStats={selectionStats}
                 bulkEditValue={bulkEditValue}
                 setBulkEditValue={setBulkEditValue}

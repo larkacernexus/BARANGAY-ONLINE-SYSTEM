@@ -30,7 +30,7 @@ export function ResidentSelector({ residents, value, onChange, processing, error
             id="resident_id"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
             required
             disabled={processing}
           >

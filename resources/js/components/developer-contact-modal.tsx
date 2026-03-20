@@ -1,6 +1,6 @@
 // @/components/developer-contact-modal.tsx
 import React from 'react';
-import { X, Mail, Phone, User, Building, Shield, Clock } from 'lucide-react';
+import { X, Mail, Phone, User, Building, Shield, Clock, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -11,8 +11,11 @@ interface DeveloperContactModalProps {
         name?: string;
         email?: string;
         phone?: string;
+        position?: string; // Added
         department?: string;
         company?: string;
+        office?: string;   // Added
+        schedule?: string; // Added
         responseTime?: string;
         notes?: string;
     };
@@ -25,7 +28,7 @@ const defaultDeveloperDetails = {
     department: "Software Engineering",
     company: "Your Company",
     responseTime: "Within 24-48 hours",
-    notes: "For permission requests, please include the permission name, display name, module, description, and initial roles."
+    notes: "For permission requests, please include details."
 };
 
 export default function DeveloperContactModal({ 
@@ -40,112 +43,76 @@ export default function DeveloperContactModal({
     };
 
     const handleSendEmail = () => {
-        window.location.href = `mailto:${developerDetails.email}?subject=Permission Creation Request`;
+        window.location.href = `mailto:${developerDetails.email}?subject=Permission Inquiry`;
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="relative w-full max-w-md mx-4">
-                <Card className="shadow-xl">
-                    {/* Header */}
-                    <div className="flex items-center justify-between p-4 border-b">
+                <Card className="shadow-xl dark:bg-gray-900 dark:border-gray-700">
+                    <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
                         <div className="flex items-center gap-2">
-                            <Shield className="h-5 w-5 text-blue-600" />
+                            <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                             <div>
-                                <h2 className="font-semibold text-gray-900">Contact Development Team</h2>
-                                <p className="text-sm text-gray-600">Request permission creation</p>
+                                <h2 className="font-semibold text-gray-900 dark:text-gray-100">Contact IT Support</h2>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">System Permissions & Access</p>
                             </div>
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={onClose}
-                            className="h-8 w-8 p-0"
-                        >
+                        <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
                             <X className="h-4 w-4" />
                         </Button>
                     </div>
 
-                    {/* Content */}
                     <CardContent className="p-4 space-y-4">
-                        {/* Contact Information */}
                         <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-gray-500" />
+                            <div className="flex items-start gap-3">
+                                <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                                    <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                </div>
                                 <div>
-                                    <p className="font-medium text-gray-900">{developerDetails.name}</p>
-                                    <p className="text-sm text-gray-600">{developerDetails.department}</p>
+                                    <p className="font-bold text-gray-900 dark:text-gray-100">{developerDetails.name}</p>
+                                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400">{developerDetails.position}</p>
+                                    <p className="text-xs text-gray-500">{developerDetails.department}</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Mail className="h-4 w-4 text-gray-500" />
-                                    <p className="text-sm">{developerDetails.email}</p>
+                            <div className="grid grid-cols-1 gap-2 border-t pt-3 dark:border-gray-700">
+                                <div className="flex items-center justify-between group">
+                                    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <Mail className="h-4 w-4 text-gray-400" />
+                                        <span>{developerDetails.email}</span>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={() => handleCopy(developerDetails.email || '')} className="h-7 text-xs">Copy</Button>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleCopy(developerDetails.email || '')}
-                                    className="text-xs"
-                                >
-                                    Copy
-                                </Button>
-                            </div>
 
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <Phone className="h-4 w-4 text-gray-500" />
-                                    <p className="text-sm">{developerDetails.phone}</p>
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleCopy(developerDetails.phone || '')}
-                                    className="text-xs"
-                                >
-                                    Copy
-                                </Button>
-                            </div>
+                                {developerDetails.office && (
+                                    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <MapPin className="h-4 w-4 text-gray-400" />
+                                        <span>{developerDetails.office}</span>
+                                    </div>
+                                )}
 
-                            <div className="flex items-center gap-2">
-                                <Building className="h-4 w-4 text-gray-500" />
-                                <p className="text-sm">{developerDetails.company}</p>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-gray-500" />
-                                <p className="text-sm">{developerDetails.responseTime}</p>
+                                {developerDetails.schedule && (
+                                    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                        <Clock className="h-4 w-4 text-gray-400" />
+                                        <span>{developerDetails.schedule}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        {/* Important Notes */}
-                        <div className="p-3 bg-blue-50 rounded-lg">
-                            <p className="text-sm text-gray-700">{developerDetails.notes}</p>
-                        </div>
+                        {developerDetails.notes && (
+                            <div className="p-3 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                                <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">{developerDetails.notes}</p>
+                            </div>
+                        )}
 
-                        {/* Action Buttons */}
-                        <div className="flex flex-col gap-2 pt-2">
-                            <Button
-                                onClick={handleSendEmail}
-                                className="w-full"
-                            >
+                        <div className="flex flex-col gap-2">
+                            <Button onClick={handleSendEmail} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                                 <Mail className="h-4 w-4 mr-2" />
-                                Send Email Request
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={onClose}
-                                className="w-full"
-                            >
-                                Close
+                                Send Message
                             </Button>
                         </div>
-
-                        {/* Footer Note */}
-                        <p className="text-xs text-gray-500 text-center pt-2">
-                            All requests are reviewed based on system requirements and security policies.
-                        </p>
                     </CardContent>
                 </Card>
             </div>

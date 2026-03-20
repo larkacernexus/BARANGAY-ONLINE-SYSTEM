@@ -75,7 +75,7 @@ export function DocumentRequirementsCard({
                             return (
                                 <div 
                                     key={index} 
-                                    className={`flex items-center justify-between p-2 rounded-lg ${isUploaded ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-800/50'}`}
+                                    className={`flex items-center justify-between p-2 rounded-lg ${isUploaded ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-900/50'}`}
                                 >
                                     <div className="flex items-center gap-2">
                                         {isUploaded ? (

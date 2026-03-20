@@ -50,7 +50,7 @@ const NotificationItem = ({ notification, onClick }: { notification: Notificatio
       className={cn(
         "w-full text-left p-4 rounded-xl transition-all duration-200 relative overflow-hidden group hover:scale-[1.02] active:scale-[0.98]",
         notification.read_at 
-          ? 'bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50' 
+          ? 'bg-transparent hover:bg-gray-50 dark:hover:bg-gray-900/50' 
           : 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900/30 dark:hover:to-indigo-900/30'
       )}
     >
@@ -61,7 +61,7 @@ const NotificationItem = ({ notification, onClick }: { notification: Notificatio
 
       <div className="flex items-start gap-3">
         <div className={cn(
-          "p-2 rounded-lg bg-white dark:bg-gray-800 shadow-sm",
+          "p-2 rounded-lg bg-white dark:bg-gray-900 shadow-sm",
           getIconColor()
         )}>
           <Icon className="h-4 w-4" />
@@ -292,7 +292,7 @@ export function NotificationCenter({
           <Button
             onClick={onViewAll}
             variant="outline"
-            className="w-full gap-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all group"
+            className="w-full gap-2 hover:bg-gray-50 dark:hover:bg-gray-900 transition-all group"
           >
             <Bell className="h-4 w-4 text-gray-500 group-hover:text-blue-500 transition-colors" />
             <span>All Notifications</span>

@@ -131,7 +131,7 @@ export default function PositionsTableView({
                 <div className="overflow-hidden">
                     <Table className="min-w-full">
                         <TableHeader>
-                            <TableRow className="bg-gray-50 dark:bg-gray-800">
+                            <TableRow className="bg-gray-50 dark:bg-gray-900">
                                 {isBulkMode && (
                                     <TableHead className="px-4 py-3 text-center w-12">
                                         <div className="flex items-center justify-center">
@@ -198,7 +198,7 @@ export default function PositionsTableView({
                                         {getSortIcon('status')}
                                     </div>
                                 </TableHead>
-                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[80px]">
+                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[80px]">
                                     Actions
                                 </TableHead>
                             </TableRow>
@@ -214,7 +214,7 @@ export default function PositionsTableView({
                                 return (
                                     <TableRow 
                                         key={position.id} 
-                                        className={`hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${
+                                        className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors ${
                                             isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
                                         }`}
                                         onClick={(e) => {
@@ -263,7 +263,7 @@ export default function PositionsTableView({
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
                                             <code 
-                                                className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono cursor-text select-text"
+                                                className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded text-sm font-mono cursor-text select-text"
                                                 onDoubleClick={(e) => {
                                                     const selection = window.getSelection();
                                                     if (selection) {
@@ -292,7 +292,7 @@ export default function PositionsTableView({
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
                                             <div className="flex items-center justify-center">
-                                                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-800 text-sm font-medium">
+                                                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-900 text-sm font-medium">
                                                     {position.order}
                                                 </span>
                                             </div>
@@ -343,7 +343,7 @@ export default function PositionsTableView({
                                                 <DropdownMenuTrigger asChild>
                                                     <Button 
                                                         variant="ghost" 
-                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <span className="sr-only">Open menu</span>

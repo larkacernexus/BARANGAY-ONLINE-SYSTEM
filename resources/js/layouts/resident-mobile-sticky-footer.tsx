@@ -146,7 +146,7 @@ const QuickActionMenu = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
             />
             
             {/* Menu Items */}
-            <div className="absolute bottom-24 left-4 right-4 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
+            <div className="absolute bottom-24 left-4 right-4 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
                 <div className="p-2">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">

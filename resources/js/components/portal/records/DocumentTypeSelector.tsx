@@ -166,7 +166,7 @@ export function DocumentTypeSelector({
             variant="outline"
             size="icon"
             onClick={onViewModeChange}
-            className="hidden sm:flex relative overflow-hidden bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300"
+            className="hidden sm:flex relative overflow-hidden bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300"
             aria-label={viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-purple-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
@@ -183,7 +183,7 @@ export function DocumentTypeSelector({
             placeholder="Search document types..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10 pr-10 w-full bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 dark:text-white dark:placeholder:text-gray-500 focus:bg-white dark:focus:bg-gray-800 transition-all duration-300"
+            className="pl-10 pr-10 w-full bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50 dark:text-white dark:placeholder:text-gray-500 focus:bg-white dark:focus:bg-gray-900 transition-all duration-300"
           />
           {searchQuery && (
             <Button
@@ -206,7 +206,7 @@ export function DocumentTypeSelector({
             variant="outline"
             size="sm"
             onClick={() => setShowMobileFilters(!showMobileFilters)}
-            className="sm:hidden flex-1 justify-between bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-800"
+            className="sm:hidden flex-1 justify-between bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-900"
           >
             <span className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
@@ -219,7 +219,7 @@ export function DocumentTypeSelector({
           <select
             value={selectedCategory}
             onChange={(e) => onCategoryChange(e.target.value)}
-            className="hidden sm:block px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 dark:text-gray-300 min-w-[160px] backdrop-blur-sm transition-all duration-300"
+            className="hidden sm:block px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50 dark:text-gray-300 min-w-[160px] backdrop-blur-sm transition-all duration-300"
             aria-label="Select category"
           >
             <option value="all">All Categories</option>
@@ -235,7 +235,7 @@ export function DocumentTypeSelector({
             <select
               value={sortBy}
               onChange={(e) => onSortByChange(e.target.value as 'name' | 'size' | 'date')}
-              className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 dark:text-gray-300 min-w-[140px] backdrop-blur-sm transition-all duration-300"
+              className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50 dark:text-gray-300 min-w-[140px] backdrop-blur-sm transition-all duration-300"
               aria-label="Sort by"
             >
               <option value="name">Sort by Name</option>
@@ -247,7 +247,7 @@ export function DocumentTypeSelector({
               variant="outline"
               size="icon"
               onClick={onSortOrderChange}
-              className="bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-800 transition-all duration-300"
+              className="bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-900 transition-all duration-300"
               aria-label={sortOrder === 'asc' ? 'Sort descending' : 'Sort ascending'}
             >
               {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
@@ -260,7 +260,7 @@ export function DocumentTypeSelector({
             variant="outline"
             size="sm"
             onClick={onViewModeChange}
-            className="sm:hidden bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-800 px-3 transition-all duration-300"
+            className="sm:hidden bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-900 px-3 transition-all duration-300"
             aria-label={viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
           >
             {viewMode === 'grid' ? (
@@ -279,13 +279,13 @@ export function DocumentTypeSelector({
 
         {/* Mobile Filters - Expandable */}
         {showMobileFilters && (
-          <div className="sm:hidden space-y-3 p-4 bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-lg border border-gray-200/50 dark:border-gray-700/50 animate-in slide-in-from-top-2 duration-300">
+          <div className="sm:hidden space-y-3 p-4 bg-white/70 dark:bg-gray-900/70 backdrop-blur-md rounded-lg border border-gray-200/50 dark:border-gray-700/50 animate-in slide-in-from-top-2 duration-300">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
               <select
                 value={selectedCategory}
                 onChange={(e) => onCategoryChange(e.target.value)}
-                className="w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 dark:text-gray-300 backdrop-blur-sm"
+                className="w-full px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50 dark:text-gray-300 backdrop-blur-sm"
               >
                 <option value="all">All Categories</option>
                 {categories.map((category) => (
@@ -302,7 +302,7 @@ export function DocumentTypeSelector({
                 <select
                   value={sortBy}
                   onChange={(e) => onSortByChange(e.target.value as 'name' | 'size' | 'date')}
-                  className="flex-1 px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 dark:text-gray-300 backdrop-blur-sm"
+                  className="flex-1 px-3 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50 dark:text-gray-300 backdrop-blur-sm"
                 >
                   <option value="name">Name</option>
                   <option value="size">Size</option>
@@ -313,7 +313,7 @@ export function DocumentTypeSelector({
                   variant="outline"
                   size="icon"
                   onClick={onSortOrderChange}
-                  className="bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-800 h-auto aspect-square"
+                  className="bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50 hover:bg-white dark:hover:bg-gray-900 h-auto aspect-square"
                 >
                   {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
                 </Button>
@@ -327,7 +327,7 @@ export function DocumentTypeSelector({
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-gray-500 dark:text-gray-400">Active filters:</span>
             {selectedCategory !== 'all' && (
-              <Badge variant="secondary" className="gap-1 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-gray-200/50 dark:border-gray-700/50">
+              <Badge variant="secondary" className="gap-1 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-gray-200/50 dark:border-gray-700/50">
                 {selectedCategoryName}
                 <button
                   onClick={() => onCategoryChange('all')}
@@ -338,7 +338,7 @@ export function DocumentTypeSelector({
               </Badge>
             )}
             {searchQuery && (
-              <Badge variant="secondary" className="gap-1 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-gray-200/50 dark:border-gray-700/50">
+              <Badge variant="secondary" className="gap-1 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-gray-200/50 dark:border-gray-700/50">
                 "{searchQuery}"
                 <button
                   onClick={() => onSearchChange('')}
@@ -377,7 +377,7 @@ export function DocumentTypeSelector({
                     relative overflow-hidden border rounded-lg p-3 cursor-pointer transition-all duration-300
                     ${isSelected 
                       ? 'border-blue-500/50 bg-blue-50/80 dark:bg-blue-900/20 dark:border-blue-700/50 ring-2 ring-blue-500/20 backdrop-blur-sm' 
-                      : 'border-gray-200/50 dark:border-gray-700/50 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-800 hover:border-blue-300/50 dark:hover:border-blue-700/50 hover:shadow-lg hover:shadow-blue-500/5'
+                      : 'border-gray-200/50 dark:border-gray-700/50 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-900 hover:border-blue-300/50 dark:hover:border-blue-700/50 hover:shadow-lg hover:shadow-blue-500/5'
                     }
                   `}
                   onClick={() => onSelect(type.id.toString())}
@@ -425,13 +425,13 @@ export function DocumentTypeSelector({
 
                     <div className="flex items-center gap-1 mt-1">
                       {type.requires_expiry_date && (
-                        <Badge variant="outline" className="text-[8px] py-0 h-4 px-1 bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50">
+                        <Badge variant="outline" className="text-[8px] py-0 h-4 px-1 bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50">
                           <CalendarDays className="h-2.5 w-2.5 mr-0.5 text-yellow-600" />
                           <span>Expiry</span>
                         </Badge>
                       )}
                       {type.requires_reference_number && (
-                        <Badge variant="outline" className="text-[8px] py-0 h-4 px-1 bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50">
+                        <Badge variant="outline" className="text-[8px] py-0 h-4 px-1 bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50">
                           <Tag className="h-2.5 w-2.5 mr-0.5 text-purple-600" />
                           <span>Ref #</span>
                         </Badge>
@@ -439,11 +439,11 @@ export function DocumentTypeSelector({
                     </div>
 
                     <div className="flex flex-wrap gap-1 mt-1">
-                      <Badge variant="outline" className="text-[8px] py-0 h-4 bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50">
+                      <Badge variant="outline" className="text-[8px] py-0 h-4 bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50">
                         <ShieldCheck className="h-2.5 w-2.5 mr-0.5 text-gray-500 dark:text-gray-400" />
                         {maxSizeMB}
                       </Badge>
-                      <Badge variant="outline" className="text-[8px] py-0 h-4 bg-white/50 dark:bg-gray-800/50 border-gray-200/50 dark:border-gray-700/50">
+                      <Badge variant="outline" className="text-[8px] py-0 h-4 bg-white/50 dark:bg-gray-900/50 border-gray-200/50 dark:border-gray-700/50">
                         <Check className="h-2.5 w-2.5 mr-0.5 text-gray-500 dark:text-gray-400" />
                         {acceptedFormatsString}
                         {hasMoreFormats && '...'}
@@ -472,7 +472,7 @@ export function DocumentTypeSelector({
                     relative overflow-hidden border rounded-lg p-3 cursor-pointer transition-all duration-300
                     ${isSelected 
                       ? 'border-blue-500/50 bg-blue-50/80 dark:bg-blue-900/20 dark:border-blue-700/50 ring-2 ring-blue-500/20 backdrop-blur-sm' 
-                      : 'border-gray-200/50 dark:border-gray-700/50 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-800 hover:border-blue-300/50 dark:hover:border-blue-700/50 hover:shadow-lg hover:shadow-blue-500/5'
+                      : 'border-gray-200/50 dark:border-gray-700/50 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm hover:bg-white dark:hover:bg-gray-900 hover:border-blue-300/50 dark:hover:border-blue-700/50 hover:shadow-lg hover:shadow-blue-500/5'
                     }
                   `}
                   onClick={() => onSelect(type.id.toString())}

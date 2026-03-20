@@ -22,10 +22,12 @@ import {
   Square,
   Lock,
   Unlock,
-  CheckCircle
+  CheckCircle,
+  MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { User } from '@/types';
+import { JSX } from 'react';
 
 interface UsersTableRowProps {
   user: User;
@@ -41,6 +43,10 @@ interface UsersTableRowProps {
   getStatusIcon: (status: string) => JSX.Element | null;
   getRoleBadgeVariant: (roleName: string | undefined) => "default" | "secondary" | "destructive" | "outline";
   formatDate: (dateString: string | null) => string;
+  onDelete?: (user: User) => void;
+  onToggleStatus?: (user: User) => void;
+  onSendMessage?: (user: User) => void;
+  onCopyToClipboard?: (text: string, label: string) => void;
 }
 
 export default function UsersTableRow({
@@ -56,30 +62,39 @@ export default function UsersTableRow({
   getStatusBadgeVariant,
   getStatusIcon,
   getRoleBadgeVariant,
-  formatDate
+  formatDate,
+  onDelete,
+  onToggleStatus,
+  onSendMessage,
+  onCopyToClipboard
 }: UsersTableRowProps) {
   const fullName = getFullName(user);
   const roleName = user.role?.name || 'N/A';
   const departmentName = user.department?.name || 'N/A';
 
   const handleCopyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast.success(`${label} copied to clipboard`);
-    }).catch(() => {
-      toast.error('Failed to copy to clipboard');
-    });
+    if (onCopyToClipboard) {
+      onCopyToClipboard(text, label);
+    } else {
+      navigator.clipboard.writeText(text).then(() => {
+        toast.success(`${label} copied to clipboard`);
+      }).catch(() => {
+        toast.error('Failed to copy to clipboard');
+      });
+    }
   };
 
   return (
     <TableRow 
-      className={`hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${
+      className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors ${
         isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
       }`}
       onClick={(e) => {
         if (isBulkMode && e.target instanceof HTMLElement && 
             !e.target.closest('a') && 
             !e.target.closest('button') &&
-            !e.target.closest('.dropdown-menu-content') &&
+            !e.target.closest('[role="menuitem"]') &&
+            !e.target.closest('[data-radix-menu-content]') &&
             !e.target.closest('input[type="checkbox"]')) {
           onSelect();
         }
@@ -111,7 +126,7 @@ export default function UsersTableRow({
           }}
           title={`Double-click to select all\nName: ${fullName}\nEmail: ${user.email}`}
         >
-          <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+          <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-900 flex items-center justify-center flex-shrink-0">
             <UserIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           </div>
           <div className="min-w-0">
@@ -170,7 +185,15 @@ export default function UsersTableRow({
       <TableCell className="px-4 py-3">
         <Badge 
           variant={getStatusBadgeVariant(user.status)} 
-          className="flex items-center gap-1 truncate max-w-full"
+          className={`flex items-center gap-1 truncate max-w-full ${
+            user.status === 'active' 
+              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+              : user.status === 'inactive'
+              ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
+              : user.status === 'suspended'
+              ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+          }`}
           title={user.status}
         >
           {getStatusIcon(user.status)}
@@ -211,7 +234,7 @@ export default function UsersTableRow({
           <DropdownMenuTrigger asChild>
             <Button 
               variant="ghost" 
-              className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900"
               onClick={(e) => e.stopPropagation()}
             >
               <span className="sr-only">Open menu</span>
@@ -220,15 +243,15 @@ export default function UsersTableRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem asChild>
-              <Link href={`/admin/users/${user.id}`} className="flex items-center cursor-pointer">
-                <Eye className="mr-2 h-4 w-4" />
+              <Link href={`/admin/users/${user.id}`} className="flex items-center gap-2 cursor-pointer">
+                <Eye className="h-4 w-4" />
                 <span>View Profile</span>
               </Link>
             </DropdownMenuItem>
             
             <DropdownMenuItem asChild>
-              <Link href={`/admin/users/${user.id}/edit`} className="flex items-center cursor-pointer">
-                <Edit className="mr-2 h-4 w-4" />
+              <Link href={`/admin/users/${user.id}/edit`} className="flex items-center gap-2 cursor-pointer">
+                <Edit className="h-4 w-4" />
                 <span>Edit User</span>
               </Link>
             </DropdownMenuItem>
@@ -236,36 +259,69 @@ export default function UsersTableRow({
             <DropdownMenuSeparator />
             
             <DropdownMenuItem 
-              onClick={() => handleCopyToClipboard(user.email, 'Email')}
-              className="flex items-center cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                handleCopyToClipboard(user.email, 'Email');
+              }}
+              className="flex items-center gap-2 cursor-pointer"
             >
-              <Copy className="mr-2 h-4 w-4" />
+              <Copy className="h-4 w-4" />
               <span>Copy Email</span>
             </DropdownMenuItem>
             
             <DropdownMenuItem 
-              onClick={() => handleCopyToClipboard(fullName, 'Name')}
-              className="flex items-center cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                handleCopyToClipboard(fullName, 'Name');
+              }}
+              className="flex items-center gap-2 cursor-pointer"
             >
-              <Copy className="mr-2 h-4 w-4" />
+              <Copy className="h-4 w-4" />
               <span>Copy Name</span>
             </DropdownMenuItem>
+
+            <DropdownMenuItem asChild>
+              <a 
+                href={`mailto:${user.email}`}
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Mail className="h-4 w-4" />
+                <span>Send Email</span>
+              </a>
+            </DropdownMenuItem>
+
+            {onSendMessage && (
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onSendMessage(user);
+                }}
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>Send Message</span>
+              </DropdownMenuItem>
+            )}
 
             {isBulkMode && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
-                  onClick={onSelect}
-                  className="flex items-center cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onSelect();
+                  }}
+                  className="flex items-center gap-2 cursor-pointer"
                 >
                   {isSelected ? (
                     <>
-                      <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
+                      <CheckSquare className="h-4 w-4 text-green-600" />
                       <span className="text-green-600">Deselect</span>
                     </>
                   ) : (
                     <>
-                      <Square className="mr-2 h-4 w-4" />
+                      <Square className="h-4 w-4" />
                       <span>Select for Bulk</span>
                     </>
                   )}
@@ -275,43 +331,40 @@ export default function UsersTableRow({
             
             <DropdownMenuSeparator />
             
-            {user.status === 'active' ? (
+            {onToggleStatus && (
               <DropdownMenuItem 
-                className="text-amber-600 focus:text-amber-700 focus:bg-amber-50"
-                onClick={() => {
-                  if (confirm(`Are you sure you want to deactivate ${fullName}?`)) {
-                    // Handle deactivate
-                  }
+                onClick={(e) => {
+                  e.preventDefault();
+                  onToggleStatus(user);
                 }}
+                className={`flex items-center gap-2 cursor-pointer ${
+                  user.status === 'active' 
+                    ? 'text-amber-600 dark:text-amber-400 focus:text-amber-700 dark:focus:text-amber-300 focus:bg-amber-50 dark:focus:bg-amber-950/30' 
+                    : 'text-green-600 dark:text-green-400 focus:text-green-700 dark:focus:text-green-300 focus:bg-green-50 dark:focus:bg-green-950/30'
+                }`}
               >
-                <Lock className="mr-2 h-4 w-4" />
-                <span>Deactivate User</span>
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem 
-                className="text-green-600 focus:text-green-700 focus:bg-green-50"
-                onClick={() => {
-                  if (confirm(`Are you sure you want to activate ${fullName}?`)) {
-                    // Handle activate
-                  }
-                }}
-              >
-                <Unlock className="mr-2 h-4 w-4" />
-                <span>Activate User</span>
+                {user.status === 'active' 
+                  ? <Lock className="h-4 w-4" /> 
+                  : <Unlock className="h-4 w-4" />
+                }
+                <span>{user.status === 'active' ? 'Deactivate User' : 'Activate User'}</span>
               </DropdownMenuItem>
             )}
             
-            <DropdownMenuItem 
-              className="text-red-600 focus:text-red-700 focus:bg-red-50"
-              onClick={() => {
-                if (confirm(`Are you sure you want to delete user ${fullName}?`)) {
-                  // Handle delete
-                }
-              }}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete User</span>
-            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            
+            {onDelete && (
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onDelete(user);
+                }}
+                className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/30"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete User</span>
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

@@ -1,43 +1,51 @@
 // components/admin/roles/RolesStats.tsx
-import { Card, CardContent } from '@/components/ui/card';
+import { StatCard } from '@/components/adminui/stats-grid';
 import { Shield, Users, Edit, Key } from 'lucide-react';
 
 interface RolesStatsProps {
-    stats: Array<{ label: string; value: string | number }>;
+    stats: {
+        total: number;
+        system: number;
+        custom: number;
+        users: number;
+    };
 }
 
 export default function RolesStats({ stats }: RolesStatsProps) {
-    const getIcon = (label: string) => {
-        if (label.toLowerCase().includes('system')) return <Shield className="h-6 w-6 text-purple-600 dark:text-purple-400" />;
-        if (label.toLowerCase().includes('custom')) return <Edit className="h-6 w-6 text-green-600 dark:text-green-400" />;
-        if (label.toLowerCase().includes('user')) return <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />;
-        return <Key className="h-6 w-6 text-gray-600 dark:text-gray-400" />;
-    };
-
-    const getBgColor = (label: string) => {
-        if (label.toLowerCase().includes('system')) return 'bg-purple-100 dark:bg-purple-900';
-        if (label.toLowerCase().includes('custom')) return 'bg-green-100 dark:bg-green-900';
-        if (label.toLowerCase().includes('user')) return 'bg-blue-100 dark:bg-blue-900';
-        return 'bg-gray-100 dark:bg-gray-900';
+    // Safe stats with fallbacks
+    const safeStats = {
+        total: stats?.total || 0,
+        system: stats?.system || 0,
+        custom: stats?.custom || 0,
+        users: stats?.users || 0
     };
 
     return (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat, index) => (
-                <Card key={index}>
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-500">{stat.label}</p>
-                                <p className="text-2xl font-bold">{stat.value}</p>
-                            </div>
-                            <div className={`h-12 w-12 rounded-full ${getBgColor(stat.label)} flex items-center justify-center`}>
-                                {getIcon(stat.label)}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            ))}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+                title="Total Roles"
+                value={safeStats.total.toLocaleString()}
+                icon={<Key className="h-4 w-4 text-blue-500" />}
+                description="All roles in the system"
+            />
+            <StatCard
+                title="System Roles"
+                value={safeStats.system.toLocaleString()}
+                icon={<Shield className="h-4 w-4 text-purple-500" />}
+                description="Predefined system roles"
+            />
+            <StatCard
+                title="Custom Roles"
+                value={safeStats.custom.toLocaleString()}
+                icon={<Edit className="h-4 w-4 text-green-500" />}
+                description="User-created custom roles"
+            />
+            <StatCard
+                title="Users with Roles"
+                value={safeStats.users.toLocaleString()}
+                icon={<Users className="h-4 w-4 text-amber-500" />}
+                description="Users assigned to roles"
+            />
         </div>
     );
 }

@@ -36,6 +36,7 @@ interface UsersFiltersProps {
   users: any;
   selectionMode: 'page' | 'filtered' | 'all';
   setSelectionMode: (mode: 'page' | 'filtered' | 'all') => void;
+  isLoading?: boolean;
 }
 
 export default function UsersFilters({
@@ -56,7 +57,8 @@ export default function UsersFilters({
   setIsSelectAll,
   users,
   selectionMode,
-  setSelectionMode
+  setSelectionMode,
+  isLoading = false
 }: UsersFiltersProps) {
   const [showSelectionOptions, setShowSelectionOptions] = useState(false);
   const selectionRef = useRef<HTMLDivElement>(null);
@@ -106,26 +108,28 @@ export default function UsersFilters({
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
       <CardContent className="pt-6">
         <div className="flex flex-col space-y-4">
           {/* Search Bar */}
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
               <Input
                 ref={searchInputRef}
                 placeholder="Search users by name, email, or role... (Ctrl+F)"
-                className="pl-10"
+                className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                disabled={isLoading}
               />
-              {search && (
+              {search && !isLoading && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                   onClick={() => setSearch('')}
+                  disabled={isLoading}
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -135,7 +139,8 @@ export default function UsersFilters({
               <Button 
                 variant="outline" 
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="h-9"
+                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                disabled={isLoading}
               >
                 <Filter className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">
@@ -147,8 +152,9 @@ export default function UsersFilters({
               </Button>
               <Button 
                 variant="outline"
-                className="h-9"
+                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={() => {/* handle export */}}
+                disabled={isLoading}
               >
                 <Download className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Export</span>
@@ -159,15 +165,16 @@ export default function UsersFilters({
           {/* Basic Filters */}
           <div className="flex flex-wrap gap-2 sm:gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500 hidden sm:inline">Role:</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Role:</span>
               <select
-                className="border rounded px-2 py-1 text-sm w-28 sm:w-auto"
+                className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
+                disabled={isLoading}
               >
-                <option value="all">All Roles</option>
+                <option value="all" className="bg-white dark:bg-gray-900">All Roles</option>
                 {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
+                  <option key={role.id} value={role.id} className="bg-white dark:bg-gray-900">
                     {truncateText(role.name, 15)}
                   </option>
                 ))}
@@ -175,40 +182,42 @@ export default function UsersFilters({
             </div>
             
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500 hidden sm:inline">Status:</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Status:</span>
               <select
-                className="border rounded px-2 py-1 text-sm w-28 sm:w-auto"
+                className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
+                disabled={isLoading}
               >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="suspended">Suspended</option>
-                <option value="pending">Pending</option>
+                <option value="all" className="bg-white dark:bg-gray-900">All Status</option>
+                <option value="active" className="bg-white dark:bg-gray-900">Active</option>
+                <option value="inactive" className="bg-white dark:bg-gray-900">Inactive</option>
+                <option value="suspended" className="bg-white dark:bg-gray-900">Suspended</option>
+                <option value="pending" className="bg-white dark:bg-gray-900">Pending</option>
               </select>
             </div>
 
             {isBulkMode && (
-              <div className="flex items-center gap-2" ref={selectionRef}>
+              <div className="flex items-center gap-2 relative" ref={selectionRef}>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowSelectionOptions(!showSelectionOptions)}
-                  className="h-8"
+                  className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  disabled={isLoading}
                 >
                   <Layers className="h-3.5 w-3.5 mr-1" />
                   Select
                 </Button>
                 {showSelectionOptions && (
-                  <div className="absolute right-0 top-full mt-1 z-50 w-48 bg-white dark:bg-gray-800 border rounded-md shadow-lg">
+                  <div className="absolute right-0 top-full mt-1 z-50 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
                     <div className="p-2">
                       <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">
                         SELECTION OPTIONS
                       </div>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start h-8 text-sm"
+                        className="w-full justify-start h-8 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         onClick={handleSelectAllOnPage}
                       >
                         <Rows className="h-3.5 w-3.5 mr-2" />
@@ -216,7 +225,7 @@ export default function UsersFilters({
                       </Button>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start h-8 text-sm"
+                        className="w-full justify-start h-8 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         onClick={handleSelectAllFiltered}
                       >
                         <Filter className="h-3.5 w-3.5 mr-2" />
@@ -224,16 +233,16 @@ export default function UsersFilters({
                       </Button>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start h-8 text-sm"
+                        className="w-full justify-start h-8 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         onClick={handleSelectAll}
                       >
                         <Hash className="h-3.5 w-3.5 mr-2" />
                         All ({users.total})
                       </Button>
-                      <div className="border-t my-1"></div>
+                      <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700"
+                        className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50"
                         onClick={() => setSelectedUsers([])}
                       >
                         <RotateCcw className="h-3.5 w-3.5 mr-2" />
@@ -248,23 +257,25 @@ export default function UsersFilters({
 
           {/* Advanced Filters */}
           {showAdvancedFilters && (
-            <div className="border-t pt-4 space-y-4">
+            <div className="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* 2FA Filter */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Two-Factor Authentication</label>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Two-Factor Authentication</label>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8"
+                      className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      disabled={isLoading}
                     >
                       2FA Enabled
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8"
+                      className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      disabled={isLoading}
                     >
                       2FA Disabled
                     </Button>
@@ -273,18 +284,19 @@ export default function UsersFilters({
 
                 {/* Department Filter */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Department</label>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
                   <select
-                    className="w-full border rounded px-2 py-1 text-sm"
+                    className="w-full border rounded px-2 py-1 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                     onChange={(e) => {}}
+                    disabled={isLoading}
                   >
-                    <option value="all">All Departments</option>
-                    <option value="Barangay Office">Barangay Office</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Registry">Registry</option>
-                    <option value="Services">Services</option>
-                    <option value="Planning">Planning</option>
-                    <option value="Internal Audit">Internal Audit</option>
+                    <option value="all" className="bg-white dark:bg-gray-900">All Departments</option>
+                    <option value="Barangay Office" className="bg-white dark:bg-gray-900">Barangay Office</option>
+                    <option value="Finance" className="bg-white dark:bg-gray-900">Finance</option>
+                    <option value="Registry" className="bg-white dark:bg-gray-900">Registry</option>
+                    <option value="Services" className="bg-white dark:bg-gray-900">Services</option>
+                    <option value="Planning" className="bg-white dark:bg-gray-900">Planning</option>
+                    <option value="Internal Audit" className="bg-white dark:bg-gray-900">Internal Audit</option>
                   </select>
                 </div>
               </div>
@@ -293,9 +305,11 @@ export default function UsersFilters({
 
           {/* Active filters indicator */}
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               Showing {users.from} to {users.to} of {users.total} users
               {search && ` matching "${search}"`}
+              {roleFilter !== 'all' && ` • Role: ${roles.find(r => r.id.toString() === roleFilter)?.name || ''}`}
+              {statusFilter !== 'all' && ` • Status: ${statusFilter}`}
             </div>
             
             <div className="flex items-center gap-3">
@@ -304,7 +318,8 @@ export default function UsersFilters({
                   variant="ghost"
                   size="sm"
                   onClick={handleClearFilters}
-                  className="text-red-600 hover:text-red-700 h-8"
+                  disabled={isLoading}
+                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 h-8"
                 >
                   <FilterX className="h-3.5 w-3.5 mr-1" />
                   Clear Filters
@@ -312,6 +327,13 @@ export default function UsersFilters({
               )}
             </div>
           </div>
+
+          {/* Loading indicator */}
+          {isLoading && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 animate-pulse">
+              Updating...
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

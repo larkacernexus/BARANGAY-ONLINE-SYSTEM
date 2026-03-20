@@ -92,7 +92,7 @@ export function FilePreviewComponent({ file }: FilePreviewProps) {
       >
         <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 p-4">
           <div className="text-center max-w-xs sm:max-w-sm">
-            <div className="inline-block p-6 sm:p-8 rounded-full bg-gray-800 border-4 border-gray-700 shadow-2xl mb-6 sm:mb-8">
+            <div className="inline-block p-6 sm:p-8 rounded-full bg-gray-900 border-4 border-gray-700 shadow-2xl mb-6 sm:mb-8">
               <FileIcon className="h-20 w-20 sm:h-24 sm:w-24 text-gray-300" />
             </div>
             
@@ -106,7 +106,7 @@ export function FilePreviewComponent({ file }: FilePreviewProps) {
               </div>
               
               <div className="flex flex-wrap justify-center gap-2">
-                <Badge variant="secondary" className="px-3 py-1 text-xs bg-gray-800 text-gray-300">
+                <Badge variant="secondary" className="px-3 py-1 text-xs bg-gray-900 text-gray-300">
                   {file.name.split('.').pop()?.toUpperCase() || 'FILE'}
                 </Badge>
                 <Badge variant="outline" className="px-3 py-1 text-xs border-gray-700 text-gray-300">
@@ -124,7 +124,7 @@ export function FilePreviewComponent({ file }: FilePreviewProps) {
                 }}
                 size="sm"
                 variant="outline"
-                className="w-full py-2 text-sm border-gray-700 text-white hover:bg-gray-800"
+                className="w-full py-2 text-sm border-gray-700 text-white hover:bg-gray-900"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open File
@@ -142,7 +142,7 @@ export function FilePreviewComponent({ file }: FilePreviewProps) {
                 }}
                 size="sm"
                 variant="outline"
-                className="w-full py-2 text-sm border-gray-700 text-white hover:bg-gray-800"
+                className="w-full py-2 text-sm border-gray-700 text-white hover:bg-gray-900"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download

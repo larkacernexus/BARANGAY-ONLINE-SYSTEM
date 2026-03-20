@@ -49,7 +49,7 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
                 <CardContent className="p-4 lg:p-6">
                     <h3 className="font-medium mb-4 text-lg">Report Summary</h3>
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                             <span className="text-gray-600 dark:text-gray-400">Type</span>
                             <div className="flex items-center gap-2">
                                 {selectedType && (() => {
@@ -59,21 +59,21 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
                                 <span className="font-medium">{selectedType?.name}</span>
                             </div>
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                             <span className="text-gray-600 dark:text-gray-400">Title</span>
                             <span className="font-medium">{data.title}</span>
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                             <span className="text-gray-600 dark:text-gray-400">Location</span>
                             <span className="font-medium">{data.location}</span>
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                             <span className="text-gray-600 dark:text-gray-400">Date & Time</span>
                             <span className="font-medium">
                                 {data.incident_date} {data.incident_time && 'at'} {data.incident_time}
                             </span>
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                             <span className="text-gray-600 dark:text-gray-400">Urgency</span>
                             <Badge 
                                 variant="outline"
@@ -86,13 +86,13 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
                                 {data.urgency.charAt(0).toUpperCase() + data.urgency.slice(1)}
                             </Badge>
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                             <span className="text-gray-600 dark:text-gray-400">Attachments</span>
                             <span className="font-medium">
                                 {totalFiles} files
                             </span>
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                             <span className="text-gray-600 dark:text-gray-400">Reported By</span>
                             <div className="flex items-center gap-2">
                                 <span className="font-medium">
@@ -107,13 +107,13 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
                             </div>
                         </div>
                         {!anonymous && data.reporter_contact && (
-                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                 <span className="text-gray-600 dark:text-gray-400">Contact</span>
                                 <span className="font-medium">{data.reporter_contact}</span>
                             </div>
                         )}
                         {currentDraftId && (
-                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                                 <span className="text-gray-600 dark:text-gray-400">Draft Status</span>
                                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                                     <Save className="h-3 w-3 mr-1" />

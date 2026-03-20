@@ -263,19 +263,19 @@ export default function FeeDetails() {
                                 iconColor="from-blue-500 to-blue-600"
                             >
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                         <p className="text-xs text-gray-500">Fee Code</p>
                                         <p className="font-medium text-sm mt-1">{fee.fee_code}</p>
                                     </div>
-                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                         <p className="text-xs text-gray-500">Type</p>
                                         <p className="font-medium text-sm mt-1">{fee.fee_type?.name || 'N/A'}</p>
                                     </div>
-                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                         <p className="text-xs text-gray-500">Issue Date</p>
                                         <p className="font-medium text-sm mt-1">{fee.formatted_issue_date}</p>
                                     </div>
-                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                         <p className="text-xs text-gray-500">Due Date</p>
                                         <div className="font-medium text-sm mt-1">
                                             {fee.formatted_due_date}
@@ -288,7 +288,7 @@ export default function FeeDetails() {
                                     </div>
                                     {fee.billing_period && (
                                         <div className="col-span-1 sm:col-span-2">
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500">Billing Period</p>
                                                 <p className="font-medium text-sm mt-1">{fee.billing_period}</p>
                                             </div>
@@ -297,7 +297,7 @@ export default function FeeDetails() {
                                 </div>
                                 
                                 {fee.remarks && (
-                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 mt-2">
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50 mt-2">
                                         <p className="text-xs text-gray-500 mb-1">Remarks</p>
                                         <p className="text-sm">{fee.remarks}</p>
                                     </div>
@@ -311,26 +311,26 @@ export default function FeeDetails() {
                                 iconColor="from-green-500 to-green-600"
                             >
                                 <div className="space-y-3">
-                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                         <p className="text-xs text-gray-500 mb-1">Name</p>
                                         <p className="font-medium">{fee.payer_name}</p>
                                         {fee.payer_type === 'resident' && fee.is_own_fee && (
                                             <span className="text-xs text-blue-600 mt-1 block">(You)</span>
                                         )}
                                     </div>
-                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                         <p className="text-xs text-gray-500 mb-1">Address</p>
                                         <p className="font-medium">{fee.address}</p>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {fee.purok && (
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500">Purok</p>
                                                 <p className="font-medium text-sm mt-1">{fee.purok}</p>
                                             </div>
                                         )}
                                         {fee.zone && (
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500">Zone</p>
                                                 <p className="font-medium text-sm mt-1">{fee.zone}</p>
                                             </div>
@@ -349,7 +349,7 @@ export default function FeeDetails() {
                                 iconColor="from-purple-500 to-purple-600"
                             >
                                 <div className="space-y-3">
-                                    <div className="flex justify-between items-center p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                    <div className="flex justify-between items-center p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                         <span className="text-sm text-gray-600">Base Amount</span>
                                         <span className="font-medium">{fee.formatted_base_amount}</span>
                                     </div>
@@ -376,7 +376,7 @@ export default function FeeDetails() {
                                     )}
                                     
                                     <div className="border-t pt-3 mt-3">
-                                        <div className="flex justify-between items-center p-3 rounded-lg bg-gray-100 dark:bg-gray-800">
+                                        <div className="flex justify-between items-center p-3 rounded-lg bg-gray-100 dark:bg-gray-900">
                                             <span className="font-semibold">Total Amount</span>
                                             <span className="text-xl font-bold">{fee.formatted_total}</span>
                                         </div>
@@ -406,35 +406,35 @@ export default function FeeDetails() {
                                 >
                                     <div className="space-y-3">
                                         {fee.business_name && (
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500">Business Name</p>
                                                 <p className="font-medium text-sm mt-1">{fee.business_name}</p>
                                             </div>
                                         )}
                                         
                                         {fee.business_type && (
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500">Business Type</p>
                                                 <p className="font-medium text-sm mt-1">{fee.business_type}</p>
                                             </div>
                                         )}
                                         
                                         {fee.property_description && (
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500">Property Description</p>
                                                 <p className="font-medium text-sm mt-1">{fee.property_description}</p>
                                             </div>
                                         )}
                                         
                                         {fee.area && (
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500">Area</p>
                                                 <p className="font-medium text-sm mt-1">{fee.area.toLocaleString()} sq.m.</p>
                                             </div>
                                         )}
                                         
                                         {fee.valid_from && fee.valid_until && (
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500">Validity Period</p>
                                                 <p className="font-medium text-sm mt-1">
                                                     {fee.formatted_valid_from} to {fee.formatted_valid_until}
@@ -443,21 +443,21 @@ export default function FeeDetails() {
                                         )}
                                         
                                         {fee.certificate_number && (
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500">Certificate Number</p>
                                                 <p className="font-medium font-mono text-sm mt-1">{fee.certificate_number}</p>
                                             </div>
                                         )}
                                         
                                         {fee.or_number && (
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500">Official Receipt</p>
                                                 <p className="font-medium font-mono text-sm mt-1">{fee.or_number}</p>
                                             </div>
                                         )}
                                         
                                         {requirements.length > 0 && (
-                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                 <p className="text-xs text-gray-500 mb-2">Requirements Submitted</p>
                                                 <ul className="space-y-1">
                                                     {requirements.map((req, index) => (
@@ -497,7 +497,7 @@ export default function FeeDetails() {
                                 <div className="overflow-x-auto">
                                     <Table>
                                         <TableHeader>
-                                            <TableRow className="bg-gray-50 dark:bg-gray-800/50">
+                                            <TableRow className="bg-gray-50 dark:bg-gray-900/50">
                                                 <TableHead className="font-semibold">Date</TableHead>
                                                 <TableHead className="font-semibold">OR Number</TableHead>
                                                 <TableHead className="font-semibold">Amount</TableHead>
@@ -507,7 +507,7 @@ export default function FeeDetails() {
                                         </TableHeader>
                                         <TableBody>
                                             {paymentHistory.map((payment, index) => (
-                                                <TableRow key={`${payment.or_number}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                                <TableRow key={`${payment.or_number}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
                                                     <TableCell className="font-medium">
                                                         {formatDate(payment.date)}
                                                     </TableCell>

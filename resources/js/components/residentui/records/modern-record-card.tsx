@@ -48,7 +48,7 @@ export const ModernRecordCard = ({
             <div className="flex items-start gap-3">
                 <div className={cn(
                     "p-2 rounded-full flex-shrink-0",
-                    category?.color ? BG_COLOR_MAP[category.color] : 'bg-gray-100 dark:bg-gray-800'
+                    category?.color ? BG_COLOR_MAP[category.color] : 'bg-gray-100 dark:bg-gray-900'
                 )}>
                     <DocIconComponent className={`h-4 w-4 ${categoryColor}`} />
                 </div>

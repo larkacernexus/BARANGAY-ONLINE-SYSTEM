@@ -653,7 +653,7 @@ export default function ReportTypeEdit() {
                                 size="icon"
                                 onClick={handleCancel}
                                 type="button"
-                                className="h-8 w-8"
+                                className="h-8 w-8 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
                             >
                                 <ArrowLeft className="h-4 w-4" />
                             </Button>
@@ -665,8 +665,8 @@ export default function ReportTypeEdit() {
                                     {React.createElement(getIconComponent(formData.icon), { className: "h-5 w-5" })}
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl font-bold tracking-tight">Edit Report Type</h1>
-                                    <p className="text-sm text-muted-foreground">
+                                    <h1 className="text-2xl font-bold tracking-tight dark:text-white">Edit Report Type</h1>
+                                    <p className="text-sm text-muted-foreground dark:text-gray-400">
                                         Update the details for "{reportType.name}"
                                     </p>
                                 </div>
@@ -680,6 +680,7 @@ export default function ReportTypeEdit() {
                                 onClick={() => router.visit(route('admin.report-types.show', reportType.id))}
                                 disabled={isSubmitting}
                                 type="button"
+                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                             >
                                 <Eye className="h-4 w-4 mr-2" />
                                 View
@@ -690,6 +691,7 @@ export default function ReportTypeEdit() {
                                 onClick={() => setShowHistory(true)}
                                 disabled={isSubmitting}
                                 type="button"
+                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                             >
                                 <History className="h-4 w-4 mr-2" />
                                 History
@@ -700,6 +702,7 @@ export default function ReportTypeEdit() {
                                 onClick={handleCancel}
                                 disabled={isSubmitting}
                                 type="button"
+                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                             >
                                 <X className="h-4 w-4 mr-2" />
                                 Cancel
@@ -709,7 +712,7 @@ export default function ReportTypeEdit() {
                                 form="report-type-form"
                                 size="sm"
                                 disabled={isSubmitting}
-                                className="gap-2 min-w-[100px]"
+                                className="gap-2 min-w-[100px] dark:bg-blue-600 dark:hover:bg-blue-700"
                             >
                                 {isSubmitting ? (
                                     <div className="flex items-center gap-2">
@@ -729,18 +732,18 @@ export default function ReportTypeEdit() {
                     {/* Progress Bar */}
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                            <span>Form Completion</span>
-                            <span className="font-medium">{formProgress}%</span>
+                            <span className="dark:text-gray-300">Form Completion</span>
+                            <span className="font-medium dark:text-white">{formProgress}%</span>
                         </div>
-                        <Progress value={formProgress} className="h-2" />
+                        <Progress value={formProgress} className="h-2 dark:bg-gray-700" />
                     </div>
 
                     {/* Status Alert */}
                     {!reportType.is_active && (
-                        <Alert variant="destructive">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>Report Type is Inactive</AlertTitle>
-                            <AlertDescription>
+                        <Alert variant="destructive" className="dark:bg-red-950 dark:border-red-800">
+                            <AlertCircle className="h-4 w-4 dark:text-red-400" />
+                            <AlertTitle className="dark:text-red-300">Report Type is Inactive</AlertTitle>
+                            <AlertDescription className="dark:text-red-400">
                                 This report type is currently inactive and won't be available for submission.
                                 Toggle the active status to enable it.
                             </AlertDescription>
@@ -758,34 +761,34 @@ export default function ReportTypeEdit() {
                         }}
                     >
                         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                            <TabsList className="grid w-full grid-cols-4 lg:w-auto">
-                                <TabsTrigger value="basic" className="gap-2" type="button">
+                            <TabsList className="grid w-full grid-cols-4 lg:w-auto ">
+                                <TabsTrigger value="basic" className="gap-2 " type="button">
                                     <FileText className="h-4 w-4" />
                                     <span className="hidden sm:inline">Basic Info</span>
                                 </TabsTrigger>
-                                <TabsTrigger value="fields" className="gap-2" type="button">
+                                <TabsTrigger value="fields" className="gap-2 " type="button">
                                     <ListChecks className="h-4 w-4" />
                                     <span className="hidden sm:inline">Required Fields</span>
                                     {formData.required_fields.length > 0 && (
-                                        <Badge variant="secondary" className="ml-1">
+                                        <Badge variant="secondary" className="ml-1 dark:bg-gray-700 dark:text-gray-300">
                                             {formData.required_fields.length}
                                         </Badge>
                                     )}
                                 </TabsTrigger>
-                                <TabsTrigger value="steps" className="gap-2" type="button">
+                                <TabsTrigger value="steps" className="gap-2 " type="button">
                                     <Activity className="h-4 w-4" />
                                     <span className="hidden sm:inline">Resolution Steps</span>
                                     {formData.resolution_steps.length > 0 && (
-                                        <Badge variant="secondary" className="ml-1">
+                                        <Badge variant="secondary" className="ml-1 dark:bg-gray-700 dark:text-gray-300">
                                             {formData.resolution_steps.length}
                                         </Badge>
                                     )}
                                 </TabsTrigger>
-                                <TabsTrigger value="settings" className="gap-2" type="button">
+                                <TabsTrigger value="settings" className="gap-2 " type="button">
                                     <Settings className="h-4 w-4" />
                                     <span className="hidden sm:inline">Settings</span>
                                     {formData.assigned_to_roles.length > 0 && (
-                                        <Badge variant="secondary" className="ml-1">
+                                        <Badge variant="secondary" className="ml-1 dark:bg-gray-700 dark:text-gray-300">
                                             {formData.assigned_to_roles.length}
                                         </Badge>
                                     )}
@@ -794,10 +797,10 @@ export default function ReportTypeEdit() {
 
                             {/* Basic Information Tab */}
                             <TabsContent value="basic" className="space-y-4">
-                                <Card>
+                                <Card className="dark:bg-gray-900 dark:border-gray-700">
                                     <CardHeader>
-                                        <CardTitle>Basic Information</CardTitle>
-                                        <CardDescription>
+                                        <CardTitle className="dark:text-white">Basic Information</CardTitle>
+                                        <CardDescription className="dark:text-gray-400">
                                             Edit the basic details for this report type
                                         </CardDescription>
                                     </CardHeader>
@@ -805,21 +808,23 @@ export default function ReportTypeEdit() {
                                         {/* Code and Name */}
                                         <div className="grid gap-6 md:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label htmlFor="code" className="flex items-center gap-1">
+                                                <Label htmlFor="code" className="flex items-center gap-1 dark:text-gray-300">
                                                     Code
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p>Unique identifier (uppercase letters, numbers, underscores)</p>
-                                                            {codeManuallyEdited && (
-                                                                <p className="text-xs text-yellow-600 mt-1">
-                                                                    Auto-generation disabled (manual edit detected)
-                                                                </p>
-                                                            )}
-                                                        </TooltipContent>
-                                                    </Tooltip>
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <HelpCircle className="h-4 w-4 text-muted-foreground dark:text-gray-500 cursor-help" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                                <p className="dark:text-gray-300">Unique identifier (uppercase letters, numbers, underscores)</p>
+                                                                {codeManuallyEdited && (
+                                                                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                                                                        Auto-generation disabled (manual edit detected)
+                                                                    </p>
+                                                                )}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
                                                 </Label>
                                                 <div className="flex gap-2">
                                                     <Input
@@ -828,7 +833,7 @@ export default function ReportTypeEdit() {
                                                         value={formData.code}
                                                         onChange={handleCodeEdit}
                                                         placeholder="e.g., NOISE_COMPLAINT"
-                                                        className={`${errors.code ? 'border-destructive' : ''} ${codeManuallyEdited ? 'border-yellow-500' : ''}`}
+                                                        className={`${errors.code ? 'border-destructive dark:border-red-800' : ''} ${codeManuallyEdited ? 'border-yellow-500 dark:border-yellow-600' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                                         disabled={isSubmitting}
                                                         ref={codeInputRef}
                                                     />
@@ -839,6 +844,7 @@ export default function ReportTypeEdit() {
                                                         onClick={generateCode}
                                                         disabled={!formData.name || isSubmitting}
                                                         title="Generate from name"
+                                                        className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                                     >
                                                         <Sparkles className="h-4 w-4" />
                                                     </Button>
@@ -850,36 +856,36 @@ export default function ReportTypeEdit() {
                                                             onClick={resetAutoGenerate}
                                                             disabled={isSubmitting}
                                                             title="Re-enable auto-generation"
-                                                            className="text-yellow-600 hover:text-yellow-700"
+                                                            className="text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300"
                                                         >
                                                             <RefreshCw className="h-4 w-4" />
                                                         </Button>
                                                     )}
                                                 </div>
                                                 {errors.code && (
-                                                    <p className="text-sm text-destructive">{errors.code}</p>
+                                                    <p className="text-sm text-destructive dark:text-red-400">{errors.code}</p>
                                                 )}
                                                 {codeManuallyEdited && !errors.code && (
-                                                    <p className="text-xs text-yellow-600">
+                                                    <p className="text-xs text-yellow-600 dark:text-yellow-400">
                                                         Manual edit - auto-generation disabled
                                                     </p>
                                                 )}
                                             </div>
 
                                             <div className="space-y-2">
-                                                <Label htmlFor="name">Name</Label>
+                                                <Label htmlFor="name" className="dark:text-gray-300">Name</Label>
                                                 <Input
                                                     id="name"
                                                     name="name"
                                                     value={formData.name}
                                                     onChange={handleNameEdit}
                                                     placeholder="e.g., Noise Complaint"
-                                                    className={errors.name ? 'border-destructive' : ''}
+                                                    className={`${errors.name ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                                     disabled={isSubmitting}
                                                     ref={nameInputRef}
                                                 />
                                                 {errors.name && (
-                                                    <p className="text-sm text-destructive">{errors.name}</p>
+                                                    <p className="text-sm text-destructive dark:text-red-400">{errors.name}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -887,18 +893,18 @@ export default function ReportTypeEdit() {
                                         {/* Category and Subcategory */}
                                         <div className="grid gap-6 md:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label htmlFor="category">Category</Label>
+                                                <Label htmlFor="category" className="dark:text-gray-300">Category</Label>
                                                 <Select
                                                     value={formData.category}
                                                     onValueChange={(value) => handleSelectChange('category', value)}
                                                     disabled={isSubmitting}
                                                 >
-                                                    <SelectTrigger className={errors.category ? 'border-destructive' : ''}>
+                                                    <SelectTrigger className={`${errors.category ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
                                                         <SelectValue placeholder="Select a category" />
                                                     </SelectTrigger>
-                                                    <SelectContent>
+                                                    <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                         {categoryOptionsArray.map((option) => (
-                                                            <SelectItem key={option.value} value={option.value}>
+                                                            <SelectItem key={option.value} value={option.value} className="dark:text-white dark:focus:bg-gray-700">
                                                                 {option.label}
                                                             </SelectItem>
                                                         ))}
@@ -907,13 +913,14 @@ export default function ReportTypeEdit() {
                                             </div>
 
                                             <div className="space-y-2">
-                                                <Label htmlFor="subcategory">Subcategory (Optional)</Label>
+                                                <Label htmlFor="subcategory" className="dark:text-gray-300">Subcategory (Optional)</Label>
                                                 <Input
                                                     id="subcategory"
                                                     name="subcategory"
                                                     value={formData.subcategory}
                                                     onChange={handleInputChange}
                                                     placeholder="e.g., neighbor, animals, parking"
+                                                    className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                     disabled={isSubmitting}
                                                 />
                                             </div>
@@ -921,7 +928,7 @@ export default function ReportTypeEdit() {
 
                                         {/* Description */}
                                         <div className="space-y-2">
-                                            <Label htmlFor="description">Description</Label>
+                                            <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
                                             <Textarea
                                                 id="description"
                                                 name="description"
@@ -929,6 +936,7 @@ export default function ReportTypeEdit() {
                                                 onChange={handleInputChange}
                                                 placeholder="Enter a description for this report type"
                                                 rows={4}
+                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                 disabled={isSubmitting}
                                             />
                                         </div>
@@ -936,12 +944,12 @@ export default function ReportTypeEdit() {
                                         {/* Icon and Color */}
                                         <div className="grid gap-6 md:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label htmlFor="icon">Icon</Label>
+                                                <Label htmlFor="icon" className="dark:text-gray-300">Icon</Label>
                                                 <div className="relative">
                                                     <Button
                                                         type="button"
                                                         variant="outline"
-                                                        className="w-full justify-start gap-2 h-10"
+                                                        className="w-full justify-start gap-2 h-10 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                                         onClick={() => setShowIconPicker(!showIconPicker)}
                                                     >
                                                         {selectedIcon && (
@@ -963,13 +971,13 @@ export default function ReportTypeEdit() {
                                                     </Button>
 
                                                     {showIconPicker && (
-                                                        <Card className="absolute z-50 mt-1 w-full max-h-[400px] overflow-hidden">
-                                                            <div className="p-2 border-b">
+                                                        <Card className="absolute z-50 mt-1 w-full max-h-[400px] overflow-hidden dark:bg-gray-900 dark:border-gray-700">
+                                                            <div className="p-2 border-b dark:border-gray-700">
                                                                 <Input
                                                                     placeholder="Search icons..."
                                                                     value={searchIconTerm}
                                                                     onChange={(e) => setSearchIconTerm(e.target.value)}
-                                                                    className="h-8"
+                                                                    className="h-8 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                                 />
                                                             </div>
                                                             <ScrollArea className="h-[300px]">
@@ -980,8 +988,8 @@ export default function ReportTypeEdit() {
                                                                             type="button"
                                                                             variant="ghost"
                                                                             size="sm"
-                                                                            className={`h-auto py-2 flex-col gap-1 ${
-                                                                                selectedIcon === icon.value ? 'bg-primary/10 border-primary' : ''
+                                                                            className={`h-auto py-2 flex-col gap-1 dark:hover:bg-gray-700 ${
+                                                                                selectedIcon === icon.value ? 'bg-primary/10 border-primary dark:bg-primary/20' : ''
                                                                             }`}
                                                                             onClick={() => {
                                                                                 handleSelectChange('icon', icon.value);
@@ -991,7 +999,7 @@ export default function ReportTypeEdit() {
                                                                             }}
                                                                         >
                                                                             <icon.icon className="h-5 w-5" />
-                                                                            <span className="text-[10px] text-center line-clamp-2">
+                                                                            <span className="text-[10px] text-center line-clamp-2 dark:text-gray-400">
                                                                                 {icon.label}
                                                                             </span>
                                                                         </Button>
@@ -1004,7 +1012,7 @@ export default function ReportTypeEdit() {
                                             </div>
 
                                             <div className="space-y-2">
-                                                <Label htmlFor="color">Color</Label>
+                                                <Label htmlFor="color" className="dark:text-gray-300">Color</Label>
                                                 <div className="flex gap-2">
                                                     <Input
                                                         id="color"
@@ -1012,28 +1020,30 @@ export default function ReportTypeEdit() {
                                                         type="color"
                                                         value={formData.color}
                                                         onChange={handleInputChange}
-                                                        className="w-20 h-10 p-1"
+                                                        className="w-20 h-10 p-1 dark:bg-gray-900 dark:border-gray-700"
                                                         disabled={isSubmitting}
                                                     />
                                                     <div className="flex-1 grid grid-cols-6 gap-1">
                                                         {colorPresets.map((color) => (
-                                                            <Tooltip key={color}>
-                                                                <TooltipTrigger asChild>
-                                                                    <button
-                                                                        type="button"
-                                                                        className="w-8 h-8 rounded-full border-2 transition-all hover:scale-110"
-                                                                        style={{ 
-                                                                            backgroundColor: color,
-                                                                            borderColor: formData.color === color ? '#000' : 'transparent'
-                                                                        }}
-                                                                        onClick={() => handleSelectChange('color', color)}
-                                                                        disabled={isSubmitting}
-                                                                    />
-                                                                </TooltipTrigger>
-                                                                <TooltipContent side="bottom">
-                                                                    <p>{color}</p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
+                                                            <TooltipProvider key={color}>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <button
+                                                                            type="button"
+                                                                            className="w-8 h-8 rounded-full border-2 transition-all hover:scale-110"
+                                                                            style={{ 
+                                                                                backgroundColor: color,
+                                                                                borderColor: formData.color === color ? '#000' : 'transparent'
+                                                                            }}
+                                                                            onClick={() => handleSelectChange('color', color)}
+                                                                            disabled={isSubmitting}
+                                                                        />
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent side="bottom" className="dark:bg-gray-900 dark:border-gray-700">
+                                                                        <p className="dark:text-gray-300">{color}</p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -1043,18 +1053,18 @@ export default function ReportTypeEdit() {
                                         {/* Priority and Resolution */}
                                         <div className="grid gap-6 md:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label htmlFor="priority_level">Priority Level</Label>
+                                                <Label htmlFor="priority_level" className="dark:text-gray-300">Priority Level</Label>
                                                 <Select
                                                     value={formData.priority_level.toString()}
                                                     onValueChange={(value) => handleNumberChange('priority_level', value)}
                                                     disabled={isSubmitting}
                                                 >
-                                                    <SelectTrigger className={errors.priority_level ? 'border-destructive' : ''}>
+                                                    <SelectTrigger className={`${errors.priority_level ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
                                                         <SelectValue placeholder="Select priority level" />
                                                     </SelectTrigger>
-                                                    <SelectContent>
+                                                    <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                         {Object.entries(priorityOptions).map(([value, label]) => (
-                                                            <SelectItem key={value} value={value}>
+                                                            <SelectItem key={value} value={value} className="dark:text-white dark:focus:bg-gray-700">
                                                                 <div className="flex items-center gap-2">
                                                                     {value === '1' && <Zap className="h-4 w-4 text-red-500" />}
                                                                     {value === '2' && <AlertTriangle className="h-4 w-4 text-orange-500" />}
@@ -1067,12 +1077,12 @@ export default function ReportTypeEdit() {
                                                     </SelectContent>
                                                 </Select>
                                                 {errors.priority_level && (
-                                                    <p className="text-sm text-destructive">{errors.priority_level}</p>
+                                                    <p className="text-sm text-destructive dark:text-red-400">{errors.priority_level}</p>
                                                 )}
                                             </div>
 
                                             <div className="space-y-2">
-                                                <Label htmlFor="resolution_days">Resolution Days</Label>
+                                                <Label htmlFor="resolution_days" className="dark:text-gray-300">Resolution Days</Label>
                                                 <Input
                                                     id="resolution_days"
                                                     name="resolution_days"
@@ -1081,11 +1091,11 @@ export default function ReportTypeEdit() {
                                                     max="365"
                                                     value={formData.resolution_days}
                                                     onChange={(e) => handleNumberChange('resolution_days', e.target.value)}
-                                                    className={errors.resolution_days ? 'border-destructive' : ''}
+                                                    className={`${errors.resolution_days ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                                     disabled={isSubmitting}
                                                 />
                                                 {errors.resolution_days && (
-                                                    <p className="text-sm text-destructive">{errors.resolution_days}</p>
+                                                    <p className="text-sm text-destructive dark:text-red-400">{errors.resolution_days}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -1095,12 +1105,12 @@ export default function ReportTypeEdit() {
 
                             {/* Required Fields Tab */}
                             <TabsContent value="fields" className="space-y-4">
-                                <Card>
+                                <Card className="dark:bg-gray-900 dark:border-gray-700">
                                     <CardHeader>
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <CardTitle>Required Fields</CardTitle>
-                                                <CardDescription>
+                                                <CardTitle className="dark:text-white">Required Fields</CardTitle>
+                                                <CardDescription className="dark:text-gray-400">
                                                     Configure the fields required for this report type
                                                 </CardDescription>
                                             </div>
@@ -1121,6 +1131,7 @@ export default function ReportTypeEdit() {
                                                     setShowCustomFieldForm(true);
                                                 }}
                                                 disabled={isSubmitting}
+                                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                             >
                                                 <Plus className="h-4 w-4 mr-2" />
                                                 Add Field
@@ -1130,29 +1141,31 @@ export default function ReportTypeEdit() {
                                     <CardContent className="space-y-4">
                                         {/* Custom Field Form */}
                                         {showCustomFieldForm && (
-                                            <Card className="border border-primary/20 bg-primary/5">
+                                            <Card className="border border-primary/20 bg-primary/5 dark:bg-primary/10">
                                                 <CardContent className="pt-6 space-y-4">
                                                     <div className="grid gap-4 md:grid-cols-2">
                                                         <div className="space-y-2">
-                                                            <Label htmlFor="field_key">Field Key *</Label>
+                                                            <Label htmlFor="field_key" className="dark:text-gray-300">Field Key *</Label>
                                                             <Input
                                                                 id="field_key"
                                                                 value={newField.key}
                                                                 onChange={(e) => setNewField({ ...newField, key: e.target.value })}
                                                                 placeholder="e.g., complainant_name"
+                                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                                 disabled={isSubmitting}
                                                             />
-                                                            <p className="text-xs text-muted-foreground">
+                                                            <p className="text-xs text-muted-foreground dark:text-gray-400">
                                                                 Unique identifier (lowercase, underscores)
                                                             </p>
                                                         </div>
                                                         <div className="space-y-2">
-                                                            <Label htmlFor="field_label">Field Label *</Label>
+                                                            <Label htmlFor="field_label" className="dark:text-gray-300">Field Label *</Label>
                                                             <Input
                                                                 id="field_label"
                                                                 value={newField.label}
                                                                 onChange={(e) => setNewField({ ...newField, label: e.target.value })}
                                                                 placeholder="e.g., Full Name"
+                                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                                 disabled={isSubmitting}
                                                             />
                                                         </div>
@@ -1160,18 +1173,18 @@ export default function ReportTypeEdit() {
 
                                                     <div className="grid gap-4 md:grid-cols-2">
                                                         <div className="space-y-2">
-                                                            <Label htmlFor="field_type">Field Type</Label>
+                                                            <Label htmlFor="field_type" className="dark:text-gray-300">Field Type</Label>
                                                             <Select
                                                                 value={newField.type}
                                                                 onValueChange={(value) => setNewField({ ...newField, type: value })}
                                                                 disabled={isSubmitting}
                                                             >
-                                                                <SelectTrigger>
+                                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
                                                                     <SelectValue placeholder="Select field type" />
                                                                 </SelectTrigger>
-                                                                <SelectContent>
+                                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                                     {Object.entries(fieldTypes).map(([value, label]) => (
-                                                                        <SelectItem key={value} value={value}>
+                                                                        <SelectItem key={value} value={value} className="dark:text-white dark:focus:bg-gray-700">
                                                                             {label}
                                                                         </SelectItem>
                                                                     ))}
@@ -1180,12 +1193,13 @@ export default function ReportTypeEdit() {
                                                         </div>
 
                                                         <div className="space-y-2">
-                                                            <Label htmlFor="field_placeholder">Placeholder (Optional)</Label>
+                                                            <Label htmlFor="field_placeholder" className="dark:text-gray-300">Placeholder (Optional)</Label>
                                                             <Input
                                                                 id="field_placeholder"
                                                                 value={newField.placeholder || ''}
                                                                 onChange={(e) => setNewField({ ...newField, placeholder: e.target.value })}
                                                                 placeholder="Enter placeholder text"
+                                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                                 disabled={isSubmitting}
                                                             />
                                                         </div>
@@ -1194,12 +1208,13 @@ export default function ReportTypeEdit() {
                                                     {/* Options for select/radio fields */}
                                                     {(newField.type === 'select' || newField.type === 'radio') && (
                                                         <div className="space-y-2">
-                                                            <Label>Options</Label>
+                                                            <Label className="dark:text-gray-300">Options</Label>
                                                             <div className="flex gap-2">
                                                                 <Input
                                                                     value={newOption}
                                                                     onChange={(e) => setNewOption(e.target.value)}
                                                                     placeholder="Add an option"
+                                                                    className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                                     disabled={isSubmitting}
                                                                 />
                                                                 <Button
@@ -1208,6 +1223,7 @@ export default function ReportTypeEdit() {
                                                                     size="sm"
                                                                     onClick={addOption}
                                                                     disabled={!newOption.trim() || isSubmitting}
+                                                                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                                                 >
                                                                     Add
                                                                 </Button>
@@ -1215,12 +1231,12 @@ export default function ReportTypeEdit() {
                                                             {newField.options && newField.options.length > 0 && (
                                                                 <div className="flex flex-wrap gap-2 mt-2">
                                                                     {newField.options.map((opt, idx) => (
-                                                                        <Badge key={idx} variant="secondary" className="gap-1">
+                                                                        <Badge key={idx} variant="secondary" className="gap-1 dark:bg-gray-700 dark:text-gray-300">
                                                                             {opt}
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => removeOption(idx)}
-                                                                                className="ml-1 hover:text-destructive"
+                                                                                className="ml-1 hover:text-destructive dark:hover:text-red-400"
                                                                             >
                                                                                 <X className="h-3 w-3" />
                                                                             </button>
@@ -1234,7 +1250,7 @@ export default function ReportTypeEdit() {
                                                     {/* Rows for textarea */}
                                                     {newField.type === 'textarea' && (
                                                         <div className="space-y-2">
-                                                            <Label htmlFor="field_rows">Rows</Label>
+                                                            <Label htmlFor="field_rows" className="dark:text-gray-300">Rows</Label>
                                                             <Input
                                                                 id="field_rows"
                                                                 type="number"
@@ -1242,6 +1258,7 @@ export default function ReportTypeEdit() {
                                                                 max="10"
                                                                 value={newField.rows || 4}
                                                                 onChange={(e) => setNewField({ ...newField, rows: parseInt(e.target.value) || 4 })}
+                                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                                 disabled={isSubmitting}
                                                             />
                                                         </div>
@@ -1253,8 +1270,9 @@ export default function ReportTypeEdit() {
                                                                 checked={newField.required}
                                                                 onCheckedChange={(checked) => setNewField({ ...newField, required: checked })}
                                                                 disabled={isSubmitting}
+                                                                className="dark:data-[state=checked]:bg-blue-600"
                                                             />
-                                                            <Label>Required field</Label>
+                                                            <Label className="dark:text-gray-300">Required field</Label>
                                                         </div>
                                                         <div className="flex gap-2">
                                                             <Button
@@ -1266,6 +1284,7 @@ export default function ReportTypeEdit() {
                                                                     setEditingFieldIndex(null);
                                                                 }}
                                                                 disabled={isSubmitting}
+                                                                className="dark:text-gray-400 dark:hover:text-white"
                                                             >
                                                                 Cancel
                                                             </Button>
@@ -1275,6 +1294,7 @@ export default function ReportTypeEdit() {
                                                                 size="sm"
                                                                 onClick={editingFieldIndex !== null ? updateRequiredField : addRequiredField}
                                                                 disabled={isSubmitting}
+                                                                className="dark:bg-blue-600 dark:hover:bg-blue-700"
                                                             >
                                                                 {editingFieldIndex !== null ? 'Update' : 'Add'} Field
                                                             </Button>
@@ -1288,22 +1308,22 @@ export default function ReportTypeEdit() {
                                         {formData.required_fields.length > 0 ? (
                                             <div className="space-y-2">
                                                 {formData.required_fields.map((field, index) => (
-                                                    <Card key={index} className="border border-muted hover:border-primary/20 transition-colors">
+                                                    <Card key={index} className="border border-muted hover:border-primary/20 transition-colors dark:bg-gray-900 dark:border-gray-700">
                                                         <CardContent className="p-4">
                                                             <div className="flex items-start justify-between">
                                                                 <div className="flex-1">
                                                                     <div className="flex items-center gap-2 flex-wrap">
-                                                                        <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                                                                        <span className="font-medium">{field.label}</span>
+                                                                        <GripVertical className="h-4 w-4 text-muted-foreground dark:text-gray-500 cursor-move" />
+                                                                        <span className="font-medium dark:text-white">{field.label}</span>
                                                                         {field.required && (
-                                                                            <Badge variant="destructive" className="text-xs">Required</Badge>
+                                                                            <Badge variant="destructive" className="text-xs dark:bg-red-900 dark:text-red-200">Required</Badge>
                                                                         )}
-                                                                        <Badge variant="outline" className="text-xs">
+                                                                        <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">
                                                                             {field.type}
                                                                         </Badge>
                                                                     </div>
-                                                                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground ml-6">
-                                                                        <code className="px-1 py-0.5 bg-muted rounded">
+                                                                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground dark:text-gray-400 ml-6">
+                                                                        <code className="px-1 py-0.5 bg-muted rounded dark:bg-gray-700 dark:text-gray-300">
                                                                             {field.key}
                                                                         </code>
                                                                         {field.placeholder && (
@@ -1316,7 +1336,7 @@ export default function ReportTypeEdit() {
                                                                     {field.options && field.options.length > 0 && (
                                                                         <div className="flex flex-wrap gap-1 mt-2 ml-6">
                                                                             {field.options.map((opt, optIdx) => (
-                                                                                <Badge key={optIdx} variant="secondary" className="text-xs">
+                                                                                <Badge key={optIdx} variant="secondary" className="text-xs dark:bg-gray-700 dark:text-gray-300">
                                                                                     {opt}
                                                                                 </Badge>
                                                                             ))}
@@ -1328,7 +1348,7 @@ export default function ReportTypeEdit() {
                                                                         type="button"
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        className="h-8 w-8"
+                                                                        className="h-8 w-8 dark:text-gray-400 dark:hover:text-white"
                                                                         onClick={() => moveFieldUp(index)}
                                                                         disabled={index === 0 || isSubmitting}
                                                                         title="Move up"
@@ -1339,7 +1359,7 @@ export default function ReportTypeEdit() {
                                                                         type="button"
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        className="h-8 w-8"
+                                                                        className="h-8 w-8 dark:text-gray-400 dark:hover:text-white"
                                                                         onClick={() => moveFieldDown(index)}
                                                                         disabled={index === formData.required_fields.length - 1 || isSubmitting}
                                                                         title="Move down"
@@ -1350,7 +1370,7 @@ export default function ReportTypeEdit() {
                                                                         type="button"
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        className="h-8 w-8"
+                                                                        className="h-8 w-8 dark:text-gray-400 dark:hover:text-white"
                                                                         onClick={() => editRequiredField(index)}
                                                                         disabled={isSubmitting}
                                                                         title="Edit field"
@@ -1361,7 +1381,7 @@ export default function ReportTypeEdit() {
                                                                         type="button"
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        className="h-8 w-8 text-destructive hover:text-destructive"
+                                                                        className="h-8 w-8 text-destructive hover:text-destructive dark:text-red-400 dark:hover:text-red-300"
                                                                         onClick={() => removeRequiredField(index)}
                                                                         disabled={isSubmitting}
                                                                         title="Remove field"
@@ -1375,12 +1395,12 @@ export default function ReportTypeEdit() {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                                                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
+                                            <div className="text-center py-12 border-2 border-dashed rounded-lg dark:border-gray-700">
+                                                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-900 mb-4">
                                                     <ListChecks className="h-6 w-6 text-gray-600 dark:text-gray-400" />
                                                 </div>
-                                                <h3 className="text-lg font-semibold mb-2">No Custom Fields</h3>
-                                                <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                                                <h3 className="text-lg font-semibold mb-2 dark:text-white">No Custom Fields</h3>
+                                                <p className="text-sm text-muted-foreground dark:text-gray-400 mb-4 max-w-md mx-auto">
                                                     This report type will use default fields. Add custom fields to collect specific information.
                                                 </p>
                                                 <Button
@@ -1397,6 +1417,7 @@ export default function ReportTypeEdit() {
                                                         });
                                                         setShowCustomFieldForm(true);
                                                     }}
+                                                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                                 >
                                                     <Plus className="h-4 w-4 mr-2" />
                                                     Add Your First Field
@@ -1409,12 +1430,12 @@ export default function ReportTypeEdit() {
 
                             {/* Resolution Steps Tab */}
                             <TabsContent value="steps" className="space-y-4">
-                                <Card>
+                                <Card className="dark:bg-gray-900 dark:border-gray-700">
                                     <CardHeader>
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <CardTitle>Resolution Steps</CardTitle>
-                                                <CardDescription>
+                                                <CardTitle className="dark:text-white">Resolution Steps</CardTitle>
+                                                <CardDescription className="dark:text-gray-400">
                                                     Define the steps to resolve this type of report
                                                 </CardDescription>
                                             </div>
@@ -1424,6 +1445,7 @@ export default function ReportTypeEdit() {
                                                 size="sm"
                                                 onClick={addResolutionStep}
                                                 disabled={isSubmitting}
+                                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                             >
                                                 <Plus className="h-4 w-4 mr-2" />
                                                 Add Step
@@ -1434,11 +1456,11 @@ export default function ReportTypeEdit() {
                                         {formData.resolution_steps.length > 0 ? (
                                             <div className="space-y-4">
                                                 {formData.resolution_steps.map((step, index) => (
-                                                    <Card key={index} className="border border-muted hover:border-primary/20 transition-colors">
+                                                    <Card key={index} className="border border-muted hover:border-primary/20 transition-colors dark:bg-gray-900 dark:border-gray-700">
                                                         <CardContent className="p-4">
                                                             <div className="flex items-start gap-4">
-                                                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                                    <span className="text-sm font-bold text-primary">{step.step}</span>
+                                                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center dark:bg-primary/20">
+                                                                    <span className="text-sm font-bold text-primary dark:text-primary-400">{step.step}</span>
                                                                 </div>
                                                                 <div className="flex-1 space-y-2">
                                                                     <Input
@@ -1446,7 +1468,7 @@ export default function ReportTypeEdit() {
                                                                         onChange={(e) => updateResolutionStep(index, 'action', e.target.value)}
                                                                         placeholder="Action title (e.g., 'Initial Assessment')"
                                                                         disabled={isSubmitting}
-                                                                        className="font-medium"
+                                                                        className="font-medium dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                                     />
                                                                     <Textarea
                                                                         value={step.description}
@@ -1454,13 +1476,14 @@ export default function ReportTypeEdit() {
                                                                         placeholder="Step description - explain what happens in this step"
                                                                         rows={2}
                                                                         disabled={isSubmitting}
+                                                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                                     />
                                                                 </div>
                                                                 <Button
                                                                     type="button"
                                                                     variant="ghost"
                                                                     size="icon"
-                                                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                                                    className="h-8 w-8 text-destructive hover:text-destructive dark:text-red-400 dark:hover:text-red-300"
                                                                     onClick={() => removeResolutionStep(index)}
                                                                     disabled={isSubmitting}
                                                                     title="Remove step"
@@ -1473,18 +1496,19 @@ export default function ReportTypeEdit() {
                                                 ))}
                                             </div>
                                         ) : (
-                                            <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                                                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
+                                            <div className="text-center py-12 border-2 border-dashed rounded-lg dark:border-gray-700">
+                                                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-900 mb-4">
                                                     <Activity className="h-6 w-6 text-gray-600 dark:text-gray-400" />
                                                 </div>
-                                                <h3 className="text-lg font-semibold mb-2">No Resolution Steps</h3>
-                                                <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+                                                <h3 className="text-lg font-semibold mb-2 dark:text-white">No Resolution Steps</h3>
+                                                <p className="text-sm text-muted-foreground dark:text-gray-400 mb-4 max-w-md mx-auto">
                                                     Add steps to define how this report type should be resolved from submission to closure.
                                                 </p>
                                                 <Button
                                                     type="button"
                                                     variant="outline"
                                                     onClick={addResolutionStep}
+                                                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                                 >
                                                     <Plus className="h-4 w-4 mr-2" />
                                                     Add First Step
@@ -1497,23 +1521,23 @@ export default function ReportTypeEdit() {
 
                             {/* Settings Tab */}
                             <TabsContent value="settings" className="space-y-4">
-                                <Card>
+                                <Card className="dark:bg-gray-900 dark:border-gray-700">
                                     <CardHeader>
-                                        <CardTitle>Report Type Settings</CardTitle>
-                                        <CardDescription>
+                                        <CardTitle className="dark:text-white">Report Type Settings</CardTitle>
+                                        <CardDescription className="dark:text-gray-400">
                                             Configure behavior and permissions
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent className="space-y-6">
                                         {/* Toggle Switches */}
                                         <div className="space-y-6">
-                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors dark:border-gray-700 dark:hover:bg-gray-700/50">
                                                 <div className="space-y-0.5">
                                                     <div className="flex items-center gap-2">
-                                                        <CheckCircle className="h-5 w-5 text-green-500" />
-                                                        <Label className="text-base">Active Status</Label>
+                                                        <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400" />
+                                                        <Label className="text-base dark:text-white">Active Status</Label>
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground">
+                                                    <p className="text-sm text-muted-foreground dark:text-gray-400">
                                                         Enable this report type for submission
                                                     </p>
                                                 </div>
@@ -1521,16 +1545,17 @@ export default function ReportTypeEdit() {
                                                     checked={formData.is_active}
                                                     onCheckedChange={(checked) => handleSwitchChange('is_active', checked)}
                                                     disabled={isSubmitting}
+                                                    className="dark:data-[state=checked]:bg-blue-600"
                                                 />
                                             </div>
 
-                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors dark:border-gray-700 dark:hover:bg-gray-700/50">
                                                 <div className="space-y-0.5">
                                                     <div className="flex items-center gap-2">
-                                                        <Zap className="h-5 w-5 text-orange-500" />
-                                                        <Label className="text-base">Requires Immediate Action</Label>
+                                                        <Zap className="h-5 w-5 text-orange-500 dark:text-orange-400" />
+                                                        <Label className="text-base dark:text-white">Requires Immediate Action</Label>
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground">
+                                                    <p className="text-sm text-muted-foreground dark:text-gray-400">
                                                         Mark this report type as high priority requiring immediate response
                                                     </p>
                                                 </div>
@@ -1538,16 +1563,17 @@ export default function ReportTypeEdit() {
                                                     checked={formData.requires_immediate_action}
                                                     onCheckedChange={(checked) => handleSwitchChange('requires_immediate_action', checked)}
                                                     disabled={isSubmitting}
+                                                    className="dark:data-[state=checked]:bg-blue-600"
                                                 />
                                             </div>
 
-                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors dark:border-gray-700 dark:hover:bg-gray-700/50">
                                                 <div className="space-y-0.5">
                                                     <div className="flex items-center gap-2">
-                                                        <Camera className="h-5 w-5 text-blue-500" />
-                                                        <Label className="text-base">Requires Evidence</Label>
+                                                        <Camera className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+                                                        <Label className="text-base dark:text-white">Requires Evidence</Label>
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground">
+                                                    <p className="text-sm text-muted-foreground dark:text-gray-400">
                                                         Require photo/video evidence when submitting reports
                                                     </p>
                                                 </div>
@@ -1555,16 +1581,17 @@ export default function ReportTypeEdit() {
                                                     checked={formData.requires_evidence}
                                                     onCheckedChange={(checked) => handleSwitchChange('requires_evidence', checked)}
                                                     disabled={isSubmitting}
+                                                    className="dark:data-[state=checked]:bg-blue-600"
                                                 />
                                             </div>
 
-                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors dark:border-gray-700 dark:hover:bg-gray-700/50">
                                                 <div className="space-y-0.5">
                                                     <div className="flex items-center gap-2">
-                                                        <EyeOff className="h-5 w-5 text-purple-500" />
-                                                        <Label className="text-base">Allows Anonymous Reports</Label>
+                                                        <EyeOff className="h-5 w-5 text-purple-500 dark:text-purple-400" />
+                                                        <Label className="text-base dark:text-white">Allows Anonymous Reports</Label>
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground">
+                                                    <p className="text-sm text-muted-foreground dark:text-gray-400">
                                                         Allow residents to submit reports anonymously
                                                     </p>
                                                 </div>
@@ -1572,19 +1599,20 @@ export default function ReportTypeEdit() {
                                                     checked={formData.allows_anonymous}
                                                     onCheckedChange={(checked) => handleSwitchChange('allows_anonymous', checked)}
                                                     disabled={isSubmitting}
+                                                    className="dark:data-[state=checked]:bg-blue-600"
                                                 />
                                             </div>
                                         </div>
 
-                                        <Separator />
+                                        <Separator className="dark:bg-gray-700" />
 
                                         {/* Assigned Roles */}
                                         <div className="space-y-4">
                                             <div className="flex items-center gap-2">
-                                                <Users className="h-5 w-5" />
-                                                <Label className="text-base">Assigned Roles</Label>
+                                                <Users className="h-5 w-5 dark:text-gray-300" />
+                                                <Label className="text-base dark:text-white">Assigned Roles</Label>
                                             </div>
-                                            <p className="text-sm text-muted-foreground">
+                                            <p className="text-sm text-muted-foreground dark:text-gray-400">
                                                 Select which personnel roles should handle this type of report
                                             </p>
                                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -1596,7 +1624,11 @@ export default function ReportTypeEdit() {
                                                         size="sm"
                                                         onClick={() => toggleRole(value)}
                                                         disabled={isSubmitting}
-                                                        className="justify-start h-auto py-2 px-3"
+                                                        className={`justify-start h-auto py-2 px-3 ${
+                                                            formData.assigned_to_roles.includes(value) 
+                                                                ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
+                                                                : 'dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600'
+                                                        }`}
                                                     >
                                                         <Users className="h-4 w-4 mr-2 flex-shrink-0" />
                                                         <span className="text-sm truncate">{label}</span>
@@ -1607,26 +1639,26 @@ export default function ReportTypeEdit() {
                                                 ))}
                                             </div>
                                             {formData.assigned_to_roles.length === 0 && (
-                                                <p className="text-sm text-muted-foreground text-center py-4 border rounded-lg bg-muted/50">
+                                                <p className="text-sm text-muted-foreground dark:text-gray-400 text-center py-4 border rounded-lg bg-muted/50 dark:bg-gray-900/50 dark:border-gray-700">
                                                     No roles selected. This report type will use default assignment.
                                                 </p>
                                             )}
                                         </div>
 
-                                        <Separator />
+                                        <Separator className="dark:bg-gray-700" />
 
                                         {/* Danger Zone */}
                                         <div className="space-y-4">
-                                            <Label className="text-destructive">Danger Zone</Label>
-                                            <div className="flex items-center justify-between p-4 border border-destructive/20 rounded-lg bg-destructive/5">
+                                            <Label className="text-destructive dark:text-red-400">Danger Zone</Label>
+                                            <div className="flex items-center justify-between p-4 border border-destructive/20 rounded-lg bg-destructive/5 dark:border-red-900 dark:bg-red-950/20">
                                                 <div className="flex items-start gap-3">
-                                                    <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                                                    <AlertCircle className="h-5 w-5 text-destructive dark:text-red-400 mt-0.5" />
                                                     <div>
-                                                        <p className="text-sm font-medium">Delete Report Type</p>
-                                                        <p className="text-xs text-muted-foreground">
+                                                        <p className="text-sm font-medium dark:text-gray-300">Delete Report Type</p>
+                                                        <p className="text-xs text-muted-foreground dark:text-gray-400">
                                                             Once deleted, this action cannot be undone.
                                                             {reportType.community_reports_count > 0 && (
-                                                                <span className="text-destructive block mt-1">
+                                                                <span className="text-destructive dark:text-red-400 block mt-1">
                                                                     Has {reportType.community_reports_count} associated report(s). Cannot delete.
                                                                 </span>
                                                             )}
@@ -1639,6 +1671,7 @@ export default function ReportTypeEdit() {
                                                     size="sm"
                                                     onClick={() => setShowDeleteDialog(true)}
                                                     disabled={isSubmitting || reportType.community_reports_count > 0}
+                                                    className="dark:bg-red-900 dark:hover:bg-red-800"
                                                 >
                                                     <Trash2 className="h-4 w-4 mr-2" />
                                                     Delete
@@ -1652,9 +1685,9 @@ export default function ReportTypeEdit() {
                     </form>
 
                     {/* Form Tips */}
-                    <Card className="bg-muted/50">
+                    <Card className="bg-muted/50 dark:bg-gray-900/50 dark:border-gray-700">
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2 dark:text-gray-300">
                                 <HelpCircle className="h-4 w-4" />
                                 Form Tips
                             </CardTitle>
@@ -1662,35 +1695,35 @@ export default function ReportTypeEdit() {
                         <CardContent>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                                 <div className="flex items-start gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-xs font-bold text-primary">1</span>
+                                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5 dark:bg-primary/20">
+                                        <span className="text-xs font-bold text-primary dark:text-primary-400">1</span>
                                     </div>
-                                    <p className="text-muted-foreground">
-                                        <span className="font-medium text-foreground">Code:</span> Auto-generated from name, but you can edit it manually
+                                    <p className="text-muted-foreground dark:text-gray-400">
+                                        <span className="font-medium text-foreground dark:text-white">Code:</span> Auto-generated from name, but you can edit it manually
                                     </p>
                                 </div>
                                 <div className="flex items-start gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-xs font-bold text-primary">2</span>
+                                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5 dark:bg-primary/20">
+                                        <span className="text-xs font-bold text-primary dark:text-primary-400">2</span>
                                     </div>
-                                    <p className="text-muted-foreground">
-                                        <span className="font-medium text-foreground">Priority Level:</span> 1=Critical, 2=High, 3=Medium, 4=Low
+                                    <p className="text-muted-foreground dark:text-gray-400">
+                                        <span className="font-medium text-foreground dark:text-white">Priority Level:</span> 1=Critical, 2=High, 3=Medium, 4=Low
                                     </p>
                                 </div>
                                 <div className="flex items-start gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-xs font-bold text-primary">3</span>
+                                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5 dark:bg-primary/20">
+                                        <span className="text-xs font-bold text-primary dark:text-primary-400">3</span>
                                     </div>
-                                    <p className="text-muted-foreground">
-                                        <span className="font-medium text-foreground">Required Fields:</span> Add custom fields specific to this report type
+                                    <p className="text-muted-foreground dark:text-gray-400">
+                                        <span className="font-medium text-foreground dark:text-white">Required Fields:</span> Add custom fields specific to this report type
                                     </p>
                                 </div>
                                 <div className="flex items-start gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-xs font-bold text-primary">4</span>
+                                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5 dark:bg-primary/20">
+                                        <span className="text-xs font-bold text-primary dark:text-primary-400">4</span>
                                     </div>
-                                    <p className="text-muted-foreground">
-                                        <span className="font-medium text-foreground">Resolution Steps:</span> Define the process from submission to closure
+                                    <p className="text-muted-foreground dark:text-gray-400">
+                                        <span className="font-medium text-foreground dark:text-white">Resolution Steps:</span> Define the process from submission to closure
                                     </p>
                                 </div>
                             </div>
@@ -1701,16 +1734,16 @@ export default function ReportTypeEdit() {
 
             {/* Delete Confirmation Dialog */}
             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <DialogContent>
+                <DialogContent className="dark:bg-gray-900 dark:border-gray-700">
                     <DialogHeader>
-                        <DialogTitle>Delete Report Type</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle className="dark:text-white">Delete Report Type</DialogTitle>
+                        <DialogDescription className="dark:text-gray-400">
                             Are you sure you want to delete "{reportType.name}"? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     {reportType.community_reports_count > 0 && (
-                        <div className="bg-destructive/10 p-3 rounded-lg">
-                            <p className="text-sm text-destructive">
+                        <div className="bg-destructive/10 p-3 rounded-lg dark:bg-red-950/30">
+                            <p className="text-sm text-destructive dark:text-red-400">
                                 <AlertCircle className="h-4 w-4 inline mr-1" />
                                 This report type has {reportType.community_reports_count} associated report(s). 
                                 You cannot delete it while reports exist.
@@ -1722,6 +1755,7 @@ export default function ReportTypeEdit() {
                             variant="outline"
                             onClick={() => setShowDeleteDialog(false)}
                             disabled={isSubmitting}
+                            className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                         >
                             Cancel
                         </Button>
@@ -1729,6 +1763,7 @@ export default function ReportTypeEdit() {
                             variant="destructive"
                             onClick={handleDelete}
                             disabled={isSubmitting || reportType.community_reports_count > 0}
+                            className="dark:bg-red-900 dark:hover:bg-red-800"
                         >
                             {isSubmitting ? 'Deleting...' : 'Delete'}
                         </Button>
@@ -1738,41 +1773,41 @@ export default function ReportTypeEdit() {
 
             {/* History Dialog */}
             <Dialog open={showHistory} onOpenChange={setShowHistory}>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[425px] dark:bg-gray-900 dark:border-gray-700">
                     <DialogHeader>
-                        <DialogTitle>Report Type History</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle className="dark:text-white">Report Type History</DialogTitle>
+                        <DialogDescription className="dark:text-gray-400">
                             Creation and modification details
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
-                            <p className="text-sm font-medium">Created</p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm font-medium dark:text-gray-300">Created</p>
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">
                                 {formatDate(reportType.created_at)}
                             </p>
                         </div>
                         <div className="space-y-2">
-                            <p className="text-sm font-medium">Last Updated</p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm font-medium dark:text-gray-300">Last Updated</p>
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">
                                 {formatDate(reportType.updated_at)}
                             </p>
                         </div>
                         <div className="space-y-2">
-                            <p className="text-sm font-medium">ID</p>
-                            <p className="text-sm font-mono text-muted-foreground">
+                            <p className="text-sm font-medium dark:text-gray-300">ID</p>
+                            <p className="text-sm font-mono text-muted-foreground dark:text-gray-400">
                                 {reportType.id}
                             </p>
                         </div>
                         <div className="space-y-2">
-                            <p className="text-sm font-medium">Total Reports</p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm font-medium dark:text-gray-300">Total Reports</p>
+                            <p className="text-sm text-muted-foreground dark:text-gray-400">
                                 {reportType.community_reports_count}
                             </p>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button onClick={() => setShowHistory(false)} type="button">Close</Button>
+                        <Button onClick={() => setShowHistory(false)} type="button" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">Close</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

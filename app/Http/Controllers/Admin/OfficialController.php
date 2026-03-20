@@ -9,14 +9,13 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Position;
 use App\Models\Committee;
-use App\Models\HouseholdMember;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class OfficialController extends Controller
 {
@@ -25,51 +24,79 @@ class OfficialController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Official::with(['resident' => function ($q) {
-            // FIXED: Remove 'user_id' from select - residents table doesn't have it
-            $q->select('id', 'first_name', 'last_name', 'middle_name', 'age', 'gender', 'contact_number', 'photo_path');
-        }]);
+        $query = Official::with([
+            'resident' => function ($q) {
+                $q->select('id', 'first_name', 'last_name', 'middle_name', 'age', 'gender', 'contact_number', 'photo_path');
+            },
+            'positionData',
+            'committeeData',
+            'user'
+        ]);
 
-        // Apply filters
+        // Apply search filter
         if ($request->has('search') && $request->search) {
-            $query->whereHas('resident', function ($q) use ($request) {
-                $q->where('first_name', 'like', '%' . $request->search . '%')
-                  ->orWhere('last_name', 'like', '%' . $request->search . '%')
-                  ->orWhere('middle_name', 'like', '%' . $request->search . '%');
-            })
-            ->orWhere('position', 'like', '%' . $request->search . '%')
-            ->orWhere('committee', 'like', '%' . $request->search . '%');
+            $query->search($request->search);
         }
 
+        // Apply status filter
         if ($request->has('status') && $request->status !== 'all') {
             if ($request->status === 'current') {
-                $query->current();  
+                $query->current();
             } else {
                 $query->where('status', $request->status);
             }
         }
 
+        // Apply position filter
         if ($request->has('position') && $request->position !== 'all') {
-            $query->where('position', $request->position);
+            $position = Position::where('code', $request->position)->first();
+            if ($position) {
+                $query->where('position_id', $position->id);
+            }
         }
 
+        // Apply committee filter
         if ($request->has('committee') && $request->committee !== 'all') {
-            $query->where('committee', $request->committee);
+            $committee = Committee::where('code', $request->committee)->first();
+            if ($committee) {
+                $query->where('committee_id', $committee->id);
+            }
         }
 
+        // Apply type filter
         if ($request->has('type') && $request->type !== 'all') {
-            $query->where('is_regular', $request->type === 'regular');
+            if ($request->type === 'regular') {
+                $query->where('is_regular', true);
+            } else if ($request->type === 'ex_officio') {
+                $query->where('is_regular', false);
+            }
         }
 
         // Apply sorting
         $sortBy = $request->get('sort_by', 'order');
         $sortOrder = $request->get('sort_order', 'asc');
-        $query->orderBy($sortBy, $sortOrder);
+        
+        if ($sortBy === 'position') {
+            $query->join('positions', 'officials.position_id', '=', 'positions.id')
+                  ->orderBy('positions.order', $sortOrder)
+                  ->select('officials.*');
+        } else if ($sortBy === 'name') {
+            $query->join('residents', 'officials.resident_id', '=', 'residents.id')
+                  ->orderBy('residents.last_name', $sortOrder)
+                  ->orderBy('residents.first_name', $sortOrder)
+                  ->select('officials.*');
+        } else if ($sortBy === 'committee') {
+            $query->leftJoin('committees', 'officials.committee_id', '=', 'committees.id')
+                  ->orderBy('committees.name', $sortOrder)
+                  ->select('officials.*');
+        } else {
+            $query->orderBy($sortBy, $sortOrder);
+        }
 
         // Get paginated results
         $officials = $query->paginate($request->get('per_page', 15))->withQueryString();
 
-        // Get positions for filter dropdown - format as object
+        // Get positions for filter dropdown
         $positions = Position::active()
             ->ordered()
             ->get()
@@ -77,7 +104,7 @@ class OfficialController extends Controller
                 return [$position->code => ['name' => $position->name, 'order' => $position->order]];
             });
 
-        // Get committees from model
+        // Get committees for filter dropdown
         $committees = Committee::active()
             ->ordered()
             ->get()
@@ -89,12 +116,13 @@ class OfficialController extends Controller
         $stats = [
             'total' => Official::count(),
             'active' => Official::where('status', 'active')->count(),
+            'inactive' => Official::where('status', 'inactive')->count(),
             'current' => Official::current()->count(),
             'former' => Official::where('status', 'former')->count(),
             'regular' => Official::where('is_regular', true)->count(),
             'ex_officio' => Official::where('is_regular', false)->count(),
             'by_position' => Position::active()->get()->mapWithKeys(function ($position) {
-                return [$position->code => Official::where('position', $position->code)->count()];
+                return [$position->code => Official::where('position_id', $position->id)->count()];
             })->toArray(),
         ];
 
@@ -114,18 +142,130 @@ class OfficialController extends Controller
             'typeOptions' => [
                 ['value' => 'all', 'label' => 'All Types'],
                 ['value' => 'regular', 'label' => 'Regular Officials'],
-                ['value' => 'ex_officio', 'label' => 'Ex-Officio'],
+                ['value' => 'ex_officio', 'label' => 'Ex-Officio Officials'],
             ],
         ]);
     }
+
+    /**
+ * End an official's term (make former)
+ */
+public function endTerm(Request $request, Official $official)
+{
+    Log::info('Ending term for official', [
+        'official_id' => $official->id,
+        'current_status' => $official->status,
+        'current_term_end' => $official->term_end
+    ]);
+
+    try {
+        // Validate that the official exists and is active
+        if ($official->status !== 'active') {
+            return redirect()->back()->with('error', 'Only active officials can have their term ended.');
+        }
+
+        // Get today's date
+        $today = now()->format('Y-m-d');
+        
+        // Allow ending term on the same day it starts (>= instead of >)
+        if ($official->term_start > $today) {
+            return redirect()->back()->with('error', 'Cannot end term before it starts.');
+        }
+
+        // Start transaction
+        DB::beginTransaction();
+        
+        // Update the official
+        $official->update([
+            'term_end' => $today,
+            'status' => 'former'
+        ]);
+
+        // Handle user account if needed
+        if ($official->user_id) {
+            $this->handleReplacedOfficial($official->resident, $official);
+        }
+
+        DB::commit();
+
+        Log::info('Term ended successfully', [
+            'official_id' => $official->id,
+            'new_status' => $official->status,
+            'new_term_end' => $official->term_end
+        ]);
+
+        return redirect()->back()->with('success', 'Term ended successfully. Official marked as former.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        
+        Log::error('Failed to end term', [
+            'official_id' => $official->id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return redirect()->back()->with('error', 'Failed to end term: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Reactivate a former official
+ */
+public function reactivate(Request $request, Official $official)
+{
+    Log::info('Reactivating official', [
+        'official_id' => $official->id,
+        'current_status' => $official->status
+    ]);
+
+    try {
+        // Validate that the official is former
+        if ($official->status !== 'former') {
+            return redirect()->back()->with('error', 'Only former officials can be reactivated.');
+        }
+
+        // Set new term end date (3 years from now)
+        $newTermEnd = now()->addYears(3)->format('Y-m-d');
+
+        DB::beginTransaction();
+
+        // Update the official
+        $official->update([
+            'term_end' => $newTermEnd,
+            'status' => 'active'
+        ]);
+
+        DB::commit();
+
+        Log::info('Official reactivated successfully', [
+            'official_id' => $official->id,
+            'new_status' => $official->status,
+            'new_term_end' => $official->term_end
+        ]);
+
+        return redirect()->back()->with('success', 'Official reactivated successfully.');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        
+        Log::error('Failed to reactivate official', [
+            'official_id' => $official->id,
+            'error' => $e->getMessage()
+        ]);
+
+        return redirect()->back()->with('error', 'Failed to reactivate: ' . $e->getMessage());
+    }
+}
 
     /**
      * Show the form for creating a new resource.
      */
     public function create()
     {
-        // Get residents who are not currently officials (active)
+        // Get residents who are not currently officials
         $availableResidents = Resident::whereDoesntHave('officials', function ($query) {
+            $query->whereIn('status', ['active', 'inactive']);
         })
         ->where('status', 'active')
         ->select('id', 'first_name', 'last_name', 'middle_name', 'age', 'gender', 
@@ -135,14 +275,51 @@ class OfficialController extends Controller
         ->orderBy('last_name')
         ->get();
 
+        // GET POSITION ACCOUNTS - Users that belong to positions
+        $positionUsers = User::with(['resident' => function($q) {
+                $q->select('id', 'first_name', 'last_name', 'middle_name', 'suffix');
+            }, 'role:id,name'])
+            ->where('status', 'active')
+            ->whereIn('role_id', Position::active()->pluck('role_id')->unique())
+            ->select('id', 'username', 'email', 'role_id', 'resident_id', 'status', 'position')
+            ->orderBy('username')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'email' => $user->email,
+                    'role_id' => $user->role_id,
+                    'resident_id' => $user->resident_id,
+                    'status' => $user->status,
+                    'position' => $user->position,
+                    'role' => $user->role ? [
+                        'id' => $user->role->id,
+                        'name' => $user->role->name,
+                    ] : null,
+                    'resident' => $user->resident ? [
+                        'id' => $user->resident->id,
+                        'first_name' => $user->resident->first_name,
+                        'last_name' => $user->resident->last_name,
+                        'middle_name' => $user->resident->middle_name,
+                        'suffix' => $user->resident->suffix,
+                        'full_name' => trim($user->resident->first_name . ' ' . 
+                                            $user->resident->middle_name . ' ' . 
+                                            $user->resident->last_name . ' ' . 
+                                            $user->resident->suffix),
+                    ] : null,
+                ];
+            });
+
         // Get positions for dropdown
         $positions = Position::active()
             ->ordered()
             ->get()
             ->map(function ($position) {
                 return [
-                    'value' => $position->code,
-                    'label' => $position->name,
+                    'id' => $position->id,
+                    'code' => $position->code,
+                    'name' => $position->name,
                     'order' => $position->order,
                     'role_id' => $position->role_id,
                     'requires_account' => (bool) $position->requires_account,
@@ -150,20 +327,20 @@ class OfficialController extends Controller
             })
             ->toArray();
 
-        // Get committees
+        // Get committees for dropdown
         $committees = Committee::active()
             ->ordered()
             ->get()
             ->map(function ($committee) {
                 return [
-                    'value' => $committee->code,
-                    'label' => $committee->name,
-                    'description' => $committee->description,
+                    'id' => $committee->id,
+                    'code' => $committee->code,
+                    'name' => $committee->name,
                 ];
             })
             ->toArray();
 
-        // Get all roles for user account creation
+        // Get all roles
         $roles = Role::where('is_system_role', true)
             ->orWhere('name', 'like', '%official%')
             ->orWhere('name', 'like', '%household%')
@@ -175,6 +352,7 @@ class OfficialController extends Controller
             'positions' => $positions,
             'committees' => $committees,
             'availableResidents' => $availableResidents,
+            'availableUsers' => $positionUsers,
             'defaultTermStart' => now()->format('Y-m-d'),
             'defaultTermEnd' => now()->addYears(3)->format('Y-m-d'),
             'roles' => $roles,
@@ -186,14 +364,10 @@ class OfficialController extends Controller
      */
     public function store(Request $request)
     {
-        // Get active position codes for validation
-        $positionCodes = Position::active()->pluck('code')->toArray();
-        $committeeCodes = Committee::active()->pluck('code')->toArray();
-
         $validated = $request->validate([
             'resident_id' => 'required|exists:residents,id',
-            'position' => 'required|string|in:' . implode(',', $positionCodes),
-            'committee' => 'nullable|string|in:' . implode(',', $committeeCodes),
+            'position_id' => 'required|exists:positions,id',
+            'committee_id' => 'nullable|exists:committees,id',
             'term_start' => 'required|date',
             'term_end' => 'required|date|after:term_start',
             'status' => 'required|in:active,inactive,former',
@@ -204,33 +378,31 @@ class OfficialController extends Controller
             'achievements' => 'nullable|string|max:2000',
             'photo' => 'nullable|image|max:2048|mimes:jpg,jpeg,png',
             'is_regular' => 'boolean',
-            'create_user_account' => 'boolean',
-            'role_id' => 'nullable|exists:roles,id',
-            'username' => 'nullable|string|max:255|unique:users,username',
-            'password' => 'nullable|string|min:8|confirmed',
+            'user_id' => 'nullable|exists:users,id',
         ]);
 
         // Check if resident already holds an active position
         $existingOfficial = Official::where('resident_id', $validated['resident_id'])
+            ->whereIn('status', ['active', 'inactive'])
             ->first();
 
         if ($existingOfficial) {
             return redirect()->back()->withErrors([
-                'resident_id' => 'This resident already holds an active official position.'
+                'resident_id' => 'This resident already holds an official position.'
             ]);
         }
 
         // Get position details
-        $position = Position::where('code', $validated['position'])->first();
+        $position = Position::findOrFail($validated['position_id']);
         
-        // Get resident details
-        $resident = Resident::findOrFail($validated['resident_id']);
-        
-        // Check if position requires account but user didn't select account creation
-        if ($position && $position->requires_account && !$request->boolean('create_user_account')) {
-            return redirect()->back()->withErrors([
-                'create_user_account' => 'This position requires a system account. Please enable account creation.'
-            ]);
+        // AUTO-ASSIGN USER ID BASED ON POSITION ROLE
+        if (empty($validated['user_id'])) {
+            $positionAccount = $this->findPositionAccountByRole($position->role_id);
+            if ($positionAccount) {
+                $validated['user_id'] = $positionAccount->id;
+            } else {
+                Log::warning("No position account found for role_id: {$position->role_id}");
+            }
         }
 
         // Handle photo upload
@@ -240,7 +412,7 @@ class OfficialController extends Controller
         }
 
         // Set order if not provided
-        if (!isset($validated['order']) && $position) {
+        if (!isset($validated['order'])) {
             $validated['order'] = $position->order;
         }
 
@@ -250,16 +422,14 @@ class OfficialController extends Controller
             // Create the official record
             $official = Official::create($validated);
 
-            // Handle user account if needed
-            $shouldCreateAccount = $request->boolean('create_user_account') || ($position && $position->requires_account);
-            
-            if ($shouldCreateAccount) {
-                $this->handleOfficialUserAccount($resident, $validated, $position);
+            // If a user was assigned, update the user's information
+            if (!empty($validated['user_id'])) {
+                $this->updateAssignedUser($validated['user_id'], $official);
             }
 
             DB::commit();
             
-            return redirect()->route('officials.show', $official)->with('success', 'Official created successfully.');
+            return redirect()->route('admin.officials.show', $official)->with('success', 'Official created successfully.');
             
         } catch (\Exception $e) {
             DB::rollBack();
@@ -272,38 +442,14 @@ class OfficialController extends Controller
      */
     public function show(Official $official)
     {
-        $official->load(['resident' => function ($query) {
-            $query->with(['household', 'purok']);
-        }]);
-
-        // Get position name
-        $position = Position::where('code', $official->position)->first();
-        $positionName = $position ? $position->name : $official->position;
-
-        // Get committee name
-        $committeeName = null;
-        if ($official->committee) {
-            $committee = Committee::where('code', $official->committee)->first();
-            $committeeName = $committee ? $committee->name : $official->committee;
-        }
-
-        // Get user account if exists
-        $userAccount = null;
-        if ($official->resident && $official->resident->household) {
-            $user = User::where('household_id', $official->resident->household->id)
-                ->where('current_resident_id', $official->resident->id)
-                ->first();
-            
-            if ($user) {
-                $userAccount = [
-                    'id' => $user->id,
-                    'username' => $user->username,
-                    'email' => $user->email,
-                    'role' => $user->role ? $user->role->name : null,
-                    'status' => $user->status,
-                ];
-            }
-        }
+        $official->load([
+            'resident' => function ($query) {
+                $query->with(['household', 'purok']);
+            },
+            'positionData',
+            'committeeData',
+            'user'
+        ]);
 
         // Get all positions for edit dropdown
         $positions = Position::active()
@@ -311,20 +457,31 @@ class OfficialController extends Controller
             ->get()
             ->map(function ($position) {
                 return [
-                    'value' => $position->code,
+                    'value' => $position->id,
                     'label' => $position->name,
                 ];
             });
 
+        // Get all committees for display
+        $committees = Committee::active()
+            ->ordered()
+            ->get()
+            ->mapWithKeys(function ($committee) {
+                return [$committee->id => $committee->name];
+            })->toArray();
+
         return Inertia::render('admin/Officials/Show', [
             'official' => [
                 'id' => $official->id,
-                'position' => $official->position,
-                'position_name' => $positionName,
-                'committee' => $official->committee,
-                'committee_name' => $committeeName,
-                'term_start' => $official->term_start->format('Y-m-d'),
-                'term_end' => $official->term_end->format('Y-m-d'),
+                'resident_id' => $official->resident_id,
+                'position_id' => $official->position_id,
+                'position_name' => $official->position_name,
+                'position_code' => $official->position_code,
+                'committee_id' => $official->committee_id,
+                'committee_name' => $official->committee_name,
+                'committee_code' => $official->committee_code,
+                'term_start' => $official->term_start?->format('Y-m-d'),
+                'term_end' => $official->term_end?->format('Y-m-d'),
                 'term_duration' => $official->term_duration,
                 'status' => $official->status,
                 'order' => $official->order,
@@ -335,8 +492,11 @@ class OfficialController extends Controller
                 'photo_path' => $official->photo_path,
                 'photo_url' => $official->photo_url,
                 'is_regular' => $official->is_regular,
-                'created_at' => $official->created_at->format('Y-m-d H:i:s'),
-                'updated_at' => $official->updated_at->format('Y-m-d H:i:s'),
+                'user_id' => $official->user_id,
+                'is_current' => $official->is_current,
+                'full_position' => $official->full_position,
+                'created_at' => $official->created_at?->format('Y-m-d H:i:s'),
+                'updated_at' => $official->updated_at?->format('Y-m-d H:i:s'),
                 'resident' => $official->resident ? [
                     'id' => $official->resident->id,
                     'full_name' => $official->resident->full_name,
@@ -362,13 +522,17 @@ class OfficialController extends Controller
                         'household_number' => $official->resident->household->household_number,
                         'address' => $official->resident->household->address,
                     ] : null,
-                    'user_account' => $userAccount,
+                ] : null,
+                'user' => $official->user ? [
+                    'id' => $official->user->id,
+                    'username' => $official->user->username,
+                    'email' => $official->user->email,
+                    'role' => $official->user->role ? $official->user->role->name : null,
+                    'status' => $official->user->status,
                 ] : null,
             ],
             'positions' => $positions,
-            'committees' => Committee::active()->ordered()->get()->mapWithKeys(function ($committee) {
-                return [$committee->code => $committee->name];
-            })->toArray(),
+            'committees' => $committees,
         ]);
     }
 
@@ -377,31 +541,55 @@ class OfficialController extends Controller
      */
     public function edit(Official $official)
     {
-        $official->load(['resident']);
+        $official->load([
+            'resident', 
+            'positionData',
+            'committeeData',
+            'user'
+        ]);
 
-        // Get all residents for selection (including current resident)
+        // Get all residents for selection
         $availableResidents = Resident::where('status', 'active')
-            ->select('id', 'first_name', 'last_name', 'middle_name', 'age', 'gender', 'contact_number', 'photo_path')
+            ->select('id', 'first_name', 'last_name', 'middle_name', 'age', 'gender', 
+                     'contact_number', 'email', 'address', 'photo_path')
             ->orderBy('last_name')
             ->get();
 
-        // Get user account info if exists
-        $userAccount = null;
-        if ($official->resident && $official->resident->household) {
-            $user = User::where('household_id', $official->resident->household->id)
-                ->where('current_resident_id', $official->resident->id)
-                ->first();
-            
-            if ($user) {
-                $userAccount = [
+        // GET POSITION ACCOUNTS - Users that belong to positions
+        $positionUsers = User::with(['resident' => function($q) {
+                $q->select('id', 'first_name', 'last_name', 'middle_name', 'suffix');
+            }, 'role:id,name'])
+            ->where('status', 'active')
+            ->whereIn('role_id', Position::active()->pluck('role_id')->unique())
+            ->select('id', 'username', 'email', 'role_id', 'resident_id', 'status', 'position')
+            ->orderBy('username')
+            ->get()
+            ->map(function ($user) {
+                return [
                     'id' => $user->id,
                     'username' => $user->username,
                     'email' => $user->email,
                     'role_id' => $user->role_id,
+                    'resident_id' => $user->resident_id,
                     'status' => $user->status,
+                    'position' => $user->position,
+                    'role' => $user->role ? [
+                        'id' => $user->role->id,
+                        'name' => $user->role->name,
+                    ] : null,
+                    'resident' => $user->resident ? [
+                        'id' => $user->resident->id,
+                        'first_name' => $user->resident->first_name,
+                        'last_name' => $user->resident->last_name,
+                        'middle_name' => $user->resident->middle_name,
+                        'suffix' => $user->resident->suffix,
+                        'full_name' => trim($user->resident->first_name . ' ' . 
+                                            $user->resident->middle_name . ' ' . 
+                                            $user->resident->last_name . ' ' . 
+                                            $user->resident->suffix),
+                    ] : null,
                 ];
-            }
-        }
+            });
 
         // Get positions
         $positions = Position::active()
@@ -409,8 +597,9 @@ class OfficialController extends Controller
             ->get()
             ->map(function ($position) {
                 return [
-                    'value' => $position->code,
-                    'label' => $position->name,
+                    'id' => $position->id,
+                    'code' => $position->code,
+                    'name' => $position->name,
                     'order' => $position->order,
                     'role_id' => $position->role_id,
                     'requires_account' => (bool) $position->requires_account,
@@ -423,17 +612,21 @@ class OfficialController extends Controller
             ->get()
             ->map(function ($committee) {
                 return [
-                    'value' => $committee->code,
-                    'label' => $committee->name,
+                    'id' => $committee->id,
+                    'code' => $committee->code,
+                    'name' => $committee->name,
                 ];
             });
+
+        // Get all roles
+        $roles = Role::all(['id', 'name']);
 
         return Inertia::render('admin/Officials/Edit', [
             'official' => [
                 'id' => $official->id,
                 'resident_id' => $official->resident_id,
-                'position' => $official->position,
-                'committee' => $official->committee,
+                'position_id' => $official->position_id,
+                'committee_id' => $official->committee_id,
                 'term_start' => $official->term_start->format('Y-m-d'),
                 'term_end' => $official->term_end->format('Y-m-d'),
                 'status' => $official->status,
@@ -445,11 +638,36 @@ class OfficialController extends Controller
                 'photo_path' => $official->photo_path,
                 'photo_url' => $official->photo_url,
                 'is_regular' => $official->is_regular,
-                'user_account' => $userAccount,
+                'user_id' => $official->user_id,
+                'user' => $official->user ? [
+                    'id' => $official->user->id,
+                    'username' => $official->user->username,
+                    'email' => $official->user->email,
+                    'role_id' => $official->user->role_id,
+                    'status' => $official->user->status,
+                    'position' => $official->user->position,
+                ] : null,
+                'resident' => $official->resident ? [
+                    'id' => $official->resident->id,
+                    'first_name' => $official->resident->first_name,
+                    'last_name' => $official->resident->last_name,
+                    'middle_name' => $official->resident->middle_name,
+                    'suffix' => $official->resident->suffix,
+                    'age' => $official->resident->age,
+                    'gender' => $official->resident->gender,
+                    'contact_number' => $official->resident->contact_number,
+                    'email' => $official->resident->email,
+                    'address' => $official->resident->address,
+                    'photo_path' => $official->resident->photo_path,
+                    'photo_url' => $official->resident->photo_url,
+                    'purok' => $official->resident->purok,
+                ] : null,
             ],
             'positions' => $positions,
             'committees' => $committees,
             'availableResidents' => $availableResidents,
+            'availableUsers' => $positionUsers,
+            'roles' => $roles,
             'statusOptions' => [
                 ['value' => 'active', 'label' => 'Active'],
                 ['value' => 'inactive', 'label' => 'Inactive'],
@@ -463,14 +681,10 @@ class OfficialController extends Controller
      */
     public function update(Request $request, Official $official)
     {
-        // Get active position codes for validation
-        $positionCodes = Position::active()->pluck('code')->toArray();
-        $committeeCodes = Committee::active()->pluck('code')->toArray();
-
         $validated = $request->validate([
             'resident_id' => 'required|exists:residents,id',
-            'position' => 'required|string|in:' . implode(',', $positionCodes),
-            'committee' => 'nullable|string|in:' . implode(',', $committeeCodes),
+            'position_id' => 'required|exists:positions,id',
+            'committee_id' => 'nullable|exists:committees,id',
             'term_start' => 'required|date',
             'term_end' => 'required|date|after:term_start',
             'status' => 'required|in:active,inactive,former',
@@ -480,61 +694,32 @@ class OfficialController extends Controller
             'email' => 'nullable|email|max:255',
             'achievements' => 'nullable|string|max:2000',
             'photo' => 'nullable|image|max:2048|mimes:jpg,jpeg,png',
+            'use_resident_photo' => 'boolean',
             'is_regular' => 'boolean',
-            'remove_photo' => 'boolean',
-            'create_user_account' => 'boolean',
-            'role_id' => 'nullable|exists:roles,id',
-            'username' => 'nullable|string|max:255|unique:users,username,' . ($official->resident->household->user_id ?? 0),
-            'password' => 'nullable|string|min:8|confirmed',
+            'user_id' => 'nullable|exists:users,id',
         ]);
 
         // Check if resident already holds an active position (excluding current official)
         if ($validated['resident_id'] != $official->resident_id) {
             $existingOfficial = Official::where('resident_id', $validated['resident_id'])
                 ->where('id', '!=', $official->id)
+                ->whereIn('status', ['active', 'inactive'])
                 ->first();
 
             if ($existingOfficial) {
                 return redirect()->back()->withErrors([
-                    'resident_id' => 'This resident already holds an active official position.'
+                    'resident_id' => 'This resident already holds an official position.'
                 ]);
             }
         }
 
         // Get position details
-        $position = Position::where('code', $validated['position'])->first();
-        
-        // Check if position requires account but user didn't select account creation
-        if ($position && $position->requires_account && !$request->boolean('create_user_account')) {
-            return redirect()->back()->withErrors([
-                'create_user_account' => 'This position requires a system account. Please enable account creation.'
-            ]);
-        }
+        $position = Position::findOrFail($validated['position_id']);
 
         // Start transaction
         DB::beginTransaction();
         try {
-            // Get current resident (before update)
-            $currentResident = $official->resident;
-            
-            // Get new resident
-            $newResident = Resident::findOrFail($validated['resident_id']);
-            
-            // Check if we're replacing an official (changing resident or position)
-            $isReplacingOfficial = ($official->resident_id != $validated['resident_id']) || ($official->position != $validated['position']);
-            
-            if ($isReplacingOfficial) {
-                // Handle the replaced official's account
-                $this->handleReplacedOfficial($currentResident, $official);
-            }
-
-            // Handle photo removal
-            if ($request->boolean('remove_photo') && $official->photo_path) {
-                Storage::disk('public')->delete($official->photo_path);
-                $validated['photo_path'] = null;
-            }
-
-            // Handle new photo upload
+            // Handle photo upload/removal
             if ($request->hasFile('photo')) {
                 // Delete old photo if exists
                 if ($official->photo_path) {
@@ -543,26 +728,53 @@ class OfficialController extends Controller
                 
                 $path = $request->file('photo')->store('official-photos', 'public');
                 $validated['photo_path'] = $path;
+            } elseif ($request->boolean('use_resident_photo')) {
+                // Using resident's photo, so clear official's photo path
+                $validated['photo_path'] = null;
+            } else {
+                // Keep existing photo
+                $validated['photo_path'] = $official->photo_path;
             }
 
             // Set order if not provided
-            if (!isset($validated['order']) && $position) {
+            if (!isset($validated['order']) || empty($validated['order'])) {
                 $validated['order'] = $position->order;
+            }
+
+            // Check if position or resident changed
+            $positionChanged = ($official->position_id != $validated['position_id']);
+            $residentChanged = ($official->resident_id != $validated['resident_id']);
+            
+            if ($positionChanged || $residentChanged) {
+                // Handle the replaced official's account
+                $this->handleReplacedOfficial($official->resident, $official);
             }
 
             // Update official record
             $official->update($validated);
 
-            // Handle account creation for new resident if needed
-            $shouldCreateAccount = $request->boolean('create_user_account') || ($position && $position->requires_account);
-            
-            if ($shouldCreateAccount) {
-                $this->handleOfficialUserAccount($newResident, $validated, $position);
+            // Handle user assignment changes
+            if (isset($validated['user_id'])) {
+                if ($validated['user_id'] != $official->user_id) {
+                    // User assignment changed
+                    if ($validated['user_id']) {
+                        // New user assigned
+                        $this->updateAssignedUser($validated['user_id'], $official);
+                    }
+                    
+                    if ($official->user_id) {
+                        // Old user unassigned
+                        $this->handleUserAccountRemoval(User::find($official->user_id), $official);
+                    }
+                }
+            } elseif (empty($validated['user_id']) && $official->user_id) {
+                // If user_id is being removed, handle removal
+                $this->handleUserAccountRemoval(User::find($official->user_id), $official);
             }
 
             DB::commit();
             
-            return redirect()->route('officials.show', $official)->with('success', 'Official updated successfully.');
+            return redirect()->route('admin.officials.show', $official)->with('success', 'Official updated successfully.');
             
         } catch (\Exception $e) {
             DB::rollBack();
@@ -591,7 +803,7 @@ class OfficialController extends Controller
             
             DB::commit();
             
-            return redirect()->route('officials.index')->with('success', 'Official deleted successfully.');
+            return redirect()->route('admin.officials.index')->with('success', 'Official deleted successfully.');
             
         } catch (\Exception $e) {
             DB::rollBack();
@@ -599,76 +811,88 @@ class OfficialController extends Controller
         }
     }
 
+    // ========== HELPER METHODS ==========
+
     /**
-     * Handle user account creation/update for officials based on BUSINESS RULES
+     * Find position account by role ID
      */
-    private function handleOfficialUserAccount($resident, $data, $position = null)
+    private function findPositionAccountByRole($roleId)
     {
-        // Check if resident belongs to a household
-        if (!$resident->household_id) {
-            // Resident doesn't belong to a household, cannot create account
-            return null;
-        }
-
-        $household = $resident->household;
-
-        // Check if household already has a user account
-        if ($household->user_id) {
-            $user = User::find($household->user_id);
-            if ($user) {
-                // Update existing user account
-                $updateData = [
-                    'username' => $data['username'] ?? $user->username,
-                    'email' => $data['email'] ?? $resident->email,
-                    'contact_number' => $data['contact_number'] ?? $resident->contact_number,
-                    'position' => $position ? $position->name : ($data['position'] ?? 'Official'),
-                    'role_id' => $data['role_id'] ?? ($position ? $position->role_id : 6),
-                    'status' => 'active', // Ensure account is active
-                    'current_resident_id' => $resident->id,
-                    'household_id' => $household->id,
-                ];
-
-                // Update password if provided
-                if (isset($data['password']) && $data['password']) {
-                    $updateData['password'] = Hash::make($data['password']);
-                    $updateData['require_password_change'] = true;
-                }
-
-                $user->update($updateData);
-                return $user;
-            }
-        }
-        
-        // Create new user account
-        // Generate username if not provided
-        $username = $data['username'] ?? $this->generateUsername($resident);
-
-        // Generate password if not provided
-        $password = $data['password'] ?? Str::random(12);
-
-        // Create user
-        $user = User::create([
-            'username' => $username,
-            'email' => $data['email'] ?? $resident->email,
-            'password' => Hash::make($password),
-            'contact_number' => $data['contact_number'] ?? $resident->contact_number,
-            'position' => $position ? $position->name : ($data['position'] ?? 'Official'),
-            'role_id' => $data['role_id'] ?? ($position ? $position->role_id : 6),
-            'status' => 'active',
-            'household_id' => $household->id,
-            'current_resident_id' => $resident->id,
-            'require_password_change' => true,
-            'email_verified_at' => now(),
-        ]);
-
-        // Update household with user_id
-        $household->update(['user_id' => $user->id]);
-
-        return $user;
+        return User::where('role_id', $roleId)
+            ->where(function($query) {
+                $query->whereNotNull('position')
+                      ->orWhere('username', 'like', '%.bgy');
+            })
+            ->where('status', 'active')
+            ->first();
     }
 
     /**
-     * Handle replaced official's account based on BUSINESS RULES
+     * Update assigned user with official information
+     */
+    private function updateAssignedUser($userId, $official)
+    {
+        $user = User::find($userId);
+        if (!$user) return;
+
+        $position = $official->positionData;
+        if (!$position) return;
+
+        // Update user with official position information
+        $user->update([
+            'position' => $position->name,
+            'current_resident_id' => $official->resident_id,
+            'status' => 'active',
+        ]);
+
+        // Update household if needed
+        if ($official->resident && $official->resident->household) {
+            $household = $official->resident->household;
+            if (!$household->user_id) {
+                $household->update(['user_id' => $user->id]);
+            }
+        }
+
+        // Log the assignment
+        activity()
+            ->performedOn($official)
+            ->causedBy(auth()->user())
+            ->withProperties([
+                'user_id' => $user->id,
+                'username' => $user->username,
+                'resident' => $official->resident->full_name,
+                'position' => $position->name,
+            ])
+            ->log('assigned_position_account');
+    }
+
+    /**
+     * Handle user account removal
+     */
+    private function handleUserAccountRemoval($user, $official)
+    {
+        if (!$user) return;
+        
+        // Check if user is linked to any other official
+        $otherOfficials = Official::where('user_id', $user->id)
+            ->where('id', '!=', $official->id)
+            ->exists();
+        
+        if (!$otherOfficials) {
+            // Get the position name for the "Former" title
+            $positionName = $official->positionData->name ?? 'Official';
+            
+            // Update user to reflect they're no longer an active official
+            $user->update([
+                'status' => 'inactive',
+                'position' => 'Former ' . $positionName,
+                'current_resident_id' => null,
+            ]);
+        }
+    }
+
+    /**
+     * Handle replaced official's account
      */
     private function handleReplacedOfficial($resident, $oldOfficial)
     {
@@ -684,19 +908,22 @@ class OfficialController extends Controller
         
         // Check if the user account is currently linked to this resident
         if ($user->current_resident_id !== $resident->id) {
-            // User account is not linked to this resident, nothing to do
             return;
         }
         
         // Check if resident is a household head
         $isHouseholdHead = $resident->isHeadOfHousehold();
 
-        // BUSINESS LOGIC IMPLEMENTATION:
+        // Get position using the relationship
+        $oldOfficial->load('positionData');
+        $position = $oldOfficial->positionData;
         
-        // 1. For Kagawad position
-        if ($oldOfficial->position === 'kagawad') {
+        if (!$position) return;
+
+        // Handle based on position
+        if ($position->isKagawad()) {
             if ($isHouseholdHead) {
-                // RULE: If household head → CHANGE ROLE to regular household role
+                // If household head → CHANGE ROLE to regular household role
                 $householdRole = Role::where('name', 'like', '%household%')
                     ->orWhere('name', 'like', '%resident%')
                     ->first();
@@ -708,33 +935,24 @@ class OfficialController extends Controller
                     ]);
                 }
             } else {
-                // RULE: If NOT household head → MAKE ACCOUNT INACTIVE
+                // If NOT household head → MAKE ACCOUNT INACTIVE
                 $user->update(['status' => 'inactive']);
             }
         }
-        
-        // 2. For Captain position (when captain is replaced)
-        elseif ($oldOfficial->position === 'captain') {
-            // RULE: "just revise the resident_id on the officials table"
-            // So the previous captain keeps their account with whatever role they had
-            if ($user->position === 'Barangay Captain' || $user->position === 'Captain') {
+        elseif ($position->code === 'CAPTAIN') {
+            if ($user->position === 'Barangay Captain') {
                 $user->update(['position' => 'Former Barangay Captain']);
             }
         }
-        
-        // 3. For other positions (Secretary, Treasurer, SK Chairman)
-        elseif (in_array($oldOfficial->position, ['secretary', 'treasurer', 'sk_chairman'])) {
-            // These are default account positions
-            // If replaced, they keep their account but position changes
-            $oldPositionName = Position::where('code', $oldOfficial->position)->value('name') ?? $oldOfficial->position;
-            if ($user->position === $oldPositionName) {
-                $user->update(['position' => 'Former ' . $oldPositionName]);
+        elseif (in_array($position->code, ['SECRETARY', 'TREASURER', 'SK-CHAIRMAN'])) {
+            if ($user->position === $position->name) {
+                $user->update(['position' => 'Former ' . $position->name]);
             }
         }
     }
 
     /**
-     * Generate a username from resident name
+     * Generate a username from resident name (kept for backward compatibility)
      */
     private function generateUsername($resident)
     {
@@ -754,14 +972,21 @@ class OfficialController extends Controller
         return $username;
     }
 
+    // ========== API ENDPOINTS ==========
+
     /**
-     * Get current officials for display (e.g., in dashboard)
+     * Get current officials for display
      */
     public function currentOfficials()
     {
-        $officials = Official::with(['resident' => function ($query) {
-            $query->select('id', 'first_name', 'last_name', 'middle_name', 'photo_path');
-        }])
+        $officials = Official::with([
+            'resident' => function ($query) {
+                $query->select('id', 'first_name', 'last_name', 'middle_name', 'photo_path');
+            },
+            'positionData',
+            'committeeData'
+        ])
+        ->current()
         ->orderBy('order')
         ->get();
 
@@ -771,23 +996,26 @@ class OfficialController extends Controller
     /**
      * Get officials by committee
      */
-    public function byCommittee($committee)
+    public function byCommittee($committeeId)
     {
-        $committeeModel = Committee::where('code', $committee)->first();
+        $committee = Committee::find($committeeId);
         
-        if (!$committeeModel) {
+        if (!$committee) {
             return response()->json(['error' => 'Committee not found'], 404);
         }
 
-        $officials = Official::with(['resident'])
-            ->where('committee', $committee)
-            ->where('status', 'active')
-            ->orderBy('order')
-            ->get();
+        $officials = Official::with([
+            'resident', 
+            'positionData'
+        ])
+        ->where('committee_id', $committeeId)
+        ->where('status', 'active')
+        ->orderBy('order')
+        ->get();
 
         return response()->json([
-            'committee' => $committeeModel->name,
-            'description' => $committeeModel->description,
+            'committee' => $committee->name,
+            'description' => $committee->description,
             'officials' => $officials
         ]);
     }
@@ -822,7 +1050,7 @@ class OfficialController extends Controller
 
         DB::beginTransaction();
         try {
-            $officials = Official::whereIn('id', $request->ids)->get();
+            $officials = Official::with(['resident', 'positionData'])->whereIn('id', $request->ids)->get();
 
             foreach ($officials as $official) {
                 // Handle account for each deleted official
@@ -847,47 +1075,58 @@ class OfficialController extends Controller
         }
     }
 
-    /**
-     * Bulk update status
-     */
-    public function bulkUpdateStatus(Request $request)
-    {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'exists:officials,id',
-            'status' => 'required|in:active,inactive,former',
+  /**
+ * Bulk update status - ONE METHOD FOR ALL BULK STATUS CHANGES
+ */
+public function bulkUpdateStatus(Request $request)
+{
+    $request->validate([
+        'ids' => 'required|array',
+        'ids.*' => 'exists:officials,id',
+        'status' => 'required|in:active,inactive,former,current',
+    ]);
+
+    $status = $request->status;
+    
+    if ($status === 'current') {
+        Official::whereIn('id', $request->ids)->update([
+            'is_current' => true,
+            'status' => 'active'
         ]);
-
-        Official::whereIn('id', $request->ids)->update(['status' => $request->status]);
-
-        return response()->json(['message' => 'Status updated successfully']);
+    } else {
+        Official::whereIn('id', $request->ids)->update(['status' => $status]);
     }
+
+    return redirect()->back()->with('success', 'Status updated successfully');
+}
 
     /**
      * Export officials
      */
     public function export(Request $request)
     {
-        $query = Official::with('resident');
+        $query = Official::with([
+            'resident', 
+            'positionData',
+            'committeeData'
+        ]);
 
         if ($request->has('status') && $request->status !== 'all') {
             if ($request->status === 'current') {
+                $query->current();
             } else {
                 $query->where('status', $request->status);
             }
         }
 
         if ($request->has('position') && $request->position !== 'all') {
-            $query->where('position', $request->position);
+            $position = Position::where('code', $request->position)->first();
+            if ($position) {
+                $query->where('position_id', $position->id);
+            }
         }
 
         $officials = $query->get();
-
-        // Get position names
-        $positionNames = Position::pluck('name', 'code')->toArray();
-        
-        // Get committee names
-        $committeeNames = Committee::pluck('name', 'code')->toArray();
 
         // Generate CSV
         $csv = "ID,Resident Name,Position,Committee,Term Start,Term End,Status,Contact,Email,Type\n";
@@ -896,8 +1135,8 @@ class OfficialController extends Controller
             $csv .= implode(',', [
                 $official->id,
                 '"' . $official->resident->full_name . '"',
-                $positionNames[$official->position] ?? $official->position,
-                $official->committee ? ($committeeNames[$official->committee] ?? $official->committee) : 'N/A',
+                $official->positionData ? $official->positionData->name : 'N/A',
+                $official->committeeData ? $official->committeeData->name : 'N/A',
                 $official->term_start->format('Y-m-d'),
                 $official->term_end->format('Y-m-d'),
                 ucfirst($official->status),

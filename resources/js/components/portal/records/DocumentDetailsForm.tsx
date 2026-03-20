@@ -62,7 +62,7 @@ export function DocumentDetailsForm({
               placeholder="e.g., Birth Certificate, Passport"
               required
               disabled={processing}
-              className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
+              className="dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
             />
           </div>
           <div className="space-y-2">
@@ -74,7 +74,7 @@ export function DocumentDetailsForm({
               placeholder="Brief description of the document..."
               rows={3}
               disabled={processing}
-              className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
+              className="dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -86,7 +86,7 @@ export function DocumentDetailsForm({
                 value={data.issue_date}
                 onChange={(e) => setData('issue_date', e.target.value)}
                 disabled={processing}
-                className="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
               />
             </div>
             <div className="space-y-2">
@@ -97,7 +97,7 @@ export function DocumentDetailsForm({
                 value={data.expiry_date}
                 onChange={(e) => setData('expiry_date', e.target.value)}
                 disabled={processing}
-                className="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
               />
             </div>
           </div>
@@ -109,7 +109,7 @@ export function DocumentDetailsForm({
               onChange={(e) => setData('reference_number', e.target.value)}
               placeholder="Auto-generated if empty"
               disabled={processing}
-              className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
+              className="dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
             />
           </div>
 
@@ -121,7 +121,7 @@ export function DocumentDetailsForm({
                 <Badge 
                   key={tag} 
                   variant="secondary"
-                  className="text-xs cursor-pointer gap-1 px-2 py-0.5 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700"
+                  className="text-xs cursor-pointer gap-1 px-2 py-0.5 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700"
                   onClick={() => onTagSelect(tag)}
                 >
                   {tag}
@@ -135,7 +135,7 @@ export function DocumentDetailsForm({
                 onChange={(e) => onCustomTagChange(e.target.value)}
                 placeholder="Add tags (comma separated)"
                 disabled={processing}
-                className="text-sm flex-1 dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                className="text-sm flex-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
               />
               <Button
                 type="button"
@@ -143,7 +143,7 @@ export function DocumentDetailsForm({
                 size="sm"
                 onClick={onAddCustomTag}
                 disabled={processing}
-                className="text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="text-sm dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Add
               </Button>
@@ -156,7 +156,7 @@ export function DocumentDetailsForm({
               type="button"
               variant="ghost"
               size="sm"
-              className="w-full justify-between dark:text-gray-300 dark:hover:bg-gray-800"
+              className="w-full justify-between dark:text-gray-300 dark:hover:bg-gray-900"
               onClick={onToggleAdvancedOptions}
             >
               <span>Advanced Options</span>
@@ -168,7 +168,7 @@ export function DocumentDetailsForm({
             </Button>
             
             {showAdvancedOptions && (
-              <div className="space-y-4 p-3 border rounded-lg bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
+              <div className="space-y-4 p-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
                 <div className="space-y-3">
                   <Label className="dark:text-gray-300">AI Features</Label>
                   <div className="space-y-2">

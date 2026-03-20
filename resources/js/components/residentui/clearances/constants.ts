@@ -43,7 +43,7 @@ export const STATUS_CONFIG = {
   },
   cancelled: { 
     label: 'Cancelled', 
-    color: 'bg-gray-100 dark:bg-gray-800', 
+    color: 'bg-gray-100 dark:bg-gray-900', 
     textColor: 'text-gray-800 dark:text-gray-300',
     icon: XCircle
   },

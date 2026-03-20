@@ -413,7 +413,7 @@ export default function PermissionCreate({
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {selectedModule && (
-                                                <span className="px-3 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-l-md border border-r-0 font-mono text-sm">
+                                                <span className="px-3 py-2 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-l-md border border-r-0 font-mono text-sm">
                                                     {selectedModule.toLowerCase()}.
                                                 </span>
                                             )}
@@ -516,7 +516,7 @@ export default function PermissionCreate({
                                         </div>
 
                                         {showAdvanced && (
-                                            <div className="space-y-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800/30">
+                                            <div className="space-y-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-900/30">
                                                 {/* Status */}
                                                 <div className="flex items-center justify-between">
                                                     <div className="space-y-0.5">
@@ -596,7 +596,7 @@ export default function PermissionCreate({
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                                     <div className="flex items-center gap-3">
                                         <div className="h-10 w-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
                                             <Key className="h-5 w-5 text-purple-600 dark:text-purple-400" />
@@ -656,7 +656,7 @@ export default function PermissionCreate({
                                     <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
                                         <div className="flex items-center gap-2">
                                             <Check className="h-3 w-3 text-green-500" />
-                                            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">module.action</code>
+                                            <code className="bg-gray-100 dark:bg-gray-900 px-1 py-0.5 rounded">module.action</code>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Check className="h-3 w-3 text-green-500" />
@@ -680,23 +680,23 @@ export default function PermissionCreate({
                                     <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
                                         <div className="flex items-center justify-between">
                                             <span>View/Read</span>
-                                            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">.view</code>
+                                            <code className="bg-gray-100 dark:bg-gray-900 px-1 py-0.5 rounded">.view</code>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span>Create</span>
-                                            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">.create</code>
+                                            <code className="bg-gray-100 dark:bg-gray-900 px-1 py-0.5 rounded">.create</code>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span>Edit/Update</span>
-                                            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">.edit</code>
+                                            <code className="bg-gray-100 dark:bg-gray-900 px-1 py-0.5 rounded">.edit</code>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span>Delete</span>
-                                            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">.delete</code>
+                                            <code className="bg-gray-100 dark:bg-gray-900 px-1 py-0.5 rounded">.delete</code>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span>Manage/Admin</span>
-                                            <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">.manage</code>
+                                            <code className="bg-gray-100 dark:bg-gray-900 px-1 py-0.5 rounded">.manage</code>
                                         </div>
                                     </div>
                                 </div>

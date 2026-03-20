@@ -89,7 +89,7 @@ export const ModernFormTable = ({
             const AgencyIcon = getAgencyIcon(form.issuing_agency);
 
             return (
-              <TableRow key={form.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+              <TableRow key={form.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                 {selectMode && (
                   <TableCell>
                     <input

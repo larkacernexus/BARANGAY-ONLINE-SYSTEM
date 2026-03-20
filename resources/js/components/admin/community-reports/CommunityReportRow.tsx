@@ -86,7 +86,7 @@ export default function CommunityReportRow({
 }: CommunityReportRowProps) {
     
     const hasEvidence = report.evidences && report.evidences.length > 0;
-    const titleLength = 50; // You can make this dynamic based on windowWidth
+    const titleLength = 50;
     const descriptionLength = 45;
     const locationLength = 30;
     const userNameLength = 25;
@@ -94,9 +94,11 @@ export default function CommunityReportRow({
     return (
         <>
             <TableRow 
-                className={`hover:bg-gray-50 transition-colors ${
-                    isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-                } ${isExpanded ? 'bg-gray-50' : ''}`}
+                className={`hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors ${
+                    isSelected 
+                        ? 'bg-blue-50 dark:bg-blue-950/40 border-l-4 border-l-blue-500 dark:border-l-blue-600' 
+                        : ''
+                } ${isExpanded ? 'bg-gray-50 dark:bg-gray-900/30' : ''} dark:border-gray-700`}
                 onClick={(e) => {
                     if (isBulkMode && e.target instanceof HTMLElement && 
                         !e.target.closest('a') && 
@@ -108,18 +110,18 @@ export default function CommunityReportRow({
                 }}
             >
                 {isBulkMode && (
-                    <TableCell className="px-4 py-3 text-center">
+                    <TableCell className="px-4 py-3 text-center dark:text-gray-300">
                         <div className="flex items-center justify-center">
                             <Checkbox
                                 checked={isSelected}
                                 onCheckedChange={() => onItemSelect(report.id)}
                                 onClick={(e) => e.stopPropagation()}
-                                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
                             />
                         </div>
                     </TableCell>
                 )}
-                <TableCell className="px-4 py-3 whitespace-nowrap">
+                <TableCell className="px-4 py-3 whitespace-nowrap dark:text-gray-300">
                     <div 
                         className="flex items-center gap-2 cursor-text select-text"
                         onDoubleClick={(e) => {
@@ -133,26 +135,26 @@ export default function CommunityReportRow({
                         }}
                         title={`Double-click to select all\nReport ID: ${report.report_number}`}
                     >
-                        <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                        <FileText className="h-4 w-4 text-gray-500 dark:text-gray-500 flex-shrink-0" />
                         <div 
-                            className="font-mono text-sm font-medium text-blue-600 truncate"
+                            className="font-mono text-sm font-medium text-blue-600 dark:text-blue-400 truncate"
                             data-full-text={report.report_number}
                         >
                             {truncateText(report.report_number, 12)}
                         </div>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {report.report_type?.name}
                         {report.report_type?.category && ` • ${report.report_type.category}`}
                     </div>
                     {hasEvidence && (
-                        <Badge variant="outline" className="mt-1 text-xs">
+                        <Badge variant="outline" className="mt-1 text-xs dark:border-gray-700 dark:text-gray-300">
                             <FileText className="h-3 w-3 mr-1" />
                             Evidence
                         </Badge>
                     )}
                 </TableCell>
-                <TableCell className="px-4 py-3">
+                <TableCell className="px-4 py-3 dark:text-gray-300">
                     <div 
                         className="cursor-text select-text"
                         onDoubleClick={(e) => {
@@ -167,18 +169,18 @@ export default function CommunityReportRow({
                         title={`Double-click to select all\nTitle: ${report.title}\nDescription: ${report.description}`}
                     >
                         <div 
-                            className="font-medium mb-1 truncate"
+                            className="font-medium mb-1 truncate dark:text-gray-200"
                             data-full-text={report.title}
                         >
                             {truncateText(report.title, titleLength)}
                         </div>
                         <div 
-                            className="text-sm text-gray-600 mb-2 truncate"
+                            className="text-sm text-gray-600 dark:text-gray-400 mb-2 truncate"
                             data-full-text={report.description}
                         >
                             {truncateText(report.description, descriptionLength)}
                         </div>
-                        <div className="flex items-center gap-1 text-sm text-gray-500">
+                        <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
                             <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
                             <div 
                                 className="truncate"
@@ -194,13 +196,13 @@ export default function CommunityReportRow({
                                 <Badge 
                                     key={index} 
                                     variant="outline" 
-                                    className="text-xs"
+                                    className="text-xs dark:border-gray-700 dark:text-gray-300"
                                 >
                                     {tag}
                                 </Badge>
                             ))}
                             {report.tags.length > 3 && (
-                                <Badge variant="outline" className="text-xs">
+                                <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
                                     +{report.tags.length - 3}
                                 </Badge>
                             )}
@@ -208,19 +210,19 @@ export default function CommunityReportRow({
                     )}
                     <div className="flex flex-wrap gap-1 mt-2">
                         {report.safety_concern && (
-                            <Badge variant="outline" className="text-xs bg-orange-50 border-orange-200 text-orange-700">
+                            <Badge variant="outline" className="text-xs bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-950/30 dark:border-orange-800 dark:text-orange-400">
                                 <ShieldAlert className="h-3 w-3 mr-1" />
                                 Safety Concern
                             </Badge>
                         )}
                         {report.environmental_impact && (
-                            <Badge variant="outline" className="text-xs bg-green-50 border-green-200 text-green-700">
+                            <Badge variant="outline" className="text-xs bg-green-50 border-green-200 text-green-700 dark:bg-green-950/30 dark:border-green-800 dark:text-green-400">
                                 <AlertOctagon className="h-3 w-3 mr-1" />
                                 Environmental
                             </Badge>
                         )}
                         {report.recurring_issue && (
-                            <Badge variant="outline" className="text-xs bg-yellow-50 border-yellow-200 text-yellow-700">
+                            <Badge variant="outline" className="text-xs bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-950/30 dark:border-yellow-800 dark:text-yellow-400">
                                 <RefreshCw className="h-3 w-3 mr-1" />
                                 Recurring
                             </Badge>
@@ -244,62 +246,62 @@ export default function CommunityReportRow({
                             {safeStatuses[report.status] || report.status || 'N/A'}
                         </Badge>
                         <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                            <Badge variant="outline" className="flex items-center gap-1 w-fit dark:border-gray-700 dark:text-gray-300">
                                 {getUrgencyIcon(report.urgency_level)}
                                 {safeUrgencies[report.urgency_level] || report.urgency_level || 'N/A'}
                             </Badge>
-                            <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                            <Badge variant="outline" className="flex items-center gap-1 w-fit dark:border-gray-700 dark:text-gray-300">
                                 {getImpactIcon(report.impact_level)}
                                 {report.impact_level ? report.impact_level.replace('_', ' ').toUpperCase() : 'N/A'}
                             </Badge>
                         </div>
                         {report.estimated_affected_count && (
-                            <Badge variant="outline" className="w-fit">
+                            <Badge variant="outline" className="w-fit dark:border-gray-700 dark:text-gray-300">
                                 {getAffectedPeopleIcon(report.affected_people)}
                                 <span className="ml-1">{report.estimated_affected_count} affected</span>
                             </Badge>
                         )}
                     </div>
                 </TableCell>
-                <TableCell className="px-4 py-3">
+                <TableCell className="px-4 py-3 dark:text-gray-300">
                     <div className="space-y-1 text-sm">
                         <div>
-                            <span className="text-gray-600">Incident:</span>{' '}
-                            <span className="font-medium">{formatDate(report.incident_date)}</span>
+                            <span className="text-gray-600 dark:text-gray-400">Incident:</span>{' '}
+                            <span className="font-medium dark:text-gray-200">{formatDate(report.incident_date)}</span>
                         </div>
                         <div>
-                            <span className="text-gray-600">Reported:</span>{' '}
-                            <span className="font-medium">{getTimeAgo(report.created_at)}</span>
+                            <span className="text-gray-600 dark:text-gray-400">Reported:</span>{' '}
+                            <span className="font-medium dark:text-gray-200">{getTimeAgo(report.created_at)}</span>
                         </div>
                         {report.resolved_at && (
-                            <div className="text-xs text-green-600">
+                            <div className="text-xs text-green-600 dark:text-green-400">
                                 <CheckCircle className="h-3 w-3 inline mr-1" />
                                 Resolved: {formatDateTime(report.resolved_at)}
                             </div>
                         )}
                         {report.recurring_issue && (
-                            <div className="text-xs text-yellow-600">
+                            <div className="text-xs text-yellow-600 dark:text-yellow-400">
                                 <RefreshCw className="h-3 w-3 inline mr-1" />
                                 Recurring Issue
                             </div>
                         )}
                         {report.duration_hours && (
-                            <div className="text-xs text-blue-600">
+                            <div className="text-xs text-blue-600 dark:text-blue-400">
                                 <Clock className="h-3 w-3 inline mr-1" />
                                 Duration: {report.duration_hours} hours
                             </div>
                         )}
                     </div>
                 </TableCell>
-                <TableCell className="px-4 py-3">
+                <TableCell className="px-4 py-3 dark:text-gray-300">
                     <div className="space-y-2">
                         {report.is_anonymous ? (
                             <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-gray-400" />
-                                <span className="font-medium text-gray-600">
+                                <User className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                <span className="font-medium text-gray-600 dark:text-gray-300">
                                     Anonymous Reporter
                                 </span>
-                                <Badge variant="outline" className="text-xs">
+                                <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
                                     <Shield className="h-3 w-3 mr-1" />
                                     Protected
                                 </Badge>
@@ -307,12 +309,12 @@ export default function CommunityReportRow({
                         ) : (
                             <div className="space-y-1">
                                 <div 
-                                    className="font-medium truncate"
+                                    className="font-medium truncate dark:text-gray-200"
                                     title={report.user?.name}
                                 >
                                     {truncateText(report.user?.name || 'Unknown Reporter', userNameLength)}
                                 </div>
-                                <div className="text-sm text-gray-500 space-y-1">
+                                <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
                                     {report.user?.phone && (
                                         <div className="flex items-center gap-1">
                                             <Phone className="h-3 w-3" />
@@ -335,27 +337,27 @@ export default function CommunityReportRow({
                             </div>
                         )}
                         {report.assigned_to && (
-                            <div className="mt-2 p-2 bg-gray-50 rounded border">
-                                <div className="text-xs text-gray-500 mb-1">Assigned To</div>
+                            <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded border dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assigned To</div>
                                 <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                                        <User className="h-3 w-3 text-blue-600" />
+                                    <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                        <User className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                                     </div>
-                                    <div className="font-medium text-sm">
+                                    <div className="font-medium text-sm dark:text-gray-200">
                                         {report.assigned_to.name}
                                     </div>
                                 </div>
                             </div>
                         )}
                         {!report.assigned_to && (
-                            <Badge variant="outline" className="text-xs text-gray-500">
+                            <Badge variant="outline" className="text-xs text-gray-500 dark:text-gray-400 dark:border-gray-700">
                                 <UserX className="h-3 w-3 mr-1" />
                                 Unassigned
                             </Badge>
                         )}
                     </div>
                 </TableCell>
-                <TableCell className="px-4 py-3 text-right sticky right-0 bg-white">
+                <TableCell className="px-4 py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
                     <div className="flex items-center justify-end gap-1">
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -363,7 +365,7 @@ export default function CommunityReportRow({
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => onToggleExpand(report.id)}
-                                    className="h-8 w-8 p-0"
+                                    className="h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-900"
                                 >
                                     {isExpanded ? (
                                         <ChevronUp className="h-4 w-4" />
@@ -372,7 +374,7 @@ export default function CommunityReportRow({
                                     )}
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent>
+                            <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                 {isExpanded ? 'Collapse details' : 'Expand details'}
                             </TooltipContent>
                         </Tooltip>
@@ -380,26 +382,26 @@ export default function CommunityReportRow({
                             <DropdownMenuTrigger asChild>
                                 <Button 
                                     variant="ghost" 
-                                    className="h-8 w-8 p-0 hover:bg-gray-100"
+                                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-900"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     <span className="sr-only">Open menu</span>
                                     <MoreVertical className="h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem asChild>
+                            <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
+                                <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-700">
                                     <Link href={`/admin/community-reports/${report.id}`} className="flex items-center cursor-pointer">
                                         <Eye className="mr-2 h-4 w-4" />
                                         <span>View Details</span>
                                     </Link>
                                 </DropdownMenuItem>
                                 
-                                <DropdownMenuSeparator />
+                                <DropdownMenuSeparator className="dark:bg-gray-700" />
                                 
                                 <DropdownMenuItem 
                                     onClick={() => onCopyToClipboard(report.report_number, 'Report ID')}
-                                    className="flex items-center cursor-pointer"
+                                    className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
                                 >
                                     <Clipboard className="mr-2 h-4 w-4" />
                                     <span>Copy Report ID</span>
@@ -408,27 +410,27 @@ export default function CommunityReportRow({
                                 {report.user?.phone && !report.is_anonymous && (
                                     <DropdownMenuItem 
                                         onClick={() => onCopyToClipboard(report.user!.phone!, 'Phone Number')}
-                                        className="flex items-center cursor-pointer"
+                                        className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
                                     >
                                         <Clipboard className="mr-2 h-4 w-4" />
                                         <span>Copy Contact</span>
                                     </DropdownMenuItem>
                                 )}
                                 
-                                <DropdownMenuSeparator />
+                                <DropdownMenuSeparator className="dark:bg-gray-700" />
                                 
                                 <DropdownMenuItem 
                                     onClick={() => {
                                         const url = `${window.location.origin}/admin/community-reports/${report.id}`;
                                         onCopyToClipboard(url, 'Report URL');
                                     }}
-                                    className="flex items-center cursor-pointer"
+                                    className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
                                 >
                                     <LinkIcon className="mr-2 h-4 w-4" />
                                     <span>Copy Link</span>
                                 </DropdownMenuItem>
                                 
-                                <DropdownMenuItem asChild>
+                                <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-700">
                                     <Link href={`/admin/community-reports/${report.id}/print`} className="flex items-center cursor-pointer">
                                         <Printer className="mr-2 h-4 w-4" />
                                         <span>Print Details</span>
@@ -437,15 +439,15 @@ export default function CommunityReportRow({
 
                                 {isBulkMode && (
                                     <>
-                                        <DropdownMenuSeparator />
+                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
                                         <DropdownMenuItem 
                                             onClick={() => onItemSelect(report.id)}
-                                            className="flex items-center cursor-pointer"
+                                            className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
                                         >
                                             {isSelected ? (
                                                 <>
-                                                    <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
-                                                    <span className="text-green-600">Deselect</span>
+                                                    <CheckSquare className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
+                                                    <span className="text-green-600 dark:text-green-400">Deselect</span>
                                                 </>
                                             ) : (
                                                 <>
@@ -457,11 +459,11 @@ export default function CommunityReportRow({
                                     </>
                                 )}
                                 
-                                <DropdownMenuSeparator />
+                                <DropdownMenuSeparator className="dark:bg-gray-700" />
                                 
                                 {report.status !== 'resolved' && report.status !== 'rejected' && onMarkResolved && (
                                     <DropdownMenuItem 
-                                        className="text-green-600 focus:text-green-700 focus:bg-green-50"
+                                        className="text-green-600 dark:text-green-400 focus:text-green-700 dark:focus:text-green-300 focus:bg-green-50 dark:focus:bg-green-950/30"
                                         onClick={() => onMarkResolved(report)}
                                     >
                                         <CheckCircle className="mr-2 h-4 w-4" />
@@ -470,7 +472,7 @@ export default function CommunityReportRow({
                                 )}
                                 
                                 <DropdownMenuItem 
-                                    className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                    className="text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/30"
                                     onClick={() => onDelete(report)}
                                 >
                                     <Trash2 className="mr-2 h-4 w-4" />

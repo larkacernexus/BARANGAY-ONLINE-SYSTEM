@@ -294,7 +294,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                     {/* Login Details */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Login Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="p-6">
                                 <div className="flex items-start gap-4">
                                     <div className={`p-3 rounded-lg ${getStatusClass(log.is_successful)}`}>
@@ -351,7 +351,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="p-2 bg-white dark:bg-gray-800 rounded">
+                                                            <div className="p-2 bg-white dark:bg-gray-900 rounded">
                                                                 <UserIcon className="h-4 w-4" />
                                                             </div>
                                                             <div className="flex-1">
@@ -364,7 +364,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                                     </div>
                                                     <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="p-2 bg-white dark:bg-gray-800 rounded">
+                                                            <div className="p-2 bg-white dark:bg-gray-900 rounded">
                                                                 <UserIcon className="h-4 w-4" />
                                                             </div>
                                                             <div className="flex-1">
@@ -378,7 +378,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                                     {log.user.username && (
                                                         <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="p-2 bg-white dark:bg-gray-800 rounded">
+                                                                <div className="p-2 bg-white dark:bg-gray-900 rounded">
                                                                     <UserIcon className="h-4 w-4" />
                                                                 </div>
                                                                 <div className="flex-1">
@@ -480,7 +480,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                                 {log.ip_address && (
                                                     <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                                                         <div className="flex items-center gap-3 mb-2">
-                                                            <div className="p-2 bg-white dark:bg-gray-800 rounded">
+                                                            <div className="p-2 bg-white dark:bg-gray-900 rounded">
                                                                 <Globe className="h-4 w-4" />
                                                             </div>
                                                             <div className="flex-1">
@@ -503,7 +503,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                                     <>
                                                         <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                                                             <div className="flex items-center gap-3 mb-2">
-                                                                <div className="p-2 bg-white dark:bg-gray-800 rounded">
+                                                                <div className="p-2 bg-white dark:bg-gray-900 rounded">
                                                                     {getDeviceIcon(log.device_type || userAgentDetails.device)}
                                                                 </div>
                                                                 <div className="flex-1">
@@ -524,7 +524,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                                         
                                                         <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                                                             <div className="flex items-center gap-3 mb-2">
-                                                                <div className="p-2 bg-white dark:bg-gray-800 rounded">
+                                                                <div className="p-2 bg-white dark:bg-gray-900 rounded">
                                                                     {getBrowserIcon(log.browser || userAgentDetails.browser)}
                                                                 </div>
                                                                 <div className="flex-1">
@@ -543,7 +543,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                                         
                                                         <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                                                             <div className="flex items-center gap-3 mb-2">
-                                                                <div className="p-2 bg-white dark:bg-gray-800 rounded">
+                                                                <div className="p-2 bg-white dark:bg-gray-900 rounded">
                                                                     <HardDrive className="h-4 w-4" />
                                                                 </div>
                                                                 <div className="flex-1">
@@ -569,7 +569,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                             <div>
                                                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Raw User Agent</h3>
                                                 <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
-                                                    <pre className="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded overflow-x-auto max-h-48 overflow-y-auto">
+                                                    <pre className="text-xs bg-gray-100 dark:bg-gray-900 p-3 rounded overflow-x-auto max-h-48 overflow-y-auto">
                                                         {log.user_agent}
                                                     </pre>
                                                 </div>
@@ -582,7 +582,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                         
                         {/* Related Logs */}
                         {related_logs && related_logs.length > 0 && (
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Related Login Activities</h3>
                                 <div className="space-y-3">
                                     {related_logs.slice(0, 5).map((relatedLog) => (
@@ -638,7 +638,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                     {/* Sidebar with Quick Info & Actions */}
                     <div className="space-y-6">
                         {/* Quick Info Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Information</h3>
                             
                             <div className="space-y-3">
@@ -687,7 +687,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                         </div>
                         
                         {/* Actions Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Actions</h3>
                             
                             <div className="space-y-3">
@@ -702,7 +702,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                         </Link>
                                         <Link
                                             href={`/reports/login-logs?user_id=${log.user.id}`}
-                                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                                         >
                                             <FileText className="h-4 w-4" />
                                             View User's Login History
@@ -713,7 +713,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                 {log.ip_address && (
                                     <Link
                                         href={`/reports/login-logs?search=${log.ip_address}`}
-                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                                     >
                                         <Network className="h-4 w-4" />
                                         Find by IP Address
@@ -722,7 +722,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                                 
                                 <Link
                                     href="/reports/login-logs"
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
                                 >
                                     <ArrowLeft className="h-4 w-4" />
                                     Back to All Logs
@@ -731,7 +731,7 @@ export default function LoginLogShow({ log, related_logs }: LoginLogShowProps) {
                         </div>
                         
                         {/* Security Notes */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <Shield className="h-5 w-5 text-amber-500" />
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Security Notes</h3>

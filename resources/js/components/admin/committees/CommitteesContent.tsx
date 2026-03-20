@@ -3,16 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox'; // ADD THIS
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CommitteesTable } from './CommitteesTable';
 import { CommitteesGridView } from './CommitteesGridView';
 import { CommitteesBulkActions } from './CommitteesBulkActions';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { Pagination } from '@/components/adminui/pagination';
-import { SelectAllFloat } from '@/components/adminui/select-all-float'; // ADD THIS
-import { GridSelectionSummary } from '@/components/adminui/grid-selection-summary'; // ADD THIS
-import { Grid3X3, List } from 'lucide-react';
+import { SelectAllFloat } from '@/components/adminui/select-all-float';
+import { GridSelectionSummary } from '@/components/adminui/grid-selection-summary';
+import { Grid3X3, List, Users } from 'lucide-react';
 import { Committee } from '@/types/committees';
 
 interface CommitteesContentProps {
@@ -35,7 +35,7 @@ interface CommitteesContentProps {
     onDelete: (committee: Committee) => void;
     onToggleStatus: (committee: Committee) => void;
     onToggleBulkMode: () => void;
-    onClearSelection?: () => void; // ADD OPTIONAL PROP
+    onClearSelection?: () => void;
 }
 
 export function CommitteesContent({
@@ -58,11 +58,11 @@ export function CommitteesContent({
     onDelete,
     onToggleStatus,
     onToggleBulkMode,
-    onClearSelection = () => {} // ADD DEFAULT
+    onClearSelection = () => {}
 }: CommitteesContentProps) {
     return (
         <>
-            {/* ADD: Floating Select All for Grid View */}
+            {/* Floating Select All for Grid View */}
             {viewMode === 'grid' && committees.length > 0 && selectedIds.length < committees.length && isBulkMode && (
                 <SelectAllFloat
                     isSelectAll={isSelectAll}
@@ -86,13 +86,13 @@ export function CommitteesContent({
                 />
             )}
 
-            <Card className="overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <Card className="overflow-hidden border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-4">
-                        <CardTitle className="text-lg sm:text-xl">
+                        <CardTitle className="text-lg sm:text-xl dark:text-gray-100">
                             Committees List
                             {selectedIds.length > 0 && isBulkMode && (
-                                <span className="ml-2 text-sm font-normal text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                <span className="ml-2 text-sm font-normal text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30 px-2 py-1 rounded">
                                     {selectedIds.length} selected
                                 </span>
                             )}
@@ -103,40 +103,55 @@ export function CommitteesContent({
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className={`h-8 w-8 p-0 ${viewMode === 'table' ? 'bg-gray-100' : ''}`}
+                                        className={`h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-900 ${
+                                            viewMode === 'table' 
+                                                ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' 
+                                                : ''
+                                        }`}
                                         onClick={() => onViewModeChange('table')}
                                     >
                                         <List className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Table view</TooltipContent>
+                                <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
+                                    Table view
+                                </TooltipContent>
                             </Tooltip>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className={`h-8 w-8 p-0 ${viewMode === 'grid' ? 'bg-gray-100' : ''}`}
+                                        className={`h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-900 ${
+                                            viewMode === 'grid' 
+                                                ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' 
+                                                : ''
+                                        }`}
                                         onClick={() => onViewModeChange('grid')}
                                     >
                                         <Grid3X3 className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Grid view</TooltipContent>
+                                <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
+                                    Grid view
+                                </TooltipContent>
                             </Tooltip>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        {/* ADD: Grid view select all checkbox */}
+                        {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && committees.length > 0 && (
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="select-all-grid"
                                     checked={isSelectAll}
                                     onCheckedChange={onSelectAllOnPage}
-                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
                                 />
-                                <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap">
+                                <Label 
+                                    htmlFor="select-all-grid" 
+                                    className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300"
+                                >
                                     {isSelectAll ? 'Deselect Page' : 'Select Page'}
                                 </Label>
                             </div>
@@ -149,30 +164,41 @@ export function CommitteesContent({
                                         <Switch
                                             checked={isBulkMode}
                                             onCheckedChange={onToggleBulkMode}
-                                            className="data-[state=checked]:bg-blue-600"
+                                            className="data-[state=checked]:bg-blue-600 h-5 w-9 dark:data-[state=checked]:bg-blue-600"
                                         />
-                                        <Label htmlFor="bulk-mode" className="text-sm font-medium cursor-pointer whitespace-nowrap">
+                                        <Label 
+                                            htmlFor="bulk-mode" 
+                                            className="text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300"
+                                        >
                                             Bulk Mode
                                         </Label>
                                     </div>
                                 </TooltipTrigger>
-                                <TooltipContent>
+                                <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                     <p>Toggle bulk selection mode</p>
-                                    <p className="text-xs text-gray-500">Ctrl+Shift+B • Ctrl+A to select</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Ctrl+Shift+B • Ctrl+A to select</p>
                                 </TooltipContent>
                             </Tooltip>
                         </div>
                         
-                        <div className="text-sm text-gray-500 hidden sm:block">
+                        <div className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
                             Page {currentPage} of {totalPages}
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="p-0">
+                <CardContent className="p-0 dark:bg-gray-900">
                     {committees.length === 0 ? (
-                        <EmptyState 
-                            hasActiveFilters={hasActiveFilters}
-                            onClearFilters={onClearFilters}
+                        <EmptyState
+                            icon={<Users className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
+                            title="No committees found"
+                            description={hasActiveFilters 
+                                ? "No committees match your current filters. Try adjusting your search or filters."
+                                : "No committees have been created yet."}
+                            action={hasActiveFilters ? {
+                                label: "Clear Filters",
+                                onClick: onClearFilters
+                            } : undefined}
+                            className="py-12 sm:py-16"
                         />
                     ) : viewMode === 'table' ? (
                         <CommitteesTable
@@ -197,7 +223,7 @@ export function CommitteesContent({
                                 isMobile={isMobile}
                             />
                             
-                            {/* ADD: Grid Selection Summary */}
+                            {/* Grid Selection Summary */}
                             {viewMode === 'grid' && isBulkMode && selectedIds.length > 0 && (
                                 <GridSelectionSummary
                                     selectedCount={selectedIds.length}
@@ -205,20 +231,22 @@ export function CommitteesContent({
                                     isSelectAll={isSelectAll}
                                     onSelectAll={onSelectAllOnPage}
                                     onClearSelection={onClearSelection}
-                                    className="mt-4 mx-4"
+                                    className="mt-4 mx-4 dark:text-gray-300"
                                 />
                             )}
                         </>
                     )}
 
                     {totalPages > 1 && (
-                        <Pagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            totalItems={totalItems}
-                            itemsPerPage={itemsPerPage}
-                            onPageChange={onPageChange}
-                        />
+                        <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                totalItems={totalItems}
+                                itemsPerPage={itemsPerPage}
+                                onPageChange={onPageChange}
+                            />
+                        </div>
                     )}
                 </CardContent>
             </Card>

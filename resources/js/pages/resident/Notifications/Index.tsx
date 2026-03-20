@@ -227,7 +227,7 @@ const NotificationIcon = ({ notification }: { notification: Notification }) => {
 
   return (
     <div className={cn(
-      "p-3 rounded-xl bg-white dark:bg-gray-800 shadow-sm border",
+      "p-3 rounded-xl bg-white dark:bg-gray-900 shadow-sm border",
       color
     )}>
       <Icon className="h-5 w-5" />
@@ -326,7 +326,7 @@ const NotificationCard = ({
         "relative overflow-hidden transition-all duration-200 hover:shadow-md",
         !notification.read_at 
           ? 'border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20' 
-          : 'hover:bg-gray-50/50 dark:hover:bg-gray-800/50',
+          : 'hover:bg-gray-50/50 dark:hover:bg-gray-900/50',
         isHovered && !selectMode && 'scale-[1.01]',
         selectMode && 'cursor-pointer',
         isSelected && 'ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/20',
@@ -426,7 +426,7 @@ const NotificationCard = ({
                 )}
                 
                 {notification.fee_code && (
-                  <Badge variant="outline" className="text-xs font-mono bg-gray-50 dark:bg-gray-800">
+                  <Badge variant="outline" className="text-xs font-mono bg-gray-50 dark:bg-gray-900">
                     #{notification.fee_code}
                   </Badge>
                 )}
@@ -497,7 +497,7 @@ const NotificationCard = ({
                     {/* Custom dropdown menu - Simple with only Copy ID and Open in new tab */}
                     {dropdownOpen && (
                       <div 
-                        className="absolute right-0 bottom-full mb-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 dropdown-menu"
+                        className="absolute right-0 bottom-full mb-1 w-48 bg-white dark:bg-gray-900 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 dropdown-menu"
                         style={{ 
                           zIndex: 9999,
                           position: 'absolute',

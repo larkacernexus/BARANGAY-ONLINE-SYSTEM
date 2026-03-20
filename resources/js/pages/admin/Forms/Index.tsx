@@ -423,7 +423,7 @@ export default function FormsIndex({
     };
 
     const handleDownload = (form: Form) => {
-        window.open(`/forms/${form.id}/download`, '_blank');
+        window.open(`/admin/forms/${form.id}/download`, '_blank');
     };
 
     const handleSort = (column: string) => {
@@ -598,7 +598,7 @@ export default function FormsIndex({
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border hidden sm:block">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border hidden sm:block">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <KeyRound className="h-4 w-4 text-gray-500" />

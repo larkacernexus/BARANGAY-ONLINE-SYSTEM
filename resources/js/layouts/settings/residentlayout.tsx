@@ -14,7 +14,6 @@ import {
   Settings as SettingsIcon,
   Bell,
   Smartphone,
-  CreditCard,
   ShieldCheck,
   HelpCircle,
   ChevronDown,
@@ -22,22 +21,7 @@ import {
   Search,
   X,
   Command,
-  Activity,
-  LogIn,
-  LogOut,
-  FileText,
-  DollarSign,
-  AlertTriangle,
-  CheckCircle,
-  Eye,
-  Download,
-  Edit,
-  Trash2,
-  Plus,
-  Calendar,
-  Filter,
-  RefreshCw,
-  MoreHorizontal
+  ActivityIcon
 } from 'lucide-react';
 
 // Extended type that includes description
@@ -53,7 +37,7 @@ type ExtendedNavItem = NavItem & {
   }>;
 };
 
-// Navigation items with Activities tab added
+// Navigation items - Updated Help link to point to /portal/instructions
 const settingsNavItems: ExtendedNavItem[] = [
   {
     title: 'Profile',
@@ -117,8 +101,15 @@ const settingsNavItems: ExtendedNavItem[] = [
   {
     title: 'Activities',
     href: '/residentsettings/activities',
-    icon: Activity,
+    icon: ActivityIcon,
     description: 'View your account activity & audit logs',
+    exact: true,
+  },
+  {
+    title: 'Help',
+    href: '/portal/instructions',
+    icon: HelpCircle,
+    description: 'Guides and instructions',
     exact: true,
   },
 ];
@@ -133,48 +124,6 @@ type SearchResult = {
   icon?: React.ComponentType<any>;
   keywords?: string[];
 };
-
-// Activity Item Type (keep this for type safety)
-type ActivityItem = {
-  id: string;
-  type: 'login' | 'logout' | 'payment' | 'document' | 'profile' | 'security' | 'settings' | 'report' | 'announcement';
-  action: string;
-  description: string;
-  timestamp: string;
-  status?: 'success' | 'pending' | 'failed';
-  ip_address?: string;
-  device?: string;
-  location?: string;
-  resource_type?: string;
-  resource_id?: string;
-  metadata?: Record<string, any>;
-};
-
-// Props interface for the layout
-interface SettingsLayoutProps extends PropsWithChildren {
-  activities?: ActivityItem[];
-  stats?: {
-    total: number;
-    successful: number;
-    pending: number;
-    failed: number;
-    logins: number;
-    payments: number;
-    documents: number;
-    audits: number;
-    loginSuccess: number;
-    loginFailed: number;
-    paymentSuccess: number;
-    paymentPending: number;
-    paymentFailed: number;
-    today: number;
-    thisWeek: number;
-    thisMonth: number;
-    profile?: number;
-    security?: number;
-    settings?: number;
-  };
-}
 
 // Helper functions
 const isActivePath = (currentPath: string, itemHref: string, exact: boolean = true) => {
@@ -207,9 +156,8 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
     { id: '5', title: 'Notification Preferences', description: 'Manage your notifications', href: '/residentsettings/preferences/notifications', category: 'Preferences', icon: Bell, keywords: ['notifications', 'alerts', 'email'] },
     { id: '6', title: 'Connected Devices', description: 'View and manage devices', href: '/residentsettings/devices', category: 'Devices', icon: Smartphone, keywords: ['devices', 'sessions', 'active'] },
     { id: '7', title: 'Privacy Settings', description: 'Control your data privacy', href: '/residentsettings/privacy', category: 'Privacy', icon: Shield, keywords: ['privacy', 'data', 'share'] },
-    { id: '8', title: 'Activity Log', description: 'View your account activity', href: '/residentsettings/activities', category: 'Activities', icon: Activity, keywords: ['activity', 'log', 'history', 'audit'] },
-    { id: '9', title: 'Login History', description: 'See your recent logins', href: '/residentsettings/activities?tab=logins', category: 'Activities', icon: LogIn, keywords: ['login', 'signin', 'access'] },
-    { id: '10', title: 'Payment History', description: 'View your payment records', href: '/residentsettings/activities?tab=payments', category: 'Activities', icon: DollarSign, keywords: ['payment', 'transaction', 'receipt'] },
+    { id: '8', title: 'Activity Log', description: 'View your account activity', href: '/residentsettings/activities', category: 'Activities', icon: ActivityIcon, keywords: ['activity', 'log', 'history', 'audit'] },
+    { id: '9', title: 'Help & Instructions', description: 'Guides and tutorials', href: '/portal/instructions', category: 'Help', icon: HelpCircle, keywords: ['help', 'guide', 'instructions', 'support', 'tutorial'] },
   ];
 
   useEffect(() => {
@@ -389,21 +337,33 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
                 <div>
                   <span className="text-xs font-medium text-muted-foreground px-2">SUGGESTIONS</span>
                   <div className="grid grid-cols-2 gap-2 mt-2">
-                    <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted">
+                    <button 
+                      onClick={() => window.location.href = '/residentsettings/profile'}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted"
+                    >
                       <User className="h-4 w-4" />
                       <span>Profile</span>
                     </button>
-                    <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted">
+                    <button 
+                      onClick={() => window.location.href = '/residentsettings/security/password'}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted"
+                    >
                       <Lock className="h-4 w-4" />
                       <span>Password</span>
                     </button>
-                    <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted">
+                    <button 
+                      onClick={() => window.location.href = '/residentsettings/preferences/notifications'}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted"
+                    >
                       <Bell className="h-4 w-4" />
                       <span>Notifications</span>
                     </button>
-                    <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted">
-                      <Activity className="h-4 w-4" />
-                      <span>Activity Log</span>
+                    <button 
+                      onClick={() => window.location.href = '/portal/instructions'}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted"
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                      <span>Help</span>
                     </button>
                   </div>
                 </div>
@@ -421,307 +381,6 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
               <span>ESC to close</span>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Activity Log Component - Now receives activities from props
-const ActivityLog = ({ activities = [], stats = {} }: { activities?: ActivityItem[], stats?: any }) => {
-  const [filter, setFilter] = useState<string>('all');
-  const [timeRange, setTimeRange] = useState<string>('all');
-  const [view, setView] = useState<'list' | 'compact'>('list');
-
-  const getActivityIcon = (type: ActivityItem['type'], status?: ActivityItem['status']) => {
-    switch (type) {
-      case 'login':
-        return <LogIn className="h-4 w-4 text-green-500" />;
-      case 'logout':
-        return <LogOut className="h-4 w-4 text-gray-500" />;
-      case 'payment':
-        return status === 'failed' 
-          ? <AlertTriangle className="h-4 w-4 text-red-500" />
-          : <DollarSign className="h-4 w-4 text-blue-500" />;
-      case 'document':
-        return <FileText className="h-4 w-4 text-purple-500" />;
-      case 'profile':
-        return <User className="h-4 w-4 text-indigo-500" />;
-      case 'security':
-        return <Shield className="h-4 w-4 text-yellow-500" />;
-      case 'settings':
-        return <SettingsIcon className="h-4 w-4 text-gray-500" />;
-      case 'report':
-        return <AlertTriangle className="h-4 w-4 text-orange-500" />;
-      case 'announcement':
-        return <Bell className="h-4 w-4 text-pink-500" />;
-      default:
-        return <Activity className="h-4 w-4" />;
-    }
-  };
-
-  const getStatusBadge = (status?: ActivityItem['status']) => {
-    if (!status) return null;
-    
-    const variants = {
-      success: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-      pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-      failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-    };
-
-    return (
-      <Badge className={cn('text-xs', variants[status])}>
-        {status}
-      </Badge>
-    );
-  };
-
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Filter activities based on selected filter
-  const filteredActivities = activities
-    .filter(activity => filter === 'all' || activity.type === filter)
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-  return (
-    <div className="space-y-4">
-      {/* Activity Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-muted-foreground" />
-          <h3 className="text-lg font-medium">Account Activity</h3>
-          <Badge variant="secondary" className="ml-2">
-            {activities.length} events
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Activity Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge 
-          variant={filter === 'all' ? 'default' : 'outline'}
-          className="cursor-pointer"
-          onClick={() => setFilter('all')}
-        >
-          All Activity
-        </Badge>
-        <Badge 
-          variant={filter === 'login' ? 'default' : 'outline'}
-          className="cursor-pointer"
-          onClick={() => setFilter('login')}
-        >
-          Logins
-        </Badge>
-        <Badge 
-          variant={filter === 'payment' ? 'default' : 'outline'}
-          className="cursor-pointer"
-          onClick={() => setFilter('payment')}
-        >
-          Payments
-        </Badge>
-        <Badge 
-          variant={filter === 'document' ? 'default' : 'outline'}
-          className="cursor-pointer"
-          onClick={() => setFilter('document')}
-        >
-          Documents
-        </Badge>
-        <Badge 
-          variant={filter === 'profile' ? 'default' : 'outline'}
-          className="cursor-pointer"
-          onClick={() => setFilter('profile')}
-        >
-          Profile
-        </Badge>
-        <Badge 
-          variant={filter === 'security' ? 'default' : 'outline'}
-          className="cursor-pointer"
-          onClick={() => setFilter('security')}
-        >
-          Security
-        </Badge>
-        <Badge 
-          variant={filter === 'settings' ? 'default' : 'outline'}
-          className="cursor-pointer"
-          onClick={() => setFilter('settings')}
-        >
-          Settings
-        </Badge>
-      </div>
-
-      {/* Time Range Filter */}
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Time:</span>
-        {['All time', 'Today', 'This week', 'This month', 'Custom'].map((range) => (
-          <button
-            key={range}
-            onClick={() => setTimeRange(range.toLowerCase())}
-            className={cn(
-              'px-2 py-1 rounded-md transition-colors',
-              timeRange === range.toLowerCase() 
-                ? 'bg-primary/10 text-primary font-medium' 
-                : 'hover:bg-muted text-muted-foreground'
-            )}
-          >
-            {range}
-          </button>
-        ))}
-      </div>
-
-      {/* Activity List - Now using real data */}
-      <div className="space-y-3">
-        {filteredActivities.length > 0 ? (
-          filteredActivities.map((activity, index) => (
-            <div
-              key={activity.id}
-              className={cn(
-                'group relative rounded-lg border p-4 transition-all hover:shadow-md',
-                activity.status === 'failed' && 'border-red-200 bg-red-50/50 dark:border-red-900 dark:bg-red-950/10',
-                activity.status === 'pending' && 'border-yellow-200 bg-yellow-50/50 dark:border-yellow-900 dark:bg-yellow-950/10'
-              )}
-            >
-              <div className="flex items-start gap-4">
-                {/* Icon */}
-                <div className={cn(
-                  'p-2 rounded-full',
-                  activity.status === 'failed' ? 'bg-red-100 dark:bg-red-900/20' :
-                  activity.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/20' :
-                  'bg-primary/10'
-                )}>
-                  {getActivityIcon(activity.type, activity.status)}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{activity.action}</span>
-                        {getStatusBadge(activity.status)}
-                        <Badge variant="outline" className="text-xs">
-                          {activity.type}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {activity.description}
-                      </p>
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {formatTimestamp(activity.timestamp)}
-                    </span>
-                  </div>
-
-                  {/* Metadata */}
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    {activity.ip_address && (
-                      <span className="flex items-center gap-1">
-                        <span className="font-mono">{activity.ip_address}</span>
-                      </span>
-                    )}
-                    {activity.device && (
-                      <span className="flex items-center gap-1">
-                        <Smartphone className="h-3 w-3" />
-                        {activity.device}
-                      </span>
-                    )}
-                    {activity.location && (
-                      <span className="flex items-center gap-1">
-                        <span>📍</span>
-                        {activity.location}
-                      </span>
-                    )}
-                    {activity.resource_id && (
-                      <span className="flex items-center gap-1">
-                        <FileText className="h-3 w-3" />
-                        {activity.resource_id}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Timeline Connector */}
-              {index < filteredActivities.length - 1 && (
-                <div className="absolute left-8 top-14 bottom-0 w-px bg-border" />
-              )}
-            </div>
-          ))
-        ) : (
-          <div className="text-center py-12 border rounded-lg bg-muted/10">
-            <Activity className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-            <p className="text-muted-foreground">No activities found</p>
-            <p className="text-sm text-muted-foreground/70 mt-1">
-              Activities will appear here when you perform actions
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Load More - Only show if there are more activities */}
-      {activities.length > 10 && (
-        <div className="flex justify-center pt-4">
-          <Button variant="outline">
-            Load More Activities
-          </Button>
-        </div>
-      )}
-
-      {/* Activity Summary - Using real stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6 pt-6 border-t">
-        <div className="text-center">
-          <div className="text-2xl font-bold">{stats.total || 0}</div>
-          <div className="text-xs text-muted-foreground">Total Activities</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-green-600">{stats.successful || 0}</div>
-          <div className="text-xs text-muted-foreground">Successful</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-yellow-600">{stats.pending || 0}</div>
-          <div className="text-xs text-muted-foreground">Pending</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-red-600">{stats.failed || 0}</div>
-          <div className="text-xs text-muted-foreground">Failed</div>
         </div>
       </div>
     </div>
@@ -942,15 +601,15 @@ const MobileNavigation = ({
           );
         })}
 
-        {/* Help Link */}
+        {/* Help Link - Updated to /portal/instructions */}
         <div className="pt-4 mt-4 border-t">
           <Link
-            href="/help/settings"
+            href="/portal/instructions"
             onClick={onLinkClick}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-muted transition-colors text-muted-foreground"
           >
             <HelpCircle className="h-4 w-4" />
-            <span>Help & Support</span>
+            <span>Help & Instructions</span>
           </Link>
         </div>
       </nav>
@@ -959,19 +618,10 @@ const MobileNavigation = ({
 };
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
-  const { url, props } = usePage();
+  const { url } = usePage();
   const currentPath = url;
   const [showMobileNav, setShowMobileNav] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
-  
-  // Get activities and stats from props
-  const activities = (props as any).activities || [];
-  const stats = (props as any).stats || {
-    total: 0,
-    successful: 0,
-    pending: 0,
-    failed: 0
-  };
   
   // Get current section for breadcrumb
   const currentSection = settingsNavItems.find(item => 
@@ -1093,9 +743,9 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             );
           })}
 
-          {/* Help Link */}
+          {/* Help Link - Now points to /portal/instructions */}
           <Link
-            href="/help/settings"
+            href="/portal/instructions"
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium hover:bg-muted text-muted-foreground hover:text-foreground whitespace-nowrap ml-auto"
           >
             <HelpCircle className="h-4 w-4" />
@@ -1122,15 +772,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
           )}
         </div>
 
-        {/* Main Content - NOW USING REAL DATA FROM SERVER */}
+        {/* Main Content - Just render children */}
         <main className="mt-6">
           <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
             <div className="p-6">
-              {currentPath.includes('/residentsettings/activities') ? (
-                <ActivityLog activities={activities} stats={stats} />
-              ) : (
-                children
-              )}
+              {children}
             </div>
           </div>
 

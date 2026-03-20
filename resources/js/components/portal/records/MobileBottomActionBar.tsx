@@ -68,7 +68,7 @@ export function MobileBottomActionBar({
               variant="outline"
               size="sm"
               onClick={onCancel}
-              className="flex-1 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+              className="flex-1 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
               disabled={processing}
             >
               Cancel

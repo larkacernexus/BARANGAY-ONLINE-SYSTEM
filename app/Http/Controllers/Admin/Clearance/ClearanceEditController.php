@@ -9,18 +9,40 @@ use Inertia\Inertia;
 
 class ClearanceEditController extends Controller
 {
-    public function __invoke(ClearanceRequest $clearance)
+    public function edit(ClearanceRequest $clearance)
     {
-        // Load necessary relationships
-        $this->loadRelationships($clearance);
+        $clearance->load(['clearanceType', 'contactPurok', 'payment']);
         
-        // Get active clearance types
-        $clearanceTypes = $this->getClearanceTypes();
+        // Load payer based on type
+        if ($clearance->payer_type === 'resident') {
+            $clearance->load('resident.purok');
+        } elseif ($clearance->payer_type === 'household') {
+            $clearance->load(['household' => fn($q) => $q->with(['householdMembers.resident', 'purok'])]);
+        } elseif ($clearance->payer_type === 'business') {
+            $clearance->load(['business' => fn($q) => $q->with(['owner', 'purok'])]);
+        }
 
-        // Format the data for Inertia
+        $clearanceTypes = ClearanceType::active()
+            ->orderBy('name')
+            ->get()
+            ->map(fn($type) => [
+                'id' => $type->id,
+                'name' => $type->name,
+                'code' => $type->code,
+                'description' => $type->description,
+                'fee' => (float) $type->fee,
+                'processing_days' => $type->processing_days,
+                'validity_days' => $type->validity_days,
+                'formatted_fee' => $type->formatted_fee,
+                'requires_payment' => $type->requires_payment,
+                'requires_approval' => $type->requires_approval,
+                'is_online_only' => $type->is_online_only,
+                'is_discountable' => (bool) $type->is_discountable,
+                'purpose_options' => $type->purpose_options,
+            ]);
+
         $formattedClearance = $this->formatClearance($clearance);
-
-        // Get purpose options
+        
         $purposeOptions = $this->getPurposeOptions($clearance);
 
         return Inertia::render('admin/Clearances/Edit', [
@@ -30,48 +52,7 @@ class ClearanceEditController extends Controller
         ]);
     }
 
-    protected function loadRelationships(ClearanceRequest $clearance): void
-    {
-        $clearance->load(['clearanceType', 'contactPurok', 'payment']);
-        
-        if ($clearance->payer_type === 'resident') {
-            $clearance->load('resident.purok');
-        } elseif ($clearance->payer_type === 'household') {
-            $clearance->load(['household' => function ($query) {
-                $query->with(['householdMembers.resident', 'purok']);
-            }]);
-        } elseif ($clearance->payer_type === 'business') {
-            $clearance->load(['business' => function ($query) {
-                $query->with(['owner', 'purok']);
-            }]);
-        }
-    }
-
-    protected function getClearanceTypes(): array
-    {
-        return ClearanceType::active()
-            ->orderBy('name')
-            ->get()
-            ->map(function ($type) {
-                return [
-                    'id' => $type->id,
-                    'name' => $type->name,
-                    'code' => $type->code,
-                    'description' => $type->description,
-                    'fee' => (float) $type->fee,
-                    'processing_days' => $type->processing_days,
-                    'validity_days' => $type->validity_days,
-                    'formatted_fee' => $type->formatted_fee,
-                    'requires_payment' => $type->requires_payment,
-                    'requires_approval' => $type->requires_approval,
-                    'is_discountable' => (bool) $type->is_discountable,
-                    'requirements' => $type->documentRequirements()->get()->map(fn($req) => $req->name)->toArray(),
-                    'purpose_options' => $type->purpose_options,
-                ];
-            })->toArray();
-    }
-
-    protected function formatClearance(ClearanceRequest $clearance): array
+    private function formatClearance($clearance)
     {
         return [
             'id' => $clearance->id,
@@ -79,7 +60,7 @@ class ClearanceEditController extends Controller
             'clearance_number' => $clearance->clearance_number,
             'payer_type' => $clearance->payer_type,
             'payer_id' => $clearance->payer_id,
-            'payer_display' => $clearance->payer_display,
+            'payer_name' => $clearance->payer_name,
             'resident_id' => $clearance->resident_id,
             'contact_name' => $clearance->contact_name,
             'contact_number' => $clearance->contact_number,
@@ -99,40 +80,34 @@ class ClearanceEditController extends Controller
             'status' => $clearance->status,
             'issue_date' => $clearance->issue_date?->toDateString(),
             'valid_until' => $clearance->valid_until?->toDateString(),
-            'payment_id' => $clearance->payment_id,
             'payment_status' => $clearance->payment_status,
             'amount_paid' => (float) $clearance->amount_paid,
             'balance' => (float) $clearance->balance,
+            'clearance_type' => $clearance->clearanceType ? [
+                'id' => $clearance->clearanceType->id,
+                'name' => $clearance->clearanceType->name,
+                'code' => $clearance->clearanceType->code,
+                'fee' => (float) $clearance->clearanceType->fee,
+                'requires_payment' => $clearance->clearanceType->requires_payment,
+                'requires_approval' => $clearance->clearanceType->requires_approval,
+                'is_discountable' => (bool) $clearance->clearanceType->is_discountable,
+            ] : null,
             'status_display' => $clearance->status_display,
             'payment_status_display' => $clearance->payment_status_display,
             'urgency_display' => $clearance->urgency_display,
             'formatted_fee' => $clearance->formatted_fee,
             'is_fully_paid' => $clearance->is_fully_paid,
-            'clearance_type' => $clearance->clearanceType ? [
-                'id' => $clearance->clearanceType->id,
-                'name' => $clearance->clearanceType->name,
-                'requires_payment' => $clearance->clearanceType->requires_payment,
-                'is_discountable' => (bool) $clearance->clearanceType->is_discountable,
-            ] : null,
         ];
     }
 
-    protected function getPurposeOptions(ClearanceRequest $clearance): array
+    private function getPurposeOptions($clearance)
     {
+        $purposeOptions = [];
         if ($clearance->clearanceType && $clearance->clearanceType->purpose_options) {
-            return is_array($clearance->clearanceType->purpose_options) 
+            $purposeOptions = is_array($clearance->clearanceType->purpose_options) 
                 ? $clearance->clearanceType->purpose_options
                 : array_map('trim', explode(',', $clearance->clearanceType->purpose_options));
         }
-        
-        return [
-            'Employment',
-            'Business Registration',
-            'Travel',
-            'School Requirement',
-            'Government Transaction',
-            'Loan Application',
-            'Other',
-        ];
+        return $purposeOptions;
     }
 }

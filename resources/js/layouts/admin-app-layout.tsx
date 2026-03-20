@@ -5,6 +5,7 @@ import MobileStickyFooter from '@/layouts/mobile-sticky-footer';
 import { usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react'; 
 import { Loader2 } from 'lucide-react';
+import { initializeTheme } from '@/hooks/use-appearance'; // Add this import
 
 interface AppLayoutProps {
     children: ReactNode;
@@ -16,6 +17,11 @@ interface AppLayoutProps {
 export default ({ children, breadcrumbs, className = '', ...props }: AppLayoutProps) => {
     const { component } = usePage();
     const [isChangingPage, setIsChangingPage] = useState(false);
+    
+    // Initialize theme once when the app loads
+    useEffect(() => {
+        initializeTheme();
+    }, []);
     
     useEffect(() => {
         const handleStart = () => setIsChangingPage(true);
@@ -42,7 +48,7 @@ export default ({ children, breadcrumbs, className = '', ...props }: AppLayoutPr
             label: 'Residents', 
             href: '/residents',
             activePaths: ['/residents', '/residents/create', '/residents/edit']
-        },
+        }, 
         { 
             icon: 'user',
             label: 'Households', 

@@ -21,6 +21,13 @@ use Inertia\Inertia;
 Route::get('/dashboard', [ResidentDashboardController::class, 'residentdashboard'])
     ->name('dashboard');
 
+
+    // Search routes
+Route::get('/search', function () {
+    return Inertia::render('resident/Search/Index');
+})->name('search')->middleware(['auth']);
+
+
 Route::get('/instructions', function () {
     return Inertia::render('resident/Instructions/HouseholdInstructions', [
         'section' => request('section', 'overview'),

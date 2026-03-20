@@ -86,7 +86,7 @@ export const ModernClearanceTable = ({
             const StatusIcon = statusConfig?.icon;
 
             return (
-              <TableRow key={clearance.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+              <TableRow key={clearance.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                 {selectMode && (
                   <TableCell>
                     <input

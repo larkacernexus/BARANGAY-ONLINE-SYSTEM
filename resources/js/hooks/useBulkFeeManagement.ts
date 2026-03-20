@@ -6,17 +6,68 @@ interface UseBulkFeeManagementProps {
   setData: (key: string, value: any) => void;
   residents: Resident[];
   households: Household[];
+  // DYNAMIC: All privileges for reference
+  allPrivileges?: any[];
 }
+
+// ========== DYNAMIC PRIVILEGE HELPER FUNCTIONS ==========
+
+/**
+ * Check if resident has any active privileges
+ */
+const hasAnyPrivilege = (resident: Resident): boolean => {
+  if (!resident.privileges || !Array.isArray(resident.privileges)) {
+    return false;
+  }
+  
+  return resident.privileges.some((p: any) => 
+    p.status === 'active' || p.status === 'expiring_soon'
+  );
+};
+
+/**
+ * Get active privileges from resident
+ */
+const getActivePrivileges = (resident: Resident): any[] => {
+  if (!resident.privileges || !Array.isArray(resident.privileges)) {
+    return [];
+  }
+  
+  return resident.privileges.filter((p: any) => 
+    p.status === 'active' || p.status === 'expiring_soon'
+  );
+};
+
+/**
+ * Check if resident has a specific privilege
+ */
+const hasPrivilege = (resident: Resident, privilegeCode: string): boolean => {
+  if (!resident.privileges || !Array.isArray(resident.privileges)) {
+    return false;
+  }
+  
+  return resident.privileges.some((p: any) => {
+    if (p.status !== 'active' && p.status !== 'expiring_soon') return false;
+    const code = p.privilege?.code || p.code;
+    return code?.toUpperCase() === privilegeCode?.toUpperCase();
+  });
+};
 
 export const useBulkFeeManagement = ({
   data,
   setData,
   residents,
-  households
+  households,
+  allPrivileges = [] // DYNAMIC: All privileges from database
 }: UseBulkFeeManagementProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectAllResidents, setSelectAllResidents] = useState(false);
   const [selectAllHouseholds, setSelectAllHouseholds] = useState(false);
+
+  // DYNAMIC: Filter residents by discount eligibility (any privilege)
+  const isDiscountEligible = useCallback((resident: Resident): boolean => {
+    return hasAnyPrivilege(resident);
+  }, []);
 
   const filteredResidents = useMemo(() => {
     let filtered = [...residents];
@@ -27,13 +78,9 @@ export const useBulkFeeManagement = ({
       );
     }
     
+    // DYNAMIC: Filter by discount eligibility (any privilege)
     if (data.filter_discount_eligible) {
-      filtered = filtered.filter(resident => 
-        resident.is_senior || 
-        resident.is_pwd || 
-        resident.is_solo_parent || 
-        resident.is_indigent
-      );
+      filtered = filtered.filter(resident => isDiscountEligible(resident));
     }
     
     if (searchTerm) {
@@ -41,12 +88,17 @@ export const useBulkFeeManagement = ({
       filtered = filtered.filter(resident =>
         resident.full_name.toLowerCase().includes(term) ||
         resident.contact_number?.toLowerCase().includes(term) ||
-        resident.purok?.toLowerCase().includes(term)
+        resident.purok?.toLowerCase().includes(term) ||
+        // Search in privileges
+        resident.privileges?.some((p: any) => 
+          p.name?.toLowerCase().includes(term) ||
+          p.code?.toLowerCase().includes(term)
+        )
       );
     }
     
     return filtered;
-  }, [residents, data.filter_purok, data.filter_discount_eligible, searchTerm]);
+  }, [residents, data.filter_purok, data.filter_discount_eligible, searchTerm, isDiscountEligible]);
 
   const filteredHouseholds = useMemo(() => {
     let filtered = [...households];
@@ -62,7 +114,12 @@ export const useBulkFeeManagement = ({
       filtered = filtered.filter(household =>
         household.name.toLowerCase().includes(term) ||
         household.contact_number?.toLowerCase().includes(term) ||
-        household.purok?.toLowerCase().includes(term)
+        household.purok?.toLowerCase().includes(term) ||
+        // Search in head privileges
+        household.head_privileges?.some((p: any) => 
+          p.name?.toLowerCase().includes(term) ||
+          p.code?.toLowerCase().includes(term)
+        )
       );
     }
     
@@ -121,7 +178,6 @@ export const useBulkFeeManagement = ({
     setData('bulk_type', bulkType);
     
     if (previousBulkType !== 'none' && bulkType === 'none') {
-      // Reset bulk selections
       setData('selected_resident_ids', []);
       setData('selected_household_ids', []);
       setData('custom_payers', []);
@@ -210,6 +266,34 @@ export const useBulkFeeManagement = ({
     setSelectAllHouseholds(!selectAllHouseholds);
   }, [selectAllHouseholds, filteredHouseholds, setData]);
 
+  // DYNAMIC: Get statistics about selected residents' privileges
+  const selectedResidentsPrivileges = useMemo(() => {
+    if (data.bulk_type !== 'residents' || data.selected_resident_ids.length === 0) {
+      return { total: 0, byPrivilege: {} };
+    }
+    
+    const privilegeCounts: Record<string, number> = {};
+    let totalPrivileges = 0;
+    
+    residents
+      .filter(r => data.selected_resident_ids.includes(r.id.toString()))
+      .forEach(resident => {
+        if (resident.privileges && Array.isArray(resident.privileges)) {
+          resident.privileges.forEach((p: any) => {
+            if (p.status === 'active' || p.status === 'expiring_soon') {
+              const code = p.privilege?.code || p.code;
+              if (code) {
+                privilegeCounts[code] = (privilegeCounts[code] || 0) + 1;
+                totalPrivileges++;
+              }
+            }
+          });
+        }
+      });
+    
+    return { total: totalPrivileges, byPrivilege: privilegeCounts };
+  }, [data.bulk_type, data.selected_resident_ids, residents]);
+
   return {
     filteredResidents,
     filteredHouseholds,
@@ -227,5 +311,7 @@ export const useBulkFeeManagement = ({
     selectAllHouseholds,
     searchTerm,
     setSearchTerm,
+    // DYNAMIC: Additional data
+    selectedResidentsPrivileges,
   };
 };

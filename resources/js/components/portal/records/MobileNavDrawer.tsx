@@ -60,7 +60,7 @@ export function MobileNavDrawer({ isOpen, onClose, currentStep, totalSteps, step
                         ? 'bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' 
                         : isCompleted
                         ? 'bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800'
-                        : 'bg-gray-50 border border-gray-200 dark:bg-gray-800 dark:border-gray-700'
+                        : 'bg-gray-50 border border-gray-200 dark:bg-gray-900 dark:border-gray-700'
                     }`}
                   >
                     <div className={`
@@ -95,7 +95,7 @@ export function MobileNavDrawer({ isOpen, onClose, currentStep, totalSteps, step
             </div>
             
             {/* Quick Stats */}
-            <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
               <h4 className="font-medium text-sm mb-2 dark:text-white">Quick Stats</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -116,7 +116,7 @@ export function MobileNavDrawer({ isOpen, onClose, currentStep, totalSteps, step
           <div className="p-4 border-t dark:border-gray-800">
             <Button
               variant="outline"
-              className="w-full dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+              className="w-full dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
               onClick={onClose}
             >
               Close Menu

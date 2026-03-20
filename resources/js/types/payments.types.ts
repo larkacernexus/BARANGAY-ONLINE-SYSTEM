@@ -14,6 +14,7 @@ export interface PaymentItem {
 }
 
 export interface Payment {
+    notes: any;
     amount_paid: number;
     id: number;
     or_number: string;

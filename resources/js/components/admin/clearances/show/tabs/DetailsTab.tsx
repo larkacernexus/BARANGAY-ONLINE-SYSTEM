@@ -1,3 +1,4 @@
+// components/admin/clearances/show/tabs/DetailsTab.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -10,7 +11,13 @@ import {
     Mail, 
     MapPin, 
     FileCheck,
-    DollarSign
+    DollarSign,
+    Home,
+    Hash,
+    Clock,
+    AlertCircle,
+    CheckCircle,
+    XCircle
 } from 'lucide-react';
 import { ClearanceRequest, ClearanceType, Resident } from '@/types/clearance';
 
@@ -31,131 +38,213 @@ export function DetailsTab({
     formatCurrency, 
     getUrgencyVariant 
 }: DetailsTabProps) {
+    
+    const getStatusColor = (status: string): string => {
+        const colors: Record<string, string> = {
+            'paid': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+            'unpaid': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700',
+            'partially_paid': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+            'pending': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+        };
+        return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
+    };
+
     return (
         <div className="space-y-6">
-            <Card>
+            {/* Request Information Card */}
+            <Card className="dark:bg-gray-900">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
+                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center">
+                            <FileText className="h-3 w-3 text-white" />
+                        </div>
                         Request Information
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CardContent className="space-y-6">
+                    {/* Basic Info Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-500">Clearance Type</p>
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                <Hash className="h-3 w-3" />
+                                Reference Number
+                            </p>
+                            <p className="font-mono text-sm dark:text-gray-300">{clearance.reference_number}</p>
+                        </div>
+                        
+                        {clearance.clearance_number && (
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                    <FileCheck className="h-3 w-3" />
+                                    Clearance Number
+                                </p>
+                                <p className="font-mono text-sm dark:text-gray-300">{clearance.clearance_number}</p>
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Clearance Type</p>
                             <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="text-sm">
+                                <Badge variant="outline" className="text-sm bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
                                     {clearanceType?.name || 'N/A'}
                                 </Badge>
-                                <span className="text-xs text-gray-500">({clearanceType?.code})</span>
+                                {clearanceType?.code && (
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">({clearanceType.code})</span>
+                                )}
                             </div>
                         </div>
+
                         <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-500">Purpose</p>
-                            <p className="text-sm">{clearance.purpose}</p>
-                            {clearance.specific_purpose && (
-                                <p className="text-sm text-gray-500">{clearance.specific_purpose}</p>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-500">Urgency</p>
-                            <Badge variant={getUrgencyVariant(clearance.urgency)}>
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Urgency</p>
+                            <Badge variant={getUrgencyVariant(clearance.urgency)} className={
+                                clearance.urgency === 'express' ? 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' :
+                                clearance.urgency === 'rush' ? 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' :
+                                'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
+                            }>
                                 {clearance.urgency_display || clearance.urgency}
                             </Badge>
                         </div>
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-500">Fee Amount</p>
-                            <div className="flex items-center gap-2">
-                                <p className="text-lg font-semibold">
-                                    {formatCurrency(clearance.fee_amount)}
-                                </p>
-                                {clearanceType?.requires_payment === false && (
-                                    <Badge variant="outline" className="text-xs text-green-600">
-                                        Free
-                                    </Badge>
+                    </div>
+
+                    <Separator className="dark:bg-gray-700" />
+
+                    {/* Purpose Section */}
+                    <div className="space-y-4">
+                        <div>
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Purpose</p>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                                <p className="text-gray-700 dark:text-gray-300">{clearance.purpose || 'Not specified'}</p>
+                                {clearance.specific_purpose && (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{clearance.specific_purpose}</p>
                                 )}
-                                {clearanceType?.requires_payment === true && clearance.payment_status === 'paid' && (
-                                    <Badge variant="outline" className="text-xs text-green-600">
-                                        Paid
-                                    </Badge>
-                                )}
-                                {clearanceType?.requires_payment === true && clearance.payment_status === 'unpaid' && (
-                                    <Badge variant="outline" className="text-xs text-amber-600">
-                                        Unpaid
-                                    </Badge>
-                                )}
-                                {clearanceType?.requires_payment === true && clearance.payment_status === 'partially_paid' && (
-                                    <Badge variant="outline" className="text-xs text-blue-600">
-                                        Partially Paid
-                                    </Badge>
-                                )}
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-500">Requested Date</p>
-                            <div className="flex items-center gap-1 text-sm">
-                                <Calendar className="h-3 w-3" />
-                                {formatDate(clearance.created_at)}
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-500">Needed By</p>
-                            <div className="flex items-center gap-1 text-sm">
-                                <CalendarDays className="h-3 w-3" />
-                                {clearance.needed_date ? formatDate(clearance.needed_date) : 'Not specified'}
                             </div>
                         </div>
                     </div>
 
-                    {clearance.additional_requirements && (
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-500">Additional Requirements</p>
-                            <p className="text-sm text-gray-600">{clearance.additional_requirements}</p>
-                        </div>
-                    )}
+                    <Separator className="dark:bg-gray-700" />
 
-                    {clearance.requirements_met && clearance.requirements_met.length > 0 && (
+                    {/* Dates Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-500">Requirements Met</p>
-                            <div className="flex flex-wrap gap-2">
-                                {clearance.requirements_met.map((req: string, index: number) => (
-                                    <Badge key={index} variant="outline" className="flex items-center gap-1">
-                                        <FileCheck className="h-3 w-3" />
-                                        {req}
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                Requested Date
+                            </p>
+                            <p className="text-sm dark:text-gray-300">{formatDate(clearance.created_at)}</p>
+                        </div>
+                        <div className="space-y-2">
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                <CalendarDays className="h-3 w-3" />
+                                Needed By
+                            </p>
+                            <p className="text-sm dark:text-gray-300">
+                                {clearance.needed_date ? formatDate(clearance.needed_date) : 'Not specified'}
+                            </p>
+                        </div>
+                        {clearance.issue_date && (
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                    <FileCheck className="h-3 w-3" />
+                                    Issue Date
+                                </p>
+                                <p className="text-sm dark:text-gray-300">{formatDate(clearance.issue_date)}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <Separator className="dark:bg-gray-700" />
+
+                    {/* Fee Information */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                <DollarSign className="h-3 w-3" />
+                                Fee Amount
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                    {formatCurrency(clearance.fee_amount)}
+                                </p>
+                                {clearanceType?.requires_payment === false && (
+                                    <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
+                                        Free
                                     </Badge>
-                                ))}
+                                )}
                             </div>
                         </div>
+                        <div className="space-y-2">
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Status</p>
+                            <Badge variant="outline" className={getStatusColor(clearance.payment_status || 'unpaid')}>
+                                {clearance.payment_status === 'paid' && <CheckCircle className="h-3 w-3 mr-1" />}
+                                {clearance.payment_status === 'unpaid' && <Clock className="h-3 w-3 mr-1" />}
+                                {clearance.payment_status === 'partially_paid' && <AlertCircle className="h-3 w-3 mr-1" />}
+                                {clearance.payment_status_display || clearance.payment_status || 'Unpaid'}
+                            </Badge>
+                        </div>
+                    </div>
+
+                    {/* Additional Requirements */}
+                    {clearance.additional_requirements && (
+                        <>
+                            <Separator className="dark:bg-gray-700" />
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Additional Requirements</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    {clearance.additional_requirements}
+                                </p>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Requirements Met */}
+                    {clearance.requirements_met && clearance.requirements_met.length > 0 && (
+                        <>
+                            <Separator className="dark:bg-gray-700" />
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Requirements Met</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {clearance.requirements_met.map((req: string, index: number) => (
+                                        <Badge key={index} variant="outline" className="flex items-center gap-1 bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
+                                            <FileCheck className="h-3 w-3" />
+                                            {req}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
                     )}
                 </CardContent>
             </Card>
 
-            <Card>
+            {/* Resident Information Card */}
+            <Card className="dark:bg-gray-900">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <User className="h-5 w-5" />
+                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
+                            <User className="h-3 w-3 text-white" />
+                        </div>
                         Resident Information
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     {resident ? (
-                        <div className="space-y-4">
+                        <div className="space-y-6">
+                            {/* Resident Header */}
                             <div className="flex items-start gap-4">
                                 {resident.photo_path ? (
                                     <img
                                         src={resident.photo_path}
                                         alt={resident.full_name}
-                                        className="h-16 w-16 rounded-full object-cover"
+                                        className="h-16 w-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                                     />
                                 ) : (
-                                    <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center">
-                                        <User className="h-8 w-8 text-gray-400" />
+                                    <div className="h-16 w-16 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
+                                        <User className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                                     </div>
                                 )}
                                 <div>
-                                    <h3 className="font-semibold text-lg">{resident.full_name}</h3>
-                                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                                    <h3 className="font-semibold text-lg dark:text-gray-100">{resident.full_name}</h3>
+                                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
                                         {resident.contact_number && (
                                             <span className="flex items-center gap-1">
                                                 <Phone className="h-3 w-3" />
@@ -172,44 +261,87 @@ export function DetailsTab({
                                 </div>
                             </div>
 
-                            <Separator />
+                            <Separator className="dark:bg-gray-700" />
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <p className="text-sm font-medium text-gray-500">Address</p>
-                                    <p className="text-sm flex items-start gap-1">
-                                        <MapPin className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                                        {resident.address || 'No address provided'}
-                                    </p>
+                            {/* Resident Details Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <div className="flex items-start gap-2">
+                                        <MapPin className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Address</p>
+                                            <p className="text-sm dark:text-gray-300">{resident.address || 'No address provided'}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    {resident.purok && (
+                                        <div className="flex items-start gap-2">
+                                            <Home className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Purok</p>
+                                                <p className="text-sm dark:text-gray-300">{resident.purok.name}</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                                {resident.birth_date && (
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-medium text-gray-500">Date of Birth</p>
-                                        <p className="text-sm">{formatDate(resident.birth_date)}</p>
+
+                                <div className="space-y-4">
+                                    {resident.birth_date && (
+                                        <div className="flex items-start gap-2">
+                                            <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Date of Birth</p>
+                                                <p className="text-sm dark:text-gray-300">{formatDate(resident.birth_date)}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {resident.gender && (
+                                            <div>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">Gender</p>
+                                                <p className="text-sm capitalize dark:text-gray-300">{resident.gender}</p>
+                                            </div>
+                                        )}
+                                        {resident.civil_status && (
+                                            <div>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">Civil Status</p>
+                                                <p className="text-sm capitalize dark:text-gray-300">{resident.civil_status}</p>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                                {resident.gender && (
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-medium text-gray-500">Gender</p>
-                                        <p className="text-sm capitalize">{resident.gender}</p>
-                                    </div>
-                                )}
-                                {resident.civil_status && (
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-medium text-gray-500">Civil Status</p>
-                                        <p className="text-sm capitalize">{resident.civil_status}</p>
-                                    </div>
-                                )}
-                                {resident.occupation && (
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-medium text-gray-500">Occupation</p>
-                                        <p className="text-sm">{resident.occupation}</p>
-                                    </div>
-                                )}
+
+                                    {resident.occupation && (
+                                        <div>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">Occupation</p>
+                                            <p className="text-sm dark:text-gray-300">{resident.occupation}</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
+
+                            {/* Household Information */}
+                            {resident.household && (
+                                <>
+                                    <Separator className="dark:bg-gray-700" />
+                                    <div className="flex items-center gap-2">
+                                        <Home className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Household</p>
+                                            <p className="text-sm dark:text-gray-300">
+                                                House #{resident.household.household_number}
+                                                {resident.household.address && ` • ${resident.household.address}`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     ) : (
-                        <p className="text-gray-500">Resident information not available</p>
+                        <div className="text-center py-8">
+                            <User className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                            <p className="text-gray-500 dark:text-gray-400">Resident information not available</p>
+                        </div>
                     )}
                 </CardContent>
             </Card>

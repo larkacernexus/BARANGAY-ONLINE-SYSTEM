@@ -34,7 +34,7 @@ export function ModernFloatingActionButton({
                 {icon}
                 <div className="absolute inset-0 rounded-full border-2 border-white/30 animate-ripple" />
             </button>
-            <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg text-xs font-medium border border-gray-200 dark:border-gray-700">
+            <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg text-xs font-medium border border-gray-200 dark:border-gray-700">
                 {label}
             </div>
         </div>

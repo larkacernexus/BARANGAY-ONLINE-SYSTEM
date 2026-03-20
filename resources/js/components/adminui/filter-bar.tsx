@@ -17,7 +17,10 @@ interface FilterBarProps {
     totalItems?: number;
     startIndex?: number;
     endIndex?: number;
+    isLoading?: boolean;
+    searchInputRef?: React.RefObject<HTMLInputElement>;
     children?: React.ReactNode;
+    className?: string;
 }
 
 export function FilterBar({
@@ -33,7 +36,10 @@ export function FilterBar({
     totalItems = 0,
     startIndex = 0,
     endIndex = 0,
-    children
+    isLoading = false,
+    searchInputRef,
+    children,
+    className = ''
 }: FilterBarProps) {
     const [localSearch, setLocalSearch] = useState(search);
 
@@ -70,22 +76,24 @@ export function FilterBar({
     const showingTotal = safeTotalItems;
 
     return (
-        <div className="space-y-4">
+        <div className={`space-y-4 ${className}`}>
             {/* Search Bar */}
             <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                     <Input
+                        ref={searchInputRef}
                         placeholder={searchPlaceholder}
                         value={localSearch}
                         onChange={handleSearchChange}
-                        className="pl-9 pr-10"
+                        disabled={isLoading}
+                        className="pl-9 pr-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
                     />
-                    {localSearch && (
+                    {localSearch && !isLoading && (
                         <button
                             type="button"
                             onClick={handleClearSearch}
-                            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                         >
                             <X className="h-4 w-4" />
                         </button>
@@ -97,10 +105,11 @@ export function FilterBar({
                         variant="outline"
                         size="sm"
                         onClick={onToggleAdvancedFilters}
-                        className="flex items-center gap-2"
+                        disabled={isLoading}
+                        className="flex items-center gap-2 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 h-9"
                     >
                         <Filter className="h-4 w-4" />
-                        {showAdvancedFilters ? 'Hide Filters' : 'Show Filters'}
+                        {showAdvancedFilters ? 'Hide Filters' : 'More Filters'}
                         {showAdvancedFilters ? (
                             <ChevronUp className="h-4 w-4" />
                         ) : (
@@ -113,10 +122,11 @@ export function FilterBar({
                             variant="outline"
                             size="sm"
                             onClick={handleClearAllFilters}
-                            className="flex items-center gap-2"
+                            disabled={isLoading}
+                            className="flex items-center gap-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 border-gray-200 dark:border-gray-700 h-9"
                         >
                             <FilterX className="h-4 w-4" />
-                            Clear All
+                            Clear Filters
                         </Button>
                     )}
                 </div>
@@ -136,13 +146,13 @@ export function FilterBar({
                             <span className="font-medium">
                                 Showing {showingFrom}-{showingTo} of {showingTotal}
                             </span>
-                            {showingTotal === 1 ? ' household' : ' households'}
+                            {showingTotal === 1 ? ' result' : ' results'}
                         </div>
                     )}
                     
                     {showCount && safeTotalItems === 0 && (
                         <div className="text-gray-500 dark:text-gray-400">
-                            No households found
+                            No results found
                         </div>
                     )}
                 </div>
@@ -150,7 +160,7 @@ export function FilterBar({
 
             {/* Advanced Filters Content */}
             {showAdvancedFilters && children && (
-                <div className="border-t pt-4">
+                <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
                     {children}
                 </div>
             )}

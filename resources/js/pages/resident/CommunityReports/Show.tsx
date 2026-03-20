@@ -105,7 +105,7 @@ const STATUS_CONFIG = {
     },
     rejected: { 
         label: 'Rejected', 
-        color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400', 
+        color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-400', 
         icon: XCircle,
         gradient: 'from-gray-50 to-gray-100/50 dark:from-gray-800 dark:to-gray-700',
         description: 'Report rejected',
@@ -387,7 +387,7 @@ const ModernEvidenceThumbnail = ({
                         loading="lazy"
                     />
                     {imageError && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900">
                             <Image className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400" />
                         </div>
                     )}
@@ -1157,7 +1157,7 @@ export default function ShowReport({ report }: Props) {
 
         return (
             <div className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl py-2 -mx-4 px-4 border-b border-gray-200 dark:border-gray-800">
-                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
                         return (

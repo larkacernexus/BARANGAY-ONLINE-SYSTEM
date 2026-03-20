@@ -187,7 +187,7 @@ const getCategoryColor = (category: string): string => {
         'Legal & Police': 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300',
         'Employment': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300',
         'Housing': 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-300',
-        'Other': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300',
+        'Other': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300',
     };
     return colors[category] || colors['Other'];
 };
@@ -435,7 +435,7 @@ const CollapsibleStats = ({
     <div className="md:hidden">
         <Button 
             variant="outline" 
-            className="w-full justify-between bg-white dark:bg-gray-800 rounded-xl border-gray-200 dark:border-gray-700"
+            className="w-full justify-between bg-white dark:bg-gray-900 rounded-xl border-gray-200 dark:border-gray-700"
             onClick={() => setShowStats(!showStats)}
         >
             <div className="flex items-center gap-2">
@@ -911,7 +911,7 @@ Forms Catalog System
 
                             {/* View Toggle */}
                             {!selectMode && tabHasData && (
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
                                     <Button
                                         variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                         size="sm"

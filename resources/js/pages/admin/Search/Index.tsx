@@ -96,18 +96,18 @@ export default function SearchIndex() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      router.get(route('search'), { q: searchQuery }, { preserveState: true, preserveScroll: true });
+      router.get(route('admin.search'), { q: searchQuery }, { preserveState: true, preserveScroll: true });
     }
   };
 
   const handleRecentSearchClick = (query: string) => {
     setSearchQuery(query);
-    router.get(route('search'), { q: query }, { preserveState: true, preserveScroll: true });
+    router.get(route('admin.search'), { q: query }, { preserveState: true, preserveScroll: true });
   };
 
   const clearSearch = () => {
     setSearchQuery('');
-    router.get(route('search'), {}, { preserveState: true, preserveScroll: true });
+    router.get(route('admin.search'), {}, { preserveState: true, preserveScroll: true });
   };
 
   const handleResultClick = (url: string, e: React.MouseEvent) => {
@@ -145,7 +145,95 @@ export default function SearchIndex() {
     return 'bg-gray-100 text-gray-800';
   };
 
-  // Group results by type for tabs (with safety check)
+  /**
+   * Safely render meta values - handles objects, arrays, and primitive types
+   */
+  const renderMetaValue = (value: any): string => {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    
+    if (typeof value === 'object') {
+      if (Array.isArray(value)) {
+        // Handle arrays - if it's an array of objects with code/name, format them
+        if (value.length > 0 && typeof value[0] === 'object') {
+          return value.map(item => {
+            if (item.code && item.name) {
+              return `${item.name} (${item.code})`;
+            }
+            return JSON.stringify(item);
+          }).join(', ');
+        }
+        return value.join(', ');
+      }
+      
+      // Handle privilege objects specifically
+      if (value.code && value.name) {
+        return `${value.name} (${value.code})`;
+      }
+      
+      // For other objects, return a string representation or empty
+      return Object.keys(value).length > 0 ? 'View details' : '';
+    }
+    
+    // Handle primitive types
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    
+    return String(value);
+  };
+
+  /**
+   * Check if a meta value should be displayed
+   */
+  const shouldDisplayMeta = (key: string, value: any): boolean => {
+    // Skip empty values
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string' && !value.trim()) return false;
+    if (typeof value === 'object') {
+      if (Array.isArray(value) && value.length === 0) return false;
+      if (!Array.isArray(value) && Object.keys(value).length === 0) return false;
+    }
+    
+    // Skip internal fields or fields we handle separately
+    const skipFields = ['privileges', 'privileges_count', 'id', 'code'];
+    if (skipFields.includes(key)) return false;
+    
+    return true;
+  };
+
+  /**
+   * Get display label for meta key
+   */
+  const getMetaLabel = (key: string): string => {
+    const labels: Record<string, string> = {
+      age: 'Age',
+      gender: 'Gender',
+      civil_status: 'Civil Status',
+      birth_date: 'Birth Date',
+      contact_number: 'Contact',
+      email: 'Email',
+      address: 'Address',
+      member_count: 'Members',
+      income_range: 'Income',
+      employee_count: 'Employees',
+      capital: 'Capital',
+      last_login: 'Last Login',
+      incident_date: 'Incident Date',
+      reported_by: 'Reported By',
+      amount: 'Amount',
+      payment_status: 'Payment Status',
+      start_date: 'Start Date',
+      end_date: 'End Date',
+      downloads: 'Downloads',
+      size: 'Size',
+    };
+    
+    return labels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  // Group results by type for tabs
   const groupedResults = (searchResults || []).reduce((acc, result) => {
     if (result && result.type) {
       if (!acc[result.type]) {
@@ -156,7 +244,7 @@ export default function SearchIndex() {
     return acc;
   }, {} as Record<string, SearchResult[]>);
 
-  // Get unique tags for filtering (with safety check)
+  // Get unique tags for filtering
   const allTags = Array.from(new Set(
     (searchResults || [])
       .flatMap(r => r.tags || [])
@@ -193,7 +281,6 @@ export default function SearchIndex() {
       <Head title={currentQuery ? `Search: ${currentQuery}` : 'Search'} />
       
       <div className="flex flex-col gap-6 p-4 md:p-6">
-        {/* Search Header */}
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Search</h1>
           <p className="text-muted-foreground">
@@ -201,7 +288,6 @@ export default function SearchIndex() {
           </p>
         </div>
 
-        {/* Search Form */}
         <Card>
           <CardContent className="pt-6">
             <form onSubmit={handleSearch} className="flex gap-2">
@@ -232,7 +318,6 @@ export default function SearchIndex() {
           </CardContent>
         </Card>
 
-        {/* Recent Searches */}
         {!currentQuery && recentSearches.length > 0 && (
           <Card>
             <CardHeader>
@@ -260,7 +345,6 @@ export default function SearchIndex() {
           </Card>
         )}
 
-        {/* Popular Searches */}
         {!currentQuery && (
           <Card>
             <CardHeader>
@@ -278,7 +362,7 @@ export default function SearchIndex() {
                     size="sm"
                     onClick={() => {
                       setSearchQuery(item);
-                      router.get(route('search'), { q: item });
+                      router.get(route('admin.search'), { q: item });
                     }}
                   >
                     {item}
@@ -289,7 +373,6 @@ export default function SearchIndex() {
           </Card>
         )}
 
-        {/* Results Section */}
         {currentQuery && (
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -315,7 +398,6 @@ export default function SearchIndex() {
               )}
             </div>
 
-            {/* Filter Tags */}
             {showFilters && allTags.length > 0 && (
               <Card>
                 <CardContent className="pt-4">
@@ -341,7 +423,6 @@ export default function SearchIndex() {
 
             {searchResults.length > 0 ? (
               <>
-                {/* Results Tabs */}
                 <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
                   <TabsList className="w-full justify-start overflow-x-auto flex-nowrap pb-1">
                     {resultTypes.map(type => {
@@ -360,79 +441,103 @@ export default function SearchIndex() {
 
                   <TabsContent value={activeTab} className="mt-6">
                     <div className="grid gap-4">
-                      {filteredResults.map((result, index) => (
-                        <div
-                          key={`${result.type}-${result.id}-${index}`}
-                          onClick={(e) => handleResultClick(result.url, e)}
-                          className="block group cursor-pointer"
-                        >
-                          <Card className="hover:shadow-md transition-all duration-200 cursor-pointer hover:border-primary/50">
-                            <CardContent className="p-6">
-                              <div className="flex items-start gap-4">
-                                {/* Icon */}
-                                <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                                  {getIcon(result.icon)}
-                                </div>
+                      {filteredResults.map((result, index) => {
+                        // Handle privileges specially if they exist in meta
+                        const hasPrivileges = result.meta?.privileges && 
+                                             Array.isArray(result.meta.privileges) && 
+                                             result.meta.privileges.length > 0;
+                        
+                        return (
+                          <div
+                            key={`${result.type}-${result.id}-${index}`}
+                            onClick={(e) => handleResultClick(result.url, e)}
+                            className="block group cursor-pointer"
+                          >
+                            <Card className="hover:shadow-md transition-all duration-200 cursor-pointer hover:border-primary/50">
+                              <CardContent className="p-6">
+                                <div className="flex items-start gap-4">
+                                  <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                                    {getIcon(result.icon)}
+                                  </div>
 
-                                {/* Content */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className="text-base font-semibold truncate">
-                                      {result.title}
-                                    </h3>
-                                    <Badge className={`text-xs ${getTypeColor(result.type)}`}>
-                                      {result.badge}
-                                    </Badge>
-                                    {result.status && (
-                                      <Badge className={`text-xs ${getStatusColor(result.status)}`}>
-                                        {result.status}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h3 className="text-base font-semibold truncate">
+                                        {result.title}
+                                      </h3>
+                                      <Badge className={`text-xs ${getTypeColor(result.type)}`}>
+                                        {result.badge}
                                       </Badge>
+                                      {result.status && (
+                                        <Badge className={`text-xs ${getStatusColor(result.status)}`}>
+                                          {result.status}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      {result.subtitle}
+                                    </p>
+                                    
+                                    <p className="text-sm text-muted-foreground/70 mt-1 line-clamp-2">
+                                      {result.description}
+                                    </p>
+
+                                    {result.tags && result.tags.filter(Boolean).length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-2">
+                                        {result.tags.filter(Boolean).map((tag, i) => (
+                                          <Badge key={i} variant="outline" className="text-xs bg-muted/50">
+                                            {tag}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Display privileges separately if they exist */}
+                                    {hasPrivileges && (
+                                      <div className="flex flex-wrap gap-2 mt-3">
+                                        {result.meta?.privileges.map((privilege: any, i: number) => (
+                                          <Badge 
+                                            key={i} 
+                                            className="bg-purple-100 text-purple-800 hover:bg-purple-200"
+                                          >
+                                            {privilege.name} ({privilege.code})
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Display other meta fields safely */}
+                                    {result.meta && Object.keys(result.meta).length > 0 && (
+                                      <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
+                                        {Object.entries(result.meta)
+                                          .filter(([key, value]) => shouldDisplayMeta(key, value))
+                                          .map(([key, value]) => {
+                                            const displayValue = renderMetaValue(value);
+                                            if (!displayValue) return null;
+                                            
+                                            return (
+                                              <span key={key} className="flex items-center gap-1">
+                                                <span className="capitalize font-medium">
+                                                  {getMetaLabel(key)}:
+                                                </span>
+                                                <span>{displayValue}</span>
+                                              </span>
+                                            );
+                                          })}
+                                      </div>
                                     )}
                                   </div>
-                                  
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    {result.subtitle}
-                                  </p>
-                                  
-                                  <p className="text-sm text-muted-foreground/70 mt-1 line-clamp-2">
-                                    {result.description}
-                                  </p>
 
-                                  {/* Tags */}
-                                  {result.tags && result.tags.filter(Boolean).length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mt-2">
-                                      {result.tags.filter(Boolean).map((tag, i) => (
-                                        <Badge key={i} variant="outline" className="text-xs bg-muted/50">
-                                          {tag}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {/* Meta Information */}
-                                  {result.meta && Object.keys(result.meta).length > 0 && (
-                                    <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
-                                      {Object.entries(result.meta).map(([key, value]) => (
-                                        value && (
-                                          <span key={key} className="flex items-center gap-1">
-                                            <span className="capitalize">{key.replace('_', ' ')}:</span>
-                                            <span className="font-medium">{value}</span>
-                                          </span>
-                                        )
-                                      ))}
-                                    </div>
-                                  )}
+                                  <div className="flex-shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                                    →
+                                  </div>
                                 </div>
-
-                                {/* Arrow indicator */}
-                                <div className="flex-shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                                  →
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      ))}
+                              </CardContent>
+                            </Card>
+                          </div>
+                        );
+                      })}
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -460,7 +565,7 @@ export default function SearchIndex() {
 
 // Layout configuration
 SearchIndex.layout = (page: React.ReactNode) => (
-  <AdminLayout breadcrumbs={[{ title: 'Search', href: route('search') }]}>
+  <AdminLayout breadcrumbs={[{ title: 'Search', href: route('admin.search') }]}>
     {page}
   </AdminLayout>
 );

@@ -1,3 +1,5 @@
+// pages/admin/clearances/create.tsx
+
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,13 +25,21 @@ import {
     Tag,
     CreditCard,
     Home,
-    Building
+    Building,
+    X,
+    CheckCircle
 } from 'lucide-react';
 import { Link, useForm, usePage, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { route } from 'ziggy-js';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 // --- Interfaces ---
 interface ClearanceType {
@@ -139,6 +149,15 @@ const getPayerIcon = (payerType: string) => {
         case 'household': return <Home className="h-5 w-5" />;
         case 'business': return <Building className="h-5 w-5" />;
         default: return <User className="h-5 w-5" />;
+    }
+};
+
+const getPriorityColor = (priority: string) => {
+    switch (priority) {
+        case 'normal': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
+        case 'rush': return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800';
+        case 'express': return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800';
+        default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
     }
 };
 
@@ -634,161 +653,207 @@ export default function CreateClearanceRequest() {
         >
             <form onSubmit={(e) => submit(e, false)}>
                 <div className="space-y-6">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
+                    {/* Header with Actions - Matching Forms pattern */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <Link href="/admin/clearances">
-                                <Button variant="ghost" size="sm">
+                                <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
                                 </Button>
                             </Link>
-                            <div>
-                                <h1 className="text-3xl font-bold tracking-tight">
-                                    {isFromRequest ? 'Process Online Request' : 'Create Clearance Request'}
-                                </h1>
-                                <p className="text-gray-500 dark:text-gray-400">
-                                    {isFromRequest
-                                        ? 'Review and process an online clearance request'
-                                        : 'Create a clearance request for a resident'}
-                                </p>
+                            <div className="flex items-center gap-3">
+                                <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                    <FileText className="h-6 w-6 text-white" />
+                                </div>
+                                <div>
+                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
+                                        {isFromRequest ? 'Process Online Request' : 'Create Clearance Request'}
+                                    </h1>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                        {isFromRequest
+                                            ? 'Review and process an online clearance request'
+                                            : 'Create a clearance request for a resident'}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            {/* Create Button */}
-                            <Button 
-                                type="submit" 
-                                disabled={processing || isSubmitting || !selectedPayer || !selectedClearanceType}
-                                variant="outline"
-                            >
-                                {processing || isSubmitting ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        Creating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save className="h-4 w-4 mr-2" />
-                                        Create Request
-                                    </>
-                                )}
-                            </Button>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button 
+                                            type="submit" 
+                                            disabled={processing || isSubmitting || !selectedPayer || !selectedClearanceType}
+                                            variant="outline"
+                                            className="dark:border-gray-600 dark:text-gray-300"
+                                        >
+                                            {processing || isSubmitting ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                    Creating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Save className="h-4 w-4 mr-2" />
+                                                    Create Request
+                                                </>
+                                            )}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Create the request without payment</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
 
-                            {/* Create & Pay Button - Goes DIRECTLY to payment page */}
-                            <Button 
-                                type="button"
-                                onClick={(e) => submit(e, true)}
-                                disabled={processing || isSubmitting || !selectedPayer || !selectedClearanceType || data.fee_amount === 0}
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                                {processing || isSubmitting ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        Processing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <CreditCard className="h-4 w-4 mr-2" />
-                                        Create & Pay
-                                    </>
-                                )}
-                            </Button>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button 
+                                            type="button"
+                                            onClick={(e) => submit(e, true)}
+                                            disabled={processing || isSubmitting || !selectedPayer || !selectedClearanceType || data.fee_amount === 0}
+                                            className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white dark:from-green-700 dark:to-emerald-700"
+                                        >
+                                            {processing || isSubmitting ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                    Processing...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CreditCard className="h-4 w-4 mr-2" />
+                                                    Create & Pay
+                                                </>
+                                            )}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Create request and go directly to payment page</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         </div>
                     </div>
 
                     {/* Success Message for Create & Pay */}
                     {!isFromRequest && data.fee_amount > 0 && (
-                        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-900/20">
-                            <Info className="h-4 w-4 text-blue-600 dark:text-blue-300" />
-                            <AlertTitle>Quick Payment Available</AlertTitle>
-                            <AlertDescription>
-                                Click <span className="font-medium">"Create & Pay"</span> to create this clearance and 
-                                go directly to payment. You'll be able to pay this fee along with any other outstanding fees.
-                            </AlertDescription>
+                        <Alert className="border-l-4 border-l-blue-500 dark:bg-gray-900 dark:border-blue-800">
+                            <div className="flex items-start gap-3">
+                                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                                <div>
+                                    <AlertTitle className="dark:text-gray-100">Quick Payment Available</AlertTitle>
+                                    <AlertDescription className="dark:text-gray-400">
+                                        Click <span className="font-medium">"Create & Pay"</span> to create this clearance and 
+                                        go directly to payment. You'll be able to pay this fee along with any other outstanding fees.
+                                    </AlertDescription>
+                                </div>
+                            </div>
                         </Alert>
                     )}
 
                     {/* Zero Fee Alert */}
                     {selectedClearanceType && data.fee_amount === 0 && (
-                        <Alert className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-900/20">
-                            <Info className="h-4 w-4 text-green-600 dark:text-green-300" />
-                            <AlertTitle>No Payment Required</AlertTitle>
-                            <AlertDescription>
-                                This clearance type has no fee. The request will be created and automatically processed.
-                            </AlertDescription>
+                        <Alert className="border-l-4 border-l-green-500 dark:bg-gray-900 dark:border-green-800">
+                            <div className="flex items-start gap-3">
+                                <Info className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
+                                <div>
+                                    <AlertTitle className="dark:text-gray-100">No Payment Required</AlertTitle>
+                                    <AlertDescription className="dark:text-gray-400">
+                                        This clearance type has no fee. The request will be created and automatically processed.
+                                    </AlertDescription>
+                                </div>
+                            </div>
                         </Alert>
                     )}
 
                     {/* Source Request Info Alert */}
                     {isFromRequest && sourceRequestInfo.reference_number && (
-                        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-900/20">
-                            <Info className="h-4 w-4 text-blue-600 dark:text-blue-300" />
-                            <AlertTitle>Processing Online Request</AlertTitle>
-                            <AlertDescription className="mt-2">
-                                <div className="space-y-2">
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            <span className="font-medium">Reference No:</span>
-                                            <div className="text-blue-700 dark:text-blue-300">
-                                                {sourceRequestInfo.reference_number}
+                        <Alert className="border-l-4 border-l-blue-500 dark:bg-gray-900 dark:border-blue-800">
+                            <div className="flex items-start gap-3">
+                                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                                <div>
+                                    <AlertTitle className="dark:text-gray-100">Processing Online Request</AlertTitle>
+                                    <AlertDescription className="mt-2 dark:text-gray-400">
+                                        <div className="space-y-2">
+                                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                                <div>
+                                                    <span className="font-medium">Reference No:</span>
+                                                    <div className="text-blue-700 dark:text-blue-300">
+                                                        {sourceRequestInfo.reference_number}
+                                                    </div>
+                                                </div>
+                                                {sourceRequestInfo.needed_date && (
+                                                    <div>
+                                                        <span className="font-medium">Requested Needed By:</span>
+                                                        <div className="text-blue-700 dark:text-blue-300">
+                                                            {formatDate(sourceRequestInfo.needed_date)}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="text-sm text-blue-600 dark:text-blue-400">
+                                                This request was submitted online. Details have been pre-filled.
                                             </div>
                                         </div>
-                                        {sourceRequestInfo.needed_date && (
-                                            <div>
-                                                <span className="font-medium">Requested Needed By:</span>
-                                                <div className="text-blue-700 dark:text-blue-300">
-                                                    {formatDate(sourceRequestInfo.needed_date)}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="text-sm text-blue-600 dark:text-blue-400">
-                                        This request was submitted online. Details have been pre-filled.
-                                    </div>
+                                    </AlertDescription>
                                 </div>
-                            </AlertDescription>
+                            </div>
                         </Alert>
                     )}
 
                     {/* Error Alert */}
                     {Object.keys(errors).length > 0 && (
-                        <div className="rounded-lg bg-rose-50 p-4 dark:bg-rose-900/20">
-                            <div className="flex items-center gap-2 text-rose-800 dark:text-rose-300">
-                                <AlertCircle className="h-5 w-5" />
-                                <span className="font-medium">Please fix the following errors:</span>
-                            </div>
-                            <ul className="mt-2 ml-7 list-disc text-sm text-rose-700 dark:text-rose-400">
-                                {Object.entries(errors).map(([field, message]) => (
-                                    <li key={field}>{field}: {message as string}</li>
-                                ))}
-                            </ul>
-                        </div>
+                        <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
+                            <CardContent className="p-4">
+                                <div className="flex items-start gap-3">
+                                    <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
+                                    <div>
+                                        <p className="font-medium text-red-800 dark:text-red-300">Please fix the following errors:</p>
+                                        <ul className="list-disc list-inside mt-2 space-y-1">
+                                            {Object.entries(errors).map(([field, message]) => (
+                                                <li key={field} className="text-sm text-red-600 dark:text-red-400">
+                                                    <span className="font-medium capitalize">{field.replace(/_/g, ' ')}:</span> {message as string}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     )}
 
                     <div className="grid gap-6 lg:grid-cols-3">
                         {/* Left Column - Request Details */}
                         <div className="lg:col-span-2 space-y-6">
                             {/* Applicant Information Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <User className="h-5 w-5" />
+                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
+                                            <User className="h-3 w-3 text-white" />
+                                        </div>
                                         Applicant Information
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="dark:text-gray-400">
                                         Information about the person requesting clearance
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     {/* Payer Type Selection */}
                                     <div className="space-y-2">
-                                        <Label>Payer Type</Label>
+                                        <Label className="dark:text-gray-300">Payer Type</Label>
                                         <div className="flex gap-2">
                                             <Button
                                                 type="button"
                                                 variant={payerType === 'resident' ? 'default' : 'outline'}
                                                 onClick={() => handlePayerTypeChange('resident')}
-                                                className="flex-1"
+                                                className={`flex-1 ${
+                                                    payerType === 'resident' 
+                                                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white dark:from-blue-700 dark:to-indigo-700' 
+                                                        : 'dark:border-gray-600 dark:text-gray-300'
+                                                }`}
                                             >
                                                 <User className="h-4 w-4 mr-2" />
                                                 Resident
@@ -797,7 +862,11 @@ export default function CreateClearanceRequest() {
                                                 type="button"
                                                 variant={payerType === 'household' ? 'default' : 'outline'}
                                                 onClick={() => handlePayerTypeChange('household')}
-                                                className="flex-1"
+                                                className={`flex-1 ${
+                                                    payerType === 'household' 
+                                                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white dark:from-blue-700 dark:to-indigo-700' 
+                                                        : 'dark:border-gray-600 dark:text-gray-300'
+                                                }`}
                                             >
                                                 <Home className="h-4 w-4 mr-2" />
                                                 Household
@@ -806,7 +875,11 @@ export default function CreateClearanceRequest() {
                                                 type="button"
                                                 variant={payerType === 'business' ? 'default' : 'outline'}
                                                 onClick={() => handlePayerTypeChange('business')}
-                                                className="flex-1"
+                                                className={`flex-1 ${
+                                                    payerType === 'business' 
+                                                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white dark:from-blue-700 dark:to-indigo-700' 
+                                                        : 'dark:border-gray-600 dark:text-gray-300'
+                                                }`}
                                             >
                                                 <Building className="h-4 w-4 mr-2" />
                                                 Business
@@ -816,32 +889,43 @@ export default function CreateClearanceRequest() {
 
                                     <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <Label htmlFor="payer-search">
-                                                Search {payerType === 'resident' ? 'Resident' : payerType === 'household' ? 'Household' : 'Business'} <span className="text-rose-500">*</span>
+                                            <Label htmlFor="payer-search" className="dark:text-gray-300">
+                                                Search {payerType === 'resident' ? 'Resident' : payerType === 'household' ? 'Household' : 'Business'} <span className="text-red-500">*</span>
                                             </Label>
                                             <div className="relative">
-                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                 <Input
                                                     id="payer-search"
                                                     placeholder={`Search ${payerType} by name, address, or contact...`}
-                                                    className="pl-10"
+                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                                     value={searchTerm}
                                                     onChange={(e) => setSearchTerm(e.target.value)}
                                                 />
+                                                {searchTerm && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="absolute right-1 top-1 h-7 w-7 p-0 dark:text-gray-400 dark:hover:text-white"
+                                                        onClick={() => setSearchTerm('')}
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
 
                                         {/* Search Results */}
                                         {!selectedPayer && payerType === 'resident' && filteredResidents.length > 0 && (
-                                            <div className="border rounded-lg p-2 space-y-2 max-h-60 overflow-y-auto">
+                                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 space-y-2 max-h-60 overflow-y-auto bg-white dark:bg-gray-900">
                                                 {filteredResidents.map(resident => (
                                                     <div
                                                         key={resident.id}
-                                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg cursor-pointer border"
+                                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg cursor-pointer border border-gray-100 dark:border-gray-800 transition-colors"
                                                         onClick={() => handleSelectResident(resident)}
                                                     >
-                                                        <div className="font-medium">{resident.name}</div>
-                                                        <div className="text-sm text-gray-500">
+                                                        <div className="font-medium dark:text-gray-100">{resident.name}</div>
+                                                        <div className="text-sm text-gray-500 dark:text-gray-400">
                                                             {resident.address} • {resident.contact_number}
                                                             {resident.purok && ` • ${resident.purok}`}
                                                         </div>
@@ -851,15 +935,15 @@ export default function CreateClearanceRequest() {
                                         )}
 
                                         {!selectedPayer && payerType === 'household' && filteredHouseholds.length > 0 && (
-                                            <div className="border rounded-lg p-2 space-y-2 max-h-60 overflow-y-auto">
+                                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 space-y-2 max-h-60 overflow-y-auto bg-white dark:bg-gray-900">
                                                 {filteredHouseholds.map(household => (
                                                     <div
                                                         key={household.id}
-                                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg cursor-pointer border"
+                                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg cursor-pointer border border-gray-100 dark:border-gray-800 transition-colors"
                                                         onClick={() => handleSelectHousehold(household)}
                                                     >
-                                                        <div className="font-medium">{household.head_name}</div>
-                                                        <div className="text-sm text-gray-500">
+                                                        <div className="font-medium dark:text-gray-100">{household.head_name}</div>
+                                                        <div className="text-sm text-gray-500 dark:text-gray-400">
                                                             {household.address} • Household #{household.household_number}
                                                             {household.purok && ` • ${household.purok}`}
                                                         </div>
@@ -869,18 +953,18 @@ export default function CreateClearanceRequest() {
                                         )}
 
                                         {!selectedPayer && payerType === 'business' && filteredBusinesses.length > 0 && (
-                                            <div className="border rounded-lg p-2 space-y-2 max-h-60 overflow-y-auto">
+                                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 space-y-2 max-h-60 overflow-y-auto bg-white dark:bg-gray-900">
                                                 {filteredBusinesses.map(business => (
                                                     <div
                                                         key={business.id}
-                                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg cursor-pointer border"
+                                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg cursor-pointer border border-gray-100 dark:border-gray-800 transition-colors"
                                                         onClick={() => handleSelectBusiness(business)}
                                                     >
-                                                        <div className="font-medium">{business.business_name}</div>
-                                                        <div className="text-sm text-gray-500">
+                                                        <div className="font-medium dark:text-gray-100">{business.business_name}</div>
+                                                        <div className="text-sm text-gray-500 dark:text-gray-400">
                                                             Owner: {business.owner_name} • {business.contact_number}
                                                         </div>
-                                                        <div className="text-sm text-gray-500">
+                                                        <div className="text-sm text-gray-500 dark:text-gray-400">
                                                             {business.address} • {business.purok}
                                                         </div>
                                                     </div>
@@ -891,18 +975,18 @@ export default function CreateClearanceRequest() {
                                         {/* Selected Payer Display */}
                                         {selectedPayer && (
                                             <div className="space-y-4">
-                                                <div className="flex items-center justify-between">
+                                                <div className="flex items-center justify-between p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                                                        <div className="p-2 bg-white dark:bg-gray-900 rounded-lg border border-blue-200 dark:border-blue-700">
                                                             {getPayerIcon(payerType)}
                                                         </div>
                                                         <div>
-                                                            <div className="font-medium text-lg">{selectedPayer.name}</div>
-                                                            <div className="text-sm text-gray-500">
+                                                            <div className="font-medium text-lg dark:text-gray-100">{selectedPayer.name}</div>
+                                                            <div className="text-sm text-gray-500 dark:text-gray-400">
                                                                 {selectedPayer.details}
                                                             </div>
                                                             {selectedPayer.extra && (
-                                                                <div className="text-xs text-gray-400">
+                                                                <div className="text-xs text-gray-400 dark:text-gray-500">
                                                                     {selectedPayer.extra}
                                                                 </div>
                                                             )}
@@ -912,6 +996,7 @@ export default function CreateClearanceRequest() {
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={handleChangePayer}
+                                                        className="dark:text-gray-400 dark:hover:text-white"
                                                     >
                                                         Change
                                                     </Button>
@@ -921,46 +1006,48 @@ export default function CreateClearanceRequest() {
                                     </div>
 
                                     {errors.payer_id && (
-                                        <p className="text-sm text-rose-600">{errors.payer_id}</p>
+                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.payer_id}</p>
                                     )}
                                 </CardContent>
                             </Card>
 
                             {/* Clearance Request Details Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <FileText className="h-5 w-5" />
+                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700 flex items-center justify-center">
+                                            <FileText className="h-3 w-3 text-white" />
+                                        </div>
                                         Clearance Request Details
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="clearance_type_id">
-                                            Clearance Type <span className="text-rose-500">*</span>
+                                        <Label htmlFor="clearance_type_id" className="dark:text-gray-300">
+                                            Clearance Type <span className="text-red-500">*</span>
                                         </Label>
                                         <Select
                                             value={data.clearance_type_id}
                                             onValueChange={handleSelectClearanceType}
                                             required
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                                 <SelectValue placeholder="Select type" />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                 {activeClearanceTypes.map(type => (
-                                                    <SelectItem key={type.id} value={type.id.toString()}>
+                                                    <SelectItem key={type.id} value={type.id.toString()} className="dark:text-gray-300 dark:focus:bg-gray-700">
                                                         <div className="flex items-center justify-between w-full">
                                                             <div className="flex items-center gap-2">
                                                                 <span>{type.name}</span>
                                                                 {type.is_discountable && (
-                                                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 text-xs">
                                                                         <Tag className="h-3 w-3 mr-1" />
                                                                         Discountable
                                                                     </Badge>
                                                                 )}
                                                             </div>
-                                                            <span className="text-sm text-gray-500 ml-4">
+                                                            <span className="text-sm text-gray-500 dark:text-gray-400 ml-4">
                                                                 {formatCurrency(type.fee)}
                                                             </span>
                                                         </div>
@@ -969,39 +1056,39 @@ export default function CreateClearanceRequest() {
                                             </SelectContent>
                                         </Select>
                                         {errors.clearance_type_id && (
-                                            <p className="text-sm text-rose-600">{errors.clearance_type_id}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.clearance_type_id}</p>
                                         )}
                                     </div>
 
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div className="space-y-2">
-                                            <Label htmlFor="urgency">
-                                                Processing Urgency <span className="text-rose-500">*</span>
+                                            <Label htmlFor="urgency" className="dark:text-gray-300">
+                                                Processing Urgency <span className="text-red-500">*</span>
                                             </Label>
                                             <Select
                                                 value={data.urgency}
                                                 onValueChange={(value: 'normal' | 'rush' | 'express') => handleUrgencyChange(value)}
                                                 required
                                             >
-                                                <SelectTrigger>
+                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                                     <SelectValue />
                                                 </SelectTrigger>
-                                                <SelectContent>
+                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                     <SelectItem value="normal">
                                                         <div className="flex items-center gap-2">
-                                                            <Clock className="h-4 w-4" />
+                                                            <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                                             <span>Normal ({selectedClearanceType?.processing_days || 3} days)</span>
                                                         </div>
                                                     </SelectItem>
                                                     <SelectItem value="rush">
                                                         <div className="flex items-center gap-2">
-                                                            <Zap className="h-4 w-4 text-amber-600" />
+                                                            <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                                                             <span>Rush (+50% fee, 50% faster)</span>
                                                         </div>
                                                     </SelectItem>
                                                     <SelectItem value="express">
                                                         <div className="flex items-center gap-2">
-                                                            <Zap className="h-4 w-4 text-orange-600" />
+                                                            <Zap className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                                                             <span>Express (+100% fee, 1-day processing)</span>
                                                         </div>
                                                     </SelectItem>
@@ -1010,8 +1097,8 @@ export default function CreateClearanceRequest() {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label htmlFor="needed_date">
-                                                Needed By Date <span className="text-rose-500">*</span>
+                                            <Label htmlFor="needed_date" className="dark:text-gray-300">
+                                                Needed By Date <span className="text-red-500">*</span>
                                             </Label>
                                             <Input
                                                 id="needed_date"
@@ -1020,83 +1107,86 @@ export default function CreateClearanceRequest() {
                                                 onChange={e => setData('needed_date', e.target.value)}
                                                 required
                                                 min={new Date().toISOString().split('T')[0]}
+                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                             />
                                             {errors.needed_date && (
-                                                <p className="text-sm text-rose-600">{errors.needed_date}</p>
+                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.needed_date}</p>
                                             )}
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="purpose">
-                                            Purpose <span className="text-rose-500">*</span>
+                                        <Label htmlFor="purpose" className="dark:text-gray-300">
+                                            Purpose <span className="text-red-500">*</span>
                                         </Label>
                                         <Select
                                             value={data.purpose}
                                             onValueChange={value => setData('purpose', value)}
                                             required
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                                 <SelectValue placeholder="Select purpose" />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                 {safePurposeOptions.length > 0 ? (
                                                     safePurposeOptions.map((purpose, index) => (
-                                                        <SelectItem key={index} value={purpose}>
+                                                        <SelectItem key={index} value={purpose} className="dark:text-gray-300 dark:focus:bg-gray-700">
                                                             {purpose}
                                                         </SelectItem>
                                                     ))
                                                 ) : (
                                                     <>
-                                                        <SelectItem value="Employment">Employment</SelectItem>
-                                                        <SelectItem value="Travel">Travel</SelectItem>
-                                                        <SelectItem value="School Requirement">School Requirement</SelectItem>
-                                                        <SelectItem value="Government Transaction">Government Transaction</SelectItem>
-                                                        <SelectItem value="Loan Application">Loan Application</SelectItem>
-                                                        <SelectItem value="Business Requirement">Business Requirement</SelectItem>
+                                                        <SelectItem value="Employment" className="dark:text-gray-300 dark:focus:bg-gray-700">Employment</SelectItem>
+                                                        <SelectItem value="Travel" className="dark:text-gray-300 dark:focus:bg-gray-700">Travel</SelectItem>
+                                                        <SelectItem value="School Requirement" className="dark:text-gray-300 dark:focus:bg-gray-700">School Requirement</SelectItem>
+                                                        <SelectItem value="Government Transaction" className="dark:text-gray-300 dark:focus:bg-gray-700">Government Transaction</SelectItem>
+                                                        <SelectItem value="Loan Application" className="dark:text-gray-300 dark:focus:bg-gray-700">Loan Application</SelectItem>
+                                                        <SelectItem value="Business Requirement" className="dark:text-gray-300 dark:focus:bg-gray-700">Business Requirement</SelectItem>
                                                     </>
                                                 )}
-                                                <SelectItem value="other">Other (specify below)</SelectItem>
+                                                <SelectItem value="other" className="dark:text-gray-300 dark:focus:bg-gray-700">Other (specify below)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         {data.purpose === 'other' && (
                                             <Input
                                                 placeholder="Please specify purpose..."
                                                 onChange={e => setData('purpose', e.target.value)}
-                                                className="mt-2"
+                                                className="mt-2 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                             />
                                         )}
                                         {errors.purpose && (
-                                            <p className="text-sm text-rose-600">{errors.purpose}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.purpose}</p>
                                         )}
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="specific_purpose">Specific Purpose Details (Optional)</Label>
+                                        <Label htmlFor="specific_purpose" className="dark:text-gray-300">Specific Purpose Details (Optional)</Label>
                                         <Textarea
                                             id="specific_purpose"
                                             value={data.specific_purpose}
                                             onChange={e => setData('specific_purpose', e.target.value)}
                                             placeholder="Provide more specific details about the purpose..."
                                             rows={2}
+                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                         />
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="additional_requirements">Additional Requirements/Special Requests</Label>
+                                        <Label htmlFor="additional_requirements" className="dark:text-gray-300">Additional Requirements/Special Requests</Label>
                                         <Textarea
                                             id="additional_requirements"
                                             value={data.additional_requirements}
                                             onChange={e => setData('additional_requirements', e.target.value)}
                                             placeholder="Any special requirements or additional documents needed..."
                                             rows={3}
+                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                         />
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="fee_amount">Fee Amount</Label>
+                                        <Label htmlFor="fee_amount" className="dark:text-gray-300">Fee Amount</Label>
                                         <div className="relative">
-                                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                                             <Input
                                                 id="fee_amount"
                                                 type="number"
@@ -1104,17 +1194,17 @@ export default function CreateClearanceRequest() {
                                                 step="0.01"
                                                 value={data.fee_amount}
                                                 onChange={e => setData('fee_amount', parseFloat(e.target.value) || 0)}
-                                                className="pl-10"
+                                                className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                                 readOnly={!isFromRequest && selectedClearanceType !== null}
                                             />
                                         </div>
-                                        <div className="text-xs text-gray-500">
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
                                             {selectedClearanceType?.requires_payment ?
                                                 "Fee includes urgency surcharge if applicable" :
                                                 "Free service - no payment required"}
                                         </div>
                                         {errors.fee_amount && (
-                                            <p className="text-sm text-rose-600">{errors.fee_amount}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.fee_amount}</p>
                                         )}
                                     </div>
                                 </CardContent>
@@ -1122,26 +1212,28 @@ export default function CreateClearanceRequest() {
 
                             {/* Requirements Checklist Card */}
                             {requirements.length > 0 && (
-                                <Card>
+                                <Card className="dark:bg-gray-900">
                                     <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <FileCheck className="h-5 w-5" />
+                                        <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                                            <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 flex items-center justify-center">
+                                                <FileCheck className="h-3 w-3 text-white" />
+                                            </div>
                                             Requirements Checklist
                                         </CardTitle>
-                                        <CardDescription>
+                                        <CardDescription className="dark:text-gray-400">
                                             Required documents for this clearance type
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent>
                                         <ul className="space-y-2">
                                             {requirements.map((requirement, index) => (
-                                                <li key={index} className="flex items-start gap-2 text-sm">
-                                                    <div className="mt-0.5">•</div>
+                                                <li key={index} className="flex items-start gap-2 text-sm dark:text-gray-300">
+                                                    <div className="mt-0.5 text-blue-500 dark:text-blue-400">•</div>
                                                     <span>{requirement}</span>
                                                 </li>
                                             ))}
                                         </ul>
-                                        <div className="mt-4 text-sm text-gray-500">
+                                        <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
                                             <p>Note: These requirements will need to be verified during processing.</p>
                                         </div>
                                     </CardContent>
@@ -1149,22 +1241,28 @@ export default function CreateClearanceRequest() {
                             )}
 
                             {/* Additional Information Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900">
                                 <CardHeader>
-                                    <CardTitle>Additional Information</CardTitle>
+                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-gray-600 to-slate-600 dark:from-gray-700 dark:to-slate-700 flex items-center justify-center">
+                                            <Info className="h-3 w-3 text-white" />
+                                        </div>
+                                        Additional Information
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="remarks">Remarks/Notes</Label>
+                                        <Label htmlFor="remarks" className="dark:text-gray-300">Remarks/Notes</Label>
                                         <Textarea
                                             id="remarks"
                                             value={data.remarks}
                                             onChange={e => setData('remarks', e.target.value)}
                                             placeholder="Additional notes or special conditions..."
                                             rows={3}
+                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                         />
                                         {errors.remarks && (
-                                            <p className="text-sm text-rose-600">{errors.remarks}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.remarks}</p>
                                         )}
                                     </div>
                                 </CardContent>
@@ -1174,37 +1272,42 @@ export default function CreateClearanceRequest() {
                         {/* Right Column - Preview & Summary */}
                         <div className="space-y-6">
                             {/* Request Summary Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900">
                                 <CardHeader>
-                                    <CardTitle>Request Summary</CardTitle>
+                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center">
+                                            <FileText className="h-3 w-3 text-white" />
+                                        </div>
+                                        Request Summary
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-4">
                                         <div>
                                             <div className="text-sm text-gray-500 dark:text-gray-400">Payer</div>
-                                            <div className="font-medium flex items-center gap-2">
+                                            <div className="font-medium flex items-center gap-2 dark:text-gray-100">
                                                 {getPayerIcon(payerType)}
                                                 {selectedPayer ? selectedPayer.name : 'Not selected'}
                                             </div>
                                         </div>
                                         <div>
                                             <div className="text-sm text-gray-500 dark:text-gray-400">Clearance Type</div>
-                                            <div className="font-medium">
+                                            <div className="font-medium dark:text-gray-100">
                                                 {selectedClearanceType ? selectedClearanceType.name : 'Not selected'}
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
                                                 <div className="text-sm text-gray-500 dark:text-gray-400">Urgency</div>
-                                                <div className="font-medium flex items-center gap-1">
+                                                <div className={`font-medium flex items-center gap-1 ${getPriorityColor(data.urgency)} px-2 py-1 rounded`}>
                                                     {data.urgency === 'rush' ? (
                                                         <>
-                                                            <Zap className="h-3 w-3 text-amber-600" />
+                                                            <Zap className="h-3 w-3" />
                                                             <span className="capitalize">{data.urgency} (1.5x)</span>
                                                         </>
                                                     ) : data.urgency === 'express' ? (
                                                         <>
-                                                            <Zap className="h-3 w-3 text-orange-600" />
+                                                            <Zap className="h-3 w-3" />
                                                             <span className="capitalize">{data.urgency} (2x)</span>
                                                         </>
                                                     ) : (
@@ -1217,7 +1320,7 @@ export default function CreateClearanceRequest() {
                                             </div>
                                             <div>
                                                 <div className="text-sm text-gray-500 dark:text-gray-400">Fee</div>
-                                                <div className="font-medium flex items-center gap-1">
+                                                <div className="font-medium flex items-center gap-1 dark:text-gray-100">
                                                     <DollarSign className="h-3 w-3" />
                                                     {formatCurrency(data.fee_amount)}
                                                 </div>
@@ -1225,14 +1328,14 @@ export default function CreateClearanceRequest() {
                                         </div>
                                         <div>
                                             <div className="text-sm text-gray-500 dark:text-gray-400">Estimated Processing</div>
-                                            <div className="font-medium flex items-center gap-1">
+                                            <div className="font-medium flex items-center gap-1 dark:text-gray-100">
                                                 <Clock className="h-3 w-3" />
                                                 {calculateEstimatedProcessingDays()} days
                                             </div>
                                         </div>
                                         <div>
                                             <div className="text-sm text-gray-500 dark:text-gray-400">Needed By</div>
-                                            <div className="font-medium flex items-center gap-1">
+                                            <div className="font-medium flex items-center gap-1 dark:text-gray-100">
                                                 <Calendar className="h-3 w-3" />
                                                 {formatDate(data.needed_date)}
                                             </div>
@@ -1243,19 +1346,24 @@ export default function CreateClearanceRequest() {
 
                             {/* Clearance Type Details Card */}
                             {selectedClearanceType && (
-                                <Card>
+                                <Card className="dark:bg-gray-900">
                                     <CardHeader>
-                                        <CardTitle>Type Details</CardTitle>
+                                        <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                                            <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
+                                                <Info className="h-3 w-3 text-white" />
+                                            </div>
+                                            Type Details
+                                        </CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <div className="space-y-3">
                                             <div>
                                                 <div className="text-sm text-gray-500 dark:text-gray-400">Description</div>
-                                                <div className="text-sm font-medium">{selectedClearanceType.description}</div>
+                                                <div className="text-sm font-medium dark:text-gray-300">{selectedClearanceType.description}</div>
                                             </div>
 
                                             {selectedClearanceType.is_discountable && (
-                                                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                                                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
                                                     <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
                                                         <Shield className="h-4 w-4" />
                                                         <span className="text-sm font-medium">Discount Eligible</span>
@@ -1269,14 +1377,14 @@ export default function CreateClearanceRequest() {
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
                                                     <div className="text-sm text-gray-500 dark:text-gray-400">Normal Processing</div>
-                                                    <div className="text-sm font-medium flex items-center gap-1">
+                                                    <div className="text-sm font-medium flex items-center gap-1 dark:text-gray-300">
                                                         <Clock className="h-3 w-3" />
                                                         {selectedClearanceType.processing_days} days
                                                     </div>
                                                 </div>
                                                 <div>
                                                     <div className="text-sm text-gray-500 dark:text-gray-400">Validity Period</div>
-                                                    <div className="text-sm font-medium flex items-center gap-1">
+                                                    <div className="text-sm font-medium flex items-center gap-1 dark:text-gray-300">
                                                         <Calendar className="h-3 w-3" />
                                                         {selectedClearanceType.validity_days} days
                                                     </div>
@@ -1284,19 +1392,19 @@ export default function CreateClearanceRequest() {
                                             </div>
                                             <div className="flex flex-wrap gap-2">
                                                 {selectedClearanceType.requires_payment && (
-                                                    <Badge variant="default">
+                                                    <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
                                                         <DollarSign className="h-3 w-3 mr-1" />
                                                         Paid Service
                                                     </Badge>
                                                 )}
                                                 {selectedClearanceType.requires_approval && (
-                                                    <Badge variant="secondary">
+                                                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
                                                         <Shield className="h-3 w-3 mr-1" />
                                                         Needs Approval
                                                     </Badge>
                                                 )}
                                                 {selectedClearanceType.is_online_only && (
-                                                    <Badge variant="outline">
+                                                    <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
                                                         Online Only
                                                     </Badge>
                                                 )}
@@ -1308,10 +1416,12 @@ export default function CreateClearanceRequest() {
 
                             {/* Payment Information Card - Shows what happens with Create & Pay */}
                             {data.fee_amount > 0 && (
-                                <Card>
+                                <Card className="dark:bg-gray-900">
                                     <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <CreditCard className="h-5 w-5" />
+                                        <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                                            <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700 flex items-center justify-center">
+                                                <CreditCard className="h-3 w-3 text-white" />
+                                            </div>
                                             Payment Information
                                         </CardTitle>
                                     </CardHeader>
@@ -1319,7 +1429,7 @@ export default function CreateClearanceRequest() {
                                         <div className="space-y-4">
                                             <div className="space-y-2">
                                                 <div className="text-sm text-gray-500 dark:text-gray-400">With "Create & Pay"</div>
-                                                <div className="text-sm font-medium bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                                                <div className="text-sm font-medium bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
                                                     <p className="text-green-700 dark:text-green-300">
                                                         You'll go directly to the payment page where you can:
                                                     </p>
@@ -1333,25 +1443,25 @@ export default function CreateClearanceRequest() {
 
                                             <div className="space-y-2">
                                                 <div className="text-sm text-gray-500 dark:text-gray-400">Outstanding Fees</div>
-                                                <div className="text-sm">
+                                                <div className="text-sm dark:text-gray-300">
                                                     After creation, the payment page will show other unpaid fees for this payer:
                                                 </div>
-                                                <div className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-800">
+                                                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-900">
                                                     <div className="flex items-center justify-between text-sm">
                                                         <div className="flex items-center gap-2">
                                                             <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                                                            <span>Garbage Collection Fee</span>
+                                                            <span className="dark:text-gray-300">Garbage Collection Fee</span>
                                                         </div>
-                                                        <span className="font-medium">₱50.00</span>
+                                                        <span className="font-medium dark:text-gray-300">₱50.00</span>
                                                     </div>
                                                     <div className="flex items-center justify-between text-sm mt-2">
                                                         <div className="flex items-center gap-2">
                                                             <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                                                            <span>Barangay Dues</span>
+                                                            <span className="dark:text-gray-300">Barangay Dues</span>
                                                         </div>
-                                                        <span className="font-medium">₱100.00</span>
+                                                        <span className="font-medium dark:text-gray-300">₱100.00</span>
                                                     </div>
-                                                    <div className="text-xs text-gray-500 mt-2">
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                                                         * Example only. Actual fees will be shown on payment page.
                                                     </div>
                                                 </div>
@@ -1360,11 +1470,11 @@ export default function CreateClearanceRequest() {
                                             <div className="space-y-2">
                                                 <div className="text-sm text-gray-500 dark:text-gray-400">Payment Status</div>
                                                 <div className="flex items-center gap-2">
-                                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                                                         <Clock className="h-3 w-3 mr-1" />
                                                         Pending Payment
                                                     </Badge>
-                                                    <span className="text-xs text-gray-500">
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
                                                         (after creation)
                                                     </span>
                                                 </div>
@@ -1375,9 +1485,9 @@ export default function CreateClearanceRequest() {
                             )}
 
                             {/* Form Actions Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900">
                                 <CardContent className="space-y-3 pt-6">
-                                    <div className="text-sm text-gray-500 text-center">
+                                    <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
                                         <p>Review all information before submitting.</p>
                                         <p className="text-xs mt-1">
                                             {selectedClearanceType?.requires_payment && data.fee_amount > 0
@@ -1389,7 +1499,7 @@ export default function CreateClearanceRequest() {
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            className="w-full"
+                                            className="w-full dark:border-gray-600 dark:text-gray-300"
                                             disabled={processing || isSubmitting}
                                         >
                                             Cancel

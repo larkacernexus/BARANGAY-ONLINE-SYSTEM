@@ -150,7 +150,7 @@ const DeviceCard = ({
             "p-2 rounded-lg",
             isCurrent && "bg-green-100 dark:bg-green-900/30",
             device.is_trusted && !isCurrent && "bg-blue-100 dark:bg-blue-900/30",
-            !isCurrent && !device.is_trusted && "bg-gray-100 dark:bg-gray-800"
+            !isCurrent && !device.is_trusted && "bg-gray-100 dark:bg-gray-900"
           )}>
             <Icon className={cn(
               "h-5 w-5",
@@ -181,7 +181,7 @@ const DeviceCard = ({
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 dark:hover:bg-gray-800">
+            <Button variant="ghost" size="icon" className="h-8 w-8 dark:hover:bg-gray-900">
               <MoreVertical className="h-4 w-4 dark:text-gray-400" />
             </Button>
           </DropdownMenuTrigger>
@@ -200,7 +200,7 @@ const DeviceCard = ({
               <DropdownMenuItem 
                 onClick={() => onUntrust?.(device.id)}
                 disabled={isProcessing}
-                className="dark:text-gray-300 dark:focus:bg-gray-800"
+                className="dark:text-gray-300 dark:focus:bg-gray-900"
               >
                 <XCircle className="mr-2 h-4 w-4" />
                 Remove Trust
@@ -209,13 +209,13 @@ const DeviceCard = ({
               <DropdownMenuItem 
                 onClick={() => onTrust?.(device.id)}
                 disabled={isProcessing}
-                className="dark:text-gray-300 dark:focus:bg-gray-800"
+                className="dark:text-gray-300 dark:focus:bg-gray-900"
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
                 Trust Device
               </DropdownMenuItem>
             ) : null}
-            <DropdownMenuItem className="dark:text-gray-300 dark:focus:bg-gray-800">
+            <DropdownMenuItem className="dark:text-gray-300 dark:focus:bg-gray-900">
               <Info className="mr-2 h-4 w-4" />
               Details
             </DropdownMenuItem>
@@ -261,7 +261,7 @@ const DeviceCard = ({
 
 // Session History Item Component
 const SessionItem = ({ session }: { session: SessionHistory }) => (
-  <div className="flex items-center justify-between p-2 hover:bg-accent/30 dark:hover:bg-gray-800/50 rounded">
+  <div className="flex items-center justify-between p-2 hover:bg-accent/30 dark:hover:bg-gray-900/50 rounded">
     <div>
       <div className="font-medium text-sm dark:text-gray-200">{session.device_name}</div>
       <div className="text-xs text-muted-foreground dark:text-gray-400">
@@ -287,22 +287,22 @@ const DevicesSkeleton = () => (
   <div className="space-y-6">
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <Skeleton className="h-8 w-48 dark:bg-gray-800" />
-        <Skeleton className="h-4 w-64 mt-2 dark:bg-gray-800" />
+        <Skeleton className="h-8 w-48 dark:bg-gray-900" />
+        <Skeleton className="h-4 w-64 mt-2 dark:bg-gray-900" />
       </div>
-      <Skeleton className="h-9 w-24 dark:bg-gray-800" />
+      <Skeleton className="h-9 w-24 dark:bg-gray-900" />
     </div>
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
-        <Skeleton className="h-64 w-full dark:bg-gray-800" />
-        <Skeleton className="h-80 w-full dark:bg-gray-800" />
-        <Skeleton className="h-96 w-full dark:bg-gray-800" />
+        <Skeleton className="h-64 w-full dark:bg-gray-900" />
+        <Skeleton className="h-80 w-full dark:bg-gray-900" />
+        <Skeleton className="h-96 w-full dark:bg-gray-900" />
       </div>
       <div className="space-y-6">
-        <Skeleton className="h-48 w-full dark:bg-gray-800" />
-        <Skeleton className="h-64 w-full dark:bg-gray-800" />
-        <Skeleton className="h-72 w-full dark:bg-gray-800" />
-        <Skeleton className="h-48 w-full dark:bg-gray-800" />
+        <Skeleton className="h-48 w-full dark:bg-gray-900" />
+        <Skeleton className="h-64 w-full dark:bg-gray-900" />
+        <Skeleton className="h-72 w-full dark:bg-gray-900" />
+        <Skeleton className="h-48 w-full dark:bg-gray-900" />
       </div>
     </div>
   </div>
@@ -472,7 +472,7 @@ export default function ConnectedDevices() {
               variant="outline" 
               onClick={handleRefresh}
               disabled={refreshing}
-              className="w-full sm:w-auto dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+              className="w-full sm:w-auto dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
             >
               <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               {refreshing ? 'Refreshing...' : 'Refresh'}
@@ -545,7 +545,7 @@ export default function ConnectedDevices() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base dark:text-gray-100">Trusted Devices</CardTitle>
-                      <Badge variant="outline" className="dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{trustedDevices.length}</Badge>
+                      <Badge variant="outline" className="dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">{trustedDevices.length}</Badge>
                     </div>
                     <CardDescription className="text-xs dark:text-gray-400">
                       Devices you've marked as trusted
@@ -571,7 +571,7 @@ export default function ConnectedDevices() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base dark:text-gray-100">Other Active Devices</CardTitle>
-                      <Badge variant="outline" className="dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{activeDevices.length}</Badge>
+                      <Badge variant="outline" className="dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">{activeDevices.length}</Badge>
                     </div>
                     <CardDescription className="text-xs dark:text-gray-400">
                       Devices currently logged into your account
@@ -589,10 +589,10 @@ export default function ConnectedDevices() {
                     ))}
                   </CardContent>
                   {activeDevices.length > 0 && (
-                    <CardFooter className="border-t bg-muted/30 dark:bg-gray-800/50 dark:border-gray-700">
+                    <CardFooter className="border-t bg-muted/30 dark:bg-gray-900/50 dark:border-gray-700">
                       <Button 
                         variant="outline" 
-                        className="w-full dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                        className="w-full dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                         onClick={handleLogoutAll}
                         disabled={processing === -1}
                       >
@@ -610,7 +610,7 @@ export default function ConnectedDevices() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base dark:text-gray-100">Inactive Devices</CardTitle>
-                      <Badge variant="outline" className="dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">{inactiveDevices.length}</Badge>
+                      <Badge variant="outline" className="dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">{inactiveDevices.length}</Badge>
                     </div>
                     <CardDescription className="text-xs dark:text-gray-400">
                       Devices that haven't been active recently
@@ -658,7 +658,7 @@ export default function ConnectedDevices() {
                     </div>
                     <Progress 
                       value={securityStats.security_score} 
-                      className="h-2 dark:bg-gray-800"
+                      className="h-2 dark:bg-gray-900"
                     />
                   </div>
                   
@@ -677,7 +677,7 @@ export default function ConnectedDevices() {
                     </div>
                   </div>
 
-                  <Separator className="dark:bg-gray-800" />
+                  <Separator className="dark:bg-gray-900" />
 
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm">
@@ -774,7 +774,7 @@ export default function ConnectedDevices() {
                 <CardContent className="space-y-2">
                   <Button 
                     variant="outline" 
-                    className="w-full justify-start text-sm h-9 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    className="w-full justify-start text-sm h-9 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                     onClick={handleLogoutAll}
                     disabled={processing === -1}
                   >
@@ -783,7 +783,7 @@ export default function ConnectedDevices() {
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="w-full justify-start text-sm h-9 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    className="w-full justify-start text-sm h-9 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                     onClick={handleReportSuspicious}
                   >
                     <AlertTriangle className="mr-2 h-4 w-4" />
@@ -791,7 +791,7 @@ export default function ConnectedDevices() {
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="w-full justify-start text-sm h-9 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    className="w-full justify-start text-sm h-9 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                     asChild
                   >
                     <a href="/residentsettings/security">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\Resident;
+use App\Models\Privilege;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,67 +14,155 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Illuminate\Support\Facades\Cache;
 
 class ResidentProfileController extends Controller
 {
+    /**
+     * Get all active privileges - DYNAMIC FROM DATABASE
+     */
+    private function getAllPrivileges(): array
+    {
+        return Cache::remember('all_active_privileges', 3600, function () {
+            return Privilege::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'description'])
+                ->map(fn($p) => [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'code' => $p->code,
+                    'description' => $p->description,
+                ])
+                ->toArray();
+        });
+    }
+
+    /**
+     * Get resident's active privileges - DYNAMIC
+     */
+    private function getResidentPrivileges(Resident $resident): array
+    {
+        if (!$resident->relationLoaded('residentPrivileges')) {
+            $resident->load('residentPrivileges.privilege');
+        }
+
+        return $resident->residentPrivileges
+            ->filter(fn($rp) => $rp->isActive())
+            ->map(fn($rp) => [
+                'id' => $rp->id,
+                'privilege_id' => $rp->privilege->id,
+                'code' => $rp->privilege->code,
+                'name' => $rp->privilege->name,
+                'id_number' => $rp->id_number,
+                'verified_at' => $rp->verified_at?->toISOString(),
+                'expires_at' => $rp->expires_at?->toISOString(),
+            ])
+            ->values()
+            ->toArray();
+    }
+
     /**
      * Show the user's profile page (read-only).
      */
     public function show(Request $request): Response
     {
         $user = $request->user();
+        $allPrivileges = $this->getAllPrivileges();
         
-        // Log profile view
         Log::info('Resident profile viewed', [
             'user_id' => $user->id,
             'email' => $user->email,
             'ip' => $request->ip()
         ]);
         
-        // Load basic user relationships
-        $user->load([
-            'role',
-            'currentResident',
-            'household'
-        ]);
+        $user->load(['role', 'currentResident', 'household']);
 
         $resident = $user->currentResident;
         
-        // Log resident data status
         Log::debug('Resident data loaded', [
             'user_id' => $user->id,
             'has_resident' => !is_null($resident),
             'has_household' => !is_null($user->household)
         ]);
         
-        // If resident exists, load their relationships
         if ($resident) {
-            $resident->load([
-                'purok',
-            ]);
+            $resident->load(['purok', 'residentPrivileges.privilege']);
             
-            // Load household with members if household exists
             if ($user->household) {
                 $user->household->load([
                     'purok',
-                    'householdMembers.resident',
+                    'householdMembers.resident.residentPrivileges.privilege',
                 ]);
                 
-                // Get head of household info
                 $headOfHousehold = $user->household->head_of_household;
                 
-                // Get all household members
-                $householdMembers = $user->household->householdMembers->map(function ($member) {
-                    return [
-                        'id' => $member->resident->id,
-                        'full_name' => $member->resident->full_name,
-                        'first_name' => $member->resident->first_name,
-                        'last_name' => $member->resident->last_name,
-                        'middle_name' => $member->resident->middle_name,
-                        'relationship_to_head' => $member->relationship_to_head,
-                        'is_head' => $member->is_head,
-                    ];
-                })->values();
+                $householdMembers = $user->household->householdMembers
+                    ->map(function ($member) use ($allPrivileges) {
+                        $resident = $member->resident;
+                        if (!$resident) return null;
+                        
+                        $resident->loadMissing(['purok', 'residentPrivileges.privilege']);
+                        $memberPrivileges = $this->getResidentPrivileges($resident);
+                        
+                        $memberData = [
+                            'id' => $resident->id,
+                            'resident_id' => $resident->resident_id,
+                            'full_name' => $resident->full_name,
+                            'first_name' => $resident->first_name,
+                            'last_name' => $resident->last_name,
+                            'middle_name' => $resident->middle_name,
+                            'suffix' => $resident->suffix,
+                            'birth_date' => $resident->birth_date?->format('Y-m-d'),
+                            'age' => $resident->age,
+                            'gender' => $resident->gender,
+                            'civil_status' => $resident->civil_status,
+                            'place_of_birth' => $resident->place_of_birth,
+                            'religion' => $resident->religion,
+                            'contact_number' => $resident->contact_number,
+                            'email' => $resident->email,
+                            'address' => $resident->address,
+                            'occupation' => $resident->occupation,
+                            'education' => $resident->education,
+                            'is_voter' => (bool) $resident->is_voter,
+                            'status' => $resident->status,
+                            'remarks' => $resident->remarks,
+                            'photo_path' => $resident->photo_path,
+                            'photo_url' => $resident->photo_url,
+                            'purok' => $resident->purok ? [
+                                'id' => $resident->purok->id,
+                                'name' => $resident->purok->name,
+                            ] : null,
+                            'relationship_to_head' => $member->relationship_to_head,
+                            'is_head' => (bool) $member->is_head,
+                            'joined_at' => $member->created_at?->format('Y-m-d'),
+                            'membership' => [
+                                'id' => $member->id,
+                                'household_id' => $member->household_id,
+                                'resident_id' => $member->resident_id,
+                                'relationship_to_head' => $member->relationship_to_head,
+                                'is_head' => (bool) $member->is_head,
+                                'joined_at' => $member->created_at?->format('Y-m-d'),
+                            ],
+                            
+                            // DYNAMIC privilege data
+                            'privileges' => $memberPrivileges,
+                            'privileges_count' => count($memberPrivileges),
+                            'has_privileges' => count($memberPrivileges) > 0,
+                            'discount_eligibilities' => $memberPrivileges,
+                        ];
+
+                        // DYNAMIC flags for each privilege
+                        foreach ($memberPrivileges as $priv) {
+                            $code = strtolower($priv['code']);
+                            $memberData["is_{$code}"] = true;
+                            $memberData["has_{$code}"] = true;
+                            $memberData["{$code}_id_number"] = $priv['id_number'];
+                        }
+
+                        return $memberData;
+                    })
+                    ->filter()
+                    ->values();
                 
                 Log::debug('Household data loaded', [
                     'user_id' => $user->id,
@@ -83,61 +172,13 @@ class ResidentProfileController extends Controller
             }
         }
 
-        // FIXED: Generate QR code URL as simple path, not full URL
-        $qrCodeUrl = null;
-        if ($user->qr_code_url) {
-            // If it's already a full URL (from old data), extract just the filename
-            if (filter_var($user->qr_code_url, FILTER_VALIDATE_URL)) {
-                $path = parse_url($user->qr_code_url, PHP_URL_PATH);
-                $filename = basename($path);
-                $qrCodeUrl = '/storage/qr-codes/' . $filename;
-            } 
-            // If it's a path with storage/ prefix, clean it
-            elseif (str_contains($user->qr_code_url, 'storage/')) {
-                $filename = basename($user->qr_code_url);
-                $qrCodeUrl = '/storage/qr-codes/' . $filename;
-            }
-            // If it's already the correct relative path (qr-codes/filename.png)
-            elseif (str_starts_with($user->qr_code_url, 'qr-codes/')) {
-                $qrCodeUrl = '/storage/' . $user->qr_code_url;
-            }
-            // Fallback
-            else {
-                $qrCodeUrl = '/storage/' . $user->qr_code_url;
-            }
-            
-            Log::info('QR code data fetched for user', [
-                'user_id' => $user->id,
-                'qr_code_exists' => true,
-                'qr_code_url' => $qrCodeUrl,
-                'original_path' => $user->qr_code_url,
-                'qr_login_token_exists' => !is_null($user->login_qr_code),
-                'qr_login_token' => $user->login_qr_code ? substr($user->login_qr_code, 0, 8) . '...' : null,
-                'qr_login_generated_at' => $user->login_qr_code_generated_at,
-                'qr_login_expires_at' => $user->login_qr_code_expires_at,
-                'qr_login_used_count' => $user->login_qr_code_used_count,
-                'is_expired' => $user->login_qr_code_expires_at ? now()->gt($user->login_qr_code_expires_at) : false,
-            ]);
-        } else {
-            Log::info('No QR code found for user', [
-                'user_id' => $user->id,
-                'qr_code_url_field' => $user->qr_code_url,
-                'login_qr_code_field' => $user->login_qr_code ? 'exists' : 'null'
-            ]);
-        }
-
-        // Log QR code status summary
-        Log::debug('QR code status summary', [
-            'user_id' => $user->id,
-            'has_qr_code' => !is_null($user->qr_code_url) && !is_null($user->login_qr_code),
-            'qr_code_url_generated' => !is_null($qrCodeUrl),
-            'qr_token_exists' => !is_null($user->login_qr_code),
-            'qr_expires_at' => $user->login_qr_code_expires_at,
-        ]);
+        // QR code handling (unchanged)
+        $qrCodeUrl = $this->getQrCodeUrl($user);
 
         return Inertia::render('residentsettings/profile', [
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'allPrivileges' => $allPrivileges,
             'user' => [
                 'id' => $user->id,
                 'first_name' => $user->first_name,
@@ -152,80 +193,153 @@ class ResidentProfileController extends Controller
                 'updated_at' => $user->updated_at,
                 'full_name' => $user->full_name,
                 
-                // QR CODE FIELDS - Using simple path
                 'qr_login_token' => $user->login_qr_code,
-                'qr_code_url' => $qrCodeUrl, // This will be like '/storage/qr-codes/17_1772948368.png'
+                'qr_code_url' => $qrCodeUrl,
                 
                 'role' => $user->role ? [
                     'id' => $user->role->id,
                     'name' => $user->role->name,
                 ] : null,
-                'resident' => $resident ? [
-                    'id' => $resident->id,
-                    'resident_id' => $resident->resident_id,
-                    'first_name' => $resident->first_name,
-                    'last_name' => $resident->last_name,
-                    'middle_name' => $resident->middle_name,
-                    'suffix' => $resident->suffix,
-                    'birth_date' => $resident->birth_date ? $resident->birth_date->format('Y-m-d') : null,
-                    'age' => $resident->age,
-                    'gender' => $resident->gender,
-                    'civil_status' => $resident->civil_status,
-                    'contact_number' => $resident->contact_number,
-                    'email' => $resident->email,
-                    'address' => $resident->address,
-                    'occupation' => $resident->occupation,
-                    'education' => $resident->education,
-                    'religion' => $resident->religion,
-                    'is_voter' => (bool) $resident->is_voter,
-                    'is_pwd' => (bool) $resident->is_pwd,
-                    'is_senior' => (bool) $resident->is_senior,
-                    'place_of_birth' => $resident->place_of_birth,
-                    'remarks' => $resident->remarks,
-                    'photo_path' => $resident->photo_path,
-                    'status' => $resident->status,
-                    'is_head_of_household' => $this->isHeadOfHousehold($user, $resident),
-                    'purok' => $resident->purok ? [
-                        'id' => $resident->purok->id,
-                        'name' => $resident->purok->name,
-                        'leader_name' => $resident->purok->leader_name ?? null,
-                        'leader_contact' => $resident->purok->leader_contact ?? null,
-                        'google_maps_url' => $resident->purok->google_maps_url ?? null,
-                    ] : null,
-                    'household' => $user->household ? [
-                        'id' => $user->household->id,
-                        'household_number' => $user->household->household_number,
-                        'address' => $user->household->address,
-                        'full_address' => $user->household->full_address,
-                        'contact_number' => $user->household->contact_number,
-                        'email' => $user->household->email,
-                        'member_count' => $user->household->member_count,
-                        'income_range' => $user->household->income_range,
-                        'housing_type' => $user->household->housing_type,
-                        'ownership_status' => $user->household->ownership_status,
-                        'water_source' => $user->household->water_source,
-                        'electricity' => (bool) $user->household->electricity,
-                        'has_electricity' => (bool) ($user->household->has_electricity ?? $user->household->electricity),
-                        'internet' => (bool) $user->household->internet,
-                        'has_internet' => (bool) ($user->household->has_internet ?? $user->household->internet),
-                        'vehicle' => (bool) $user->household->vehicle,
-                        'has_vehicle' => (bool) ($user->household->has_vehicle ?? $user->household->vehicle),
-                        'remarks' => $user->household->remarks,
-                        'purok' => $user->household->purok ? [
-                            'id' => $user->household->purok->id,
-                            'name' => $user->household->purok->name,
-                        ] : null,
-                        'head_of_household' => $headOfHousehold ? [
-                            'id' => $headOfHousehold->id,
-                            'full_name' => $headOfHousehold->full_name,
-                            'first_name' => $headOfHousehold->first_name,
-                            'last_name' => $headOfHousehold->last_name,
-                        ] : null,
-                        'members' => $householdMembers ?? [],
-                    ] : null,
-                ] : null,
+                
+                'resident' => $resident ? $this->formatResidentData($resident, $user, $allPrivileges, $householdMembers ?? collect([])) : null,
             ],
         ]);
+    }
+
+    /**
+     * Format resident data with dynamic privileges
+     */
+    private function formatResidentData($resident, $user, array $allPrivileges, $householdMembers): array
+    {
+        $activePrivileges = $this->getResidentPrivileges($resident);
+        
+        $data = [
+            'id' => $resident->id,
+            'resident_id' => $resident->resident_id,
+            'first_name' => $resident->first_name,
+            'last_name' => $resident->last_name,
+            'middle_name' => $resident->middle_name,
+            'suffix' => $resident->suffix,
+            'birth_date' => $resident->birth_date?->format('Y-m-d'),
+            'age' => $resident->age,
+            'gender' => $resident->gender,
+            'civil_status' => $resident->civil_status,
+            'contact_number' => $resident->contact_number,
+            'email' => $resident->email,
+            'address' => $resident->address,
+            'occupation' => $resident->occupation,
+            'education' => $resident->education,
+            'religion' => $resident->religion,
+            'is_voter' => (bool) $resident->is_voter,
+            'place_of_birth' => $resident->place_of_birth,
+            'remarks' => $resident->remarks,
+            'photo_path' => $resident->photo_path,
+            'photo_url' => $resident->photo_url,
+            'status' => $resident->status,
+            
+            // DYNAMIC privilege data
+            'privileges' => $activePrivileges,
+            'privileges_count' => count($activePrivileges),
+            'has_privileges' => count($activePrivileges) > 0,
+            'discount_eligibilities' => $activePrivileges,
+            
+            'is_head_of_household' => $this->isHeadOfHousehold($user, $resident),
+            'purok' => $resident->purok ? [
+                'id' => $resident->purok->id,
+                'name' => $resident->purok->name,
+                'leader_name' => $resident->purok->leader_name ?? null,
+                'leader_contact' => $resident->purok->leader_contact ?? null,
+                'google_maps_url' => $resident->purok->google_maps_url ?? null,
+            ] : null,
+            
+            'household' => $user->household ? [
+                'id' => $user->household->id,
+                'household_number' => $user->household->household_number,
+                'address' => $user->household->address,
+                'full_address' => $user->household->full_address,
+                'contact_number' => $user->household->contact_number,
+                'email' => $user->household->email,
+                'member_count' => $user->household->member_count,
+                'income_range' => $user->household->income_range,
+                'housing_type' => $user->household->housing_type,
+                'ownership_status' => $user->household->ownership_status,
+                'water_source' => $user->household->water_source,
+                'electricity' => (bool) $user->household->electricity,
+                'has_electricity' => (bool) ($user->household->has_electricity ?? $user->household->electricity),
+                'internet' => (bool) $user->household->internet,
+                'has_internet' => (bool) ($user->household->has_internet ?? $user->household->internet),
+                'vehicle' => (bool) $user->household->vehicle,
+                'has_vehicle' => (bool) ($user->household->has_vehicle ?? $user->household->vehicle),
+                'remarks' => $user->household->remarks,
+                'purok' => $user->household->purok ? [
+                    'id' => $user->household->purok->id,
+                    'name' => $user->household->purok->name,
+                ] : null,
+                'head_of_household' => $user->household->head_of_household ? [
+                    'id' => $user->household->head_of_household->id,
+                    'full_name' => $user->household->head_of_household->full_name,
+                    'first_name' => $user->household->head_of_household->first_name,
+                    'last_name' => $user->household->head_of_household->last_name,
+                ] : null,
+                'members' => $householdMembers,
+            ] : null,
+        ];
+
+        // DYNAMIC flags for each privilege
+        foreach ($activePrivileges as $priv) {
+            $code = strtolower($priv['code']);
+            $data["is_{$code}"] = true;
+            $data["has_{$code}"] = true;
+            $data["{$code}_id_number"] = $priv['id_number'];
+        }
+
+        return $data;
+    }
+
+    /**
+     * Get QR code URL
+     */
+    private function getQrCodeUrl($user): ?string
+    {
+        if (!$user->qr_code_url) {
+            Log::info('No QR code found for user', [
+                'user_id' => $user->id,
+                'qr_code_url_field' => $user->qr_code_url,
+                'login_qr_code_field' => $user->login_qr_code ? 'exists' : 'null'
+            ]);
+            return null;
+        }
+
+        // If it's already a full URL, extract filename
+        if (filter_var($user->qr_code_url, FILTER_VALIDATE_URL)) {
+            $path = parse_url($user->qr_code_url, PHP_URL_PATH);
+            $filename = basename($path);
+            $qrCodeUrl = '/storage/qr-codes/' . $filename;
+        } 
+        // If it's a path with storage/ prefix, clean it
+        elseif (str_contains($user->qr_code_url, 'storage/')) {
+            $filename = basename($user->qr_code_url);
+            $qrCodeUrl = '/storage/qr-codes/' . $filename;
+        }
+        // If it's already the correct relative path
+        elseif (str_starts_with($user->qr_code_url, 'qr-codes/')) {
+            $qrCodeUrl = '/storage/' . $user->qr_code_url;
+        }
+        // Fallback
+        else {
+            $qrCodeUrl = '/storage/' . $user->qr_code_url;
+        }
+
+        Log::info('QR code data fetched for user', [
+            'user_id' => $user->id,
+            'qr_code_exists' => true,
+            'qr_code_url' => $qrCodeUrl,
+            'original_path' => $user->qr_code_url,
+            'qr_login_token_exists' => !is_null($user->login_qr_code),
+            'qr_login_expires_at' => $user->login_qr_code_expires_at,
+        ]);
+
+        return $qrCodeUrl;
     }
 
     /**
@@ -250,61 +364,26 @@ class ResidentProfileController extends Controller
     public function edit(Request $request): Response
     {
         $user = $request->user();
+        $allPrivileges = $this->getAllPrivileges();
         
         Log::info('Resident profile edit form viewed', [
             'user_id' => $user->id,
             'ip' => $request->ip()
         ]);
         
-        // Load basic user relationships
-        $user->load([
-            'role',
-            'currentResident',
-            'household'
-        ]);
-
+        $user->load(['role', 'currentResident', 'household']);
         $resident = $user->currentResident;
         
-        // If resident exists, load their relationships
         if ($resident) {
-            $resident->load([
-                'purok',
-            ]);
+            $resident->load(['purok', 'residentPrivileges.privilege']);
         }
 
-        // FIXED: Generate QR code URL as simple path
-        $qrCodeUrl = null;
-        if ($user->qr_code_url) {
-            // If it's already a full URL (from old data), extract just the filename
-            if (filter_var($user->qr_code_url, FILTER_VALIDATE_URL)) {
-                $path = parse_url($user->qr_code_url, PHP_URL_PATH);
-                $filename = basename($path);
-                $qrCodeUrl = '/storage/qr-codes/' . $filename;
-            } 
-            // If it's a path with storage/ prefix, clean it
-            elseif (str_contains($user->qr_code_url, 'storage/')) {
-                $filename = basename($user->qr_code_url);
-                $qrCodeUrl = '/storage/qr-codes/' . $filename;
-            }
-            // If it's already the correct relative path (qr-codes/filename.png)
-            elseif (str_starts_with($user->qr_code_url, 'qr-codes/')) {
-                $qrCodeUrl = '/storage/' . $user->qr_code_url;
-            }
-            // Fallback
-            else {
-                $qrCodeUrl = '/storage/' . $user->qr_code_url;
-            }
-            
-            Log::debug('QR code data loaded in edit form', [
-                'user_id' => $user->id,
-                'qr_code_url' => $qrCodeUrl,
-                'original_path' => $user->qr_code_url
-            ]);
-        }
+        $qrCodeUrl = $this->getQrCodeUrl($user);
 
         return Inertia::render('residentsettings/profile', [
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'allPrivileges' => $allPrivileges,
             'user' => [
                 'id' => $user->id,
                 'first_name' => $user->first_name,
@@ -317,14 +396,14 @@ class ResidentProfileController extends Controller
                 'email_verified_at' => $user->email_verified_at,
                 'full_name' => $user->full_name,
                 
-                // QR CODE FIELDS - Using simple path
                 'qr_login_token' => $user->login_qr_code,
-                'qr_code_url' => $qrCodeUrl, // This will be like '/storage/qr-codes/17_1772948368.png'
+                'qr_code_url' => $qrCodeUrl,
                 
                 'role' => $user->role ? [
                     'id' => $user->role->id,
                     'name' => $user->role->name,
                 ] : null,
+                
                 'resident' => $resident ? [
                     'id' => $resident->id,
                     'resident_id' => $resident->resident_id,
@@ -332,7 +411,7 @@ class ResidentProfileController extends Controller
                     'last_name' => $resident->last_name,
                     'middle_name' => $resident->middle_name,
                     'suffix' => $resident->suffix,
-                    'birth_date' => $resident->birth_date ? $resident->birth_date->format('Y-m-d') : null,
+                    'birth_date' => $resident->birth_date?->format('Y-m-d'),
                     'age' => $resident->age,
                     'gender' => $resident->gender,
                     'civil_status' => $resident->civil_status,
@@ -343,12 +422,16 @@ class ResidentProfileController extends Controller
                     'education' => $resident->education,
                     'religion' => $resident->religion,
                     'is_voter' => (bool) $resident->is_voter,
-                    'is_pwd' => (bool) $resident->is_pwd,
-                    'is_senior' => (bool) $resident->is_senior,
                     'place_of_birth' => $resident->place_of_birth,
                     'remarks' => $resident->remarks,
                     'photo_path' => $resident->photo_path,
                     'status' => $resident->status,
+                    
+                    // DYNAMIC privilege data
+                    'privileges' => $this->getResidentPrivileges($resident),
+                    'privileges_count' => $resident->residentPrivileges->filter(fn($rp) => $rp->isActive())->count(),
+                    'has_privileges' => $resident->residentPrivileges->filter(fn($rp) => $rp->isActive())->count() > 0,
+                    
                     'is_head_of_household' => $this->isHeadOfHousehold($user, $resident),
                     'purok' => $resident->purok ? [
                         'id' => $resident->purok->id,
@@ -405,7 +488,6 @@ class ResidentProfileController extends Controller
         // Also update the resident record if it exists
         $resident = $user->currentResident;
         if ($resident) {
-            // Validate resident-specific fields if provided
             $residentValidated = $request->validate([
                 'resident.first_name' => ['nullable', 'string', 'max:255'],
                 'resident.last_name' => ['nullable', 'string', 'max:255'],
@@ -432,7 +514,7 @@ class ResidentProfileController extends Controller
 
         Log::info('Profile updated successfully', ['user_id' => $user->id]);
 
-        return redirect()->route('resident.profile.show')->with('status', 'profile-updated');
+        return redirect()->route('portal.profile.show')->with('status', 'profile-updated');
     }
 
     /**
@@ -452,7 +534,6 @@ class ResidentProfileController extends Controller
             'ip' => $request->ip()
         ]);
 
-        // Delete QR code image if exists using Storage facade
         if ($user->qr_code_url) {
             Log::info('Deleting QR code image during account deletion', [
                 'user_id' => $user->id,
@@ -469,7 +550,6 @@ class ResidentProfileController extends Controller
         ]);
 
         Auth::logout();
-
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
@@ -485,7 +565,7 @@ class ResidentProfileController extends Controller
 
         if ($user->hasVerifiedEmail()) {
             Log::info('Email already verified', ['user_id' => $user->id]);
-            return redirect()->route('resident.profile.show')
+            return redirect()->route('portal.profile.show')
                 ->with('status', 'already-verified');
         }
 

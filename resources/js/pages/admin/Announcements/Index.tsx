@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+// resources/js/pages/admin/announcements/index.tsx
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
@@ -15,6 +16,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Import AdminUI components
 import AnnouncementsHeader from '@/components/admin/announcements/AnnouncementsHeader';
+import AnnouncementsStats from '@/components/admin/announcements/AnnouncementsStats';
 import AnnouncementsFilters from '@/components/admin/announcements/AnnouncementsFilters';
 import AnnouncementsContent from '@/components/admin/announcements/AnnouncementsContent';
 import AnnouncementsDialogs from '@/components/admin/announcements/AnnouncementsDialogs';
@@ -70,6 +72,8 @@ export default function AnnouncementsIndex({
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [bulkEditValue, setBulkEditValue] = useState<string>('');
+
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     // Handle window resize
     useEffect(() => {
@@ -139,6 +143,16 @@ export default function AnnouncementsIndex({
         });
     }, [announcements.data, search, filtersState]);
 
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        return {
+            total: filteredAnnouncements.length,
+            active: filteredAnnouncements.filter(a => a.is_active && new Date(a.start_date) <= new Date() && new Date(a.end_date) >= new Date()).length,
+            expired: filteredAnnouncements.filter(a => new Date(a.end_date) < new Date()).length,
+            upcoming: filteredAnnouncements.filter(a => new Date(a.start_date) > new Date()).length
+        };
+    }, [filteredAnnouncements]);
+
     // Pagination
     const totalItems = filteredAnnouncements.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
@@ -191,7 +205,7 @@ export default function AnnouncementsIndex({
             // Ctrl/Cmd + F to focus search
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
-                // Focus search input - you'll need to pass searchInputRef to Filters component
+                searchInputRef.current?.focus();
             }
             // Delete key for bulk delete
             if (e.key === 'Delete' && isBulkMode && selectedAnnouncements.length > 0) {
@@ -230,8 +244,8 @@ export default function AnnouncementsIndex({
 
     const handleSelectAll = () => {
         if (confirm(`This will select ALL ${announcements.total || 0} announcements. This action may take a moment.`)) {
-            const pageIds = paginatedAnnouncements.map(announcement => announcement.id);
-            setSelectedAnnouncements(pageIds);
+            const allIds = announcements.data.map(a => a.id);
+            setSelectedAnnouncements(allIds);
             setSelectionMode('all');
         }
     };
@@ -275,22 +289,7 @@ export default function AnnouncementsIndex({
         try {
             switch (operation) {
                 case 'delete':
-                    if (confirm(`Are you sure you want to delete ${selectedAnnouncements.length} selected announcement(s)?`)) {
-                        await router.post('/admin/announcements/bulk-action', {
-                            action: 'delete',
-                            announcement_ids: selectedAnnouncements,
-                        }, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                setSelectedAnnouncements([]);
-                                setShowBulkDeleteDialog(false);
-                                toast.success('Announcements deleted successfully');
-                            },
-                            onError: () => {
-                                toast.error('Failed to delete announcements');
-                            }
-                        });
-                    }
+                    setShowBulkDeleteDialog(true);
                     break;
 
                 case 'activate':
@@ -301,7 +300,7 @@ export default function AnnouncementsIndex({
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedAnnouncements([]);
-                            toast.success('Announcements activated successfully');
+                            toast.success(`${selectedAnnouncements.length} announcements activated successfully`);
                         },
                         onError: () => {
                             toast.error('Failed to activate announcements');
@@ -317,7 +316,7 @@ export default function AnnouncementsIndex({
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedAnnouncements([]);
-                            toast.success('Announcements deactivated successfully');
+                            toast.success(`${selectedAnnouncements.length} announcements deactivated successfully`);
                         },
                         onError: () => {
                             toast.error('Failed to deactivate announcements');
@@ -326,12 +325,10 @@ export default function AnnouncementsIndex({
                     break;
 
                 case 'publish':
-                    // Implement publish logic
                     toast.info('Publish functionality to be implemented');
                     break;
 
                 case 'archive':
-                    // Implement archive logic
                     toast.info('Archive functionality to be implemented');
                     break;
 
@@ -352,35 +349,38 @@ export default function AnnouncementsIndex({
                     break;
 
                 case 'copy_data':
-                    // Copy selected data to clipboard
-                    if (selectedAnnouncementsData.length === 0) {
-                        toast.error('No data to copy');
-                        return;
-                    }
-                    
-                    const data = selectedAnnouncementsData.map(announcement => ({
-                        'Title': announcement.title || 'N/A',
-                        'Type': announcement.type || 'N/A',
-                        'Priority': announcement.priority || 'N/A',
-                        'Status': announcement.is_active ? 'Active' : 'Inactive',
-                        'Created': announcementUtils.formatDate(announcement.created_at),
-                    }));
-                    
-                    const csv = [
-                        Object.keys(data[0]).join(','),
-                        ...data.map(row => Object.values(row).join(','))
-                    ].join('\n');
-                    
-                    navigator.clipboard.writeText(csv).then(() => {
-                        toast.success('Data copied to clipboard');
-                    }).catch(() => {
-                        toast.error('Failed to copy to clipboard');
-                    });
+                    handleCopySelectedData();
                     break;
             }
         } catch (error) {
             console.error('Bulk operation error:', error);
             toast.error('An error occurred during the bulk operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/announcements/bulk-action', {
+                action: 'delete',
+                announcement_ids: selectedAnnouncements,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedAnnouncements([]);
+                    setShowBulkDeleteDialog(false);
+                    toast.success(`${selectedAnnouncements.length} announcements deleted successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to delete announcements');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            toast.error('An error occurred during the operation.');
         } finally {
             setIsPerformingBulkAction(false);
         }
@@ -415,11 +415,34 @@ export default function AnnouncementsIndex({
     };
 
     const handleSort = (column: string) => {
+        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
+        
         setFiltersState(prev => ({
             ...prev,
             sort_by: column,
-            sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc'
+            sort_order: newOrder
         }));
+        
+        // Trigger server-side sort update
+        const params = {
+            ...filtersState,
+            sort_by: column,
+            sort_order: newOrder,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/announcements', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearFilters = () => {
@@ -432,6 +455,21 @@ export default function AnnouncementsIndex({
             sort_by: 'created_at',
             sort_order: 'desc'
         });
+        
+        // Trigger server-side filter clear
+        router.get('/admin/announcements', {
+            search: '',
+            type: 'all',
+            status: 'all',
+            from_date: '',
+            to_date: '',
+            sort_by: 'created_at',
+            sort_order: 'desc'
+        }, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearSelection = () => {
@@ -440,11 +478,55 @@ export default function AnnouncementsIndex({
     };
 
     const handleCopySelectedData = () => {
-        handleBulkOperation('copy_data');
+        if (selectedAnnouncementsData.length === 0) {
+            toast.error('No data to copy');
+            return;
+        }
+        
+        const data = selectedAnnouncementsData.map(announcement => ({
+            'Title': announcement.title || 'N/A',
+            'Type': announcement.type || 'N/A',
+            'Priority': announcement.priority || 'N/A',
+            'Status': announcement.is_active ? 'Active' : 'Inactive',
+            'Start Date': announcement.start_date,
+            'End Date': announcement.end_date,
+            'Created': announcementUtils.formatDate(announcement.created_at),
+        }));
+        
+        const csv = [
+            Object.keys(data[0]).join(','),
+            ...data.map(row => Object.values(row).join(','))
+        ].join('\n');
+        
+        navigator.clipboard.writeText(csv).then(() => {
+            toast.success(`${selectedAnnouncementsData.length} records copied to clipboard`);
+        }).catch(() => {
+            toast.error('Failed to copy to clipboard');
+        });
     };
 
     const updateFilter = (key: keyof AnnouncementFilters, value: string) => {
         setFiltersState(prev => ({ ...prev, [key]: value }));
+        
+        // Trigger server-side filter update
+        const params = {
+            ...filtersState,
+            [key]: value,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/announcements', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const hasActiveFilters = 
@@ -470,8 +552,15 @@ export default function AnnouncementsIndex({
                         isMobile={isMobile}
                     />
 
+                    {/* Separate Stats Component */}
+                    <AnnouncementsStats 
+                        globalStats={stats}
+                        filteredStats={filteredStats}
+                        isLoading={isPerformingBulkAction}
+                    />
+
                     <AnnouncementsFilters
-                        stats={stats}
+                        // Remove stats prop
                         search={search}
                         setSearch={handleSearchChange}
                         filtersState={filtersState}
@@ -485,11 +574,13 @@ export default function AnnouncementsIndex({
                         totalItems={totalItems}
                         startIndex={startIndex}
                         endIndex={endIndex}
+                        searchInputRef={searchInputRef}
+                        isLoading={isPerformingBulkAction}
                     />
 
                     <AnnouncementsContent
                         announcements={paginatedAnnouncements}
-                        stats={stats}
+                        // Remove stats prop - content component shouldn't need stats
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -525,7 +616,7 @@ export default function AnnouncementsIndex({
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <KeyRound className="h-4 w-4 text-gray-500" />
@@ -558,6 +649,10 @@ export default function AnnouncementsIndex({
                                     <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
                                     <span>Exit/clear</span>
                                 </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+F</kbd>
+                                    <span>Focus search</span>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -569,7 +664,7 @@ export default function AnnouncementsIndex({
                 setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                 isPerformingBulkAction={isPerformingBulkAction}
                 selectedAnnouncements={selectedAnnouncements}
-                handleBulkOperation={handleBulkOperation}
+                handleBulkOperation={handleBulkDelete}
                 selectionStats={selectionStats}
             />
         </AppLayout>

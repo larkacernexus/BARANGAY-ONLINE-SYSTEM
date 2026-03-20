@@ -25,7 +25,7 @@ export default function UsersPermissionsOverview() {
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {permissions.map((item) => (
-            <div key={item.role} className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+            <div key={item.role} className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
               <h4 className="font-medium mb-2 truncate" title={item.role}>
                 {item.role}
               </h4>

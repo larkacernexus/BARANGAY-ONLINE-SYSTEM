@@ -33,7 +33,7 @@ export function StepNavigation({ isMobile, steps, activeStep, onStepChange }: St
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mb-1 ${
                             activeStep === step.id 
                                 ? 'bg-blue-600 text-white' 
-                                : 'bg-gray-200 dark:bg-gray-800'
+                                : 'bg-gray-200 dark:bg-gray-900'
                         }`}>
                             {step.id}
                         </div>

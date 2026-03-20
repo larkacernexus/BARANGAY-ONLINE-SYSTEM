@@ -163,7 +163,7 @@ export default function UsersTable({
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
-          <TableRow className="bg-gray-50 dark:bg-gray-800">
+          <TableRow className="bg-gray-50 dark:bg-gray-900">
             {isBulkMode && (
               <TableHead className="px-4 py-3 text-center w-12">
                 <div className="flex items-center justify-center">
@@ -210,7 +210,7 @@ export default function UsersTable({
             <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px]">
               Last Activity
             </TableHead>
-            <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[80px]">
+            <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[80px]">
               Actions
             </TableHead>
           </TableRow>

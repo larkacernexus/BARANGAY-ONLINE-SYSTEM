@@ -1,4 +1,5 @@
 // resources/js/components/admin/payment/PayerSelectionStep.tsx
+
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -400,15 +401,15 @@ export function PayerSelectionStep({
             
             return (
                 <>
-                    <div className="text-xs">
+                    <div className="text-xs dark:text-gray-400">
                         {payer.purok && `Purok ${payer.purok} • `}
                         House #{payer.household_number || 'N/A'}
                     </div>
                     <div className="text-xs font-medium mt-1 flex items-center gap-1 flex-wrap">
                         {hasFees && (
                             <>
-                                <CreditCard className="h-3 w-3 text-amber-600" />
-                                <span className="text-amber-600">
+                                <CreditCard className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                <span className="text-amber-600 dark:text-amber-400">
                                     {payer.outstanding_fee_count || 0} outstanding fee{payer.outstanding_fee_count !== 1 ? 's' : ''}
                                     {payer.total_outstanding_balance && ` • ${payer.total_outstanding_balance}`}
                                 </span>
@@ -416,9 +417,9 @@ export function PayerSelectionStep({
                         )}
                         {clearanceRequestsForResident.length > 0 && (
                             <>
-                                {hasFees && <span className="mx-1">|</span>}
-                                <FileText className="h-3 w-3 text-purple-600" />
-                                <span className="text-purple-600">{clearanceRequestsForResident.length} clearance request{clearanceRequestsForResident.length !== 1 ? 's' : ''}</span>
+                                {hasFees && <span className="mx-1 text-gray-400 dark:text-gray-600">|</span>}
+                                <FileText className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                                <span className="text-purple-600 dark:text-purple-400">{clearanceRequestsForResident.length} clearance request{clearanceRequestsForResident.length !== 1 ? 's' : ''}</span>
                             </>
                         )}
                     </div>
@@ -430,15 +431,15 @@ export function PayerSelectionStep({
             return (
                 <>
                     <div className="flex items-center gap-1 mb-1">
-                        <Hash className="h-3 w-3" />
-                        <span className="font-medium">Household #{payer.household_number}</span>
+                        <Hash className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                        <span className="font-medium dark:text-gray-300">Household #{payer.household_number}</span>
                     </div>
-                    <div className="text-xs">
+                    <div className="text-xs dark:text-gray-400">
                         {payer.address}
                         {payer.family_members && ` • ${payer.family_members} members`}
                     </div>
                     {hasFees && (
-                        <div className="text-xs font-medium text-amber-600 mt-1 flex items-center gap-1">
+                        <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
                             <CreditCard className="h-3 w-3" />
                             <span>
                                 {payer.outstanding_fee_count || 0} outstanding fee{payer.outstanding_fee_count !== 1 ? 's' : ''}
@@ -456,22 +457,24 @@ export function PayerSelectionStep({
             return (
                 <>
                     <div className="flex items-center gap-1 mb-1">
-                        <Briefcase className="h-3 w-3" />
-                        <span className="text-xs">{payer.business_type_label || payer.business_type || 'Business'}</span>
+                        <Briefcase className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                        <span className="text-xs dark:text-gray-400">{payer.business_type_label || payer.business_type || 'Business'}</span>
                         {payer.permit_expiry_date && (
                             <Badge variant="outline" className={`text-xs ${
-                                payer.is_permit_valid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                payer.is_permit_valid 
+                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
+                                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800'
                             }`}>
                                 {permitStatus}
                             </Badge>
                         )}
                     </div>
-                    <div className="text-xs">
+                    <div className="text-xs dark:text-gray-400">
                         Owner: {payer.owner_name}
                         {payer.purok && ` • Purok ${payer.purok}`}
                     </div>
                     {hasFees && (
-                        <div className="text-xs font-medium text-amber-600 mt-1 flex items-center gap-1">
+                        <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
                             <CreditCard className="h-3 w-3" />
                             <span>
                                 {payer.outstanding_fee_count || 0} outstanding fee{payer.outstanding_fee_count !== 1 ? 's' : ''}
@@ -493,22 +496,22 @@ export function PayerSelectionStep({
             return (
                 <>
                     <div className="text-sm">
-                        <span className="font-medium">Reference: {payer.reference_number}</span>
-                        <div className="text-xs">
+                        <span className="font-medium dark:text-gray-200">Reference: {payer.reference_number}</span>
+                        <div className="text-xs dark:text-gray-400">
                             {clearanceTypeName || payer.purpose}
                             {payer.specific_purpose && ` • ${payer.specific_purpose}`}
                         </div>
-                        <div className="text-xs text-primary mt-1 flex items-center gap-1">
+                        <div className="text-xs text-primary dark:text-blue-400 mt-1 flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             <span className="capitalize">{payer.status_display || payer.status.replace('_', ' ')}</span>
-                            <span className="mx-1">•</span>
+                            <span className="mx-1 text-gray-400 dark:text-gray-600">•</span>
                             <span>Fee: ₱{feeAmount.toFixed(2)}</span>
                         </div>
                         
                         {payer.has_payments && (
                             <div className={`mt-1 text-xs ${
-                                payer.is_fully_paid ? 'text-green-600' : 
-                                payer.total_paid && payer.total_paid > 0 ? 'text-amber-600' : 'text-gray-600'
+                                payer.is_fully_paid ? 'text-green-600 dark:text-green-400' : 
+                                payer.total_paid && payer.total_paid > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'
                             }`}>
                                 <AlertCircle className="h-3 w-3 inline mr-1" />
                                 {payer.payment_count} payment{payer.payment_count !== 1 ? 's' : ''}
@@ -543,10 +546,10 @@ export function PayerSelectionStep({
                     <div className="text-xs mb-1">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1">
-                                <Hash className="h-3 w-3" />
-                                <span className="font-mono">{payer.fee_code}</span>
+                                <Hash className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                                <span className="font-mono dark:text-gray-300">{payer.fee_code}</span>
                             </div>
-                            <Badge variant="outline" className="text-xs px-2 py-0">
+                            <Badge variant="outline" className="text-xs px-2 py-0 dark:border-gray-600 dark:text-gray-300">
                                 {payer.payer_type === 'resident' ? 'Resident' : 
                                  payer.payer_type === 'household' ? 'Household' : 
                                  payer.payer_type === 'business' ? 'Business' : 'Other'}
@@ -556,37 +559,37 @@ export function PayerSelectionStep({
                         <div className="mt-1 space-y-0.5">
                             {payer.billing_period && (
                                 <div className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3 text-gray-400" />
-                                    <span>{payer.billing_period}</span>
+                                    <Calendar className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                                    <span className="dark:text-gray-400">{payer.billing_period}</span>
                                 </div>
                             )}
                             
                             {payer.purok && (
                                 <div className="flex items-center gap-1">
-                                    <MapPin className="h-3 w-3 text-gray-400" />
-                                    <span>Purok {payer.purok}</span>
+                                    <MapPin className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                                    <span className="dark:text-gray-400">Purok {payer.purok}</span>
                                 </div>
                             )}
                             
                             {payer.purpose && (
                                 <div className="flex items-center gap-1">
-                                    <Tag className="h-3 w-3 text-gray-400" />
-                                    <span>{payer.purpose}</span>
+                                    <Tag className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                                    <span className="dark:text-gray-400">{payer.purpose}</span>
                                 </div>
                             )}
                             
                             {isBusinessFee && payer.business_name && (
                                 <div className="flex items-center gap-1">
-                                    <Building className="h-3 w-3 text-gray-400" />
-                                    <span>{payer.business_name}</span>
+                                    <Building className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                                    <span className="dark:text-gray-400">{payer.business_name}</span>
                                     {payer.business_type && ` • ${payer.business_type}`}
                                 </div>
                             )}
                             
                             {payer.contact_number && (
                                 <div className="flex items-center gap-1">
-                                    <Phone className="h-3 w-3 text-gray-400" />
-                                    <span>{payer.contact_number}</span>
+                                    <Phone className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                                    <span className="dark:text-gray-400">{payer.contact_number}</span>
                                 </div>
                             )}
                         </div>
@@ -594,44 +597,44 @@ export function PayerSelectionStep({
                     
                     <div className="text-xs font-medium space-y-1 mt-2">
                         <div className="flex items-center justify-between">
-                            <span className="text-gray-600">Balance:</span>
-                            <span className={`font-bold ${balance > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                            <span className="text-gray-600 dark:text-gray-400">Balance:</span>
+                            <span className={`font-bold ${balance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}>
                                 ₱{balance.toFixed(2)}
                             </span>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-1 text-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-gray-500">Base:</span>
-                                <span>₱{baseAmount.toFixed(2)}</span>
+                                <span className="text-gray-500 dark:text-gray-400">Base:</span>
+                                <span className="dark:text-gray-300">₱{baseAmount.toFixed(2)}</span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-gray-500">Surcharge:</span>
-                                <span className={surchargeAmount > 0 ? 'text-amber-600' : ''}>
+                                <span className="text-gray-500 dark:text-gray-400">Surcharge:</span>
+                                <span className={surchargeAmount > 0 ? 'text-amber-600 dark:text-amber-400' : 'dark:text-gray-300'}>
                                     ₱{surchargeAmount.toFixed(2)}
                                 </span>
                             </div>
                             {penaltyAmount > 0 && (
                                 <div className="flex items-center justify-between">
-                                    <span className="text-gray-500">Penalty:</span>
-                                    <span className="text-red-600">₱{penaltyAmount.toFixed(2)}</span>
+                                    <span className="text-gray-500 dark:text-gray-400">Penalty:</span>
+                                    <span className="text-red-600 dark:text-red-400">₱{penaltyAmount.toFixed(2)}</span>
                                 </div>
                             )}
                             {discountAmount > 0 && (
                                 <div className="flex items-center justify-between">
-                                    <span className="text-gray-500">Discount:</span>
-                                    <span className="text-green-600">₱{discountAmount.toFixed(2)}</span>
+                                    <span className="text-gray-500 dark:text-gray-400">Discount:</span>
+                                    <span className="text-green-600 dark:text-green-400">₱{discountAmount.toFixed(2)}</span>
                                 </div>
                             )}
                         </div>
                         
-                        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                            <span className="text-gray-600">Total:</span>
-                            <span className="text-gray-900 font-bold">₱{totalAmount.toFixed(2)}</span>
+                        <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700">
+                            <span className="text-gray-600 dark:text-gray-400">Total:</span>
+                            <span className="text-gray-900 dark:text-gray-100 font-bold">₱{totalAmount.toFixed(2)}</span>
                         </div>
                         
                         {amountPaid > 0 && (
-                            <div className="flex items-center justify-between text-green-600">
+                            <div className="flex items-center justify-between text-green-600 dark:text-green-400">
                                 <span>Paid:</span>
                                 <span className="font-bold">₱{amountPaid.toFixed(2)}</span>
                             </div>
@@ -640,16 +643,16 @@ export function PayerSelectionStep({
                     
                     <div className="mt-2 flex items-center justify-between">
                         <Badge variant="outline" className={`text-xs ${
-                            payer.status === 'pending' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                            payer.status === 'overdue' ? 'bg-red-100 text-red-700 border-red-200' :
-                            payer.status === 'partially_paid' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                            payer.status === 'issued' ? 'bg-green-100 text-green-700 border-green-200' :
-                            'bg-gray-100 text-gray-700 border-gray-200'
+                            payer.status === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' :
+                            payer.status === 'overdue' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' :
+                            payer.status === 'partially_paid' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800' :
+                            payer.status === 'issued' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' :
+                            'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700'
                         }`}>
                             {payer.status.replace('_', ' ')}
                         </Badge>
                         
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             <span>
                                 Due: {new Date(payer.due_date).toLocaleDateString()}
@@ -663,14 +666,14 @@ export function PayerSelectionStep({
                     </div>
                     
                     {isOverdue && (
-                        <div className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                        <div className="mt-1 text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
                             <AlertTriangle className="h-3 w-3" />
                             <span>OVERDUE</span>
                         </div>
                     )}
                     
                     {payer.amount_paid && parseAmount(payer.amount_paid) > 0 && (
-                        <div className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                        <div className="mt-1 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
                             <AlertCircle className="h-3 w-3" />
                             <span>Partial payment: ₱{parseAmount(payer.amount_paid).toFixed(2)}</span>
                         </div>
@@ -723,26 +726,28 @@ export function PayerSelectionStep({
     return (
         <div className="grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
-                <Card>
+                <Card className="dark:bg-gray-900">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Users className="h-5 w-5" />
+                        <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                            <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center">
+                                <Users className="h-3 w-3 text-white" />
+                            </div>
                             Who is Paying?
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="dark:text-gray-400">
                             Select from residents, households, businesses, clearance requests, or outstanding fees
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="mb-6">
-                            <Label className="mb-3 block">Select Payment Type</Label>
+                            <Label className="mb-3 block dark:text-gray-300">Select Payment Type</Label>
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-2"> {/* UPDATED to 5 columns */}
                                 {[
-                                    { value: 'residents', icon: User, label: 'Residents', count: getPayerCount('residents'), color: 'text-blue-600 border-blue-200' },
-                                    { value: 'households', icon: Home, label: 'Households', count: getPayerCount('households'), color: 'text-green-600 border-green-200' },
-                                    { value: 'businesses', icon: Building, label: 'Businesses', count: getPayerCount('businesses'), color: 'text-orange-600 border-orange-200' }, // ADDED
-                                    { value: 'clearance', icon: FileText, label: 'Clearance', count: getPayerCount('clearance'), color: 'text-purple-600 border-purple-200' },
-                                    { value: 'fees', icon: Receipt, label: 'Outstanding Fees', count: getPayerCount('fees'), color: 'text-amber-600 border-amber-200' },
+                                    { value: 'residents', icon: User, label: 'Residents', count: getPayerCount('residents'), color: 'text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800' },
+                                    { value: 'households', icon: Home, label: 'Households', count: getPayerCount('households'), color: 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-800' },
+                                    { value: 'businesses', icon: Building, label: 'Businesses', count: getPayerCount('businesses'), color: 'text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800' }, // ADDED
+                                    { value: 'clearance', icon: FileText, label: 'Clearance', count: getPayerCount('clearance'), color: 'text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800' },
+                                    { value: 'fees', icon: Receipt, label: 'Outstanding Fees', count: getPayerCount('fees'), color: 'text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' },
                                 ].map((source) => (
                                     <button
                                         key={source.value}
@@ -750,14 +755,14 @@ export function PayerSelectionStep({
                                         onClick={() => setPayerSource(source.value as any)}
                                         className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all cursor-pointer relative ${
                                             payerSource === source.value
-                                                ? `${source.color} bg-opacity-10 border-opacity-100`
-                                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                                ? `${source.color} bg-opacity-10 border-opacity-100 dark:bg-opacity-20`
+                                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900'
                                         }`}
                                     >
                                         <source.icon className="h-5 w-5 mb-1" />
-                                        <span className="text-xs font-medium text-center">{source.label}</span>
+                                        <span className="text-xs font-medium text-center dark:text-gray-300">{source.label}</span>
                                         {source.count > 0 && (
-                                            <span className="absolute -top-1 -right-1 text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                                            <span className="absolute -top-1 -right-1 text-xs px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                                                 {source.count}
                                             </span>
                                         )}
@@ -767,7 +772,7 @@ export function PayerSelectionStep({
                         </div>
 
                         <div className="mb-6">
-                            <Label className="mb-2 block">
+                            <Label className="mb-2 block dark:text-gray-300">
                                 {payerSource === 'residents' ? 'Search residents...' :
                                  payerSource === 'households' ? 'Search households...' :
                                  payerSource === 'businesses' ? 'Search businesses...' : // ADDED
@@ -775,7 +780,7 @@ export function PayerSelectionStep({
                                  'Search outstanding fees...'}
                             </Label>
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                                 <Input
                                     placeholder={
                                         payerSource === 'residents' ? 'Search residents by name, household, or purok...' :
@@ -784,7 +789,7 @@ export function PayerSelectionStep({
                                         payerSource === 'clearance' ? 'Search clearance requests by reference number, resident name, or purpose...' :
                                         'Search fees by payer name, fee code, purpose, or address...'
                                     }
-                                    className="pl-10"
+                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
@@ -793,12 +798,12 @@ export function PayerSelectionStep({
 
                         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                             {!hasPayers ? (
-                                <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                                    <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                                    <h4 className="font-medium text-gray-700">
+                                <div className="text-center py-12 border-2 border-dashed rounded-lg dark:border-gray-700">
+                                    <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+                                    <h4 className="font-medium text-gray-700 dark:text-gray-300">
                                         No {payerSource} found
                                     </h4>
-                                    <p className="text-sm text-gray-500 mt-1">
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                         {payerSource === 'residents' 
                                             ? 'No residents found matching your search'
                                             : payerSource === 'households'
@@ -812,59 +817,59 @@ export function PayerSelectionStep({
                                 </div>
                             ) : (
                                 <>
-                                    <div className="text-xs text-gray-500 mb-2">
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                                         Showing {payers.length} {payerSource}
                                     </div>
                                     {payers.map((payer: any) => (
                                         <div
                                             key={payer.id}
                                             onClick={() => handleSelectPayer(payer)}
-                                            className="w-full text-left p-4 border rounded-lg hover:border-primary hover:bg-primary/5 transition-all cursor-pointer group"
+                                            className="w-full text-left p-4 border rounded-lg hover:border-primary dark:border-gray-700 dark:hover:border-blue-700 hover:bg-primary/5 dark:hover:bg-blue-900/20 transition-all cursor-pointer group"
                                         >
                                             <div className="flex items-center gap-4">
                                                 <div className={`p-3 rounded-full ${
-                                                    payerSource === 'clearance' ? 'bg-purple-100 text-purple-600' :
-                                                    payerSource === 'fees' ? 'bg-amber-100 text-amber-600' :
-                                                    payerSource === 'residents' && payer.has_outstanding_fees ? 'bg-blue-100 text-blue-600' :
-                                                    payerSource === 'businesses' ? 'bg-orange-100 text-orange-600' : // ADDED
-                                                    'bg-primary/10 text-primary'
+                                                    payerSource === 'clearance' ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' :
+                                                    payerSource === 'fees' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                    payerSource === 'residents' && payer.has_outstanding_fees ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                    payerSource === 'businesses' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : // ADDED
+                                                    'bg-primary/10 text-primary dark:bg-blue-900/30 dark:text-blue-400'
                                                 }`}>
                                                     {getPayerSourceIcon(payerSource)}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="font-medium truncate">
+                                                    <div className="font-medium truncate dark:text-gray-200">
                                                         {getPayerDisplayName(payer)}
                                                         {payerSource === 'clearance' && payer.status === 'pending_payment' && (
-                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-red-100 text-red-600 rounded-full">
+                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-full">
                                                                 Payment Due
                                                             </Badge>
                                                         )}
                                                         {payerSource === 'fees' && payer.status === 'overdue' && (
-                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-red-100 text-red-600 rounded-full">
+                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 rounded-full">
                                                                 Overdue
                                                             </Badge>
                                                         )}
                                                         {payerSource === 'fees' && payer.status === 'pending' && (
-                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">
+                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">
                                                                 Pending
                                                             </Badge>
                                                         )}
                                                         {payerSource === 'fees' && payer.status === 'partially_paid' && (
-                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-amber-100 text-amber-600 rounded-full">
+                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 rounded-full">
                                                                 Partial Payment
                                                             </Badge>
                                                         )}
                                                         {payerSource === 'businesses' && payer.permit_expiry_date && !payer.is_permit_valid && (
-                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-yellow-100 text-yellow-600 rounded-full">
+                                                            <Badge className="ml-2 px-2 py-0.5 text-xs bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400 rounded-full">
                                                                 Permit Expiring
                                                             </Badge>
                                                         )}
                                                     </div>
-                                                    <div className="text-sm text-gray-500">
+                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
                                                         {getPayerDescription(payer)}
                                                     </div>
                                                 </div>
-                                                <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-primary transition-colors" />
+                                                <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500 group-hover:text-primary dark:group-hover:text-blue-400 transition-colors" />
                                             </div>
                                         </div>
                                     ))}
@@ -876,83 +881,93 @@ export function PayerSelectionStep({
             </div>
 
             <div className="space-y-6">
-                <Card>
+                <Card className="dark:bg-gray-900">
                     <CardHeader>
-                        <CardTitle>Quick Actions</CardTitle>
+                        <CardTitle className="dark:text-gray-100">Quick Actions</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                         <Button
                             type="button"
                             variant="outline"
-                            className="w-full justify-start"
+                            className="w-full justify-start dark:border-gray-600 dark:text-gray-300"
                             onClick={handleManualPayer}
                         >
                             <Plus className="h-4 w-4 mr-2" />
                             Add New Payer
                         </Button>
-                        <div className="text-xs text-gray-500 pt-2">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 pt-2">
                             <AlertCircle className="h-3 w-3 inline mr-1" />
                             New payers are for one-time payments only
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="dark:bg-gray-900">
                     <CardHeader>
-                        <CardTitle>Payment Types</CardTitle>
+                        <CardTitle className="dark:text-gray-100">Payment Types</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3 text-sm">
                             <div className="flex items-start gap-2">
-                                <User className="h-4 w-4 text-blue-600 mt-0.5" />
+                                <div className="p-1.5 rounded bg-blue-100 dark:bg-blue-900/30">
+                                    <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                </div>
                                 <div>
-                                    <div className="font-medium text-blue-700">Residents</div>
-                                    <p className="text-gray-500">Select from registered barangay residents</p>
-                                    <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                                    <div className="font-medium text-blue-700 dark:text-blue-300">Residents</div>
+                                    <p className="text-gray-500 dark:text-gray-400">Select from registered barangay residents</p>
+                                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
                                         <CreditCard className="h-3 w-3" />
                                         <span>Auto-detects outstanding fees & clearances</span>
                                     </div>
                                 </div>
                             </div>
                             <div className="flex items-start gap-2">
-                                <Home className="h-4 w-4 text-green-600 mt-0.5" />
+                                <div className="p-1.5 rounded bg-green-100 dark:bg-green-900/30">
+                                    <Home className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                </div>
                                 <div>
-                                    <div className="font-medium text-green-700">Households</div>
-                                    <p className="text-gray-500">Select from registered households</p>
-                                    <div className="text-xs text-green-600 mt-1">
+                                    <div className="font-medium text-green-700 dark:text-green-300">Households</div>
+                                    <p className="text-gray-500 dark:text-gray-400">Select from registered households</p>
+                                    <div className="text-xs text-green-600 dark:text-green-400 mt-1">
                                         Collect household-level payments
                                     </div>
                                 </div>
                             </div>
                             {/* ADDED BUSINESS SECTION */}
                             <div className="flex items-start gap-2">
-                                <Building className="h-4 w-4 text-orange-600 mt-0.5" />
+                                <div className="p-1.5 rounded bg-orange-100 dark:bg-orange-900/30">
+                                    <Building className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                </div>
                                 <div>
-                                    <div className="font-medium text-orange-700">Businesses</div>
-                                    <p className="text-gray-500">Select from registered businesses</p>
-                                    <div className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+                                    <div className="font-medium text-orange-700 dark:text-orange-300">Businesses</div>
+                                    <p className="text-gray-500 dark:text-gray-400">Select from registered businesses</p>
+                                    <div className="text-xs text-orange-600 dark:text-orange-400 mt-1 flex items-center gap-1">
                                         <Briefcase className="h-3 w-3" />
                                         <span>Business permits and fees</span>
                                     </div>
                                 </div>
                             </div>
                             <div className="flex items-start gap-2">
-                                <FileText className="h-4 w-4 text-purple-600 mt-0.5" />
+                                <div className="p-1.5 rounded bg-purple-100 dark:bg-purple-900/30">
+                                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                </div>
                                 <div>
-                                    <div className="font-medium text-purple-700">Clearance</div>
-                                    <p className="text-gray-500">Process clearance requests</p>
-                                    <div className="text-xs text-purple-600 mt-1 flex items-center gap-1">
+                                    <div className="font-medium text-purple-700 dark:text-purple-300">Clearance</div>
+                                    <p className="text-gray-500 dark:text-gray-400">Process clearance requests</p>
+                                    <div className="text-xs text-purple-600 dark:text-purple-400 mt-1 flex items-center gap-1">
                                         <Clock className="h-3 w-3" />
                                         <span>Status: Pending Payment</span>
                                     </div>
                                 </div>
                             </div>
                             <div className="flex items-start gap-2">
-                                <Receipt className="h-4 w-4 text-amber-600 mt-0.5" />
+                                <div className="p-1.5 rounded bg-amber-100 dark:bg-amber-900/30">
+                                    <Receipt className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                </div>
                                 <div>
-                                    <div className="font-medium text-amber-700">Outstanding Fees</div>
-                                    <p className="text-gray-500">Pay outstanding fees and bills</p>
-                                    <div className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                    <div className="font-medium text-amber-700 dark:text-amber-300">Outstanding Fees</div>
+                                    <p className="text-gray-500 dark:text-gray-400">Pay outstanding fees and bills</p>
+                                    <div className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
                                         <DollarSign className="h-3 w-3" />
                                         <span>Includes all pending and overdue fees</span>
                                     </div>
@@ -1000,39 +1015,39 @@ export function PayerSelectionStep({
                     </Card>
                 )}
 
-                <Card>
+                <Card className="dark:bg-gray-900">
                     <CardHeader>
-                        <CardTitle>Summary</CardTitle>
+                        <CardTitle className="dark:text-gray-100">Summary</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 gap-4 text-sm">
                             <div className="space-y-1">
-                                <div className="text-gray-500">Total Residents</div>
-                                <div className="font-semibold text-blue-600">{residents.length}</div>
+                                <div className="text-gray-500 dark:text-gray-400">Total Residents</div>
+                                <div className="font-semibold text-blue-600 dark:text-blue-400">{residents.length}</div>
                             </div>
                             <div className="space-y-1">
-                                <div className="text-gray-500">Total Households</div>
-                                <div className="font-semibold text-green-600">{households.length}</div>
+                                <div className="text-gray-500 dark:text-gray-400">Total Households</div>
+                                <div className="font-semibold text-green-600 dark:text-green-400">{households.length}</div>
                             </div>
                             {/* ADDED BUSINESS COUNT */}
                             <div className="space-y-1">
-                                <div className="text-gray-500">Total Businesses</div>
-                                <div className="font-semibold text-orange-600">{businesses.length}</div>
+                                <div className="text-gray-500 dark:text-gray-400">Total Businesses</div>
+                                <div className="font-semibold text-orange-600 dark:text-orange-400">{businesses.length}</div>
                             </div>
                             <div className="space-y-1">
-                                <div className="text-gray-500">Pending Clearance</div>
-                                <div className="font-semibold text-purple-600">{getPayerCount('clearance')}</div>
+                                <div className="text-gray-500 dark:text-gray-400">Pending Clearance</div>
+                                <div className="font-semibold text-purple-600 dark:text-purple-400">{getPayerCount('clearance')}</div>
                             </div>
                             <div className="space-y-1">
-                                <div className="text-gray-500">Outstanding Fees</div>
-                                <div className="font-semibold text-amber-600">{getPayerCount('fees')}</div>
+                                <div className="text-gray-500 dark:text-gray-400">Outstanding Fees</div>
+                                <div className="font-semibold text-amber-600 dark:text-amber-400">{getPayerCount('fees')}</div>
                             </div>
                         </div>
-                        <div className="mt-4 pt-4 border-t border-gray-200">
-                            <div className="text-xs text-gray-500">
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
                                 <DollarSign className="h-3 w-3 inline mr-1" />
                                 Total Outstanding Balance (Fees): 
-                                <span className="font-semibold text-amber-600 ml-1">
+                                <span className="font-semibold text-amber-600 dark:text-amber-400 ml-1">
                                     ₱{totalOutstandingBalance.toFixed(2)}
                                 </span>
                             </div>

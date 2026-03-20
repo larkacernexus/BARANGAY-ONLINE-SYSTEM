@@ -85,7 +85,7 @@ export const DOCUMENT_STATUS_CONFIG = {
     },
     revoked: { 
         label: 'Revoked', 
-        color: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
+        color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-400',
         icon: ShieldAlert,
         gradient: 'from-gray-500 to-slate-500',
         badge: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-800'

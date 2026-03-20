@@ -70,7 +70,7 @@ export function UserMenuContent({ user, Link }: UserMenuContentProps) {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
                 <DropdownMenuItem asChild>
-                    <LinkComponent
+                    {/* <LinkComponent
                         className="block w-full cursor-pointer"
                         href={PROFILE_EDIT_URL}
                         prefetch={true}
@@ -78,14 +78,14 @@ export function UserMenuContent({ user, Link }: UserMenuContentProps) {
                     >
                         <Settings className="mr-2 h-4 w-4" />
                         Settings
-                    </LinkComponent>
+                    </LinkComponent> */}
                 </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
                 <button
                     onClick={handleLogout}
-                    className="flex w-full items-center cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="flex w-full items-center cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900"
                     data-test="logout-button"
                     type="button"
                 >

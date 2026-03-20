@@ -51,7 +51,7 @@ export function ClearanceMobileCard({
     formatDate 
 }: ClearanceMobileCardProps) {
     return (
-        <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 hover:shadow-md transition-shadow">
+        <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 hover:shadow-md transition-shadow">
             <div className="p-4">
                 <div className="space-y-3">
                     {/* Header */}

@@ -1,6 +1,6 @@
 // components/admin/report-types/ReportTypesStats.tsx
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, CheckCircle, AlertTriangle, Shield, User, Zap, Clock } from 'lucide-react';
+import { FileText, CheckCircle, AlertTriangle, Shield, User, Zap } from 'lucide-react';
+import { StatCard } from '@/components/adminui/stats-grid';
 
 interface ReportTypesStatsProps {
     stats: {
@@ -23,97 +23,64 @@ interface ReportTypesStatsProps {
 }
 
 export default function ReportTypesStats({ stats, priorityCounts }: ReportTypesStatsProps) {
+    // Safe stats with fallbacks
+    const safeStats = {
+        total: stats?.total || 0,
+        active: stats?.active || 0,
+        requires_immediate_action: stats?.requires_immediate_action || 0,
+        allows_anonymous: stats?.allows_anonymous || 0,
+        requires_evidence: stats?.requires_evidence || 0,
+        critical: stats?.critical || 0,
+        high: stats?.high || 0,
+        medium: stats?.medium || 0,
+        low: stats?.low || 0
+    };
+
+    const inactiveCount = safeStats.total - safeStats.active;
+
     return (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <FileText className="h-4 w-4 mr-2 text-blue-500" />
-                        Total Types
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">{stats.total.toLocaleString()}</div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        {stats.active} active • {stats.total - stats.active} inactive
-                    </div>
-                </CardContent>
-            </Card>
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <StatCard
+                title="Total Types"
+                value={safeStats.total.toLocaleString()}
+                icon={<FileText className="h-4 w-4 text-blue-500" />}
+                description={`${safeStats.active} active • ${inactiveCount} inactive`}
+            />
             
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
-                        Active
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.active.toLocaleString()}</div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        {stats.requires_immediate_action} urgent
-                    </div>
-                </CardContent>
-            </Card>
+            <StatCard
+                title="Active"
+                value={safeStats.active.toLocaleString()}
+                icon={<CheckCircle className="h-4 w-4 text-green-500" />}
+                description={`${safeStats.requires_immediate_action} require urgent action`}
+            />
 
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
-                        Critical
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold text-red-600">{stats.critical.toLocaleString()}</div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        {stats.high} high • {stats.medium} medium • {stats.low} low
-                    </div>
-                </CardContent>
-            </Card>
+            <StatCard
+                title="Critical"
+                value={safeStats.critical.toLocaleString()}
+                icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
+                description={`${safeStats.high} high • ${safeStats.medium} med • ${safeStats.low} low`}
+            />
 
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <Zap className="h-4 w-4 mr-2 text-amber-500" />
-                        Urgent Action
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">{stats.requires_immediate_action.toLocaleString()}</div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        Requires immediate response
-                    </div>
-                </CardContent>
-            </Card>
+            <StatCard
+                title="Urgent Action"
+                value={safeStats.requires_immediate_action.toLocaleString()}
+                icon={<Zap className="h-4 w-4 text-amber-500" />}
+                description="Require immediate response"
+            />
 
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <User className="h-4 w-4 mr-2 text-purple-500" />
-                        Anonymous
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">{stats.allows_anonymous.toLocaleString()}</div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        Allows anonymous reports
-                    </div>
-                </CardContent>
-            </Card>
+            <StatCard
+                title="Anonymous"
+                value={safeStats.allows_anonymous.toLocaleString()}
+                icon={<User className="h-4 w-4 text-purple-500" />}
+                description="Allow anonymous reports"
+            />
 
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <Shield className="h-4 w-4 mr-2 text-indigo-500" />
-                        Evidence Required
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">{stats.requires_evidence.toLocaleString()}</div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        Requires proof/evidence
-                    </div>
-                </CardContent>
-            </Card>
+            <StatCard
+                title="Evidence Required"
+                value={safeStats.requires_evidence.toLocaleString()}
+                icon={<Shield className="h-4 w-4 text-indigo-500" />}
+                description="Require proof/evidence"
+            />
         </div>
     );
 }

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useTwoFactorAuth } from '@/hooks/use-two-factor-auth';
+import { useResidentTwoFactorAuth } from '@/hooks/use-resident-two-factor-auth';
 import AppLayout from '@/layouts/resident-app-layout';
 import SettingsLayout from '@/layouts/settings/residentlayout';
 import { type BreadcrumbItem } from '@/types';
@@ -65,7 +65,7 @@ export default function TwoFactor({
         regenerateRecoveryCodes,
         confirmSetup,
         errors,
-    } = useTwoFactorAuth();
+    } = useResidentTwoFactorAuth();
     
     const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
     const [showDisableModal, setShowDisableModal] = useState<boolean>(false);

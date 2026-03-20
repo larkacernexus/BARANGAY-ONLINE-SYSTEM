@@ -78,7 +78,7 @@ export default function PuroksBulkActions({
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4 shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-full border">
+                    <div className="flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-1.5 rounded-full border">
                         <PackageCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         <span className="font-medium text-sm">
                             {selectedPuroks.length} selected
@@ -156,7 +156,7 @@ export default function PuroksBulkActions({
                         </Button>
                         
                         {showBulkActions && (
-                            <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-white dark:bg-gray-800 border rounded-md shadow-lg">
+                            <div className="absolute right-0 top-full mt-1 z-50 w-56 bg-white dark:bg-gray-900 border rounded-md shadow-lg">
                                 <div className="p-2">
                                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">
                                         BULK ACTIONS

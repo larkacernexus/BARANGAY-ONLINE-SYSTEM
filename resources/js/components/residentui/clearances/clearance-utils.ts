@@ -32,7 +32,7 @@ export const getUrgencyBadge = (urgency: string, URGENCY_CONFIG: any) => {
   if (!config) {
     return {
       label: urgency,
-      color: 'bg-gray-100 dark:bg-gray-800',
+      color: 'bg-gray-100 dark:bg-gray-900',
       textColor: 'text-gray-700 dark:text-gray-300',
       dot: 'bg-gray-500'
     };

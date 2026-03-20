@@ -98,7 +98,7 @@ export default function FormsTableView({
         return (
             <TableRow 
                 key={form.id} 
-                className={`hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${
+                className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors ${
                     isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
                 } ${!form.is_active ? 'opacity-60' : ''}`}
                 onClick={(e) => {
@@ -191,64 +191,67 @@ export default function FormsTableView({
                     </Badge>
                 </TableCell>
                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
-                    <div className="flex items-center justify-end gap-1">
+                    <ActionDropdown>
+                        {/* View Action */}
                         <Link href={route('admin.forms.show', form.id)}>
-                            <button className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                                <Eye className="h-4 w-4" />
-                            </button>
+                            <ActionDropdownItem
+                                icon={<Eye className="h-4 w-4" />}
+                            >
+                                View Details
+                            </ActionDropdownItem>
                         </Link>
-                        
+
+                        {/* Edit Action */}
                         <Link href={route('admin.forms.edit', form.id)}>
-                            <button className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                                <Edit className="h-4 w-4" />
-                            </button>
+                            <ActionDropdownItem
+                                icon={<Edit className="h-4 w-4" />}
+                            >
+                                Edit Form
+                            </ActionDropdownItem>
                         </Link>
-                        
-                        <button
+
+                        {/* Download Action */}
+                        <ActionDropdownItem
+                            icon={<DownloadIcon className="h-4 w-4" />}
                             onClick={() => onDownload(form)}
-                            className="p-1 text-blue-400 hover:text-blue-600"
                         >
-                            <DownloadIcon className="h-4 w-4" />
-                        </button>
-                        
-                        <ActionDropdown>
-                            <ActionDropdownItem
-                                icon={<DownloadIcon className="h-4 w-4" />}
-                                onClick={() => onDownload(form)}
-                            >
-                                Download
-                            </ActionDropdownItem>
-                            
-                            <ActionDropdownItem
-                                icon={form.is_active ? <PauseCircle className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}
-                                onClick={() => onToggleStatus(form)}
-                            >
-                                {form.is_active ? 'Deactivate' : 'Activate'}
-                            </ActionDropdownItem>
-                            
-                            {isBulkMode && (
-                                <>
-                                    <ActionDropdownSeparator />
-                                    <ActionDropdownItem
-                                        icon={isSelected ? <CheckCircle className="h-4 w-4" /> : <MoreVertical className="h-4 w-4" />}
-                                        onClick={() => onItemSelect(form.id)}
-                                    >
-                                        {isSelected ? 'Deselect' : 'Select for Bulk'}
-                                    </ActionDropdownItem>
-                                </>
-                            )}
-                            
-                            <ActionDropdownSeparator />
-                            
-                            <ActionDropdownItem
-                                icon={<Trash2 className="h-4 w-4" />}
-                                onClick={() => onDelete(form)}
-                                dangerous
-                            >
-                                Delete Form
-                            </ActionDropdownItem>
-                        </ActionDropdown>
-                    </div>
+                            Download File
+                        </ActionDropdownItem>
+
+                        <ActionDropdownSeparator />
+
+                        {/* Toggle Status Action */}
+                        <ActionDropdownItem
+                            icon={form.is_active ? <PauseCircle className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}
+                            onClick={() => onToggleStatus(form)}
+                        >
+                            {form.is_active ? 'Deactivate' : 'Activate'}
+                        </ActionDropdownItem>
+
+                        {/* Bulk Mode Actions */}
+                        {isBulkMode && (
+                            <>
+                                <ActionDropdownSeparator />
+                                <ActionDropdownItem
+                                    icon={isSelected ? <CheckCircle className="h-4 w-4" /> : <MoreVertical className="h-4 w-4" />}
+                                    onClick={() => onItemSelect(form.id)}
+                                >
+                                    {isSelected ? 'Deselect for Bulk' : 'Select for Bulk'}
+                                </ActionDropdownItem>
+                            </>
+                        )}
+
+                        <ActionDropdownSeparator />
+
+                        {/* Delete Action */}
+                        <ActionDropdownItem
+                            icon={<Trash2 className="h-4 w-4" />}
+                            onClick={() => onDelete(form)}
+                            dangerous
+                        >
+                            Delete Form
+                        </ActionDropdownItem>
+                    </ActionDropdown>
                 </TableCell>
             </TableRow>
         );
@@ -266,7 +269,7 @@ export default function FormsTableView({
                 <div className="overflow-hidden">
                     <Table className="min-w-full">
                         <TableHeader>
-                            <TableRow className="bg-gray-50 dark:bg-gray-800">
+                            <TableRow className="bg-gray-50 dark:bg-gray-900">
                                 {isBulkMode && (
                                     <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-center w-10 sm:w-12">
                                         <div className="flex items-center justify-center">
@@ -328,7 +331,7 @@ export default function FormsTableView({
                                         {getSortIcon('status')}
                                     </div>
                                 </TableHead>
-                                <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[60px] sm:min-w-[80px]">
+                                <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[60px] sm:min-w-[80px]">
                                     Actions
                                 </TableHead>
                             </TableRow>

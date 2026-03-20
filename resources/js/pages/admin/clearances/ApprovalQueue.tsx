@@ -988,7 +988,7 @@ export default function ApprovalQueue() {
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead>
-                                            <tr className="border-b bg-gray-50 dark:bg-gray-800">
+                                            <tr className="border-b bg-gray-50 dark:bg-gray-900">
                                                 <th className="w-12 p-4">
                                                     <input
                                                         type="checkbox"
@@ -1017,7 +1017,7 @@ export default function ApprovalQueue() {
                                                 return (
                                                     <tr
                                                         key={request.id}
-                                                        className={`border-b hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                                                        className={`border-b hover:bg-gray-50 dark:hover:bg-gray-900 ${
                                                             isSelected ? 'bg-blue-50' : ''
                                                         }`}
                                                     >

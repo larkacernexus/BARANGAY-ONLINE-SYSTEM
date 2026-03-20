@@ -21,10 +21,6 @@ Route::get('receipts/create', [App\Http\Controllers\Admin\ReceiptsController::cl
 Route::get('receipts/{receipt}', [App\Http\Controllers\Admin\ReceiptsController::class, 'show'])->name('receipts.show');
 Route::post('receipts/{receipt}/print', [App\Http\Controllers\Admin\ReceiptsController::class, 'print'])->name('receipts.print');
 
-// Search routes
-Route::get('/search', function () {
-    return Inertia::render('admin/Search/Index');
-})->name('search')->middleware(['auth']);
 
 // Guest routes (not logged in)
 Route::middleware('guest')->group(function () {

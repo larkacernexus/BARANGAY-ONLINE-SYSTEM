@@ -120,12 +120,12 @@ const GlassCard = ({ children, className = '', interactive = false, gradient = f
     onClick={onClick}
     className={`
       relative overflow-hidden
-      bg-white/80 dark:bg-gray-800/80 
+      bg-white/80 dark:bg-gray-900/80 
       backdrop-blur-xl
       rounded-2xl 
       border border-white/20 dark:border-gray-700/30
       shadow-lg shadow-black/5
-      ${interactive ? 'active:scale-[0.98] hover:shadow-xl hover:scale-[1.02] hover:bg-white dark:hover:bg-gray-800 transition-all duration-300' : ''}
+      ${interactive ? 'active:scale-[0.98] hover:shadow-xl hover:scale-[1.02] hover:bg-white dark:hover:bg-gray-900 transition-all duration-300' : ''}
       ${gradient ? 'bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50' : ''}
       ${className}
     `}
@@ -503,7 +503,7 @@ const Tabs = ({ tabs, activeTab, onChange }: TabsProps) => {
       <div className="relative">
         <button
           onClick={() => setShowMobileMenu(!showMobileMenu)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 rounded-xl text-sm font-medium shadow-md border border-gray-200 dark:border-gray-700"
+          className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-900 rounded-xl text-sm font-medium shadow-md border border-gray-200 dark:border-gray-700"
         >
           <Menu className="h-4 w-4" />
           <span>{tabs.find(t => t.id === activeTab)?.label || 'Menu'}</span>
@@ -1108,7 +1108,7 @@ export default function Dashboard({
       {/* Scroll to Top Button */}
       <button
         onClick={scrollToTop}
-        className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 p-2 sm:p-3 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all z-40 group"
+        className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 p-2 sm:p-3 bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all z-40 group"
       >
         <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 dark:text-gray-300 group-hover:-translate-y-0.5 transition-transform" />
       </button>

@@ -1,3 +1,5 @@
+// pages/admin/fees/create.tsx
+
 import { useState, useEffect, useMemo } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/admin-app-layout';
@@ -16,7 +18,8 @@ import {
     Household, 
     DocumentCategory,
     DiscountInfo,
-    DiscountRule
+    DiscountRule,
+    PrivilegeData
 } from '@/types/fees';
 import { 
     formatCurrency, 
@@ -27,9 +30,37 @@ import {
     getBulkCreationSummary,
     getDiscountsForFeeType,
     getDiscountNote,
-    PHILIPPINE_DISCOUNT_LAWS,
     getPhilippineLegalBasis
 } from '@/admin-utils/fees/discount-display-utils';
+
+// ========== DYNAMIC PRIVILEGE HELPER FUNCTIONS ==========
+
+/**
+ * Get active privileges from resident
+ */
+function getActivePrivileges(resident: Resident): PrivilegeData[] {
+    if (!resident.privileges || !Array.isArray(resident.privileges)) {
+        return [];
+    }
+    
+    return resident.privileges.filter((p: any) => 
+        p.status === 'active' || p.status === 'expiring_soon'
+    );
+}
+
+/**
+ * Check if resident has any active privileges
+ */
+function hasAnyPrivilege(resident: Resident): boolean {
+    return getActivePrivileges(resident).length > 0;
+}
+
+/**
+ * Filter residents by discount eligibility (any privilege)
+ */
+function filterByDiscountEligibility(residents: Resident[]): Resident[] {
+    return residents.filter(resident => hasAnyPrivilege(resident));
+}
 
 export default function FeesCreate({
     feeTypes,
@@ -43,8 +74,9 @@ export default function FeesCreate({
     errors,
     initialData,
     duplicateFrom,
+    allPrivileges = [] // DYNAMIC: All privileges from database
 }: FeesCreateProps) {
-    // Default form data - using simple strings for payer_type (validation expects these)
+    // Default form data
     const defaultFormData: BulkFeeFormData = {
         fee_type_id: '',
         payer_type: preselectedResident
@@ -82,10 +114,7 @@ export default function FeesCreate({
         area: 0,
         remarks: '',
         requirements_submitted: [],
-        ph_senior_id_verified: false,
-        ph_pwd_id_verified: false,
-        ph_solo_parent_id_verified: false,
-        ph_indigent_id_verified: false,
+        // DYNAMIC: These will be populated from privileges
         ph_legal_compliance_notes: '',
         bulk_type: 'none',
         selected_resident_ids: [],
@@ -101,7 +130,6 @@ export default function FeesCreate({
     const cleanInitialData = (data: any): Partial<BulkFeeFormData> => {
         if (!data) return {};
         
-        // Convert any model strings to simple strings if present
         let payerType = data.payer_type;
         if (payerType === 'App\\Models\\Resident') {
             payerType = 'resident';
@@ -139,10 +167,7 @@ export default function FeesCreate({
             requirements_submitted: Array.isArray(data.requirements_submitted)
                 ? data.requirements_submitted
                 : [],
-            ph_senior_id_verified: false,
-            ph_pwd_id_verified: false,
-            ph_solo_parent_id_verified: false,
-            ph_indigent_id_verified: false,
+            // DYNAMIC: Initialize from privileges if needed
             ph_legal_compliance_notes: '',
             bulk_type: data.bulk_type || 'none',
             selected_resident_ids: Array.isArray(data.selected_resident_ids) 
@@ -181,7 +206,7 @@ export default function FeesCreate({
     const [selectAllHouseholds, setSelectAllHouseholds] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Filter residents
+    // Filter residents - DYNAMIC with privilege support
     const filteredResidents = useMemo(() => {
         let filtered = [...residents];
         
@@ -191,13 +216,9 @@ export default function FeesCreate({
             );
         }
         
+        // DYNAMIC: Filter by discount eligibility (any privilege)
         if (data.filter_discount_eligible) {
-            filtered = filtered.filter(resident => 
-                resident.is_senior || 
-                resident.is_pwd || 
-                resident.is_solo_parent || 
-                resident.is_indigent
-            );
+            filtered = filterByDiscountEligibility(filtered);
         }
         
         if (searchTerm) {
@@ -205,7 +226,12 @@ export default function FeesCreate({
             filtered = filtered.filter(resident =>
                 resident.full_name.toLowerCase().includes(term) ||
                 resident.contact_number?.toLowerCase().includes(term) ||
-                resident.purok?.toLowerCase().includes(term)
+                resident.purok?.toLowerCase().includes(term) ||
+                // Search in privileges
+                resident.privileges?.some((p: any) => 
+                    p.name?.toLowerCase().includes(term) ||
+                    p.code?.toLowerCase().includes(term)
+                )
             );
         }
         
@@ -227,7 +253,12 @@ export default function FeesCreate({
             filtered = filtered.filter(household =>
                 household.name.toLowerCase().includes(term) ||
                 household.contact_number?.toLowerCase().includes(term) ||
-                household.purok?.toLowerCase().includes(term)
+                household.purok?.toLowerCase().includes(term) ||
+                // Search in head privileges
+                household.head_privileges?.some((p: any) => 
+                    p.name?.toLowerCase().includes(term) ||
+                    p.code?.toLowerCase().includes(term)
+                )
             );
         }
         
@@ -335,8 +366,6 @@ export default function FeesCreate({
     };
 
     const handlePayerTypeChange = (payerType: string) => {
-        // Use the simple string values that the validation expects
-        // 'resident', 'business', 'household', 'visitor', 'other'
         setData('payer_type', payerType);
         setData('resident_id', '');
         setData('household_id', '');
@@ -365,7 +394,7 @@ export default function FeesCreate({
         if (resident) {
             setSelectedPayer(resident);
             setData('resident_id', residentId);
-            setData('payer_type', 'resident'); // Use simple string
+            setData('payer_type', 'resident');
             setData('payer_name', resident.full_name);
             setData('contact_number', resident.contact_number || '');
             setData('purok', resident.purok || '');
@@ -377,7 +406,7 @@ export default function FeesCreate({
         if (household) {
             setSelectedPayer(household);
             setData('household_id', householdId);
-            setData('payer_type', 'household'); // Use simple string
+            setData('payer_type', 'household');
             setData('payer_name', household.name);
             setData('contact_number', household.contact_number || '');
             setData('purok', household.purok || '');
@@ -584,7 +613,7 @@ export default function FeesCreate({
         return category ? category.name : 'Select Category';
     };
 
-    // Get supported discount info (informational only)
+    // Get supported discount info - DYNAMIC
     const discountInfo = useMemo((): DiscountInfo | null => {
         if (!selectedFeeType || !selectedFeeType.is_discountable) return null;
         
@@ -601,17 +630,8 @@ export default function FeesCreate({
             requirements: d.verification_document ? [d.verification_document] : undefined
         }));
         
+        // DYNAMIC: Build legal notes from privileges
         const legalNotes = [];
-        if (applicableDiscounts.some(d => d.discount_type === 'SENIOR')) {
-            legalNotes.push('Senior Citizen: 20% discount under RA 9994');
-        }
-        if (applicableDiscounts.some(d => d.discount_type === 'PWD')) {
-            legalNotes.push('PWD: 20% discount under RA 10754');
-        }
-        if (applicableDiscounts.some(d => d.discount_type === 'SOLO_PARENT')) {
-            legalNotes.push('Solo Parent: Up to 10% discount under RA 8972 (varies by LGU)');
-        }
-        
         const discountCodes = applicableDiscounts.map(d => d.discount_type);
         const note = getDiscountNote(discountCodes);
         
@@ -680,11 +700,11 @@ export default function FeesCreate({
         <AppLayout
             title={duplicateFrom ? 'Duplicate Fee' : 'Create New Fee'}
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Fees', href: '/fees' },
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Fees', href: '/admin/fees' },
                 {
                     title: duplicateFrom ? 'Duplicate Fee' : 'Create Fee',
-                    href: '/fees/create',
+                    href: '/admin/fees/create',
                 },
             ]}
         >
@@ -692,6 +712,7 @@ export default function FeesCreate({
 
             <form onSubmit={submit}>
                 <div className="space-y-6">
+                    {/* Header Section */}
                     <HeaderSection
                         duplicateFrom={duplicateFrom}
                         processing={processing}
@@ -700,15 +721,17 @@ export default function FeesCreate({
 
                     {/* Bulk Creation Summary Banner */}
                     {totalPayersCount > 1 && (
-                        <Alert className="border-purple-200 bg-purple-50">
+                        <Alert className="border-l-4 border-l-purple-500 dark:bg-gray-900 dark:border-purple-800">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <Users className="h-5 w-5 text-purple-600" />
+                                    <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                                        <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                    </div>
                                     <div>
-                                        <div className="font-semibold text-purple-700">
+                                        <div className="font-semibold text-purple-700 dark:text-purple-300">
                                             Bulk Fee Creation
                                         </div>
-                                        <div className="text-sm text-purple-600">
+                                        <div className="text-sm text-purple-600 dark:text-purple-400">
                                             Creating fees for <span className="font-bold">{totalPayersCount}</span> payers
                                             {data.bulk_type === 'residents' && ' (Residents)'}
                                             {data.bulk_type === 'households' && ' (Households)'}
@@ -718,8 +741,8 @@ export default function FeesCreate({
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <div className="text-right">
-                                        <div className="text-sm text-purple-600">Total Amount</div>
-                                        <div className="text-xl font-bold text-purple-700">
+                                        <div className="text-sm text-purple-600 dark:text-purple-400">Total Amount</div>
+                                        <div className="text-xl font-bold text-purple-700 dark:text-purple-300">
                                             {formatCurrency(totalEstimatedAmount)}
                                         </div>
                                     </div>
@@ -728,7 +751,7 @@ export default function FeesCreate({
                                         variant="outline"
                                         size="sm"
                                         onClick={handleOpenBulkModal}
-                                        className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                                        className="border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-800 dark:text-purple-400 dark:hover:bg-purple-950/50"
                                     >
                                         Edit Selection
                                     </Button>
@@ -738,6 +761,7 @@ export default function FeesCreate({
                     )}
 
                     <div className="grid gap-6 lg:grid-cols-2">
+                        {/* Left Column */}
                         <LeftColumn
                             data={feeFormDataForChild}
                             setData={unifiedSetData}
@@ -764,8 +788,10 @@ export default function FeesCreate({
                             totalPayersCount={totalPayersCount}
                             totalEstimatedAmount={totalEstimatedAmount}
                             onOpenBulkModal={handleOpenBulkModal}
+                            allPrivileges={allPrivileges}
                         />
 
+                        {/* Right Column */}
                         <RightColumn
                             data={feeFormDataForChild}
                             setData={unifiedSetData}
@@ -778,11 +804,13 @@ export default function FeesCreate({
                             handleResidentSelect={handleResidentSelect}
                             handleHouseholdSelect={handleHouseholdSelect}
                             hideIndividualSelection={data.bulk_type !== 'none'}
+                            allPrivileges={allPrivileges}
                         />
                     </div>
                 </div>
             </form>
 
+            {/* Bulk Selection Modal */}
             <BulkSelectionModal
                 isOpen={showBulkModal}
                 onClose={handleCloseBulkModal}
@@ -790,6 +818,7 @@ export default function FeesCreate({
                 residents={filteredResidents}
                 households={filteredHouseholds}
                 puroks={puroks}
+                allPrivileges={allPrivileges}
                 selectedResidentIds={data.selected_resident_ids}
                 selectedHouseholdIds={data.selected_household_ids}
                 customPayers={data.custom_payers}

@@ -214,7 +214,7 @@ export default function MyComplaints({ complaints, stats }: Props) {
                 label: "Pending"
             },
             dismissed: { 
-                bg: "bg-gray-100 dark:bg-gray-800", 
+                bg: "bg-gray-100 dark:bg-gray-900", 
                 text: "text-gray-800 dark:text-gray-300",
                 icon: XCircle,
                 label: "Dismissed"
@@ -280,7 +280,7 @@ export default function MyComplaints({ complaints, stats }: Props) {
         const Icon = typeConfig.icon;
         
         return (
-            <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 hover:shadow-md transition-all duration-300">
+            <div className="mb-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 hover:shadow-md transition-all duration-300">
                 <div className="p-4">
                     <div className="space-y-3">
                         {/* Header */}
@@ -487,7 +487,7 @@ export default function MyComplaints({ complaints, stats }: Props) {
                 <div className="px-4 md:px-6 pb-24 md:pb-6">
                     {/* Stats Grid - Mobile Optimized */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-                        <Card className="border-0 shadow-lg dark:bg-gray-800/50 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10">
+                        <Card className="border-0 shadow-lg dark:bg-gray-900/50 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10">
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -505,7 +505,7 @@ export default function MyComplaints({ complaints, stats }: Props) {
                             </CardContent>
                         </Card>
                         
-                        <Card className="border-0 shadow-lg dark:bg-gray-800/50 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10">
+                        <Card className="border-0 shadow-lg dark:bg-gray-900/50 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10">
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -523,7 +523,7 @@ export default function MyComplaints({ complaints, stats }: Props) {
                             </CardContent>
                         </Card>
                         
-                        <Card className="border-0 shadow-lg dark:bg-gray-800/50 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-900/10">
+                        <Card className="border-0 shadow-lg dark:bg-gray-900/50 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-900/10">
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -541,7 +541,7 @@ export default function MyComplaints({ complaints, stats }: Props) {
                             </CardContent>
                         </Card>
                         
-                        <Card className="border-0 shadow-lg dark:bg-gray-800/50 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10">
+                        <Card className="border-0 shadow-lg dark:bg-gray-900/50 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-900/10">
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -561,7 +561,7 @@ export default function MyComplaints({ complaints, stats }: Props) {
                     </div>
                     
                     {/* Search and Filters Card */}
-                    <Card className="border-0 shadow-lg dark:bg-gray-800/50 mb-6">
+                    <Card className="border-0 shadow-lg dark:bg-gray-900/50 mb-6">
                         <CardContent className="p-4">
                             <div className="space-y-4">
                                 {/* Search */}
@@ -569,7 +569,7 @@ export default function MyComplaints({ complaints, stats }: Props) {
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                                     <Input
                                         placeholder="Search complaints..."
-                                        className="pl-10 bg-white dark:bg-gray-800 rounded-lg h-12"
+                                        className="pl-10 bg-white dark:bg-gray-900 rounded-lg h-12"
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                     />
@@ -695,7 +695,7 @@ export default function MyComplaints({ complaints, stats }: Props) {
                                 
                                 {/* Desktop View - Table */}
                                 <div className="hidden md:block">
-                                    <div className="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800">
+                                    <div className="border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
@@ -714,7 +714,7 @@ export default function MyComplaints({ complaints, stats }: Props) {
                                                     const Icon = typeConfig.icon;
                                                     
                                                     return (
-                                                        <TableRow key={complaint.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                                                        <TableRow key={complaint.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
                                                             <TableCell className="font-medium">
                                                                 <div className="flex items-center gap-2">
                                                                     <div className={`p-2 rounded-lg bg-gradient-to-br ${typeConfig.color}`}>
@@ -800,8 +800,8 @@ export default function MyComplaints({ complaints, stats }: Props) {
                                 )}
                             </>
                         ) : (
-                            <div className="text-center py-12 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800">
-                                <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                            <div className="text-center py-12 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900">
+                                <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-900 rounded-full flex items-center justify-center mb-4">
                                     <AlertCircle className="h-8 w-8 text-gray-400 dark:text-gray-500" />
                                 </div>
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">

@@ -526,28 +526,7 @@ export default function AuditLogs() {
         return params;
     };
 
-    // Debounced search function
-    const debouncedSearch = useMemo(
-        () =>
-            debounce(() => {
-                const params = buildFilterParams();
-                router.get('/admin/reports/audit-logs', params, {
-                    preserveScroll: true,
-                    preserveState: true,
-                    onStart: () => setIsLoading(true),
-                    onFinish: () => setIsLoading(false),
-                });
-            }, 500),
-        [search, eventType, logName, userId, dateFrom, dateTo, perPage],
-    );
-
-    // Update search with debounce
-    useEffect(() => {
-        if (search !== undefined) {
-            debouncedSearch();
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch]);
+   
 
     // Handle filter changes
     const handleEventTypeChange = (value: string) => {
@@ -740,7 +719,7 @@ export default function AuditLogs() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white p-1 dark:border-gray-600 dark:bg-gray-800">
+                        <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white p-1 dark:border-gray-600 dark:bg-gray-900">
                             <button
                                 onClick={() => setViewMode('list')}
                                 className={`rounded px-3 py-1 text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'}`}
@@ -757,7 +736,7 @@ export default function AuditLogs() {
 
                         <button
                             onClick={() => setShowFilters(!showFilters)}
-                            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-900"
                         >
                             <Filter className="h-4 w-4" />
                             {showFilters ? 'Hide Filters' : 'Show Filters'}
@@ -766,7 +745,7 @@ export default function AuditLogs() {
                         <button
                             onClick={handleRefresh}
                             disabled={isLoading}
-                            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+                            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-900"
                         >
                             <RefreshCw
                                 className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
@@ -787,7 +766,7 @@ export default function AuditLogs() {
 
                 {/* Stats Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -807,7 +786,7 @@ export default function AuditLogs() {
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -827,7 +806,7 @@ export default function AuditLogs() {
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -848,7 +827,7 @@ export default function AuditLogs() {
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -870,7 +849,7 @@ export default function AuditLogs() {
                 </div>
 
                 {/* Search and Filter Bar */}
-                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                     <div className="mb-6 flex flex-col gap-4 md:flex-row">
                         <div className="flex-1">
                             <div className="relative">
@@ -880,7 +859,7 @@ export default function AuditLogs() {
                                     placeholder="Search activities, users, IP addresses, events..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white py-2 pr-4 pl-10 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                    className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white py-2 pr-4 pl-10 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                                 />
                             </div>
                         </div>
@@ -900,7 +879,7 @@ export default function AuditLogs() {
                                         onChange={(e) =>
                                             handleLogNameChange(e.target.value)
                                         }
-                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                                     >
                                         <option value="">All Log Types</option>
                                         {log_names?.map((log) => (
@@ -923,7 +902,7 @@ export default function AuditLogs() {
                                                 e.target.value,
                                             )
                                         }
-                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                                     >
                                         <option value="">All Events</option>
                                         {event_types?.map((event) => (
@@ -944,7 +923,7 @@ export default function AuditLogs() {
                                         onChange={(e) =>
                                             handleUserIdChange(e.target.value)
                                         }
-                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                                     >
                                         <option value="">All Users</option>
                                         {users?.map((user) => (
@@ -968,7 +947,7 @@ export default function AuditLogs() {
                                         onChange={(e) =>
                                             handlePerPageChange(e.target.value)
                                         }
-                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                                     >
                                         <option value="10">10 per page</option>
                                         <option value="25">25 per page</option>
@@ -992,7 +971,7 @@ export default function AuditLogs() {
                                         onChange={(e) =>
                                             handleDateFromChange(e.target.value)
                                         }
-                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                                     />
                                 </div>
                                 <div>
@@ -1005,7 +984,7 @@ export default function AuditLogs() {
                                         onChange={(e) =>
                                             handleDateToChange(e.target.value)
                                         }
-                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                        className="focus:ring-primary-500 focus:border-primary-500 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                                     />
                                 </div>
                             </div>
@@ -1098,7 +1077,7 @@ export default function AuditLogs() {
 
                         {/* Audit Logs Table/Grid */}
                         {viewMode === 'list' ? (
-                            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                                 {isLoading ? (
                                     <div className="flex h-64 items-center justify-center">
                                         <Loader2 className="text-primary-600 h-8 w-8 animate-spin" />
@@ -1403,7 +1382,7 @@ export default function AuditLogs() {
                                                                                 Payment
                                                                                 Details
                                                                             </h4>
-                                                                            <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                                                                            <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
                                                                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                                                                     {getPaymentDetails(
                                                                                         log.properties,
@@ -1549,7 +1528,7 @@ export default function AuditLogs() {
                                                                     {log.causer && (
                                                                         <Link
                                                                             href={`/users/${log.causer.id}`}
-                                                                            className="inline-flex items-center gap-1 rounded px-3 py-1 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+                                                                            className="inline-flex items-center gap-1 rounded px-3 py-1 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-900"
                                                                         >
                                                                             <UserIcon className="h-3 w-3" />
                                                                             View
@@ -1664,7 +1643,7 @@ export default function AuditLogs() {
                                                                 link.active
                                                                     ? 'bg-primary-600 text-white'
                                                                     : link.url
-                                                                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                                                                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700'
                                                                       : 'cursor-not-allowed bg-gray-50 text-gray-400 dark:bg-gray-900 dark:text-gray-600'
                                                             }`}
                                                             dangerouslySetInnerHTML={{
@@ -1684,7 +1663,7 @@ export default function AuditLogs() {
                                 {logs.data.map((log) => (
                                     <div
                                         key={log.id}
-                                        className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                                        className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-900"
                                     >
                                         <div className="flex items-start gap-3">
                                             <div
@@ -1879,7 +1858,7 @@ export default function AuditLogs() {
                     {/* Sidebar with Analytics */}
                     <div className="space-y-6">
                         {/* Recent Activities */}
-                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                             <div className="mb-4 flex items-center gap-3">
                                 <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-2">
                                     <Clock className="text-primary-600 dark:text-primary-400 h-5 w-5" />
@@ -1953,7 +1932,7 @@ export default function AuditLogs() {
                         </div>
 
                         {/* Activity by Log Type */}
-                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                             <div className="mb-4 flex items-center gap-3">
                                 <div className="rounded-lg bg-blue-50 p-2 dark:bg-blue-900/20">
                                     <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -2014,7 +1993,7 @@ export default function AuditLogs() {
                         </div>
 
                         {/* Event Type Distribution */}
-                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                             <div className="mb-4 flex items-center gap-3">
                                 <div className="rounded-lg bg-green-50 p-2 dark:bg-green-900/20">
                                     <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -2056,7 +2035,7 @@ export default function AuditLogs() {
                         </div>
 
                         {/* Top Active Users */}
-                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
                             <div className="mb-4 flex items-center gap-3">
                                 <div className="rounded-lg bg-purple-50 p-2 dark:bg-purple-900/20">
                                     <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />

@@ -35,7 +35,7 @@ export function FullScreenModal({ isOpen, onClose, children, title }: FullScreen
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="text-white hover:bg-gray-800 flex-shrink-0"
+            className="text-white hover:bg-gray-900 flex-shrink-0"
           >
             <X className="h-5 w-5" />
           </Button>
@@ -50,13 +50,13 @@ export function FullScreenModal({ isOpen, onClose, children, title }: FullScreen
         <div className="px-4 py-2 bg-gray-900 border-t border-gray-800">
           <div className="flex items-center justify-between">
             <div className="text-xs text-gray-400">
-              Press <kbd className="px-2 py-1 bg-gray-800 rounded text-xs">ESC</kbd> to exit
+              Press <kbd className="px-2 py-1 bg-gray-900 rounded text-xs">ESC</kbd> to exit
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={onClose}
-              className="text-white border-gray-700 hover:bg-gray-800 text-sm"
+              className="text-white border-gray-700 hover:bg-gray-900 text-sm"
             >
               <Minimize2 className="h-3 w-3 mr-1" />
               Exit

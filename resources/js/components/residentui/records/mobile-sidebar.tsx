@@ -102,7 +102,7 @@ export const MobileSidebar = ({
                     type="button" 
                     className={cn(
                         "h-10 w-10 relative transition-all duration-200",
-                        "dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700",
+                        "dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700",
                         hasActiveFilters && "border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20"
                     )}
                 >
@@ -189,17 +189,17 @@ export const MobileSidebar = ({
                             </div>
                             <div className="flex flex-wrap gap-1">
                                 {search && (
-                                    <Badge variant="secondary" className="text-xs bg-white dark:bg-gray-800">
+                                    <Badge variant="secondary" className="text-xs bg-white dark:bg-gray-900">
                                         Search: "{search}"
                                     </Badge>
                                 )}
                                 {activeTab !== 'all' && (
-                                    <Badge variant="secondary" className="text-xs bg-white dark:bg-gray-800">
+                                    <Badge variant="secondary" className="text-xs bg-white dark:bg-gray-900">
                                         {allCategories.find((c: any) => c.id === activeTab)?.name}
                                     </Badge>
                                 )}
                                 {residentFilter !== 'all' && (
-                                    <Badge variant="secondary" className="text-xs bg-white dark:bg-gray-800">
+                                    <Badge variant="secondary" className="text-xs bg-white dark:bg-gray-900">
                                         {getResidentName(residentFilter)}
                                     </Badge>
                                 )}
@@ -223,7 +223,7 @@ export const MobileSidebar = ({
                                         type="button"
                                         className={cn(
                                             "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all",
-                                            "hover:bg-gray-100 dark:hover:bg-gray-800 group",
+                                            "hover:bg-gray-100 dark:hover:bg-gray-900 group",
                                             isActive && "bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800"
                                         )}
                                         onClick={() => {
@@ -270,8 +270,8 @@ export const MobileSidebar = ({
                                     type="button"
                                     className={cn(
                                         "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all",
-                                        "hover:bg-gray-100 dark:hover:bg-gray-800",
-                                        residentFilter === 'all' && "bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                                        "hover:bg-gray-100 dark:hover:bg-gray-900",
+                                        residentFilter === 'all' && "bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
                                     )}
                                     onClick={() => {
                                         onResidentChange('all');
@@ -301,7 +301,7 @@ export const MobileSidebar = ({
                                         type="button"
                                         className={cn(
                                             "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all",
-                                            "hover:bg-gray-100 dark:hover:bg-gray-800",
+                                            "hover:bg-gray-100 dark:hover:bg-gray-900",
                                             residentFilter === resident.id.toString() && "bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800"
                                         )}
                                         onClick={() => {
@@ -349,7 +349,7 @@ export const MobileSidebar = ({
                                     "h-12 flex flex-col items-center justify-center gap-1",
                                     viewMode === 'grid' 
                                         ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0' 
-                                        : 'dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
+                                        : 'dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
                                 )}
                                 onClick={() => {
                                     onViewModeChange('grid');
@@ -367,7 +367,7 @@ export const MobileSidebar = ({
                                     "h-12 flex flex-col items-center justify-center gap-1",
                                     viewMode === 'list' 
                                         ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0' 
-                                        : 'dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
+                                        : 'dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
                                 )}
                                 onClick={() => {
                                     onViewModeChange('list');
@@ -381,7 +381,7 @@ export const MobileSidebar = ({
                     </div>
                     
                     {/* Quick Stats */}
-                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3">
                         <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
                             <div className="flex justify-between">
                                 <span>Total Documents:</span>
@@ -408,7 +408,7 @@ export const MobileSidebar = ({
                             <Button 
                                 variant="outline" 
                                 type="button"
-                                className="flex-1 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                                className="flex-1 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
                                 onClick={() => {
                                     onClearFilters();
                                     onOpenChange(false);

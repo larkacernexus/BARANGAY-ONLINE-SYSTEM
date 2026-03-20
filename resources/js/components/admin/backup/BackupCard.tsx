@@ -84,7 +84,7 @@ export function BackupCard({
               <Button 
                 variant="ghost" 
                 size="sm"
-                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreVertical className="h-4 w-4" />
@@ -163,7 +163,7 @@ export function BackupCard({
         
         {/* File Icon and Type */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
+          <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-900">
             <TypeIcon className="h-6 w-6 text-gray-600 dark:text-gray-300" />
           </div>
           <div>

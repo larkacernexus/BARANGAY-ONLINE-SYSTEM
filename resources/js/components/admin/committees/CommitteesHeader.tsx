@@ -51,7 +51,7 @@ export function CommitteesHeader({ isBulkMode, toggleBulkMode, stats }: Committe
                         <p className="text-xs text-gray-500">Select multiple committees for batch operations</p>
                     </TooltipContent>
                 </Tooltip>
-                <Link href="/committees/create">
+                <Link href="/admin/committees/create">
                     <Button className="h-9">
                         <Plus className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">Add Committee</span>

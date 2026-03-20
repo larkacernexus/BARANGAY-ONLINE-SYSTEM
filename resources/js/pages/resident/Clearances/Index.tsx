@@ -243,7 +243,7 @@ const CollapsibleStats = ({
     <div className="md:hidden">
         <Button 
             variant="outline" 
-            className="w-full justify-between bg-white dark:bg-gray-800 rounded-xl border-gray-200 dark:border-gray-700"
+            className="w-full justify-between bg-white dark:bg-gray-900 rounded-xl border-gray-200 dark:border-gray-700"
             onClick={() => setShowStats(!showStats)}
         >
             <div className="flex items-center gap-2">
@@ -733,7 +733,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
 
                             {/* View Toggle */}
                             {!selectMode && tabHasData && (
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
                                     <Button
                                         variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                         size="sm"

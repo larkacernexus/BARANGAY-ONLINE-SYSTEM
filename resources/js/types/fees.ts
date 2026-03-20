@@ -9,6 +9,37 @@ export interface FormErrors {
 }
 
 // ============================================
+// PRIVILEGE TYPES - DYNAMIC FROM DATABASE
+// ============================================
+
+export interface Privilege {
+    id: number;
+    name: string;
+    code: string;
+    description?: string;
+    default_discount_percentage?: number;
+    requires_id_number?: boolean;
+    requires_verification?: boolean;
+    validity_years?: number;
+    is_active: boolean;
+}
+
+export interface ResidentPrivilege {
+    code: any;
+    id: number;
+    resident_id: number;
+    privilege_id: number;
+    privilege: Privilege;
+    id_number?: string;
+    verified_at?: string | null;
+    expires_at?: string | null;
+    remarks?: string;
+    discount_percentage?: number;
+    is_active: boolean;
+    status: 'pending' | 'active' | 'expired' | 'expiring_soon';
+}
+
+// ============================================
 // PAYER TYPES
 // ============================================
 
@@ -45,18 +76,6 @@ export const FEE_STATUS = {
 
 export type FeeStatus = typeof FEE_STATUS[keyof typeof FEE_STATUS];
 
-// Discount Types from DiscountRule model
-export const DISCOUNT_TYPES = {
-    SENIOR: 'SENIOR',
-    PWD: 'PWD',
-    SOLO_PARENT: 'SOLO_PARENT',
-    INDIGENT: 'INDIGENT',
-    VETERAN: 'VETERAN',
-    STUDENT: 'STUDENT',
-} as const;
-
-export type DiscountTypeCode = typeof DISCOUNT_TYPES[keyof typeof DISCOUNT_TYPES];
-
 // Value Types from DiscountRule model
 export const VALUE_TYPES = {
     PERCENTAGE: 'percentage',
@@ -70,7 +89,6 @@ export type ValueType = typeof VALUE_TYPES[keyof typeof VALUE_TYPES];
 // ============================================
 
 export interface FeeFormData {
-    billing_period(billing_period: any): string | number | readonly string[] | undefined;
     // Fee Type (from FeeType model)
     fee_type_id: string;
     
@@ -116,13 +134,9 @@ export interface FeeFormData {
     // Status (from Fee model)
     status: FeeStatus;
     
-    // Philippine Law Compliance - For Reference Only
-    // These are not stored in Fee model, just for UI display
-    ph_senior_id_verified: boolean;
-    ph_pwd_id_verified: boolean;
-    ph_solo_parent_id_verified: boolean;
-    ph_indigent_id_verified: boolean;
-    ph_legal_compliance_notes: string;
+    // For Reference Only - These will be populated dynamically from privileges
+    resident_privileges?: ResidentPrivilege[];
+    billing_period: any;
 }
 
 // ============================================
@@ -176,8 +190,8 @@ export interface FeeType {
     computation_formula?: any;
     unit?: string;
     
-    // Discount Configuration
-    is_discountable: boolean; // This is the only discount-related field in FeeType
+    // Discount Configuration - DYNAMIC
+    is_discountable: boolean;
     
     // Surcharge Configuration
     has_surcharge: boolean;
@@ -213,11 +227,9 @@ export interface FeeType {
     description: string | null;
     notes: string | null;
     
-    // Appended attributes
-    display_name?: string;
-    category_display?: string;
-    applicable_to_display?: string;
-    frequency_display?: string;
+    // DYNAMIC: Discount fields will be added from privileges
+    // Example: has_SENIOR_discount, SENIOR_discount_percentage, etc.
+    [key: string]: any;
 }
 
 // ============================================
@@ -229,7 +241,7 @@ export interface DiscountRule {
     code: string;
     name: string;
     description?: string;
-    discount_type: DiscountTypeCode;
+    discount_type: string; // Will match privilege codes
     value_type: ValueType;
     discount_value: number;
     maximum_discount_amount?: number;
@@ -247,20 +259,24 @@ export interface DiscountRule {
     sort_order: number;
     notes?: string | null;
     
+    // Link to privilege
+    privilege_id?: number;
+    
     // Appended attributes
     formatted_value?: string;
     status?: 'Active' | 'Inactive' | 'Scheduled' | 'Expired';
     is_expired?: boolean;
     type_label?: string;
+    privilege_code?: string;
 }
 
 // ============================================
-// DISPLAY-ONLY DISCOUNT INFO
+// DISPLAY-ONLY DISCOUNT INFO - DYNAMIC
 // ============================================
 
 export interface DiscountInfo {
     eligibleDiscounts: Array<{
-        code: DiscountTypeCode;
+        code: string;
         name: string;
         percentage: number;
         legalBasis: string;
@@ -272,7 +288,7 @@ export interface DiscountInfo {
 }
 
 // ============================================
-// RESIDENT (from Resident model - partial for reference)
+// RESIDENT (from Resident model - DYNAMIC)
 // ============================================
 
 export interface Resident {
@@ -280,37 +296,40 @@ export interface Resident {
     first_name: string;
     last_name: string;
     middle_name?: string;
+    suffix?: string;
     full_name: string;
     purok?: string;
     purok_id?: number;
     contact_number?: string;
+    email?: string;
     birth_date?: string;
     age?: number;
     gender?: string;
+    civil_status?: string;
     occupation?: string;
     address?: string;
+    is_voter?: boolean;
+    status?: string;
     
-    // Eligibility Flags (for reference only - used by DiscountRule)
-    is_senior: boolean;
-    is_pwd: boolean;
-    is_solo_parent: boolean;
-    is_indigent: boolean;
-    is_veteran?: boolean;
-    is_student?: boolean;
-    
-    // ID Numbers (for reference)
-    senior_id_number?: string;
-    pwd_id_number?: string;
-    solo_parent_id_number?: string;
-    indigent_id_number?: string;
-    
-    // Eligibility
+    // DYNAMIC: Privilege data
+    privileges?: ResidentPrivilege[];
+    privileges_count?: number;
+    active_privileges_count?: number;
+    discount_eligibility_list?: Array<{
+        type: string;
+        label: string;
+        percentage: number;
+        id_number?: string;
+        has_id: boolean;
+        privilege_code?: string;
+    }>;
     has_special_classification: boolean;
-    eligible_discounts?: DiscountTypeCode[];
+    
+    [key: string]: any;
 }
 
 // ============================================
-// HOUSEHOLD (from Household model - partial for reference)
+// HOUSEHOLD (from Household model - DYNAMIC)
 // ============================================
 
 export interface Household {
@@ -321,12 +340,21 @@ export interface Household {
     purok?: string;
     purok_id?: number;
     contact_number?: string;
+    email?: string;
     address?: string;
     member_count?: number;
     householdMembers?: Array<{
         resident: Resident;
         is_head: boolean;
     }>;
+    
+    // Head resident's privileges
+    head_privileges?: Array<{
+        code: string;
+        name: string;
+        id_number?: string;
+    }>;
+    has_discount_eligible_head?: boolean;
 }
 
 // ============================================
@@ -354,6 +382,9 @@ export interface FeesCreateProps {
     documentCategories: DocumentCategory[];
     puroks: string[];
     
+    // ALL PRIVILEGES from database
+    allPrivileges?: Privilege[];
+    
     // Preselected Data
     preselectedResident?: Resident | null;
     preselectedHousehold?: Household | null;
@@ -371,7 +402,7 @@ export interface FeesCreateProps {
 }
 
 // ============================================
-// HELPER FUNCTIONS
+// HELPER FUNCTIONS - DYNAMIC
 // ============================================
 
 // Safe number parsing
@@ -403,52 +434,87 @@ export const calculateTotalAmount = (
     return Math.max(0, total);
 };
 
+/**
+ * Check if resident has a specific privilege - DYNAMIC
+ */
+export const hasPrivilege = (resident: Resident | null, privilegeCode: string): boolean => {
+    if (!resident || !resident.privileges) return false;
+    
+    return resident.privileges.some((p: ResidentPrivilege) => 
+        p.code?.toUpperCase() === privilegeCode?.toUpperCase() && 
+        (p.status === 'active' || p.status === 'expiring_soon')
+    );
+};
+
+/**
+ * Get resident's active privileges - DYNAMIC
+ */
+export const getActivePrivileges = (resident: Resident | null): ResidentPrivilege[] => {
+    if (!resident || !resident.privileges) return [];
+    
+    return resident.privileges.filter((p: ResidentPrivilege) => 
+        p.status === 'active' || p.status === 'expiring_soon'
+    );
+};
+
+/**
+ * Get privilege icon - DYNAMIC based on code
+ */
+export const getPrivilegeIcon = (code: string): string => {
+    const firstChar = (code?.[0] || 'A').toUpperCase();
+    
+    const iconMap: Record<string, string> = {
+        'S': '👴',
+        'P': '♿',
+        'I': '🏠',
+        'F': '🌾',
+        'O': '✈️',
+        '4': '📦',
+        'U': '💼',
+        'A': '🎫',
+        'B': '🎫',
+        'C': '🎫',
+        'D': '🎫',
+        'E': '🎫',
+    };
+    
+    return iconMap[firstChar] || '🎫';
+};
+
+/**
+ * Get privilege color - DYNAMIC based on hash of code
+ */
+export const getPrivilegeColor = (code: string): string => {
+    const firstChar = (code?.[0] || 'A').toUpperCase().charCodeAt(0);
+    const colorIndex = firstChar % 8;
+    
+    const colors = [
+        'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400',
+        'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400',
+        'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400',
+        'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400',
+        'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400',
+        'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400',
+        'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400',
+        'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400',
+    ];
+    
+    return colors[colorIndex] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-400';
+};
+
 // ============================================
-// CONSTANTS
+// CONSTANTS - REMOVED HARDCODED DISCOUNT TYPES
 // ============================================
 
-// Philippine Legal Discount Laws (For Display Only)
-export const PHILIPPINE_DISCOUNT_LAWS = {
-    SENIOR: {
-        code: 'RA 9994',
-        name: 'Expanded Senior Citizens Act of 2010',
-        maxPercentage: 20,
-        description: 'For senior citizens aged 60 and above',
-        requirements: ['Valid Senior Citizen ID', 'Age 60+'],
-        discountType: 'SENIOR' as DiscountTypeCode,
-    },
-    PWD: {
-        code: 'RA 10754',
-        name: 'Expanded PWD Benefits Act',
-        maxPercentage: 20,
-        description: 'For Persons With Disabilities',
-        requirements: ['Valid PWD ID'],
-        discountType: 'PWD' as DiscountTypeCode,
-    },
-    SOLO_PARENT: {
-        code: 'RA 8972',
-        name: 'Solo Parents Welfare Act of 2000',
-        maxPercentage: 10,
-        description: 'For solo parents',
-        requirements: ['Valid Solo Parent ID'],
-        discountType: 'SOLO_PARENT' as DiscountTypeCode,
-    },
-    INDIGENT: {
-        code: 'Local Ordinance',
-        name: 'Social Reform and Poverty Alleviation Act',
-        maxPercentage: 20,
-        description: 'For indigent families',
-        requirements: ['Certificate of Indigency'],
-        discountType: 'INDIGENT' as DiscountTypeCode,
-    },
-} as const;
+// REMOVED: DISCOUNT_TYPES constant
+// REMOVED: PHILIPPINE_DISCOUNT_LAWS constant
 
 // ============================================
-// TYPE GUARDS
+// TYPE GUARDS - DYNAMIC
 // ============================================
 
 export const isResident = (payer: any): payer is Resident => {
-    return payer && 'is_senior' in payer;
+    return payer && 'first_name' in payer && 'last_name' in payer;
 };
 
 export const isHousehold = (payer: any): payer is Household => {
@@ -497,14 +563,7 @@ export const DEFAULT_FEE_FORM_DATA: FeeFormData = {
     batch_reference: '',
     requirements_submitted: [],
     status: 'draft',
-    ph_senior_id_verified: false,
-    ph_pwd_id_verified: false,
-    ph_solo_parent_id_verified: false,
-    ph_indigent_id_verified: false,
-    ph_legal_compliance_notes: '',
-    billing_period: function (billing_period: any): string | number | readonly string[] | undefined {
-        throw new Error("Function not implemented.");
-    }
+    billing_period: '',
 };
 
 export const DEFAULT_BULK_FEE_FORM_DATA: BulkFeeFormData = {

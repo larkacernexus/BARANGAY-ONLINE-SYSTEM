@@ -35,7 +35,7 @@ export function CollapsibleStats({
         <div className="md:hidden">
             <Button 
                 variant="outline" 
-                className="w-full justify-between bg-white dark:bg-gray-800"
+                className="w-full justify-between bg-white dark:bg-gray-900"
                 onClick={() => setShowStats(!showStats)}
             >
                 <div className="flex items-center gap-2">

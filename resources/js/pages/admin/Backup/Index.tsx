@@ -1,9 +1,10 @@
+// resources/js/pages/admin/backup/index.tsx
 import AppLayout from '@/layouts/admin-app-layout';
 import { usePage } from '@inertiajs/react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { route } from 'ziggy-js';
 import { toast } from 'sonner';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, Database, Save } from 'lucide-react';
 
 // Custom hooks
 import { useBackupOperations } from '@/hooks/useBackupOperations';
@@ -15,8 +16,7 @@ import BackupHeader from '@/components/admin/backup/BackupHeader';
 import BackupStats from '@/components/admin/backup/BackupStats';
 import BackupFilters from '@/components/admin/backup/BackupFilters';
 import BackupBulkActions from '@/components/admin/backup/BackupBulkActions';
-import BackupTable from '@/components/admin/backup/BackupTable';
-import BackupGrid from '@/components/admin/backup/BackupGrid';
+import BackupContent from '@/components/admin/backup/BackupContent';
 import BackupDialogs from '@/components/admin/backup/BackupDialogs';
 import KeyboardShortcuts from '@/components/admin/backup/KeyboardShortcuts';
 
@@ -26,6 +26,7 @@ import { calculateSelectionStats } from '@/admin-utils/backupUtils';
 // Types
 import type { PageProps, BackupFile, BulkOperationType } from '@/types/backup';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 
 const ITEMS_PER_PAGE = 15;
 const MOBILE_BREAKPOINT = 768;
@@ -183,7 +184,8 @@ export default function BackupIndex() {
     backupSelection.setIsBulkMode,
     backupSelection.clearSelection,
     backupSelection.setShowBulkActions,
-    backupSelection.setShowSelectionOptions
+    backupSelection.setShowSelectionOptions,
+    backupOperations.setShowBulkDeleteDialog
   ]);
 
   useEffect(() => {
@@ -218,18 +220,18 @@ export default function BackupIndex() {
       backupSelection.selectedBackups.includes(id)
     );
     backupSelection.setIsSelectAll(allSelected);
-  }, [backupSelection.selectedBackups, paginatedBackups]);
+  }, [backupSelection.selectedBackups, paginatedBackups, backupSelection.setIsSelectAll]);
 
   // Selection handlers
   const handleSelectAllOnPage = useCallback(() => {
     const pageIds = paginatedBackups.map(b => b.id);
     backupSelection.handleSelectAllOnPage(pageIds);
-  }, [paginatedBackups, backupSelection.handleSelectAllOnPage]);
+  }, [paginatedBackups, backupSelection]);
 
   const handleSelectAllFiltered = useCallback(() => {
     const filteredIds = backupFilters.filteredBackups.map(b => b.id);
     backupSelection.handleSelectAllFiltered(filteredIds);
-  }, [backupFilters.filteredBackups, backupSelection.handleSelectAllFiltered]);
+  }, [backupFilters.filteredBackups, backupSelection]);
 
   const handleSelectAll = useCallback(() => {
     if (!backups.total || backups.total === 0) {
@@ -243,7 +245,7 @@ export default function BackupIndex() {
       backupSelection.setSelectionMode('all');
       toast.success(`Selected all ${backups.total} backups`);
     }
-  }, [backups.total, backups.data, backupSelection.setSelectedBackups, backupSelection.setSelectionMode]);
+  }, [backups.total, backups.data, backupSelection]);
 
   // Get selected backups data
   const selectedBackupsData = useCallback(() => {
@@ -265,12 +267,12 @@ export default function BackupIndex() {
   // Handle create backup
   const handleCreateBackupClick = useCallback(() => {
     backupOperations.setShowCreateDialog(true);
-  }, [backupOperations.setShowCreateDialog]);
+  }, [backupOperations]);
 
   // Handle export
   const handleExport = useCallback(() => {
     backupOperations.handleBulkOperation('export', backupSelection.selectedBackups, selectedBackupsData());
-  }, [backupOperations.handleBulkOperation, backupSelection.selectedBackups, selectedBackupsData]);
+  }, [backupOperations, backupSelection.selectedBackups, selectedBackupsData]);
 
   // Handle bulk operations
   const handleBulkOperation = useCallback((operation: BulkOperationType) => {
@@ -279,17 +281,17 @@ export default function BackupIndex() {
       backupSelection.selectedBackups,
       selectedBackupsData()
     );
-  }, [backupOperations.handleBulkOperation, backupSelection.selectedBackups, selectedBackupsData]);
+  }, [backupOperations, backupSelection.selectedBackups, selectedBackupsData]);
 
   // Handle copy selected data
   const handleCopySelectedData = useCallback(() => {
     backupOperations.handleCopySelectedData(selectedBackupsData());
-  }, [backupOperations.handleCopySelectedData, selectedBackupsData]);
+  }, [backupOperations, selectedBackupsData]);
 
   // Handle sort for grid view (if needed)
   const handleSort = useCallback((column: string) => {
     backupFilters.handleSort(column);
-  }, [backupFilters.handleSort]);
+  }, [backupFilters]);
 
   // Show loading state while initializing
   if (!isInitialized) {
@@ -411,90 +413,54 @@ export default function BackupIndex() {
             />
           )}
 
-          {/* Backups Table/Grid */}
-          {viewMode === 'table' ? (
-            <BackupTable
-              backups={paginatedBackups}
-              isBulkMode={backupSelection.isBulkMode}
-              selectedBackups={backupSelection.selectedBackups}
-              viewMode={viewMode}
-              setViewMode={setViewMode}
-              isMobile={isMobile}
-              filtersState={{
+          {/* Backups Content - Unified component */}
+          <BackupContent
+            backups={paginatedBackups}
+            isBulkMode={backupSelection.isBulkMode}
+            selectedBackups={backupSelection.selectedBackups}
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            isMobile={isMobile}
+            filtersState={{
                 type: backupFilters.typeFilter,
                 size: backupFilters.sizeFilter,
                 sort_by: backupFilters.sortBy,
                 sort_order: backupFilters.sortOrder
-              }}
-              onItemSelect={backupSelection.handleItemSelect}
-              onSort={handleSort}
-              onDelete={backupOperations.handleDeleteBackup}
-              onDownload={backupOperations.handleDownloadBackup}
-              onToggleProtection={backupOperations.toggleProtection}
-              onSelectAllOnPage={handleSelectAllOnPage}
-              onSelectAllFiltered={handleSelectAllFiltered}
-              onSelectAll={handleSelectAll}
-              onClearSelection={backupSelection.clearSelection}
-              isSelectAll={backupSelection.isSelectAll}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={totalItems}
-              itemsPerPage={ITEMS_PER_PAGE}
-              onPageChange={handlePageChange}
-              hasActiveFilters={backupFilters.hasActiveFilters}
-              onClearFilters={backupFilters.handleClearFilters}
-              onCreateBackup={handleCreateBackupClick}
-              filteredBackups={backupFilters.filteredBackups}
-              setIsBulkMode={backupSelection.setIsBulkMode}
-              showSelectionOptions={backupSelection.showSelectionOptions}
-              setShowSelectionOptions={backupSelection.setShowSelectionOptions}
-              selectionRef={selectionRef}
-            />
-          ) : (
-            <BackupGrid
-              backups={paginatedBackups}
-              isBulkMode={backupSelection.isBulkMode}
-              selectedBackups={backupSelection.selectedBackups}
-              viewMode={viewMode}
-              setViewMode={setViewMode}
-              isMobile={isMobile}
-              filtersState={{
-                type: backupFilters.typeFilter,
-                size: backupFilters.sizeFilter,
-                sort_by: backupFilters.sortBy,
-                sort_order: backupFilters.sortOrder
-              }}
-              onItemSelect={backupSelection.handleItemSelect}
-              onSort={handleSort}
-              onDelete={backupOperations.handleDeleteBackup}
-              onDownload={backupOperations.handleDownloadBackup}
-              onToggleProtection={backupOperations.toggleProtection}
-              onSelectAllOnPage={handleSelectAllOnPage}
-              onSelectAllFiltered={handleSelectAllFiltered}
-              onSelectAll={handleSelectAll}
-              onClearSelection={backupSelection.clearSelection}
-              isSelectAll={backupSelection.isSelectAll}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={totalItems}
-              itemsPerPage={ITEMS_PER_PAGE}
-              onPageChange={handlePageChange}
-              hasActiveFilters={backupFilters.hasActiveFilters}
-              onClearFilters={backupFilters.handleClearFilters}
-              onCreateBackup={handleCreateBackupClick}
-              filteredBackups={backupFilters.filteredBackups}
-              setIsBulkMode={backupSelection.setIsBulkMode}
-              showSelectionOptions={backupSelection.showSelectionOptions}
-              setShowSelectionOptions={backupSelection.setShowSelectionOptions}
-              selectionRef={selectionRef}
-            />
-          )}
+            }}
+            onItemSelect={backupSelection.handleItemSelect}
+            onSort={handleSort}
+            onDelete={backupOperations.handleDeleteBackup}
+            onDownload={backupOperations.handleDownloadBackup}
+            onToggleProtection={backupOperations.toggleProtection}
+            onSelectAllOnPage={handleSelectAllOnPage}
+            onSelectAllFiltered={handleSelectAllFiltered}
+            onSelectAll={handleSelectAll}
+            onClearSelection={backupSelection.clearSelection}
+            isSelectAll={backupSelection.isSelectAll}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={ITEMS_PER_PAGE}
+            onPageChange={handlePageChange}
+            hasActiveFilters={backupFilters.hasActiveFilters}
+            onClearFilters={backupFilters.handleClearFilters}
+            onCreateBackup={handleCreateBackupClick}
+            filteredBackups={backupFilters.filteredBackups}
+            setIsBulkMode={backupSelection.setIsBulkMode}
+            showSelectionOptions={backupSelection.showSelectionOptions}
+            setShowSelectionOptions={backupSelection.setShowSelectionOptions}
+            selectionRef={selectionRef}
+            isPerformingBulkAction={backupOperations.isPerformingBulkAction}
+            selectionStats={selectionStats}
+            onCopySelectedData={handleCopySelectedData}
+            setShowBulkDeleteDialog={backupOperations.setShowBulkDeleteDialog}
+          />
 
           {/* Empty State with helpful guidance */}
           {paginatedBackups.length === 0 && totalItems === 0 && !backupFilters.hasActiveFilters && (
             <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
-              <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                <DatabaseBackup className="h-8 w-8 text-gray-400" />
+              <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-900 rounded-full flex items-center justify-center mb-4">
+                <Database className="h-8 w-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 No backups yet

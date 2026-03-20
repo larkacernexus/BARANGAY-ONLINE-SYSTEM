@@ -241,7 +241,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                 ]}
             >
                 <div className="flex flex-col items-center justify-center py-12">
-                    <AlertCircle className="h-16 w-16 text-gray-400 mb-4" />
+                    <AlertCircle className="h-16 w-16 text-gray-400 dark:text-gray-600 mb-4" />
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                         Role Not Found
                     </h2>
@@ -281,12 +281,12 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => router.visit(route('admin.roles.index'))}
-                                className="h-8 w-8 p-0"
+                                className="h-8 w-8 p-0 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
                             >
                                 <ArrowLeft className="h-4 w-4" />
                             </Button>
                             <div>
-                                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Edit Role</h1>
+                                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-white">Edit Role</h1>
                                 <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
                                     Update role details and permissions
                                 </p>
@@ -297,7 +297,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                         <Button
                             variant="outline"
                             onClick={() => router.visit(route('admin.roles.show', role.id))}
-                            className="h-9"
+                            className="h-9 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                         >
                             <Eye className="h-4 w-4 mr-2" />
                             View
@@ -306,7 +306,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                             variant="outline"
                             onClick={handleReset}
                             disabled={processing || role.is_system_role}
-                            className="h-9"
+                            className="h-9 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                         >
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Reset
@@ -316,8 +316,8 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
 
                 {/* System Role Warning */}
                 {showSystemWarning && (
-                    <Alert variant="warning" className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
-                        <AlertCircle className="h-4 w-4 text-yellow-600" />
+                    <Alert variant="warning" className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800">
+                        <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                         <AlertDescription className="text-yellow-800 dark:text-yellow-300">
                             This is a system role. System roles cannot be modified. Only permissions can be updated.
                         </AlertDescription>
@@ -329,13 +329,13 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                         {/* Left Column - Role Details */}
                         <div className="lg:col-span-2 space-y-6">
                             {/* Basic Information Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
                                         <Shield className="h-5 w-5" />
                                         Role Details
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="dark:text-gray-400">
                                         Update the basic information for this role
                                     </CardDescription>
                                 </CardHeader>
@@ -343,9 +343,9 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                     {/* Name Field */}
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
-                                            <Label htmlFor="name" className="flex items-center gap-2">
+                                            <Label htmlFor="name" className="flex items-center gap-2 dark:text-gray-300">
                                                 Role Name
-                                                <span className="text-xs text-gray-500 font-normal">
+                                                <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">
                                                     (Technical name - used in code)
                                                 </span>
                                             </Label>
@@ -354,7 +354,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                 variant="ghost"
                                                 size="sm"
                                                 onClick={() => handleCopy(data.name, 'name')}
-                                                className="h-6 text-xs"
+                                                className="h-6 text-xs dark:text-gray-400 dark:hover:text-white"
                                             >
                                                 <Copy className="h-3 w-3 mr-1" />
                                                 {copiedField === 'name' ? 'Copied!' : 'Copy'}
@@ -365,28 +365,28 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                             value={data.name}
                                             onChange={(e) => setData('name', e.target.value.toLowerCase())}
                                             placeholder="e.g., admin"
-                                            className={`font-mono ${errors.name ? 'border-red-500' : ''}`}
+                                            className={`font-mono ${errors.name ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                             disabled={processing || role.is_system_role}
                                         />
                                         {errors.name && (
-                                            <p className="text-sm text-red-600">{errors.name}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                                         )}
                                         {role.is_system_role && (
-                                            <p className="text-sm text-yellow-600 flex items-center gap-1">
+                                            <p className="text-sm text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
                                                 <Lock className="h-3 w-3" />
                                                 System role name cannot be changed
                                             </p>
                                         )}
-                                        <p className="text-xs text-gray-500">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
                                             Use lowercase letters and underscores only
                                         </p>
                                     </div>
 
                                     {/* Description Field */}
                                     <div className="space-y-2">
-                                        <Label htmlFor="description">
+                                        <Label htmlFor="description" className="dark:text-gray-300">
                                             Description
-                                            <span className="text-xs text-gray-500 font-normal ml-2">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400 font-normal ml-2">
                                                 (Optional)
                                             </span>
                                         </Label>
@@ -395,34 +395,37 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                             value={data.description}
                                             onChange={(e) => setData('description', e.target.value)}
                                             placeholder="Describe what this role can do..."
-                                            className={`min-h-[100px] ${errors.description ? 'border-red-500' : ''}`}
+                                            className={`min-h-[100px] ${errors.description ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                             disabled={processing || role.is_system_role}
                                         />
                                         {errors.description && (
-                                            <p className="text-sm text-red-600">{errors.description}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.description}</p>
                                         )}
                                     </div>
 
                                     {/* System Role Status (Read-only) */}
-                                    <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
+                                    <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
                                         <div className="space-y-0.5">
-                                            <Label htmlFor="is_system_role" className="text-base">
+                                            <Label htmlFor="is_system_role" className="text-base dark:text-gray-300">
                                                 System Role
                                             </Label>
-                                            <p className="text-sm text-gray-500">
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
                                                 Special privileges, cannot be deleted
                                             </p>
                                         </div>
-                                        <Badge variant={role.is_system_role ? "default" : "outline"}>
+                                        <Badge variant={role.is_system_role ? "default" : "outline"} 
+                                            className={role.is_system_role 
+                                                ? 'dark:bg-purple-900 dark:text-purple-200' 
+                                                : 'dark:border-gray-600 dark:text-gray-300'}>
                                             {role.is_system_role ? 'Yes' : 'No'}
                                         </Badge>
                                     </div>
 
                                     {/* Validation Errors */}
                                     {validation_errors && Object.keys(validation_errors).length > 0 && (
-                                        <Alert variant="destructive">
-                                            <AlertCircle className="h-4 w-4" />
-                                            <AlertDescription>
+                                        <Alert variant="destructive" className="dark:bg-red-950 dark:border-red-800">
+                                            <AlertCircle className="h-4 w-4 dark:text-red-400" />
+                                            <AlertDescription className="dark:text-red-400">
                                                 <ul className="list-disc list-inside space-y-1">
                                                     {Object.entries(validation_errors).map(([field, error]) => (
                                                         <li key={field}>
@@ -437,16 +440,16 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                             </Card>
 
                             {/* Permissions Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
                                         <Key className="h-5 w-5" />
                                         Permissions
-                                        <Badge variant="outline" className="ml-2">
+                                        <Badge variant="outline" className="ml-2 dark:border-gray-600 dark:text-gray-300">
                                             {data.permissions.length} selected
                                         </Badge>
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="dark:text-gray-400">
                                         Select the permissions assigned to this role
                                     </CardDescription>
                                 </CardHeader>
@@ -454,12 +457,12 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                     {/* Search and Filter */}
                                     <div className="space-y-4 mb-6">
                                         <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
                                             <Input
                                                 placeholder="Search permissions..."
                                                 value={searchTerm}
                                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-10"
+                                                className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                             />
                                         </div>
                                         <div className="flex items-center gap-4">
@@ -467,7 +470,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                 <select
                                                     value={selectedModule}
                                                     onChange={(e) => setSelectedModule(e.target.value)}
-                                                    className="w-full border rounded px-3 py-2 text-sm"
+                                                    className="w-full border rounded px-3 py-2 text-sm dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                 >
                                                     {modules.map((module) => (
                                                         <option key={module} value={module}>
@@ -482,7 +485,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() => handleSelectAll()}
-                                                    className="h-8"
+                                                    className="h-8 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                                     disabled={filteredPermissions.length === 0 || role.is_system_role}
                                                 >
                                                     <Plus className="h-3 w-3 mr-1" />
@@ -493,7 +496,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() => handleDeselectAll()}
-                                                    className="h-8"
+                                                    className="h-8 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                                     disabled={data.permissions.length === 0 || role.is_system_role}
                                                 >
                                                     <Minus className="h-3 w-3 mr-1" />
@@ -506,7 +509,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                     {/* Permissions List or Empty State */}
                                     {filteredPermissions.length === 0 ? (
                                         <div className="text-center py-8">
-                                            <Key className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                                            <Key className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                                             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                                                 No Permissions Found
                                             </h3>
@@ -522,8 +525,8 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                 <div key={module} className="space-y-3">
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
-                                                            <h3 className="font-medium">{module}</h3>
-                                                            <Badge variant="secondary">
+                                                            <h3 className="font-medium dark:text-white">{module}</h3>
+                                                            <Badge variant="secondary" className="dark:bg-gray-700 dark:text-gray-300">
                                                                 {modulePermissions.length}
                                                             </Badge>
                                                         </div>
@@ -534,7 +537,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                                 size="sm"
                                                                 onClick={() => handleSelectAll(module)}
                                                                 disabled={isAllSelected(module) || role.is_system_role}
-                                                                className="h-7 text-xs"
+                                                                className="h-7 text-xs dark:text-gray-400 dark:hover:text-white"
                                                             >
                                                                 Select All
                                                             </Button>
@@ -544,7 +547,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                                 size="sm"
                                                                 onClick={() => handleDeselectAll(module)}
                                                                 disabled={!isAnySelected(module) || role.is_system_role}
-                                                                className="h-7 text-xs"
+                                                                className="h-7 text-xs dark:text-gray-400 dark:hover:text-white"
                                                             >
                                                                 Clear
                                                             </Button>
@@ -554,10 +557,10 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                         {modulePermissions.map((permission) => (
                                                             <div
                                                                 key={permission.id}
-                                                                className={`flex items-center space-x-2 p-3 rounded-lg border ${
+                                                                className={`flex items-start space-x-2 p-3 rounded-lg border ${
                                                                     data.permissions.includes(permission.id)
                                                                         ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                                                                        : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'
+                                                                        : 'hover:bg-gray-50 dark:hover:bg-gray-900/30 border-gray-200 dark:border-gray-700'
                                                                 }`}
                                                             >
                                                                 <Checkbox
@@ -565,13 +568,14 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                                     checked={data.permissions.includes(permission.id)}
                                                                     onCheckedChange={() => handlePermissionToggle(permission.id)}
                                                                     disabled={processing || role.is_system_role}
+                                                                    className="mt-1 dark:border-gray-600"
                                                                 />
                                                                 <Label
                                                                     htmlFor={`permission-${permission.id}`}
                                                                     className="flex-1 cursor-pointer"
                                                                 >
-                                                                    <div className="font-medium">{permission.display_name}</div>
-                                                                    <div className="text-sm text-gray-500 font-mono truncate">
+                                                                    <div className="font-medium dark:text-white">{permission.display_name}</div>
+                                                                    <div className="text-sm text-gray-500 dark:text-gray-400 font-mono truncate">
                                                                         {permission.name}
                                                                     </div>
                                                                     {permission.description && (
@@ -584,8 +588,8 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                                     variant="outline"
                                                                     className={`text-xs ${
                                                                         permission.is_active
-                                                                            ? 'bg-green-50 text-green-700 border-green-200'
-                                                                            : 'bg-gray-100 text-gray-600 border-gray-200'
+                                                                            ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/50 dark:text-green-400 dark:border-green-800'
+                                                                            : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-700'
                                                                     }`}
                                                                 >
                                                                     {permission.is_active ? 'Active' : 'Inactive'}
@@ -604,18 +608,18 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                         {/* Right Column - Information & Actions */}
                         <div className="space-y-6">
                             {/* Role Preview */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
                                         <Eye className="h-5 w-5" />
                                         Preview
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="dark:text-gray-400">
                                         How this role will appear in the system
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                                         <div className="flex items-center gap-3">
                                             <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
                                                 role.is_system_role
@@ -629,27 +633,30 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                                 }`} />
                                             </div>
                                             <div>
-                                                <div className="font-medium font-mono">{data.name || 'role.name'}</div>
+                                                <div className="font-medium font-mono dark:text-white">{data.name || 'role.name'}</div>
                                                 {data.description && (
-                                                    <div className="text-sm text-gray-500 line-clamp-1">
+                                                    <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
                                                         {data.description}
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-                                        <Badge variant={role.is_system_role ? "outline" : "default"}>
+                                        <Badge variant={role.is_system_role ? "outline" : "default"} 
+                                            className={role.is_system_role 
+                                                ? 'dark:border-gray-600 dark:text-gray-300' 
+                                                : 'dark:bg-blue-600'}>
                                             {role.is_system_role ? 'System' : 'Custom'}
                                         </Badge>
                                     </div>
 
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-500">Permissions</span>
-                                            <Badge variant="outline">{data.permissions.length}</Badge>
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">Permissions</span>
+                                            <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">{data.permissions.length}</Badge>
                                         </div>
                                         {data.description && (
                                             <div>
-                                                <span className="text-sm text-gray-500">Description</span>
+                                                <span className="text-sm text-gray-500 dark:text-gray-400">Description</span>
                                                 <p className="text-sm mt-1 text-gray-700 dark:text-gray-300">
                                                     {data.description}
                                                 </p>
@@ -660,45 +667,45 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                             </Card>
 
                             {/* Role Info */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
                                         <Users className="h-5 w-5" />
                                         Statistics
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-gray-500">ID</span>
-                                        <code className="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">ID</span>
+                                        <code className="text-sm bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded dark:text-gray-300">
                                             {roleId}
                                         </code>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-gray-500">Created</span>
-                                        <span className="text-sm">{formatDate(role.created_at)}</span>
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">Created</span>
+                                        <span className="text-sm dark:text-gray-300">{formatDate(role.created_at)}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-gray-500">Updated</span>
-                                        <span className="text-sm">{formatDate(role.updated_at)}</span>
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">Updated</span>
+                                        <span className="text-sm dark:text-gray-300">{formatDate(role.updated_at)}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-sm text-gray-500">Users</span>
-                                        <Badge variant="outline">{role.users_count || 0}</Badge>
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">Users</span>
+                                        <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">{role.users_count || 0}</Badge>
                                     </div>
                                 </CardContent>
                             </Card>
 
                             {/* Action Buttons */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle>Actions</CardTitle>
+                                    <CardTitle className="dark:text-white">Actions</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                     <Button
                                         type="submit"
                                         disabled={processing || isSubmitting || role.is_system_role}
-                                        className="w-full"
+                                        className="w-full dark:bg-blue-600 dark:hover:bg-blue-700"
                                     >
                                         {processing || isSubmitting ? (
                                             <>
@@ -717,7 +724,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                         variant="outline"
                                         onClick={() => router.visit(route('admin.roles.index'))}
                                         disabled={processing}
-                                        className="w-full"
+                                        className="w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                     >
                                         Cancel
                                     </Button>
@@ -725,7 +732,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                         type="button"
                                         variant="outline"
                                         onClick={() => router.visit(route('admin.roles.show', role.id))}
-                                        className="w-full"
+                                        className="w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                     >
                                         <Eye className="mr-2 h-4 w-4" />
                                         View Details
@@ -735,7 +742,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
 
                             {/* Danger Zone */}
                             {!role.is_system_role && (
-                                <Card className="border-red-200 dark:border-red-800">
+                                <Card className="border-red-200 dark:border-red-900 dark:bg-gray-900">
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
                                             <AlertCircle className="h-5 w-5" />
@@ -746,7 +753,7 @@ export default function RoleEdit({ role, permissions = {}, validation_errors }: 
                                         <Button
                                             variant="destructive"
                                             size="sm"
-                                            className="w-full"
+                                            className="w-full dark:bg-red-900 dark:hover:bg-red-800"
                                             onClick={() => {
                                                 if (confirm(`Are you sure you want to delete "${roleName}"? This action cannot be undone.`)) {
                                                     router.delete(route('admin.roles.destroy', role.id), {

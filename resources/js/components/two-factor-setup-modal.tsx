@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ShieldAlert, Copy, Check } from 'lucide-react';
+import { ShieldAlert, Copy, Check, QrCode } from 'lucide-react';
 
 interface TwoFactorSetupModalProps {
     isOpen: boolean;
@@ -77,6 +77,9 @@ export default function TwoFactorSetupModal({
         setStep('setup');
     };
 
+    // Check if qrCodeSvg is a URL or SVG content
+    const isUrl = qrCodeSvg && qrCodeSvg.startsWith('http');
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-md">
@@ -99,13 +102,28 @@ export default function TwoFactorSetupModal({
                         <div className="space-y-4">
                             <div className="flex flex-col items-center space-y-4">
                                 {qrCodeSvg ? (
-                                    <div 
-                                        className="p-4 border rounded-lg bg-white"
-                                        dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
-                                    />
+                                    <>
+                                        {isUrl ? (
+                                            // If it's a URL, render as an image
+                                            <div className="p-4 border rounded-lg bg-white flex justify-center">
+                                                <img 
+                                                    src={qrCodeSvg} 
+                                                    alt="QR Code" 
+                                                    className="w-48 h-48"
+                                                />
+                                            </div>
+                                        ) : (
+                                            // If it's SVG content, render as HTML
+                                            <div 
+                                                className="p-4 border rounded-lg bg-white"
+                                                dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
+                                            />
+                                        )}
+                                    </>
                                 ) : (
                                     <div className="w-48 h-48 border rounded-lg flex items-center justify-center bg-muted">
-                                        <p className="text-muted-foreground">Loading QR code...</p>
+                                        <QrCode className="h-8 w-8 text-muted-foreground animate-pulse" />
+                                        <p className="text-muted-foreground ml-2">Loading...</p>
                                     </div>
                                 )}
                                 
@@ -131,7 +149,7 @@ export default function TwoFactorSetupModal({
                                 </div>
                             </div>
                             
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm text-muted-foreground space-y-1">
                                 <p>1. Install an authenticator app like Google Authenticator, Authy, or Microsoft Authenticator</p>
                                 <p>2. Scan the QR code or enter the key manually</p>
                                 <p>3. Enter the 6-digit code from the app below</p>
@@ -140,6 +158,7 @@ export default function TwoFactorSetupModal({
                             <Button
                                 onClick={() => setStep('verify')}
                                 className="w-full"
+                                disabled={!qrCodeSvg || !manualSetupKey}
                             >
                                 I've scanned the QR code
                             </Button>

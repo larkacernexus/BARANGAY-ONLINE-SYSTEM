@@ -51,15 +51,21 @@ export function GridLayout({
         .filter(Boolean)
         .join(' ');
 
+    // When empty, show centered empty state with proper background
+    if (isEmpty) {
+        return (
+            <div className={`${padding} ${className} bg-gray-50 dark:bg-gray-950 min-h-[400px] flex items-center justify-center`}>
+                {emptyState}
+            </div>
+        );
+    }
+
+    // When not empty, show grid with proper background
     return (
-        <div className={`${padding} ${className}`}>
-            {isEmpty ? (
-                emptyState
-            ) : (
-                <div className={gridClass}>
-                    {children}
-                </div>
-            )}
+        <div className={`${padding} ${className} bg-gray-50 dark:bg-gray-950`}>
+            <div className={gridClass}>
+                {children}
+            </div>
         </div>
     );
 }

@@ -867,7 +867,7 @@ export default function EditClearance() {
                                                         Payment Required
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                                    <Badge variant="outline" className="bg-gray-50 text-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                                         <FileCheck className="h-3 w-3 mr-1" />
                                                         Free Service
                                                     </Badge>
@@ -884,7 +884,7 @@ export default function EditClearance() {
                                                         Needs Approval
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                                    <Badge variant="outline" className="bg-gray-50 text-gray-700 dark:bg-gray-900 dark:text-gray-300">
                                                         <FileCheck className="h-3 w-3 mr-1" />
                                                         Direct Processing
                                                     </Badge>

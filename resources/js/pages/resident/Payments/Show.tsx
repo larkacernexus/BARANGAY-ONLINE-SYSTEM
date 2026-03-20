@@ -344,7 +344,7 @@ const getPaymentStatusConfig = (status: PaymentStatus) => {
             label: 'Cancelled',
             icon: XCircle,
             color: 'text-gray-600 dark:text-gray-400',
-            bgColor: 'bg-gray-100 dark:bg-gray-800',
+            bgColor: 'bg-gray-100 dark:bg-gray-900',
             gradient: 'from-gray-500 to-slate-500'
         },
         refunded: {
@@ -388,7 +388,7 @@ const getPaymentMethodColor = (method: PaymentMethod): string => {
         online: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
         card: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
     };
-    return colors[method] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
+    return colors[method] || 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-400';
 };
 
 const calculateProgress = (payment: Payment): number => {
@@ -1380,15 +1380,15 @@ export default function PaymentShow({
                                             >
                                                 <div className="space-y-3">
                                                     <div className="grid grid-cols-2 gap-2">
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">OR Number</p>
                                                             <p className="text-xs font-mono truncate">{payment.or_number}</p>
                                                         </div>
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Payment Date</p>
                                                             <p className="text-xs">{payment.payment_date ? formatDate(payment.payment_date) : 'N/A'}</p>
                                                         </div>
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Method</p>
                                                             <div className="flex items-center gap-1 mt-0.5">
                                                                 <div className={cn("p-0.5 rounded", getPaymentMethodColor(payment.payment_method))}>
@@ -1398,25 +1398,25 @@ export default function PaymentShow({
                                                             </div>
                                                         </div>
                                                         {payment.reference_number && (
-                                                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                                 <p className="text-[10px] text-gray-500">Reference</p>
                                                                 <p className="text-xs font-mono truncate">{payment.reference_number}</p>
                                                             </div>
                                                         )}
                                                     </div>
                                                     
-                                                    <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                    <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                         <p className="text-[10px] text-gray-500 mb-1">Purpose</p>
                                                         <p className="text-xs">{payment.purpose}</p>
                                                     </div>
                                                     
                                                     <div className="grid grid-cols-2 gap-2">
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Collection Type</p>
                                                             <p className="text-xs">{payment.collection_type_display}</p>
                                                         </div>
                                                         {payment.certificate_type && (
-                                                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                                 <p className="text-[10px] text-gray-500">Certificate</p>
                                                                 <p className="text-xs">{payment.certificate_type_display}</p>
                                                             </div>
@@ -1461,7 +1461,7 @@ export default function PaymentShow({
                                                         </div>
                                                         
                                                         {payment.payer_details.address && (
-                                                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                                 <p className="text-[10px] text-gray-500 mb-1">Address</p>
                                                                 <div className="flex items-start gap-2">
                                                                     <MapPin className="h-3 w-3 text-gray-400 mt-0.5 flex-shrink-0" />
@@ -1471,7 +1471,7 @@ export default function PaymentShow({
                                                         )}
                                                         
                                                         {(payment.payer_details.household_number || payment.payer_details.purok || payment.payer_details.zone) && (
-                                                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                                 <p className="text-[10px] text-gray-500 mb-1">Location Details</p>
                                                                 <div className="space-y-1 text-xs">
                                                                     {payment.payer_details.household_number && (
@@ -1507,27 +1507,27 @@ export default function PaymentShow({
                                                 onToggle={() => toggleSection('breakdownInfo')}
                                             >
                                                 <div className="space-y-2">
-                                                    <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                    <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                         <span className="text-xs text-gray-600">Base Amount</span>
                                                         <span className="text-sm font-medium">{payment.formatted_subtotal}</span>
                                                     </div>
                                                     
                                                     {payment.surcharge > 0 && (
-                                                        <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <span className="text-xs text-gray-600">Surcharge</span>
                                                             <span className="text-sm font-medium text-amber-600">{payment.formatted_surcharge}</span>
                                                         </div>
                                                     )}
                                                     
                                                     {payment.penalty > 0 && (
-                                                        <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <span className="text-xs text-gray-600">Penalty</span>
                                                             <span className="text-sm font-medium text-red-600">{payment.formatted_penalty}</span>
                                                         </div>
                                                     )}
                                                     
                                                     {payment.discount > 0 && (
-                                                        <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <span className="text-xs text-gray-600">Discount</span>
                                                             <span className="text-sm font-medium text-green-600">-{payment.formatted_discount}</span>
                                                         </div>
@@ -1535,7 +1535,7 @@ export default function PaymentShow({
                                                     
                                                     <Separator className="my-1" />
                                                     
-                                                    <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                    <div className="flex justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                         <span className="text-xs font-semibold">Total Amount</span>
                                                         <span className="text-base font-bold text-gray-900 dark:text-white">
                                                             {payment.formatted_total}
@@ -1777,7 +1777,7 @@ export default function PaymentShow({
                                     {payment.items && payment.items.length > 0 ? (
                                         <div className="space-y-3">
                                             {payment.items.map((item, index) => (
-                                                <div key={item.id || index} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <div key={item.id || index} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5 mb-1.5">
@@ -1895,7 +1895,7 @@ export default function PaymentShow({
                                     {payment.notes && payment.notes.length > 0 ? (
                                         <div className="space-y-3">
                                             {payment.notes.map((note) => (
-                                                <div key={note.id} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <div key={note.id} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                     <div className="flex items-start justify-between gap-2 mb-2">
                                                         <div className="flex items-center gap-2">
                                                             <Avatar className="h-6 w-6">
@@ -2104,7 +2104,7 @@ export default function PaymentShow({
                                                 <Link
                                                     key={related.id}
                                                     href={`/portal/payments/${related.id}`}
-                                                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
+                                                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors group"
                                                 >
                                                     <div className={cn(
                                                         "p-2 rounded-lg",
@@ -2133,21 +2133,21 @@ export default function PaymentShow({
 
                             <ModernCard title="Contact Information">
                                 <div className="space-y-3">
-                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <Building className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div>
                                             <p className="font-medium text-sm">Barangay Hall</p>
                                             <p className="text-xs text-gray-500">Open Mon-Fri, 8AM-5PM</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <Phone className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div>
                                             <p className="font-medium text-sm">Contact Us</p>
                                             <p className="text-xs text-gray-500">0999-999-9999</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div>
                                             <p className="font-medium text-sm">Location</p>

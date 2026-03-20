@@ -61,7 +61,7 @@ export function MobileHeader({ activeTab, onTabChange, formStatus }: MobileHeade
                 )}
 
                 {/* Mobile Tabs */}
-                <div className="flex border rounded-lg bg-gray-50 dark:bg-gray-800 p-1">
+                <div className="flex border rounded-lg bg-gray-50 dark:bg-gray-900 p-1">
                     <button
                         type="button"
                         className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'form' ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}

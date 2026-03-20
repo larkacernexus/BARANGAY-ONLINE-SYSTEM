@@ -10,6 +10,7 @@ use App\Models\Household;
 use App\Models\HouseholdMember;
 use App\Models\Resident;
 use App\Models\Business;
+use App\Models\ResidentDocument;
 use App\Models\Purok;
 use App\Models\User;
 use App\Models\Official;
@@ -18,7 +19,9 @@ use App\Models\ClearanceRequest;
 use App\Models\Form;
 use App\Models\Announcement;
 use App\Models\Payment;
+use App\Models\Privilege;
 use App\Helpers\NotificationHelper;
+use Illuminate\Support\Facades\Cache;
 
 class ResidentHandleInertiaRequests extends Middleware
 {
@@ -27,6 +30,81 @@ class ResidentHandleInertiaRequests extends Middleware
     public function version(Request $request): ?string
     {
         return parent::version($request);
+    }
+
+    /**
+     * Get all active privileges - DYNAMIC FROM DATABASE
+     */
+    private function getAllPrivileges(): array
+    {
+        return Cache::remember('all_active_privileges', 3600, function () {
+            return Privilege::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'description', 'default_discount_percentage'])
+                ->map(function ($privilege) {
+                    return [
+                        'id' => $privilege->id,
+                        'name' => $privilege->name,
+                        'code' => $privilege->code,
+                        'description' => $privilege->description,
+                        'default_discount_percentage' => $privilege->default_discount_percentage,
+                    ];
+                })
+                ->toArray();
+        });
+    }
+
+    /**
+     * Get resident's active privileges
+     */
+    private function getResidentPrivileges(Resident $resident): array
+    {
+        if (!$resident->relationLoaded('residentPrivileges')) {
+            $resident->load('residentPrivileges.privilege');
+        }
+
+        return $resident->residentPrivileges
+            ->filter(function ($rp) {
+                return $rp->isActive();
+            })
+            ->map(function ($rp) {
+                $privilege = $rp->privilege;
+                return [
+                    'id' => $rp->id,
+                    'privilege_id' => $privilege->id,
+                    'code' => $privilege->code,
+                    'name' => $privilege->name,
+                    'id_number' => $rp->id_number,
+                    'discount_percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
+                    'verified_at' => $rp->verified_at?->toISOString(),
+                    'expires_at' => $rp->expires_at?->toISOString(),
+                ];
+            })
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * Get privilege icon for display
+     */
+    private function getPrivilegeIcon(string $code): string
+    {
+        $icons = [
+            'SC' => '👴',
+            'OSP' => '👴',
+            'PWD' => '♿',
+            'SP' => '👨‍👧',
+            'IND' => '🏠',
+            '4PS' => '📦',
+            'IP' => '🌿',
+            'FRM' => '🌾',
+            'FSH' => '🎣',
+            'OFW' => '✈️',
+            'SCH' => '📚',
+            'UNE' => '💼',
+        ];
+        
+        return $icons[$code] ?? '🎫';
     }
 
     public function share(Request $request): array
@@ -40,6 +118,9 @@ class ResidentHandleInertiaRequests extends Middleware
         $householdMembersCount = 0;
         $householdMembers = [];
         $householdData = null;
+        
+        // Get all privileges for frontend
+        $allPrivileges = $this->getAllPrivileges();
         
         // Notification data
         $notifications = [];
@@ -55,9 +136,9 @@ class ResidentHandleInertiaRequests extends Middleware
         
         if ($query && strlen($query) >= 2 && $user && $user->resident_id) {
             if ($isQuick) {
-                $quickResults = $this->performResidentQuickSearch($query, $user->resident_id);
+                $quickResults = $this->performResidentQuickSearch($query, $user->resident_id, $allPrivileges);
             } else {
-                $searchResults = $this->performResidentFullSearch($query, $user->resident_id);
+                $searchResults = $this->performResidentFullSearch($query, $user->resident_id, $allPrivileges);
                 $this->storeSearchQuery($request, $query);
             }
         }
@@ -65,14 +146,34 @@ class ResidentHandleInertiaRequests extends Middleware
         $recentSearches = $this->getRecentSearches($request);
         
         if ($user) {
-            $resident = Resident::with(['household', 'purok'])
-                ->where('id', $user->resident_id)
-                ->first();
+            $resident = Resident::with([
+                'household', 
+                'purok',
+                'residentPrivileges.privilege' // ADDED: Load privileges
+            ])->where('id', $user->resident_id)->first();
             
             if ($resident) {
                 $residentId = $resident->id;
                 
-                $residentData = [
+                // Get resident's active privileges
+                $activePrivileges = $this->getResidentPrivileges($resident);
+                
+                // DYNAMIC privilege flags
+                $privilegeFlags = [];
+                $privilegeIcons = [];
+                foreach ($activePrivileges as $priv) {
+                    $code = strtolower($priv['code']);
+                    $privilegeFlags["is_{$code}"] = true;
+                    $privilegeFlags["has_{$code}"] = true;
+                    $privilegeFlags["{$code}_id_number"] = $priv['id_number'];
+                    $privilegeIcons[] = [
+                        'code' => $priv['code'],
+                        'icon' => $this->getPrivilegeIcon($priv['code']),
+                        'name' => $priv['name'],
+                    ];
+                }
+                
+                $residentData = array_merge([
                     'id' => $resident->id,
                     'first_name' => $resident->first_name,
                     'middle_name' => $resident->middle_name,
@@ -84,13 +185,15 @@ class ResidentHandleInertiaRequests extends Middleware
                     'marital_status' => $resident->marital_status,
                     'phone_number' => $resident->phone_number,
                     'email' => $resident->email,
-                    'is_senior' => $resident->is_senior,
-                    'is_pwd' => $resident->is_pwd,
-                    'is_solo_parent' => $resident->is_solo_parent,
-                    'is_indigent' => $resident->is_indigent,
                     'is_voter' => $resident->is_voter,
                     'occupation' => $resident->occupation,
-                ];
+                    
+                    // DYNAMIC privilege data
+                    'privileges' => $activePrivileges,
+                    'privileges_count' => count($activePrivileges),
+                    'has_privileges' => count($activePrivileges) > 0,
+                    'privilege_icons' => $privilegeIcons,
+                ], $privilegeFlags);
                 
                 if ($user->household_id) {
                     $isHouseholdHead = HouseholdMember::where('resident_id', $resident->id)
@@ -105,16 +208,38 @@ class ResidentHandleInertiaRequests extends Middleware
                     if ($household) {
                         $unitNumber = $household->unit_number ?? $household->household_number;
                         
-                        $householdMembers = HouseholdMember::with(['resident'])
+                        $householdMembers = HouseholdMember::with(['resident.residentPrivileges.privilege'])
                             ->where('household_id', $user->household_id)
                             ->get()
-                            ->map(function ($member) {
+                            ->map(function ($member) use ($allPrivileges) {
                                 $resident = $member->resident;
                                 if (!$resident) {
                                     return null;
                                 }
                                 
-                                return [
+                                // Get member's active privileges
+                                $memberPrivileges = $resident->residentPrivileges
+                                    ?->filter(function ($rp) {
+                                        return $rp->isActive();
+                                    })
+                                    ->map(function ($rp) {
+                                        return [
+                                            'code' => $rp->privilege->code,
+                                            'name' => $rp->privilege->name,
+                                            'icon' => $this->getPrivilegeIcon($rp->privilege->code),
+                                        ];
+                                    })
+                                    ->values()
+                                    ->toArray() ?? [];
+
+                                // DYNAMIC privilege flags for member
+                                $privilegeFlags = [];
+                                foreach ($memberPrivileges as $priv) {
+                                    $code = strtolower($priv['code']);
+                                    $privilegeFlags["is_{$code}"] = true;
+                                }
+                                
+                                return array_merge([
                                     'id' => $member->id,
                                     'resident_id' => $resident->id,
                                     'first_name' => $resident->first_name,
@@ -133,15 +258,14 @@ class ResidentHandleInertiaRequests extends Middleware
                                     'religion' => $resident->religion,
                                     'is_head' => $member->is_head,
                                     'relationship_to_head' => $member->relationship_to_head,
-                                    'is_senior' => $resident->is_senior,
-                                    'is_pwd' => $resident->is_pwd,
-                                    'is_solo_parent' => $resident->is_solo_parent,
-                                    'is_indigent' => $resident->is_indigent,
                                     'is_voter' => $resident->is_voter,
                                     'avatar' => $resident->avatar,
-                                    'has_special_classification' => $resident->has_special_classification,
-                                    'discount_eligibilities' => $resident->discount_eligibility_list,
-                                ];
+                                    'has_special_classification' => count($memberPrivileges) > 0,
+                                    'discount_eligibilities' => $memberPrivileges,
+                                    'privileges' => $memberPrivileges,
+                                    'privileges_count' => count($memberPrivileges),
+                                    'has_privileges' => count($memberPrivileges) > 0,
+                                ], $privilegeFlags);
                             })
                             ->filter()
                             ->values()
@@ -175,32 +299,23 @@ class ResidentHandleInertiaRequests extends Middleware
                 }
             }
             
-            // ========== FIXED: PROPER NOTIFICATION HANDLING WITH CORRECT LINKS ==========
+            // ========== NOTIFICATION HANDLING ==========
             $rawNotifications = $user->notifications()
                 ->orderBy('created_at', 'desc')
                 ->limit(10)
                 ->get();
             
             // Format each notification using NotificationHelper
-            $notifications = $rawNotifications->map(function ($notification) use ($user) {
-                // Use the helper to properly format the notification
+            $notifications = $rawNotifications->map(function ($notification) use ($user, $allPrivileges) {
                 $formatted = NotificationHelper::formatNotification($notification, $user);
                 
-                // Get the notification data
                 $notificationData = $formatted->data ?? [];
                 
-                // Determine the correct link - PRIORITY ORDER:
-                // 1. Check for link in data
-                // 2. Check for action_url in data
-                // 3. Check for url in formatted
-                // 4. Check if it's admin link and convert to portal
-                // 5. Default to '#'
                 $link = $notificationData['link'] 
                     ?? $notificationData['action_url'] 
                     ?? $formatted->url 
                     ?? '#';
                 
-                // Convert admin links to portal links for residents
                 if (str_starts_with($link, '/admin/')) {
                     $link = str_replace('/admin/', '/portal/', $link);
                     Log::debug('Converted admin link to portal link', [
@@ -209,7 +324,6 @@ class ResidentHandleInertiaRequests extends Middleware
                     ]);
                 }
                 
-                // Also create action_url for compatibility
                 $actionUrl = $notificationData['action_url'] 
                     ?? $notificationData['link'] 
                     ?? $formatted->url 
@@ -227,31 +341,25 @@ class ResidentHandleInertiaRequests extends Middleware
                     'created_at' => $formatted->created_at,
                     'created_at_diff' => $formatted->created_at_diff ?? $formatted->created_at->diffForHumans(),
                     
-                    // Fields from NotificationHelper formatting
                     'title' => $formatted->title ?? 'Notification',
                     'message' => $formatted->message ?? 'New notification',
                     'url' => $formatted->url ?? '#',
                     
-                    // ✅ FIXED: Use our properly determined links
                     'link' => $link,
                     'action_url' => $actionUrl,
                     
-                    // Type flags
                     'is_announcement' => $formatted->is_announcement ?? false,
                     'is_fee_notification' => $formatted->is_fee_notification ?? false,
                     'is_clearance_notification' => $formatted->is_clearance_notification ?? false,
                     
-                    // Resident data
                     'resident_name' => $formatted->resident_name ?? null,
                     'resident_id' => $formatted->resident_id ?? null,
                     
-                    // Clearance data
                     'reference_number' => $formatted->reference_number ?? null,
                     'clearance_type' => $formatted->clearance_type ?? null,
                     'clearance_id' => $formatted->clearance_id ?? null,
                     'purpose' => $formatted->purpose ?? null,
                     
-                    // Fee/Payment data
                     'fee_amount' => $formatted->fee_amount ?? null,
                     'formatted_amount' => $formatted->formatted_amount ?? null,
                     'fee_id' => $formatted->fee_id ?? null,
@@ -259,10 +367,8 @@ class ResidentHandleInertiaRequests extends Middleware
                     'fee_type' => $formatted->fee_type ?? null,
                     'payment_id' => $formatted->payment_id ?? null,
                     
-                    // Status
                     'status' => $formatted->status ?? null,
                     
-                    // Announcement specific fields
                     'priority' => $formatted->priority ?? null,
                     'priority_label' => $formatted->priority_label ?? null,
                     'priority_color' => $formatted->priority_color ?? null,
@@ -324,39 +430,41 @@ class ResidentHandleInertiaRequests extends Middleware
             'quickResults' => $quickResults,
             'recentSearches' => $recentSearches,
             'currentQuery' => $query,
+            // ADDED: Send all privileges to frontend
+            'allPrivileges' => $allPrivileges,
         ]);
     }
 
-    // ========== SEARCH METHODS (keep all your existing search methods) ==========
+    // ========== SEARCH METHODS - ALL PUBLIC ==========
     
-    protected function performResidentQuickSearch($query, $residentId)
+    public function performResidentQuickSearch($query, $residentId, array $allPrivileges)
     {
         $searchTerm = '%' . $query . '%';
         $results = [];
 
-        $results = array_merge($results, $this->searchSelfResident($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchHouseholdMembers($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchOwnClearances($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchOwnBusinesses($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchOwnPayments($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchOwnReports($searchTerm, $residentId));
+        $results = array_merge($results, $this->searchSelfResident($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchHouseholdMembers($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchOwnClearances($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchOwnBusinesses($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchOwnPayments($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchOwnReports($searchTerm, $residentId, $allPrivileges));
 
         return array_slice($results, 0, 8);
     }
 
-    protected function performResidentFullSearch($query, $residentId)
+    public function performResidentFullSearch($query, $residentId, array $allPrivileges)
     {
         $searchTerm = '%' . $query . '%';
         $results = [];
 
-        $results = array_merge($results, $this->searchSelfResident($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchHouseholdMembers($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchOwnHousehold($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchOwnClearances($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchOwnBusinesses($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchOwnPayments($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchOwnReports($searchTerm, $residentId));
-        $results = array_merge($results, $this->searchOwnDocuments($searchTerm, $residentId));
+        $results = array_merge($results, $this->searchSelfResident($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchHouseholdMembers($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchOwnHousehold($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchOwnClearances($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchOwnBusinesses($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchOwnPayments($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchOwnReports($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge($results, $this->searchOwnDocuments($searchTerm, $residentId, $allPrivileges));
 
         usort($results, function($a, $b) {
             $priority = [
@@ -383,9 +491,9 @@ class ResidentHandleInertiaRequests extends Middleware
         return $results;
     }
 
-    protected function searchSelfResident($searchTerm, $residentId)
+    public function searchSelfResident($searchTerm, $residentId, array $allPrivileges)
     {
-        $resident = Resident::with(['purok', 'household'])
+        $resident = Resident::with(['purok', 'household', 'residentPrivileges.privilege'])
             ->where('id', $residentId)
             ->where(function($query) use ($searchTerm) {
                 $query->where('first_name', 'like', $searchTerm)
@@ -400,13 +508,25 @@ class ResidentHandleInertiaRequests extends Middleware
             })
             ->get();
 
-        return $resident->map(function ($resident) {
-            $tags = [];
-            if ($resident->is_senior) $tags[] = 'Senior';
-            if ($resident->is_pwd) $tags[] = 'PWD';
-            if ($resident->is_solo_parent) $tags[] = 'Solo Parent';
-            if ($resident->is_indigent) $tags[] = 'Indigent';
-            if ($resident->is_voter) $tags[] = 'Voter';
+        return $resident->map(function ($resident) use ($allPrivileges) {
+            // Get active privileges
+            $activePrivileges = $resident->residentPrivileges
+                ->filter(function ($rp) {
+                    return $rp->isActive();
+                })
+                ->map(function ($rp) {
+                    return [
+                        'code' => $rp->privilege->code,
+                        'name' => $rp->privilege->name,
+                        'icon' => $this->getPrivilegeIcon($rp->privilege->code),
+                    ];
+                })
+                ->values()
+                ->toArray();
+
+            $tags = array_map(function($priv) {
+                return $priv['icon'] . ' ' . $priv['name'];
+            }, $activePrivileges);
 
             return [
                 'id' => $resident->id,
@@ -414,28 +534,29 @@ class ResidentHandleInertiaRequests extends Middleware
                 'title' => 'My Profile',
                 'subtitle' => $resident->full_name ?? $resident->first_name . ' ' . $resident->last_name,
                 'description' => $resident->email ?? $resident->contact_number ?? 'No contact info',
-                'url' => route('residents.show', $resident->id),
+                'url' => route('resident.profile.show', $resident->id),
                 'icon' => 'User',
                 'badge' => 'You',
-                'tags' => array_filter($tags),
+                'tags' => $tags,
                 'meta' => [
                     'age' => $resident->age,
                     'gender' => $resident->gender,
                     'civil_status' => $resident->civil_status,
                     'purok' => $resident->purok?->name ?? 'No purok',
+                    'privileges' => $activePrivileges,
                 ]
             ];
         })->toArray();
     }
 
-    protected function searchHouseholdMembers($searchTerm, $residentId)
+    public function searchHouseholdMembers($searchTerm, $residentId, array $allPrivileges)
     {
         $resident = Resident::find($residentId);
         if (!$resident || !$resident->household_id) {
             return [];
         }
 
-        $householdMembers = HouseholdMember::with(['resident'])
+        $householdMembers = HouseholdMember::with(['resident.residentPrivileges.privilege'])
             ->where('household_id', $resident->household_id)
             ->whereHas('resident', function($q) use ($searchTerm, $residentId) {
                 $q->where('id', '!=', $residentId)
@@ -451,9 +572,28 @@ class ResidentHandleInertiaRequests extends Middleware
             })
             ->get();
 
-        return $householdMembers->map(function ($member) {
+        return $householdMembers->map(function ($member) use ($allPrivileges) {
             $resident = $member->resident;
             $relationship = $member->is_head ? 'Head of Household' : $member->relationship_to_head;
+            
+            // Get member's active privileges
+            $activePrivileges = $resident->residentPrivileges
+                ->filter(function ($rp) {
+                    return $rp->isActive();
+                })
+                ->map(function ($rp) {
+                    return [
+                        'code' => $rp->privilege->code,
+                        'name' => $rp->privilege->name,
+                        'icon' => $this->getPrivilegeIcon($rp->privilege->code),
+                    ];
+                })
+                ->values()
+                ->toArray();
+
+            $tags = array_map(function($priv) {
+                return $priv['icon'];
+            }, $activePrivileges);
             
             return [
                 'id' => $resident->id,
@@ -461,22 +601,20 @@ class ResidentHandleInertiaRequests extends Middleware
                 'title' => $resident->full_name ?? $resident->first_name . ' ' . $resident->last_name,
                 'subtitle' => 'Household Member',
                 'description' => $relationship . ' | ' . ($resident->contact_number ?? 'No contact'),
-                'url' => route('residents.show', $resident->id),
+                'url' => route('resident.profile.show') . '?tab=members&member=' . $resident->id,
                 'icon' => 'Users',
                 'badge' => 'Family Member',
-                'tags' => array_filter([
-                    $member->is_head ? 'Head' : null,
-                    $resident->is_senior ? 'Senior' : null,
-                ]),
+                'tags' => $tags,
                 'meta' => [
                     'relationship' => $relationship,
                     'age' => $resident->age,
+                    'privileges' => $activePrivileges,
                 ]
             ];
         })->toArray();
     }
 
-    protected function searchOwnHousehold($searchTerm, $residentId)
+    public function searchOwnHousehold($searchTerm, $residentId, array $allPrivileges)
     {
         $resident = Resident::find($residentId);
         if (!$resident || !$resident->household_id) {
@@ -494,14 +632,14 @@ class ResidentHandleInertiaRequests extends Middleware
             })
             ->get();
 
-        return $household->map(function ($household) {
+        return $household->map(function ($household) use ($allPrivileges) {
             return [
                 'id' => $household->id,
                 'type' => 'household',
                 'title' => 'My Household',
                 'subtitle' => 'Household ' . ($household->household_number ?? '#' . $household->id),
                 'description' => $household->address ?? 'No address',
-                'url' => route('households.show', $household->id),
+                'url' => route('portal.household.index'),
                 'icon' => 'Home',
                 'badge' => 'Household',
                 'tags' => array_filter([
@@ -516,7 +654,7 @@ class ResidentHandleInertiaRequests extends Middleware
         })->toArray();
     }
 
-    protected function searchOwnClearances($searchTerm, $residentId)
+    public function searchOwnClearances($searchTerm, $residentId, array $allPrivileges)
     {
         $clearances = ClearanceRequest::with(['clearanceType'])
             ->where('resident_id', $residentId)
@@ -529,14 +667,14 @@ class ResidentHandleInertiaRequests extends Middleware
             })
             ->limit(10)
             ->get()
-            ->map(function ($clearance) {
+            ->map(function ($clearance) use ($allPrivileges) {
                 return [
                     'id' => $clearance->id,
                     'type' => 'clearance',
                     'title' => $clearance->clearanceType?->name ?? 'Clearance Request',
                     'subtitle' => 'Ref: ' . ($clearance->reference_number ?? 'N/A'),
                     'description' => 'Status: ' . ucfirst($clearance->status) . ' | Purpose: ' . ($clearance->purpose ?? 'N/A'),
-                    'url' => route('clearances.show', $clearance->id),
+                    'url' => route('portal.my.clearances.show', $clearance->id),
                     'icon' => 'FileCheck',
                     'badge' => 'My Clearance',
                     'tags' => array_filter([$clearance->status, $clearance->payment_status]),
@@ -551,7 +689,7 @@ class ResidentHandleInertiaRequests extends Middleware
         return $clearances;
     }
 
-    protected function searchOwnBusinesses($searchTerm, $residentId)
+    public function searchOwnBusinesses($searchTerm, $residentId, array $allPrivileges)
     {
         if (!class_exists('App\Models\Business')) {
             return [];
@@ -568,14 +706,14 @@ class ResidentHandleInertiaRequests extends Middleware
             })
             ->limit(5)
             ->get()
-            ->map(function ($business) {
+            ->map(function ($business) use ($allPrivileges) {
                 return [
                     'id' => $business->id,
                     'type' => 'business',
                     'title' => 'My Business: ' . ($business->business_name ?? 'Unnamed'),
                     'subtitle' => $business->business_type ?? 'Business',
                     'description' => $business->address ?? 'No address',
-                    'url' => route('businesses.show', $business->id),
+                    'url' => route('portal.my.businesses.show', $business->id),
                     'icon' => 'Briefcase',
                     'badge' => 'My Business',
                     'tags' => [$business->status],
@@ -589,39 +727,39 @@ class ResidentHandleInertiaRequests extends Middleware
         return $businesses;
     }
 
-   protected function searchOwnPayments($searchTerm, $residentId)
-{
-    $payments = Payment::where('payer_type', 'resident')
-        ->where('payer_id', $residentId)
-        ->where(function($query) use ($searchTerm) {
-            $query->where('or_number', 'like', $searchTerm)
-                ->orWhere('reference_number', 'like', $searchTerm)
-                ->orWhere('purpose', 'like', $searchTerm);
-        })
-        ->limit(5)
-        ->get()
-        ->map(function ($payment) {
-            return [
-                'id' => $payment->id,
-                'type' => 'payment',
-                'title' => 'Payment: OR #' . ($payment->or_number ?? 'N/A'),
-                'subtitle' => 'Amount: ₱' . number_format($payment->total_amount ?? 0, 2),
-                'description' => $payment->purpose ?? '',
-                'url' => route('resident.payments.show', $payment->id),
-                'icon' => 'Receipt',
-                'badge' => 'My Payment',
-                'tags' => [$payment->payment_method, $payment->status],
-                'meta' => [
-                    'date' => $payment->payment_date ? date('M d, Y', strtotime($payment->payment_date)) : null,
-                ]
-            ];
-        })
-        ->toArray();
+    public function searchOwnPayments($searchTerm, $residentId, array $allPrivileges)
+    {
+        $payments = Payment::where('payer_type', 'resident')
+            ->where('payer_id', $residentId)
+            ->where(function($query) use ($searchTerm) {
+                $query->where('or_number', 'like', $searchTerm)
+                    ->orWhere('reference_number', 'like', $searchTerm)
+                    ->orWhere('purpose', 'like', $searchTerm);
+            })
+            ->limit(5)
+            ->get()
+            ->map(function ($payment) use ($allPrivileges) {
+                return [
+                    'id' => $payment->id,
+                    'type' => 'payment',
+                    'title' => 'Payment: OR #' . ($payment->or_number ?? 'N/A'),
+                    'subtitle' => 'Amount: ₱' . number_format($payment->total_amount ?? 0, 2),
+                    'description' => $payment->purpose ?? '',
+                    'url' => route('portal.my.payments.show', $payment->id),
+                    'icon' => 'Receipt',
+                    'badge' => 'My Payment',
+                    'tags' => [$payment->payment_method, $payment->status],
+                    'meta' => [
+                        'date' => $payment->payment_date ? date('M d, Y', strtotime($payment->payment_date)) : null,
+                    ]
+                ];
+            })
+            ->toArray();
 
-    return $payments;
-}
+        return $payments;
+    }
 
-    protected function searchOwnReports($searchTerm, $residentId)
+    public function searchOwnReports($searchTerm, $residentId, array $allPrivileges)
     {
         $reports = CommunityReport::with(['reportType'])
             ->where(function($query) use ($residentId, $searchTerm) {
@@ -642,14 +780,14 @@ class ResidentHandleInertiaRequests extends Middleware
             })
             ->limit(5)
             ->get()
-            ->map(function ($report) {
+            ->map(function ($report) use ($allPrivileges) {
                 return [
                     'id' => $report->id,
                     'type' => 'report',
                     'title' => $report->title ?? 'Untitled Report',
                     'subtitle' => 'Report #' . ($report->report_number ?? $report->id),
                     'description' => $report->description ?? '',
-                    'url' => route('community-reports.show', $report->id),
+                    'url' => route('portal.community-reports.show', $report->id),
                     'icon' => 'FileText',
                     'badge' => 'My Report',
                     'tags' => array_filter([$report->status, $report->urgency_level]),
@@ -663,9 +801,9 @@ class ResidentHandleInertiaRequests extends Middleware
         return $reports;
     }
 
-    protected function searchOwnDocuments($searchTerm, $residentId)
+    public function searchOwnDocuments($searchTerm, $residentId, array $allPrivileges)
     {
-        if (!class_exists('App\Models\ResidentDocument')) {
+        if (!class_exists('ResidentDocument')) {
             return [];
         }
 
@@ -678,14 +816,14 @@ class ResidentHandleInertiaRequests extends Middleware
             })
             ->limit(5)
             ->get()
-            ->map(function ($document) {
+            ->map(function ($document) use ($allPrivileges) {
                 return [
                     'id' => $document->id,
                     'type' => 'document',
                     'title' => $document->name ?? 'Document',
                     'subtitle' => $document->documentCategory?->name ?? 'Document',
                     'description' => $document->description ?? '',
-                    'url' => route('resident-documents.show', $document->id),
+                    'url' => route('portal.documents.show', $document->id),
                     'icon' => 'File',
                     'badge' => 'My Document',
                     'tags' => array_filter([$document->status]),
@@ -700,7 +838,7 @@ class ResidentHandleInertiaRequests extends Middleware
         return $documents;
     }
 
-    protected function storeSearchQuery(Request $request, $query)
+    public function storeSearchQuery(Request $request, $query)
     {
         $recentSearches = $request->session()->get('recent_searches', []);
         
@@ -714,7 +852,7 @@ class ResidentHandleInertiaRequests extends Middleware
         $request->session()->put('recent_searches', $recentSearches);
     }
 
-    protected function getRecentSearches(Request $request)
+    public function getRecentSearches(Request $request)
     {
         return $request->session()->get('recent_searches', []);
     }

@@ -17,6 +17,7 @@ import FlashMessage from '@/components/adminui/FlashMessages';
 
 // Types
 import { PaginationData, Filters, Stats } from '@/types/fees.types';
+import { route } from 'ziggy-js';
 
 interface FeesIndexProps {
     fees: PaginationData;
@@ -142,7 +143,7 @@ export default function FeesIndex({
     };
 
     const handleEdit = (fee: any) => {
-        router.get(route('fees.edit', fee.id));
+        router.get(route('admin.fees.edit', fee.id));
     };
 
     const handleCopyToClipboard = (text: string, label: string) => {

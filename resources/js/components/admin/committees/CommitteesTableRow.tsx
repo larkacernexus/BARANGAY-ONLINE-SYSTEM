@@ -140,21 +140,21 @@ export function CommitteesTableRow({ committee, isSelected, isBulkMode, onItemSe
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuItem asChild>
-                            <Link href={`/committees/${committee.id}`} className="cursor-pointer">
+                            <Link href={`/admin/committees/${committee.id}`} className="cursor-pointer">
                                 <Eye className="mr-2 h-4 w-4" />
                                 View Details
                             </Link>
                         </DropdownMenuItem>
                         
                         <DropdownMenuItem asChild>
-                            <Link href={`/committees/${committee.id}/edit`} className="cursor-pointer">
+                            <Link href={`/admin/committees/${committee.id}/edit`} className="cursor-pointer">
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit Committee
                             </Link>
                         </DropdownMenuItem>
                         
                         <DropdownMenuItem asChild>
-                            <Link href={`/positions?committee_id=${committee.id}`} className="cursor-pointer">
+                            <Link href={`/admin/positions?committee_id=${committee.id}`} className="cursor-pointer">
                                 <Target className="mr-2 h-4 w-4" />
                                 View Positions
                             </Link>
@@ -201,7 +201,7 @@ export function CommitteesTableRow({ committee, isSelected, isBulkMode, onItemSe
                         </DropdownMenuItem>
                         
                         <DropdownMenuItem asChild>
-                            <Link href={`/committees/${committee.id}/print`} className="cursor-pointer">
+                            <Link href={`/admin/committees/${committee.id}/print`} className="cursor-pointer">
                                 <Printer className="mr-2 h-4 w-4" />
                                 <span>Print Details</span>
                             </Link>

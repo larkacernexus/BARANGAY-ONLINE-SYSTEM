@@ -1,6 +1,8 @@
 // types/clearance.ts
 
 export interface ClearanceRequest {
+    balance: undefined;
+    payment_status_display: string;
     amount_paid: number;
     or_number: boolean;
     payment_date(payment_date: any): import("react").ReactNode;
@@ -76,6 +78,8 @@ export interface ClearanceRequest {
 }
 
 export interface Resident {
+    purok: any;
+    household: any;
     id: number;
     full_name: string;
     first_name: string;
@@ -115,6 +119,8 @@ export interface ClearanceType {
 }
 
 export interface Document {
+    rejected_at: boolean;
+    rejection_reason: string;
     id: number;
     clearance_request_id: number;
     document_type_id?: number;
@@ -163,6 +169,8 @@ export interface DocumentType {
 }
 
 export interface Payment {
+    amount(amount: any): import("react").ReactNode;
+    payer: any;
     id: number;
     
     // Receipt information
@@ -242,6 +250,7 @@ export interface PaymentItem {
 }
 
 export interface ActivityLog {
+    causer: any;
     id: number;
     description: string;
     event?: string;

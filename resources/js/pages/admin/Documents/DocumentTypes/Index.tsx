@@ -135,39 +135,7 @@ export default function DocumentTypesIndex() {
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get(route('admin.document-types.index'), params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== safeFilters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, safeFilters.search]);
-
+   
     // Handle window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -649,7 +617,7 @@ export default function DocumentTypesIndex() {
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <KeyRound className="h-4 w-4 text-gray-500" />

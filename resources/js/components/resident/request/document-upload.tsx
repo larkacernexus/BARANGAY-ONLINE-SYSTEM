@@ -420,7 +420,7 @@ export function DocumentUpload({
                                 <div key={index} className={`border rounded-lg p-3 sm:p-4 ${
                                     isLargeFile 
                                         ? 'border-red-300 bg-red-50 dark:bg-red-900/10' 
-                                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
+                                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50'
                                 }`}>
                                     {/* File Header */}
                                     <div className="flex items-start justify-between mb-3">
@@ -569,8 +569,8 @@ export function DocumentUpload({
                                                                             isSelected 
                                                                                 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' 
                                                                                 : isAssignedToOther
-                                                                                ? 'bg-gray-50 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
-                                                                                : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                                                                                ? 'bg-gray-50 dark:bg-gray-900 text-gray-400 cursor-not-allowed'
+                                                                                : 'hover:bg-gray-100 dark:hover:bg-gray-900'
                                                                         }`}
                                                                         onClick={() => {
                                                                             if (!isAssignedToOther) {

@@ -4,18 +4,22 @@ namespace App\Http\Controllers\Admin\Clearance;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClearanceRequest;
+use App\Models\Document;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use App\Http\Controllers\Admin\Clearance\Traits\ClearanceNotificationTrait;
 
-class ClearanceDocumentController extends Controller
+class ClearanceDocumentController extends BaseClearanceController
 {
-    use ClearanceNotificationTrait;
+    protected $notificationController;
+
+    public function __construct(ClearanceNotificationController $notificationController)
+    {
+        $this->notificationController = $notificationController;
+    }
 
     /**
      * Verify all pending documents.
      */
-    public function verifyAll(ClearanceRequest $clearance)
+    public function verifyAllDocuments(ClearanceRequest $clearance)
     {
         if (!$clearance->documents()->where('is_verified', false)->exists()) {
             return redirect()->back()->with('info', 'No pending documents to verify.');
@@ -30,7 +34,7 @@ class ClearanceDocumentController extends Controller
                 'verified_by' => auth()->id(),
             ]);
             
-            $this->sendDocumentNotification($clearance, $document, 'verified');
+            $this->notificationController->sendDocumentNotification($clearance, $document, 'verified');
         }
 
         activity()
@@ -42,37 +46,57 @@ class ClearanceDocumentController extends Controller
     }
 
     /**
-     * Request more documents.
+     * Verify single document.
      */
-    public function requestMore(Request $request, ClearanceRequest $clearance)
+    public function verifyDocument(ClearanceRequest $clearance, Document $document)
     {
-        $request->validate([
-            'reason' => 'required|string|max:500',
+        if ($document->clearance_request_id !== $clearance->id) {
+            return redirect()->back()->with('error', 'Document does not belong to this clearance.');
+        }
+
+        $document->update([
+            'is_verified' => true,
+            'verified_at' => now(),
+            'verified_by' => auth()->id(),
         ]);
 
-        // Update status to pending if it was in processing
-        if ($clearance->status === 'processing') {
-            $oldStatus = $clearance->status;
-            $clearance->update([
-                'status' => 'pending',
-                'admin_notes' => $clearance->admin_notes . "\nRequested more documents: " . $request->reason,
-            ]);
-            
-            $this->sendClearanceStatusNotification($clearance, $oldStatus, 'pending', 'Additional documents required: ' . $request->reason);
-        }
-
-        // Notify payer about document request
-        $payerUsers = $this->getPayerUsersFromClearance($clearance);
-        foreach ($payerUsers as $user) {
-            $user->notify(new \App\Notifications\ClearanceDocumentRequest($clearance, $request->reason));
-        }
+        $this->notificationController->sendDocumentNotification($clearance, $document, 'verified');
 
         activity()
             ->performedOn($clearance)
             ->causedBy(auth()->user())
-            ->withProperties(['reason' => $request->reason])
-            ->log('Requested more documents');
+            ->withProperties(['document_id' => $document->id])
+            ->log('Document verified');
 
-        return redirect()->back()->with('success', 'Document request sent to resident.');
+        return redirect()->back()->with('success', 'Document verified successfully.');
+    }
+
+    /**
+     * Reject document.
+     */
+    public function rejectDocument(Request $request, ClearanceRequest $clearance, Document $document)
+    {
+        $request->validate(['reason' => 'required|string|max:500']);
+
+        if ($document->clearance_request_id !== $clearance->id) {
+            return redirect()->back()->with('error', 'Document does not belong to this clearance.');
+        }
+
+        $document->update([
+            'is_verified' => false,
+            'rejection_reason' => $request->reason,
+            'verified_at' => null,
+            'verified_by' => null,
+        ]);
+
+        $this->notificationController->sendDocumentNotification($clearance, $document, 'rejected', $request->reason);
+
+        activity()
+            ->performedOn($clearance)
+            ->causedBy(auth()->user())
+            ->withProperties(['document_id' => $document->id, 'reason' => $request->reason])
+            ->log('Document rejected');
+
+        return redirect()->back()->with('success', 'Document rejected.');
     }
 }

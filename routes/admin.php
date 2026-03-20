@@ -2,14 +2,37 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\LoginLogController;
-use App\Http\Controllers\Admin\ResidentController;
+use App\Http\Controllers\Admin\Resident\ResidentIndexController;
+use App\Http\Controllers\Admin\Resident\ResidentCreateController;
+use App\Http\Controllers\Admin\Resident\ResidentStoreController;
+use App\Http\Controllers\Admin\Resident\ResidentShowController;
+use App\Http\Controllers\Admin\Resident\ResidentEditController;
+use App\Http\Controllers\Admin\Resident\ResidentUpdateController;
+use App\Http\Controllers\Admin\Resident\ResidentDestroyController;
+use App\Http\Controllers\Admin\Resident\ResidentImportController;
+use App\Http\Controllers\Admin\Resident\ResidentExportController;
+use App\Http\Controllers\Admin\Resident\ResidentBulkController;
 use App\Http\Controllers\Admin\AdminIncidentController;
 use App\Http\Controllers\Admin\OfficialController;
 use App\Http\Controllers\Admin\PositionController;
 use App\Http\Controllers\Admin\RolePermissionController;
 use App\Http\Controllers\Admin\CommitteeController;
-use App\Http\Controllers\Admin\BackupController;
-use App\Http\Controllers\Admin\HouseholdController;
+use App\Http\Controllers\Admin\Backup\BackupIndexController;
+use App\Http\Controllers\Admin\Backup\BackupCreateController;
+use App\Http\Controllers\Admin\Backup\BackupDownloadController;
+use App\Http\Controllers\Admin\Backup\BackupDestroyController;
+use App\Http\Controllers\Admin\Backup\BackupProtectionController;
+use App\Http\Controllers\Admin\Backup\BackupProgressController;
+use App\Http\Controllers\Admin\Household\HouseholdIndexController;
+use App\Http\Controllers\Admin\Household\HouseholdCreateController;
+use App\Http\Controllers\Admin\Household\HouseholdStoreController;
+use App\Http\Controllers\Admin\Household\HouseholdShowController;
+use App\Http\Controllers\Admin\Household\HouseholdEditController;
+use App\Http\Controllers\Admin\Household\HouseholdUpdateController;
+use App\Http\Controllers\Admin\Household\HouseholdDestroyController;
+use App\Http\Controllers\Admin\Household\HouseholdMemberController;
+use App\Http\Controllers\Admin\Household\HouseholdImportController;
+use App\Http\Controllers\Admin\Household\HouseholdUserController;
 use App\Http\Controllers\Admin\FeeController;
 use App\Http\Controllers\Admin\FeeReminderController;
 use App\Http\Controllers\Admin\Fees\FeeCreateController;
@@ -27,20 +50,43 @@ use App\Http\Controllers\Admin\Payment\PaymentIndexController;
 use App\Http\Controllers\Admin\Payment\PaymentCreateController;
 use App\Http\Controllers\Admin\Payment\PaymentStoreController;
 use App\Http\Controllers\Admin\Payment\PaymentShowController;
-use App\Http\Controllers\Admin\Payment\PaymentEditController;use App\Http\Controllers\Admin\ReportsController;
+use App\Http\Controllers\Admin\Payment\PaymentEditController;
+use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\FormController;
-
 use App\Http\Controllers\Admin\ReceiptsController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\ClearanceController;
+use App\Http\Controllers\Admin\Clearance\ClearanceIndexController;
+use App\Http\Controllers\Admin\Clearance\ClearanceCreateController;
+use App\Http\Controllers\Admin\Clearance\ClearanceStoreController;
+use App\Http\Controllers\Admin\Clearance\ClearanceShowController;
+use App\Http\Controllers\Admin\Clearance\ClearanceEditController;
+use App\Http\Controllers\Admin\Clearance\ClearanceUpdateController;
+use App\Http\Controllers\Admin\Clearance\ClearanceDestroyController;
+use App\Http\Controllers\Admin\Clearance\ClearanceStatusController;
+use App\Http\Controllers\Admin\Clearance\ClearancePrintController;
+use App\Http\Controllers\Admin\Clearance\ClearanceTypeController;
+use App\Http\Controllers\Admin\Clearance\ClearanceReportController;
 use App\Http\Controllers\Admin\ClearanceApprovalController;
-use App\Http\Controllers\Admin\ClearanceTypeController;
 use App\Http\Controllers\Admin\PurokController;
 use App\Http\Controllers\Admin\InstructionController;
 use App\Http\Controllers\Admin\SecurityController;
 use App\Http\Controllers\Admin\AnnouncementController;
-use App\Http\Controllers\Admin\AdminCommunityReportController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportIndexController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportCreateController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportStoreController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportShowController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportEditController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportUpdateController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportDestroyController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportBulkController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportEvidenceController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportExportController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportPrintController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportStatsController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportResponseController;
+use App\Http\Controllers\Admin\CommunityReport\CommunityReportRelatedController;
+use App\Http\Controllers\Admin\PrivilegeController;
 use Inertia\Inertia;
 
 // ====================
@@ -55,6 +101,12 @@ Route::get('/instructions', function () {
         'userRole' => auth()->user()->role ?? 'staff'
     ]);
 })->name('instructions');
+
+// Search routes
+Route::get('/search', function () {
+    return Inertia::render('admin/Search/Index');
+})->name('search')->middleware(['auth']);
+
 
     Route::get('/instructions/download', [InstructionController::class, 'download'])
         ->name('instructions.download');
@@ -150,39 +202,72 @@ Route::middleware('permission:review-incidents')->prefix('incidents')->group(fun
 // RESIDENT MANAGEMENT
 // ====================
 Route::middleware('permission:manage-residents')->prefix('residents')->name('residents.')->group(function () {
-    Route::get('/', [ResidentController::class, 'index'])->name('index');
-    Route::get('/create', [ResidentController::class, 'create'])->name('create');
-    Route::post('/', [ResidentController::class, 'store'])->name('store');
-    Route::get('/{resident}', [ResidentController::class, 'show'])->name('show');
-    Route::get('/{resident}/edit', [ResidentController::class, 'edit'])->name('edit');
-    Route::put('/{resident}', [ResidentController::class, 'update'])->name('update');
-    Route::delete('/{resident}', [ResidentController::class, 'destroy'])->name('destroy');
-    Route::post('/import', [ResidentController::class, 'import'])->name('import');
-    Route::post('/export', [ResidentController::class, 'export'])->name('export');
-    Route::post('/bulk-delete', [ResidentController::class, 'bulkDelete'])->name('bulk.delete');
+    // CRUD Operations
+    Route::get('/', [ResidentIndexController::class, 'index'])->name('index');
+    Route::get('/create', [ResidentCreateController::class, 'create'])->name('create');
+    Route::post('/', [ResidentStoreController::class, 'store'])->name('store');
+    Route::get('/{resident}', [ResidentShowController::class, 'show'])->name('show');
+    Route::get('/{resident}/edit', [ResidentEditController::class, 'edit'])->name('edit');
+    Route::put('/{resident}', [ResidentUpdateController::class, 'update'])->name('update');
+    Route::delete('/{resident}', [ResidentDestroyController::class, 'destroy'])->name('destroy');
+    
+    // Household assignment routes
+    Route::post('/{resident}/assign-household', [App\Http\Controllers\Admin\Resident\ResidentHouseholdController::class, 'assign'])
+        ->name('assign-household');
+    
+    Route::delete('/{resident}/remove-from-household', [App\Http\Controllers\Admin\Resident\ResidentHouseholdController::class, 'remove'])
+        ->name('remove-from-household');
+    
+    // Resident Privileges - MOVED INSIDE THE RESIDENTS GROUP
+    Route::post('/{resident}/privileges', [App\Http\Controllers\Admin\Resident\ResidentPrivilegeController::class, 'store'])
+        ->name('privileges.store');
+    
+    Route::delete('/{resident}/privileges/{privilege}', [App\Http\Controllers\Admin\Resident\ResidentPrivilegeController::class, 'destroy'])
+        ->name('privileges.destroy');
+    
+    // Import/Export
+    Route::post('/import', [ResidentImportController::class, 'import'])->name('import');
+    Route::get('/import/guide', [ResidentImportController::class, 'downloadGuide'])->name('import.guide');
+    Route::get('/import/template', [ResidentImportController::class, 'downloadTemplate'])->name('import.template');
+    Route::get('/import/empty-template', [ResidentImportController::class, 'downloadEmptyTemplate'])->name('import.empty-template');
+    Route::post('/import/process', [ResidentImportController::class, 'processImport'])->name('import.process');
+    
+    Route::post('/export', [ResidentExportController::class, 'export'])->name('export');
+    
+    // Bulk Operations
+    Route::post('/bulk-delete', [ResidentBulkController::class, 'bulkDelete'])->name('bulk.delete');
+    Route::post('/bulk-action', [ResidentBulkController::class, 'bulkAction'])->name('bulk.action');
 });
 
-
+// Available Privileges for dropdown - keep this outside
+Route::middleware('permission:manage-residents')->get('/privileges/available', [App\Http\Controllers\Admin\PrivilegeController::class, 'available'])
+    ->name('privileges.available');
 
 // ====================
 // OFFICIALS MANAGEMENT
 // ====================
-Route::middleware('permission:manage-officials')->prefix('officials')->name('admin/officials.')->group(function () {
+Route::middleware('permission:manage-officials')->prefix('officials')->name('officials.')->group(function () {
     Route::get('/', [OfficialController::class, 'index'])->name('index');
     Route::get('/create', [OfficialController::class, 'create'])->name('create');
     Route::post('/', [OfficialController::class, 'store'])->name('store');
-    Route::get('/{official}', [OfficialController::class, 'show'])->name('show');
-    Route::get('/{official}/edit', [OfficialController::class, 'edit'])->name('edit');
-    Route::put('/{official}', [OfficialController::class, 'update'])->name('update');
-    Route::delete('/{official}', [OfficialController::class, 'destroy'])->name('destroy');
     Route::get('/current', [OfficialController::class, 'currentOfficials'])->name('current');
     Route::get('/committee/{committee}', [OfficialController::class, 'byCommittee'])->name('committee');
     Route::post('/update-order', [OfficialController::class, 'updateOrder'])->name('update-order');
     Route::post('/export', [OfficialController::class, 'export'])->name('export');
+    
+    // BULK OPERATIONS
     Route::post('/bulk-delete', [OfficialController::class, 'bulkDelete'])->name('bulk.delete');
-    Route::post('/bulk-update-status', [OfficialController::class, 'bulkUpdateStatus'])->name('bulk.update-status');
+    Route::post('/bulk-status', [OfficialController::class, 'bulkUpdateStatus'])->name('bulk.status'); // <-- ADD THIS LINE
+    
+    // SINGLE OFFICIAL TERM MANAGEMENT
+    Route::post('/{official}/end-term', [OfficialController::class, 'endTerm'])->name('end-term');
+    Route::post('/{official}/reactivate', [OfficialController::class, 'reactivate'])->name('reactivate');
+    
+    Route::get('/{official}', [OfficialController::class, 'show'])->name('show');
+    Route::get('/{official}/edit', [OfficialController::class, 'edit'])->name('edit');
+    Route::put('/{official}', [OfficialController::class, 'update'])->name('update');
+    Route::delete('/{official}', [OfficialController::class, 'destroy'])->name('destroy');
 });
-
 // ====================
 // COMMITTEES MANAGEMENT
 // ====================
@@ -236,16 +321,31 @@ Route::middleware('permission:manage-positions')->prefix('positions')->name('pos
 // HOUSEHOLDS MANAGEMENT
 // ====================
 Route::middleware('permission:manage-households')->prefix('households')->name('households.')->group(function () {
-    Route::get('/', [HouseholdController::class, 'index'])->name('index');
-    Route::get('/create', [HouseholdController::class, 'create'])->name('create');
-    Route::post('/', [HouseholdController::class, 'store'])->name('store');
-    Route::get('/{household}', [HouseholdController::class, 'show'])->name('show');
-    Route::get('/{household}/edit', [HouseholdController::class, 'edit'])->name('edit');
-    Route::put('/{household}', [HouseholdController::class, 'update'])->name('update');
-    Route::delete('/{household}', [HouseholdController::class, 'destroy'])->name('destroy');
-    Route::get('/{household}/members', [HouseholdController::class, 'members'])->name('members');
-    Route::post('/{household}/members', [HouseholdController::class, 'addMember'])->name('members.add');
-    Route::delete('/{household}/members/{resident}', [HouseholdController::class, 'removeMember'])->name('members.remove');
+    // CRUD Operations
+    Route::get('/', [HouseholdIndexController::class, 'index'])->name('index');
+    Route::get('/create', [HouseholdCreateController::class, 'create'])->name('create');
+    Route::post('/', [HouseholdStoreController::class, 'store'])->name('store');
+    Route::get('/{household}', [HouseholdShowController::class, 'show'])->name('show');
+    Route::get('/{household}/edit', [HouseholdEditController::class, 'edit'])->name('edit');
+    Route::put('/{household}', [HouseholdUpdateController::class, 'update'])->name('update');
+    Route::delete('/{household}', [HouseholdDestroyController::class, 'destroy'])->name('destroy');
+    
+    // Import
+    Route::post('/import', [HouseholdImportController::class, 'import'])->name('import');
+    
+    // Member Management
+    Route::prefix('/{household}/members')->name('members.')->group(function () {
+        Route::get('/', [HouseholdMemberController::class, 'index'])->name('index');
+        Route::post('/', [HouseholdMemberController::class, 'addMember'])->name('add');
+        Route::delete('/{member}', [HouseholdMemberController::class, 'removeMember'])->name('remove');
+    });
+    
+    // User Account Management for Household Head
+    Route::prefix('/{household}/user')->name('user.')->group(function () {
+        Route::post('/create', [HouseholdUserController::class, 'createUserAccount'])->name('create');
+        Route::post('/reset-password', [HouseholdUserController::class, 'resetUserPassword'])->name('reset-password');
+        Route::post('/change-head', [HouseholdUserController::class, 'changeHead'])->name('change-head');
+    });
 });
 
 Route::middleware('permission:view-payments')->prefix('payments')->name('payments.')->group(function () {
@@ -319,27 +419,30 @@ Route::prefix('fees/reminders')->name('fees.reminders.')->group(function () {
 // ====================
 // COMMUNITY REPORTS MANAGEMENT
 // ====================
+
+// Routes for viewing reports (view-reports permission)
 Route::middleware('permission:view-reports')->prefix('community-reports')->name('community-reports.')->group(function () {
-    Route::get('/', [AdminCommunityReportController::class, 'index'])->name('index');
-    Route::get('/{report}', [AdminCommunityReportController::class, 'show'])->name('show');
-    Route::get('/{report}/print', [AdminCommunityReportController::class, 'print'])->name('print');
-    Route::get('/{report}/pdf', [AdminCommunityReportController::class, 'pdf'])->name('pdf');
-    Route::get('/{report}/related', [AdminCommunityReportController::class, 'related'])->name('related');
-    Route::get('/export', [AdminCommunityReportController::class, 'export'])->name('export');
+    Route::get('/', [CommunityReportIndexController::class, 'index'])->name('index');
+    Route::get('/{report}', [CommunityReportShowController::class, 'show'])->name('show');
+    Route::get('/{report}/print', [CommunityReportPrintController::class, 'print'])->name('print');
+    Route::get('/{report}/pdf', [CommunityReportPrintController::class, 'pdf'])->name('pdf');
+    Route::get('/{report}/related', [CommunityReportRelatedController::class, 'index'])->name('related');
+    Route::get('/export', [CommunityReportExportController::class, 'export'])->name('export');
+    Route::get('/statistics', [CommunityReportStatsController::class, 'statistics'])->name('statistics');
+    Route::get('/dashboard-stats', [CommunityReportStatsController::class, 'dashboardStats'])->name('dashboard-stats');
 });
 
+// Routes for managing reports (manage-reports permission)
 Route::middleware('permission:manage-reports')->prefix('community-reports')->name('community-reports.')->group(function () {
-    Route::get('/community-reports/create', [AdminCommunityReportController::class, 'create'])->name('create');
-    Route::post('/', [AdminCommunityReportController::class, 'store'])->name('store');
-    Route::get('/{report}/edit', [AdminCommunityReportController::class, 'edit'])->name('edit');
-    Route::put('/{report}', [AdminCommunityReportController::class, 'update'])->name('update');
-    Route::delete('/{report}', [AdminCommunityReportController::class, 'destroy'])->name('destroy');
-    Route::post('/bulk-action', [AdminCommunityReportController::class, 'bulkAction'])->name('bulk-action');
-    Route::post('/{report}/upload-evidence', [AdminCommunityReportController::class, 'uploadEvidence'])->name('upload-evidence');
-    Route::delete('/{report}/evidence/{evidence}', [AdminCommunityReportController::class, 'removeEvidence'])->name('remove-evidence');
-    Route::post('/{report}/send-response', [AdminCommunityReportController::class, 'sendResponse'])->name('send-response');
-    Route::get('/statistics', [AdminCommunityReportController::class, 'statistics'])->name('statistics');
-    Route::get('/dashboard-stats', [AdminCommunityReportController::class, 'dashboardStats'])->name('dashboard-stats');
+    Route::get('/community-reports/create', [CommunityReportCreateController::class, 'create'])->name('create');
+    Route::post('/', [CommunityReportStoreController::class, 'store'])->name('store');
+    Route::get('/{report}/edit', [CommunityReportEditController::class, 'edit'])->name('edit');
+    Route::put('/{report}', [CommunityReportUpdateController::class, 'update'])->name('update');
+    Route::delete('/{report}', [CommunityReportDestroyController::class, 'destroy'])->name('destroy');
+    Route::post('/bulk-action', [CommunityReportBulkController::class, 'bulkAction'])->name('bulk-action');
+    Route::post('/{report}/upload-evidence', [CommunityReportEvidenceController::class, 'upload'])->name('upload-evidence');
+    Route::delete('/{report}/evidence/{evidenceId}', [CommunityReportEvidenceController::class, 'remove'])->name('remove-evidence');
+    Route::post('/{report}/send-response', [CommunityReportResponseController::class, 'send'])->name('send-response');
 });
 
 // ====================
@@ -403,6 +506,42 @@ Route::middleware('permission:manage-forms')->prefix('forms')->name('forms.')->g
 });
 
 // ====================
+// PRIVILEGES MANAGEMENT
+// ====================
+
+// Routes for viewing privileges (view-privileges permission)
+Route::middleware('permission:view-privileges')->prefix('privileges')->name('privileges.')->group(function () {
+    Route::get('/', [PrivilegeController::class, 'index'])->name('index');
+    Route::get('/{privilege}', [PrivilegeController::class, 'show'])->name('show');
+    Route::get('/{privilege}/assignments', [PrivilegeController::class, 'assignments'])->name('assignments');
+    Route::get('/{privilege}/export', [PrivilegeController::class, 'exportAssignments'])->name('assignments.export');
+});
+
+// Routes for managing privileges (manage-privileges permission)
+Route::middleware('permission:manage-privileges')->prefix('privileges')->name('privileges.')->group(function () {
+    Route::get('/create', [PrivilegeController::class, 'create'])->name('create');
+    Route::post('/', [PrivilegeController::class, 'store'])->name('store');
+    Route::get('/{privilege}/edit', [PrivilegeController::class, 'edit'])->name('edit');
+    Route::put('/{privilege}', [PrivilegeController::class, 'update'])->name('update');
+    Route::delete('/{privilege}', [PrivilegeController::class, 'destroy'])->name('destroy');
+    Route::post('/{privilege}/toggle-status', [PrivilegeController::class, 'toggleStatus'])->name('toggle-status');
+    Route::post('/{privilege}/duplicate', [PrivilegeController::class, 'duplicate'])->name('duplicate');
+});
+
+// Routes for assigning privileges (assign-privileges permission)
+Route::middleware('permission:assign-privileges')->prefix('privileges')->name('privileges.')->group(function () {
+    Route::get('/{privilege}/assign', [PrivilegeController::class, 'assign'])->name('assign');
+    Route::post('/{privilege}/assign', [PrivilegeController::class, 'storeAssignment'])->name('assign.store');
+    Route::post('/{privilege}/bulk-verify', [PrivilegeController::class, 'bulkVerify'])->name('bulk-verify');
+    Route::get('/{privilege}/search-residents', [PrivilegeController::class, 'searchResidents'])->name('search-residents');
+});
+
+// Assignment specific routes (assign-privileges permission)
+Route::middleware('permission:assign-privileges')->prefix('assignments')->name('privileges.assignments.')->group(function () {
+    Route::post('/{assignment}/verify', [PrivilegeController::class, 'verifyAssignment'])->name('verify');
+    Route::delete('/{assignment}/revoke', [PrivilegeController::class, 'revokeAssignment'])->name('revoke');
+});
+// ====================
 // ANNOUNCEMENTS MANAGEMENT
 // ====================
 Route::middleware('permission:view-announcements')->prefix('announcements')->name('announcements.')->group(function () {
@@ -441,25 +580,32 @@ Route::middleware('permission:manage-fee-types')->prefix('fee-types')->name('fee
 // ====================
 // CLEARANCES MANAGEMENT
 // ====================
+
+// Routes for viewing clearances (view-clearances permission)
 Route::middleware('permission:view-clearances')->prefix('clearances')->name('clearances.')->group(function () {
-    Route::get('/', [ClearanceController::class, 'index'])->name('index');
-    Route::get('/{clearance}', [ClearanceController::class, 'show'])->name('show');
-    Route::get('/{clearance}/print', [ClearanceController::class, 'print'])->name('print');
-    Route::get('/types', [ClearanceController::class, 'types'])->name('types.index');
-    Route::get('/reports/issued', [ClearanceController::class, 'issuedReport'])->name('reports.issued');
+    Route::get('/', [ClearanceIndexController::class, 'index'])->name('index');
+    Route::get('/{clearance}', [ClearanceShowController::class, 'show'])->name('show');
+    Route::get('/{clearance}/print', [ClearancePrintController::class, 'print'])->name('print');
+    Route::get('/types', [ClearanceTypeController::class, 'index'])->name('types.index');
+    Route::get('/reports/issued', [ClearanceReportController::class, 'issued'])->name('reports.issued');
 });
 
+// Routes for managing clearances (manage-clearances permission)
 Route::middleware('permission:manage-clearances')->prefix('clearances')->name('clearances.')->group(function () {
-    Route::get('/clearances/create', [ClearanceController::class, 'create'])->name('create');
-    Route::post('/', [ClearanceController::class, 'store'])->name('store');
-    Route::get('/{clearance}/edit', [ClearanceController::class, 'edit'])->name('edit');
-    Route::put('/{clearance}', [ClearanceController::class, 'update'])->name('update');
-    Route::delete('/{clearance}', [ClearanceController::class, 'destroy'])->name('destroy');
+    Route::get('/clearances/create', [ClearanceCreateController::class, 'create'])->name('create');
+    Route::post('/', [ClearanceStoreController::class, 'store'])->name('store');
+    Route::get('/{clearance}/edit', [ClearanceEditController::class, 'edit'])->name('edit');
+    Route::put('/{clearance}', [ClearanceUpdateController::class, 'update'])->name('update');
+    Route::delete('/{clearance}', [ClearanceDestroyController::class, 'destroy'])->name('destroy');
 });
 
+// Routes for issuing clearances (issue-clearances permission)
 Route::middleware('permission:issue-clearances')->prefix('clearances')->name('clearances.')->group(function () {
-    Route::post('/{clearance}/approve', [ClearanceController::class, 'approve'])->name('approve');
-    Route::post('/{clearance}/reject', [ClearanceController::class, 'reject'])->name('reject');
+    Route::post('/{clearance}/approve', [ClearanceStatusController::class, 'approve'])->name('approve');
+    Route::post('/{clearance}/reject', [ClearanceStatusController::class, 'reject'])->name('reject');
+    Route::post('/{clearance}/issue', [ClearanceStatusController::class, 'issue'])->name('issue');
+    Route::post('/{clearance}/process', [ClearanceStatusController::class, 'process'])->name('process');
+    Route::post('/{clearance}/cancel', [ClearanceStatusController::class, 'cancel'])->name('cancel');
 });
 
 Route::middleware('permission:issue-clearances')->prefix('clearances/approval')->name('clearances.approval.')->group(function () {
@@ -519,10 +665,25 @@ Route::middleware('permission:manage-puroks')->prefix('puroks')->name('puroks.')
 // BACKUP MANAGEMENT
 // ====================
 Route::middleware('permission:manage-backups')->prefix('backup')->name('backup.')->group(function () {
-    Route::get('/', [BackupController::class, 'index'])->name('index');
-    Route::post('/', [BackupController::class, 'create'])->name('create');
-    Route::get('/download/{filename}', [BackupController::class, 'download'])->name('download');
-    Route::delete('/{filename}', [BackupController::class, 'destroy'])->name('destroy');
+    // Main backup page
+    Route::get('/', [BackupIndexController::class, 'index'])->name('index');
+    
+    // Create backup
+    Route::post('/', [BackupCreateController::class, 'create'])->name('create');
+    
+    // Download backup
+    Route::get('/download/{filename}', [BackupDownloadController::class, 'download'])->name('download');
+    
+    // Delete backup
+    Route::delete('/{filename}', [BackupDestroyController::class, 'destroy'])->name('destroy');
+    
+    // Protection routes
+    Route::post('/{filename}/protect', [BackupProtectionController::class, 'protect'])->name('protect');
+    Route::post('/{filename}/unprotect', [BackupProtectionController::class, 'unprotect'])->name('unprotect');
+    Route::post('/{filename}/toggle-protection', [BackupProtectionController::class, 'toggleProtection'])->name('toggle-protection');
+    
+    // Progress tracking
+    Route::get('/progress', [BackupProgressController::class, 'progress'])->name('progress');
 });
 
 // ====================

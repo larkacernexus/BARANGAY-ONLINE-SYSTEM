@@ -227,7 +227,7 @@ export function RequirementsStatus({
                                     className={`flex items-center justify-between py-2 px-2 rounded transition-colors ${
                                         item.completed 
                                             ? 'bg-green-50 dark:bg-green-900/10' 
-                                            : 'bg-gray-50 dark:bg-gray-800/30'
+                                            : 'bg-gray-50 dark:bg-gray-900/30'
                                     }`}
                                 >
                                     <div className="flex items-center gap-2.5 flex-1">

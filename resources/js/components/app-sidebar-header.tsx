@@ -1,5 +1,3 @@
-// resources/js/components/app-sidebar-header.tsx
-
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
@@ -31,6 +29,7 @@ import { NotificationCenter, Notification } from '@/components/notifications/adm
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAppearance } from '@/hooks/use-appearance';
 
 interface UserType {
   id: number;
@@ -51,13 +50,11 @@ interface UserType {
   last_active?: string;
 }
 
-// Define the notifications structure
 interface NotificationsProp {
   items?: Notification[];
   unreadCount?: number;
 }
 
-// Define the auth user structure
 interface AuthUser {
   user?: UserType & {
     notifications?: Notification[];
@@ -65,7 +62,6 @@ interface AuthUser {
   };
 }
 
-// Extend Inertia PageProps
 interface PageProps {
   auth?: AuthUser;
   notifications?: NotificationsProp;
@@ -110,7 +106,6 @@ const getUserInitials = (name: string): string => {
   return initials.slice(0, 2) || 'A';
 };
 
-// Modern Search Component
 const SearchBar = ({ onSearch }: { onSearch: (query: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -141,7 +136,7 @@ const SearchBar = ({ onSearch }: { onSearch: (query: string) => void }) => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search residents, payments, reports..."
-            className="w-48 lg:w-64 pl-10 pr-10 py-2 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            className="w-48 lg:w-64 pl-10 pr-10 py-2 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <button
@@ -155,7 +150,7 @@ const SearchBar = ({ onSearch }: { onSearch: (query: string) => void }) => {
       ) : (
         <button
           onClick={() => setIsOpen(true)}
-          className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative group"
+          className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors relative group"
         >
           <Search className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-500 transition-colors" />
           <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -165,7 +160,6 @@ const SearchBar = ({ onSearch }: { onSearch: (query: string) => void }) => {
   );
 };
 
-// Modern User Menu Component
 const UserMenu = ({ 
   user, 
   onLogout,
@@ -210,7 +204,7 @@ const UserMenu = ({
       <DropdownMenuTrigger asChild>
         <Button 
           variant="ghost" 
-          className="flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full pl-2 pr-3 py-1.5 transition-all duration-200 h-auto group"
+          className="flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-full pl-2 pr-3 py-1.5 transition-all duration-200 h-auto group"
         >
           <div className="relative">
             <Avatar className="h-9 w-9 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 transition-all group-hover:ring-blue-500">
@@ -286,12 +280,12 @@ const UserMenu = ({
           </div>
 
           <div className="grid grid-cols-2 gap-2 mt-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center hover:shadow-md transition-shadow min-w-0">
+            <div className="bg-white dark:bg-gray-900 rounded-lg p-2 text-center hover:shadow-md transition-shadow min-w-0">
               <BarChart3 className="h-4 w-4 mx-auto mb-1 text-blue-500" />
               <p className="text-xs text-gray-500 truncate">Permissions</p>
               <p className="text-sm font-semibold">{user?.permissions?.length || 0} roles</p>
             </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center hover:shadow-md transition-shadow min-w-0">
+            <div className="bg-white dark:bg-gray-900 rounded-lg p-2 text-center hover:shadow-md transition-shadow min-w-0">
               <BadgeCheck className="h-4 w-4 mx-auto mb-1 text-purple-500" />
               <p className="text-xs text-gray-500 truncate">Status</p>
               <p className="text-sm font-semibold capitalize truncate">Active</p>
@@ -299,7 +293,7 @@ const UserMenu = ({
           </div>
 
           {user?.department && (
-            <div className="mt-3 p-2 bg-white/50 dark:bg-gray-800/50 rounded-lg">
+            <div className="mt-3 p-2 bg-white/50 dark:bg-gray-900/50 rounded-lg">
               <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {user.department}
               </p>
@@ -342,26 +336,26 @@ const UserMenu = ({
   );
 };
 
-// Modern Theme Toggle Component
+// FIXED: ThemeToggle now ONLY toggles between light and dark
 const ThemeToggle = () => {
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const shouldBeDark = savedTheme === 'dark' || (!savedTheme && systemPrefersDark);
-    
-    setIsDark(shouldBeDark);
-    document.documentElement.classList.toggle('dark', shouldBeDark);
-  }, []);
+  const { appearance, updateAppearance } = useAppearance();
 
   const toggleTheme = () => {
-    setIsDark((prev) => {
-      const newMode = !prev;
-      document.documentElement.classList.toggle('dark', newMode);
-      localStorage.setItem('theme', newMode ? 'dark' : 'light');
-      return newMode;
-    });
+    if (appearance === 'light') {
+      updateAppearance('dark');
+    } else {
+      updateAppearance('light');
+    }
+  };
+
+  const getThemeIcon = () => {
+    return appearance === 'light' 
+      ? <Moon className="h-5 w-5 text-gray-700 dark:text-gray-300" />  // Show moon in light mode (to switch to dark)
+      : <Sun className="h-5 w-5 text-amber-500" />;                    // Show sun in dark mode (to switch to light)
+  };
+
+  const getThemeLabel = () => {
+    return appearance === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
   };
 
   return (
@@ -370,20 +364,16 @@ const ThemeToggle = () => {
         <TooltipTrigger asChild>
           <button
             onClick={toggleTheme}
-            className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative group"
+            className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors relative group"
           >
             <div className="transition-transform duration-300 hover:rotate-12">
-              {isDark ? (
-                <Sun className="h-5 w-5 text-amber-500" />
-              ) : (
-                <Moon className="h-5 w-5 text-gray-700" />
-              )}
+              {getThemeIcon()}
             </div>
             <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>Toggle {isDark ? 'light' : 'dark'} mode</p>
+          <p>{getThemeLabel()}</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -410,14 +400,13 @@ export function AppSidebarHeader({
   const authUser = props.auth?.user;
   const user = authUser || propUser || DEFAULT_USER;
   
-  // Safely access notification data with fallbacks
   const globalNotifications = props.notifications?.items || 
-                             authUser?.notifications || 
-                             [];
+                               authUser?.notifications || 
+                               [];
   const globalUnreadCount = props.notifications?.unreadCount || 
-                           props.unreadNotifications || 
-                           authUser?.notification_count || 
-                           0;
+                             props.unreadNotifications || 
+                             authUser?.notification_count || 
+                             0;
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(globalNotifications);
@@ -428,10 +417,6 @@ export function AppSidebarHeader({
   useEffect(() => {
     setNotifications(globalNotifications);
     setUnreadCount(globalUnreadCount);
-    console.log('📊 Notifications updated:', {
-      count: globalNotifications.length,
-      unread: globalUnreadCount
-    });
   }, [globalNotifications, globalUnreadCount]);
 
   const currentModule = props.currentModule || instructionsModule || 'general';
@@ -465,14 +450,8 @@ export function AppSidebarHeader({
     setIsNotificationsOpen(false);
   };
 
-  // MARK AS READ - USING INERTIA
   const markAsRead = (notificationId: string) => {
-    if (isProcessing) {
-      console.log('⏳ Already processing, skipping...');
-      return;
-    }
-
-    console.log('📝 Marking notification as read:', notificationId);
+    if (isProcessing) return;
     
     const previousNotifications = [...notifications];
     const previousUnreadCount = unreadCount;
@@ -494,8 +473,6 @@ export function AppSidebarHeader({
         preserveScroll: true,
         only: ['notifications', 'auth.user.notifications', 'auth.user.notification_count'],
         onSuccess: (page: any) => {
-          console.log('✅ Successfully marked notification as read');
-          
           const newNotifications = page.props.notifications?.items || 
                                   page.props.auth?.user?.notifications || 
                                   [];
@@ -508,30 +485,20 @@ export function AppSidebarHeader({
             setNotifications(newNotifications);
           }
           setUnreadCount(newUnreadCount);
-          
           setIsProcessing(false);
         },
-        onError: (errors) => {
-          console.error('❌ Failed to mark notification as read:', errors);
-          
+        onError: () => {
           setNotifications(previousNotifications);
           setUnreadCount(previousUnreadCount);
-          
           setIsProcessing(false);
         }
       }
     );
   };
 
-  // MARK ALL AS READ - USING INERTIA
   const markAllAsRead = () => {
-    if (isProcessing) {
-      console.log('⏳ Already processing, skipping...');
-      return;
-    }
+    if (isProcessing) return;
 
-    console.log('📝 Marking all notifications as read');
-    
     const previousNotifications = [...notifications];
     const previousUnreadCount = unreadCount;
     
@@ -550,24 +517,17 @@ export function AppSidebarHeader({
         preserveScroll: true,
         only: ['notifications', 'auth.user.notifications', 'auth.user.notification_count'],
         onSuccess: (page: any) => {
-          console.log('✅ Successfully marked all as read');
-          
           const newNotifications = page.props.notifications?.items || 
                                   page.props.auth?.user?.notifications || 
                                   [];
-          
           if (newNotifications.length > 0) {
             setNotifications(newNotifications);
           }
-          
           setIsProcessing(false);
         },
-        onError: (errors) => {
-          console.error('❌ Failed to mark all as read:', errors);
-          
+        onError: () => {
           setNotifications(previousNotifications);
           setUnreadCount(previousUnreadCount);
-          
           setIsProcessing(false);
         }
       }
@@ -623,12 +583,6 @@ export function AppSidebarHeader({
                   <span className="truncate">{user.department}</span>
                 </Badge>
               )}
-              {user?.is_admin && (
-                <Badge variant="default" className="gap-1 text-xs bg-gradient-to-r from-purple-500 to-purple-600">
-                  <Shield className="h-3 w-3" />
-                  Administrator
-                </Badge>
-              )}
             </div>
           </div>
         </div>
@@ -642,7 +596,7 @@ export function AppSidebarHeader({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button 
-                    className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative group"
+                    className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors relative group"
                     onClick={() => setIsInstructionsOpen(true)}
                   >
                     <HelpCircle className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-500 transition-colors" />
@@ -661,7 +615,7 @@ export function AppSidebarHeader({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button 
-                    className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors relative group"
+                    className="p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors relative group"
                     onClick={openNotifications}
                   >
                     <Bell className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-500 transition-colors" />
@@ -722,90 +676,26 @@ export function AppSidebarHeader({
 
       <style>{`
         @keyframes slideDown {
-          from {
-            transform: translateY(-100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
+          from { transform: translateY(-100%); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
         }
-
         @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateX(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+          from { opacity: 0; transform: translateX(-10px); }
+          to { opacity: 1; transform: translateX(0); }
         }
-
-        @keyframes slideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-
         @keyframes scaleIn {
-          from {
-            transform: scale(0);
-          }
-          to {
-            transform: scale(1);
-          }
+          from { transform: scale(0); }
+          to { transform: scale(1); }
         }
-
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
-
-        .animate-slide-down {
-          animation: slideDown 0.3s ease-out forwards;
-        }
-
-        .animate-slide-in {
-          animation: slideIn 0.2s ease-out forwards;
-        }
-
-        .animate-slide-in-right {
-          opacity: 0;
-          animation: slideInRight 0.3s ease-out forwards;
-        }
-
-        .animate-fade-in {
-          opacity: 0;
-          animation: fadeIn 0.3s ease-out forwards;
-        }
-
-        .animate-scale-in {
-          animation: scaleIn 0.2s ease-out forwards;
-        }
-
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
+        .animate-slide-down { animation: slideDown 0.3s ease-out forwards; }
+        .animate-slide-in { animation: slideIn 0.2s ease-out forwards; }
+        .animate-fade-in { opacity: 0; animation: fadeIn 0.3s ease-out forwards; }
+        .animate-scale-in { animation: scaleIn 0.2s ease-out forwards; }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
       `}</style>
     </>
   );

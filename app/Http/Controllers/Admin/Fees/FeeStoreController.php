@@ -556,36 +556,91 @@ private function sendFeeNotifications($fees, $request)
         return $request->validate($rules);
     }
 
-    private function createFeeForResident($request, $resident)
-    {
-        $feeData = $this->prepareFeeData($request);
-        
-        // Set resident-specific data
-        $feeData['payer_type'] = 'resident';
-        $feeData['resident_id'] = $resident->id;
-        $feeData['payer_id'] = $resident->id;
-        $feeData['payer_model'] = Resident::class;
-        $feeData['payer_name'] = $resident->full_name ?? trim($resident->first_name . ' ' . $resident->last_name);
-        $feeData['contact_number'] = $resident->contact_number;
-        $feeData['purok'] = $resident->purok ? $resident->purok->name : null;
-        
-        // SIMPLIFIED: Store resident verification info for reference, not for automatic discounts
-        if ($request->include_resident_details ?? false) {
-            $feeData['ph_senior_id_verified'] = $resident->is_senior;
-            $feeData['ph_pwd_id_verified'] = $resident->is_pwd;
-            $feeData['ph_solo_parent_id_verified'] = $resident->is_solo_parent;
-            $feeData['ph_indigent_id_verified'] = $resident->is_indigent;
-        }
-
-        // Set default values
-        $feeData = $this->setDefaultFeeValues($feeData, $request->fee_type_id);
-
-        // Create the fee
-        $fee = Fee::create($feeData);
-        $this->generateFeeIdentifiers($fee);
-        
-        return $fee;
+   private function createFeeForResident($request, $resident)
+{
+    $feeData = $this->prepareFeeData($request);
+    
+    // Make sure privileges are loaded
+    if (!$resident->relationLoaded('residentPrivileges')) {
+        $resident->load('residentPrivileges.privilege');
     }
+    
+    // Get ALL active privileges dynamically
+    $activePrivileges = $resident->residentPrivileges
+        ->filter(function ($rp) {
+            return $rp->isActive();
+        })
+        ->map(function ($rp) {
+            $privilege = $rp->privilege;
+            return [
+                'code' => $privilege->code,
+                'id_number' => $rp->id_number,
+                'discount_percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
+                'verified_at' => $rp->verified_at,
+            ];
+        })
+        ->values()
+        ->toArray();
+
+    // Set resident-specific data
+    $feeData['payer_type'] = 'resident';
+    $feeData['resident_id'] = $resident->id;
+    $feeData['payer_id'] = $resident->id;
+    $feeData['payer_model'] = Resident::class;
+    $feeData['payer_name'] = $resident->full_name ?? trim($resident->first_name . ' ' . $resident->last_name);
+    $feeData['contact_number'] = $resident->contact_number;
+    $feeData['purok'] = $resident->purok ? $resident->purok->name : null;
+    
+    // DYNAMICALLY store resident privilege info for reference
+    if ($request->include_resident_details ?? false) {
+        // Store ALL privileges dynamically in a JSON field
+        $feeData['resident_privileges'] = json_encode($activePrivileges);
+        
+        // Also create dynamic fields for each privilege (for easy querying if needed)
+        foreach ($activePrivileges as $priv) {
+            $code = strtolower($priv['code']);
+            $feeData["has_{$code}_privilege"] = true;
+            $feeData["{$code}_id_verified"] = !empty($priv['id_number']);
+            $feeData["{$code}_id_number"] = $priv['id_number'];
+            $feeData["{$code}_discount"] = $priv['discount_percentage'];
+        }
+        
+        // For backward compatibility, also set the old fields if they exist in privileges
+        $privilegeMap = [
+            'senior' => ['SC', 'OSP'],
+            'pwd' => ['PWD'],
+            'solo_parent' => ['SP'],
+            'indigent' => ['IND'],
+        ];
+        
+        foreach ($privilegeMap as $key => $codes) {
+            $hasPrivilege = false;
+            $idNumber = null;
+            
+            foreach ($activePrivileges as $priv) {
+                if (in_array($priv['code'], $codes)) {
+                    $hasPrivilege = true;
+                    $idNumber = $priv['id_number'];
+                    break;
+                }
+            }
+            
+            $feeData["ph_{$key}_id_verified"] = $hasPrivilege;
+            $feeData["{$key}_id_number"] = $idNumber;
+        }
+    }
+
+    // Set default values
+    $feeData = $this->setDefaultFeeValues($feeData, $request->fee_type_id);
+
+    // Create the fee
+    $fee = Fee::create($feeData);
+    $this->generateFeeIdentifiers($fee);
+    
+    return $fee;
+}
+
+
 
     // Create fee for a specific household
     private function createFeeForHousehold($request, $household)

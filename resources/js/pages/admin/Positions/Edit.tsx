@@ -251,13 +251,13 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <Link href="/admin/positions">
-                                <Button variant="ghost" size="sm" type="button">
+                                <Button variant="ghost" size="sm" type="button" className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
                                 </Button>
                             </Link>
                             <div>
-                                <h1 className="text-3xl font-bold tracking-tight">Edit Position</h1>
+                                <h1 className="text-3xl font-bold tracking-tight dark:text-white">Edit Position</h1>
                                 <p className="text-gray-500 dark:text-gray-400">
                                     Update position information
                                 </p>
@@ -269,12 +269,12 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                 variant="destructive"
                                 onClick={handleDelete}
                                 disabled={processing || (position.officials_count && position.officials_count > 0)}
-                                className="flex items-center gap-2"
+                                className="flex items-center gap-2 dark:bg-red-900 dark:hover:bg-red-800"
                             >
                                 <Trash2 className="h-4 w-4" />
                                 Delete
                             </Button>
-                            <Button type="submit" disabled={processing} className="flex items-center gap-2">
+                            <Button type="submit" disabled={processing} className="flex items-center gap-2 dark:bg-blue-600 dark:hover:bg-blue-700">
                                 <Save className="h-4 w-4" />
                                 {processing ? 'Saving...' : 'Save Changes'}
                             </Button>
@@ -283,15 +283,15 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
 
                     {/* Changed fields indicator */}
                     {getChangedFieldsCount() > 0 && (
-                        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded flex items-center gap-2">
-                            <div className="h-2 w-2 bg-blue-600 rounded-full"></div>
+                        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded flex items-center gap-2 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-400">
+                            <div className="h-2 w-2 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
                             <span className="font-medium">{getChangedFieldsCount()} field(s) modified</span>
                             <Button 
                                 type="button" 
                                 variant="ghost" 
                                 size="sm" 
                                 onClick={resetForm}
-                                className="ml-auto text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+                                className="ml-auto text-blue-700 hover:text-blue-900 hover:bg-blue-100 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/50"
                             >
                                 Reset All
                             </Button>
@@ -300,7 +300,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
 
                     {/* Warning for positions with officials */}
                     {position.officials_count && position.officials_count > 0 && (
-                        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded">
+                        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400">
                             <div className="flex items-center gap-2">
                                 <Users className="h-5 w-5" />
                                 <div>
@@ -315,7 +315,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
 
                     {/* Error Messages */}
                     {Object.keys(errors).length > 0 && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded dark:bg-red-950 dark:border-red-800 dark:text-red-400">
                             <p className="font-bold">Please fix the following errors:</p>
                             <ul className="list-disc list-inside mt-2">
                                 {Object.entries(errors).map(([field, error]) => (
@@ -327,95 +327,95 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
 
                     <div className="grid gap-6 lg:grid-cols-3">
                         {/* Left Column - Position Details */}
-                        <Card className="lg:col-span-2">
+                        <Card className="lg:col-span-2 dark:bg-gray-900 dark:border-gray-700">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 dark:text-white">
                                     <Shield className="h-5 w-5" />
                                     Position Information
                                 </CardTitle>
-                                <CardDescription>
+                                <CardDescription className="dark:text-gray-400">
                                     Update position details
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="name">Position Name *</Label>
+                                        <Label htmlFor="name" className="dark:text-gray-300">Position Name *</Label>
                                         <Input 
                                             id="name" 
                                             placeholder="e.g., Barangay Captain, Kagawad - Peace and Order" 
                                             value={data.name}
                                             onChange={(e) => setData('name', e.target.value)}
                                             required
-                                            className={isFieldChanged('name', position.name) ? 'border-blue-300 bg-blue-50' : ''}
+                                            className={`${isFieldChanged('name', position.name) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                         />
                                         {isFieldChanged('name', position.name) && (
-                                            <p className="text-xs text-blue-600">
+                                            <p className="text-xs text-blue-600 dark:text-blue-400">
                                                 Was: {position.name}
                                             </p>
                                         )}
                                         {errors.name && (
-                                            <p className="text-sm text-red-600">{errors.name}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="code">Code *</Label>
+                                        <Label htmlFor="code" className="dark:text-gray-300">Code *</Label>
                                         <Input 
                                             id="code" 
                                             placeholder="captain, kagawad_peace" 
                                             value={data.code}
                                             onChange={(e) => setData('code', e.target.value)}
                                             required
-                                            className={isFieldChanged('code', position.code) ? 'border-blue-300 bg-blue-50' : ''}
+                                            className={`${isFieldChanged('code', position.code) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                         />
                                         {isFieldChanged('code', position.code) && (
-                                            <p className="text-xs text-blue-600">
+                                            <p className="text-xs text-blue-600 dark:text-blue-400">
                                                 Was: {position.code}
                                             </p>
                                         )}
                                         {errors.code && (
-                                            <p className="text-sm text-red-600">{errors.code}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.code}</p>
                                         )}
                                     </div>
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="order">Display Order</Label>
+                                        <Label htmlFor="order" className="dark:text-gray-300">Display Order</Label>
                                         <Input 
                                             id="order" 
                                             type="number" 
                                             min="0"
                                             value={data.order}
                                             onChange={(e) => setData('order', parseInt(e.target.value) || 0)}
-                                            className={isFieldChanged('order', position.order) ? 'border-blue-300 bg-blue-50' : ''}
+                                            className={`${isFieldChanged('order', position.order) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                         />
                                         {isFieldChanged('order', position.order) && (
-                                            <p className="text-xs text-blue-600">
+                                            <p className="text-xs text-blue-600 dark:text-blue-400">
                                                 Was: {position.order}
                                             </p>
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="role_id">System Role</Label>
+                                        <Label htmlFor="role_id" className="dark:text-gray-300">System Role</Label>
                                         <Select 
                                             value={data.role_id?.toString() || "null"}
                                             onValueChange={handleRoleSelect}
                                         >
-                                            <SelectTrigger className={isFieldChanged('role_id', position.role_id) ? 'border-blue-300 bg-blue-50' : ''}>
+                                            <SelectTrigger className={`${isFieldChanged('role_id', position.role_id) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
                                                 <SelectValue placeholder="Select system role" />
                                             </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="null">No role</SelectItem>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                <SelectItem value="null" className="dark:text-white dark:focus:bg-gray-700">No role</SelectItem>
                                                 {safeRoles.map((role) => (
-                                                    <SelectItem key={role.id} value={role.id.toString()}>
+                                                    <SelectItem key={role.id} value={role.id.toString()} className="dark:text-white dark:focus:bg-gray-700">
                                                         {role.name}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
                                         {isFieldChanged('role_id', position.role_id) && (
-                                            <p className="text-xs text-blue-600">
+                                            <p className="text-xs text-blue-600 dark:text-blue-400">
                                                 Was: {position.role?.name || 'No role'}
                                             </p>
                                         )}
@@ -425,18 +425,18 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                 {/* Committee Selection */}
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label>Primary Committee</Label>
+                                        <Label className="dark:text-gray-300">Primary Committee</Label>
                                         <Select 
                                             value={data.committee_id?.toString() || "null"}
                                             onValueChange={handleCommitteeSelect}
                                         >
-                                            <SelectTrigger className={isFieldChanged('committee_id', position.committee_id) ? 'border-blue-300 bg-blue-50' : ''}>
+                                            <SelectTrigger className={`${isFieldChanged('committee_id', position.committee_id) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
                                                 <SelectValue placeholder="Select primary committee" />
                                             </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="null">No committee</SelectItem>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                <SelectItem value="null" className="dark:text-white dark:focus:bg-gray-700">No committee</SelectItem>
                                                 {safeCommittees.map((committee) => (
-                                                    <SelectItem key={committee.value} value={committee.value.toString()}>
+                                                    <SelectItem key={committee.value} value={committee.value.toString()} className="dark:text-white dark:focus:bg-gray-700">
                                                         <div className="flex items-center gap-2">
                                                             <Target className="h-3 w-3" />
                                                             <span>{committee.label}</span>
@@ -446,12 +446,12 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                             </SelectContent>
                                         </Select>
                                         {isFieldChanged('committee_id', position.committee_id) && (
-                                            <p className="text-xs text-blue-600">
+                                            <p className="text-xs text-blue-600 dark:text-blue-400">
                                                 Was: {position.committee?.label || 'No committee'}
                                             </p>
                                         )}
                                         {isKagawadPosition && !data.committee_id && (
-                                            <p className="text-sm text-amber-600">
+                                            <p className="text-sm text-amber-600 dark:text-amber-400">
                                                 Kagawad positions usually have a primary committee
                                             </p>
                                         )}
@@ -460,9 +460,9 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                     {safeCommittees.length > 0 && (
                                         <div className="space-y-2">
                                             <div className="flex items-center justify-between">
-                                                <Label>Additional Committees</Label>
+                                                <Label className="dark:text-gray-300">Additional Committees</Label>
                                                 {isFieldChanged('additional_committees', position.additional_committees) && (
-                                                    <span className="text-xs text-blue-600">
+                                                    <span className="text-xs text-blue-600 dark:text-blue-400">
                                                         {(position.additional_committees?.length || 0)} → {data.additional_committees.length}
                                                     </span>
                                                 )}
@@ -475,15 +475,13 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                                             checked={data.additional_committees.includes(committee.value)}
                                                             onCheckedChange={() => toggleAdditionalCommittee(committee.value)}
                                                             disabled={committee.value === data.committee_id}
-                                                            className={
-                                                                ((position.additional_committees?.includes(committee.value) || false) !== 
+                                                            className={`${((position.additional_committees?.includes(committee.value) || false) !== 
                                                                 data.additional_committees.includes(committee.value)) ? 
-                                                                'border-blue-300' : ''
-                                                            }
+                                                                'border-blue-300 dark:border-blue-600' : ''} dark:border-gray-600`}
                                                         />
                                                         <Label 
                                                             htmlFor={`committee_${committee.value}`} 
-                                                            className="cursor-pointer text-sm"
+                                                            className="cursor-pointer text-sm dark:text-gray-300"
                                                         >
                                                             {committee.label}
                                                         </Label>
@@ -495,17 +493,17 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="description">Description</Label>
+                                    <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
                                     <Textarea 
                                         id="description" 
                                         placeholder="Describe the position's responsibilities and duties..."
                                         rows={4}
                                         value={data.description}
                                         onChange={(e) => setData('description', e.target.value)}
-                                        className={isFieldChanged('description', position.description) ? 'border-blue-300 bg-blue-50' : ''}
+                                        className={`${isFieldChanged('description', position.description) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                     />
                                     {isFieldChanged('description', position.description) && (
-                                        <p className="text-xs text-blue-600">
+                                        <p className="text-xs text-blue-600 dark:text-blue-400">
                                             Description has been modified
                                         </p>
                                     )}
@@ -517,14 +515,14 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                             id="requires_account" 
                                             checked={data.requires_account}
                                             onCheckedChange={(checked) => setData('requires_account', checked as boolean)}
-                                            className={isFieldChanged('requires_account', position.requires_account) ? 'border-blue-300' : ''}
+                                            className={`${isFieldChanged('requires_account', position.requires_account) ? 'border-blue-300 dark:border-blue-600' : ''} dark:border-gray-600`}
                                         />
-                                        <Label htmlFor="requires_account" className="cursor-pointer">
+                                        <Label htmlFor="requires_account" className="cursor-pointer dark:text-gray-300">
                                             Requires system account
                                         </Label>
                                     </div>
                                     {isFieldChanged('requires_account', position.requires_account) && (
-                                        <p className="text-xs text-blue-600">
+                                        <p className="text-xs text-blue-600 dark:text-blue-400">
                                             Was: {position.requires_account ? 'Required' : 'Not required'}
                                         </p>
                                     )}
@@ -535,13 +533,13 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                         id="is_active" 
                                         checked={data.is_active}
                                         onCheckedChange={(checked) => setData('is_active', checked as boolean)}
-                                        className={isFieldChanged('is_active', position.is_active) ? 'border-blue-300' : ''}
+                                        className={`${isFieldChanged('is_active', position.is_active) ? 'border-blue-300 dark:border-blue-600' : ''} dark:border-gray-600`}
                                     />
-                                    <Label htmlFor="is_active" className="cursor-pointer">
+                                    <Label htmlFor="is_active" className="cursor-pointer dark:text-gray-300">
                                         Position is active
                                     </Label>
                                     {isFieldChanged('is_active', position.is_active) && (
-                                        <p className="text-xs text-blue-600">
+                                        <p className="text-xs text-blue-600 dark:text-blue-400">
                                             Was: {position.is_active ? 'Active' : 'Inactive'}
                                         </p>
                                     )}
@@ -551,71 +549,71 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
 
                         {/* Right Column - Preview & Current Info */}
                         <div className="space-y-6">
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle>Current Position</CardTitle>
+                                    <CardTitle className="dark:text-white">Current Position</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="flex items-center gap-3">
-                                        <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${isKagawadPosition ? 'bg-amber-100' : 'bg-blue-100'}`}>
-                                            <Shield className={`h-6 w-6 ${isKagawadPosition ? 'text-amber-600' : 'text-blue-600'}`} />
+                                        <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${isKagawadPosition ? 'bg-amber-100 dark:bg-amber-900/50' : 'bg-blue-100 dark:bg-blue-900/50'}`}>
+                                            <Shield className={`h-6 w-6 ${isKagawadPosition ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}`} />
                                         </div>
                                         <div>
-                                            <h4 className="font-medium">{position.name}</h4>
-                                            <p className="text-sm text-gray-500">
+                                            <h4 className="font-medium dark:text-white">{position.name}</h4>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
                                                 {isKagawadPosition ? 'Kagawad Position' : 'Barangay Position'}
                                             </p>
                                         </div>
                                     </div>
 
-                                    <div className="pt-4 border-t space-y-3">
+                                    <div className="pt-4 border-t dark:border-gray-700 space-y-3">
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Code:</span>
-                                            <code className="font-mono font-medium bg-gray-100 px-2 py-0.5 rounded text-xs">
+                                            <span className="text-gray-500 dark:text-gray-400">Code:</span>
+                                            <code className="font-mono font-medium bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded text-xs dark:text-gray-300">
                                                 {position.code}
                                             </code>
                                         </div>
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Order:</span>
-                                            <span className="font-medium">{position.order}</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Order:</span>
+                                            <span className="font-medium dark:text-white">{position.order}</span>
                                         </div>
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Status:</span>
-                                            <span className={`font-medium ${position.is_active ? 'text-green-600' : 'text-gray-500'}`}>
+                                            <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                                            <span className={`font-medium ${position.is_active ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                                 {position.is_active ? 'Active' : 'Inactive'}
                                             </span>
                                         </div>
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Account Required:</span>
-                                            <span className={`font-medium ${position.requires_account ? 'text-green-600' : 'text-gray-500'}`}>
+                                            <span className="text-gray-500 dark:text-gray-400">Account Required:</span>
+                                            <span className={`font-medium ${position.requires_account ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                                 {position.requires_account ? 'Yes' : 'No'}
                                             </span>
                                         </div>
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Officials:</span>
-                                            <span className="font-medium flex items-center gap-1">
+                                            <span className="text-gray-500 dark:text-gray-400">Officials:</span>
+                                            <span className="font-medium flex items-center gap-1 dark:text-white">
                                                 <Users className="h-3 w-3" />
                                                 {position.officials_count || 0}
                                             </span>
                                         </div>
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">System Role:</span>
-                                            <span className="font-medium">{position.role?.name || 'None'}</span>
+                                            <span className="text-gray-500 dark:text-gray-400">System Role:</span>
+                                            <span className="font-medium dark:text-white">{position.role?.name || 'None'}</span>
                                         </div>
                                     </div>
 
                                     {/* Current Committees */}
                                     {(position.committee || (position.additional_committees && position.additional_committees.length > 0)) && (
-                                        <div className="pt-4 border-t">
-                                            <h5 className="font-medium mb-2">Current Committees:</h5>
+                                        <div className="pt-4 border-t dark:border-gray-700">
+                                            <h5 className="font-medium mb-2 dark:text-gray-300">Current Committees:</h5>
                                             <div className="space-y-2">
                                                 {position.committee && (
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
-                                                            <Target className="h-3 w-3 text-blue-600" />
-                                                            <span className="text-sm">{position.committee.label}</span>
+                                                            <Target className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                                            <span className="text-sm dark:text-gray-300">{position.committee.label}</span>
                                                         </div>
-                                                        <Badge variant="outline" className="text-xs">
+                                                        <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
                                                             Primary
                                                         </Badge>
                                                     </div>
@@ -623,8 +621,8 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                                 
                                                 {getCurrentAdditionalCommittees().map((committee) => (
                                                     <div key={committee.value} className="flex items-center gap-2">
-                                                        <Target className="h-3 w-3 text-gray-400" />
-                                                        <span className="text-sm">{committee.label}</span>
+                                                        <Target className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                                                        <span className="text-sm dark:text-gray-300">{committee.label}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -632,22 +630,22 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                     )}
 
                                     {position.description && (
-                                        <div className="pt-4 border-t">
-                                            <h5 className="font-medium mb-2">Current Description:</h5>
-                                            <p className="text-sm text-gray-600">{position.description}</p>
+                                        <div className="pt-4 border-t dark:border-gray-700">
+                                            <h5 className="font-medium mb-2 dark:text-gray-300">Current Description:</h5>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">{position.description}</p>
                                         </div>
                                     )}
                                 </CardContent>
                             </Card>
 
                             {/* Quick Actions */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle>Quick Actions</CardTitle>
+                                    <CardTitle className="dark:text-white">Quick Actions</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <Link href={`/admin/positions/${position.id}`}>
-                                        <Button variant="outline" className="w-full justify-start">
+                                        <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
                                             <Shield className="h-4 w-4 mr-2" />
                                             View Position Details
                                         </Button>
@@ -655,15 +653,15 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                     
                                     {position.officials_count && position.officials_count > 0 && (
                                         <Link href={`/admin/officials?position=${position.id}`}>
-                                            <Button variant="outline" className="w-full justify-start">
+                                            <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
                                                 <Users className="h-4 w-4 mr-2" />
                                                 View Assigned Officials
                                             </Button>
                                         </Link>
                                     )}
                                     
-                                    <div className="pt-4 border-t">
-                                        <h4 className="font-medium mb-2">Status Actions</h4>
+                                    <div className="pt-4 border-t dark:border-gray-700">
+                                        <h4 className="font-medium mb-2 dark:text-gray-300">Status Actions</h4>
                                         <div className="space-y-2">
                                             <Button
                                                 variant={data.is_active ? "default" : "outline"}
@@ -684,8 +682,8 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                         </div>
                                     </div>
 
-                                    <div className="pt-4 border-t">
-                                        <h4 className="font-medium mb-2">Account Requirement</h4>
+                                    <div className="pt-4 border-t dark:border-gray-700">
+                                        <h4 className="font-medium mb-2 dark:text-gray-300">Account Requirement</h4>
                                         <div className="space-y-2">
                                             <Button
                                                 variant={data.requires_account ? "default" : "outline"}
@@ -711,15 +709,15 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                     </div>
 
                     {/* Form Actions */}
-                    <div className="flex items-center justify-between pt-6 border-t">
+                    <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
                         <div className="flex items-center gap-2">
                             <Link href={`/admin/positions/${position.id}`}>
-                                <Button variant="outline" type="button">
+                                <Button variant="outline" type="button" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
                                     View Details
                                 </Button>
                             </Link>
                             <Link href="/admin/positions">
-                                <Button variant="outline" type="button">
+                                <Button variant="outline" type="button" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
                                     Back to List
                                 </Button>
                             </Link>
@@ -730,7 +728,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                 type="button"
                                 onClick={resetForm}
                                 disabled={processing}
-                                className="flex items-center gap-2"
+                                className="flex items-center gap-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                             >
                                 <X className="h-4 w-4" />
                                 Reset Changes
@@ -738,7 +736,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                             <Button 
                                 type="submit" 
                                 disabled={processing}
-                                className={`flex items-center gap-2 ${Object.keys(errors).length === 0 ? '' : 'opacity-50'}`}
+                                className={`flex items-center gap-2 ${Object.keys(errors).length === 0 ? '' : 'opacity-50'} dark:bg-blue-600 dark:hover:bg-blue-700`}
                             >
                                 <Save className="h-4 w-4" />
                                 {processing ? 'Saving...' : 'Save Changes'}

@@ -57,6 +57,7 @@ interface BackupDialogsProps {
   onBulkDelete: () => void;
   onBulkRestore: () => void;
   isPerformingBulkAction: boolean;
+  setBackupProgress?: (progress: BackupProgress | null) => void; // Added this prop
 }
 
 export default function BackupDialogs({
@@ -77,7 +78,8 @@ export default function BackupDialogs({
   onCreateBackup,
   onBulkDelete,
   onBulkRestore,
-  isPerformingBulkAction
+  isPerformingBulkAction,
+  setBackupProgress
 }: BackupDialogsProps) {
   const ProgressIcon = backupProgress ? PROGRESS_ICONS[backupProgress.status] : null;
 
@@ -93,12 +95,12 @@ export default function BackupDialogs({
           setShowCreateDialog(open);
         }
       }}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="max-w-md dark:bg-gray-900 dark:border-gray-700">
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className="dark:text-gray-100">
               {backupProgress ? 'Backup in Progress' : 'Create New Backup'}
             </AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription className="dark:text-gray-400">
               {backupProgress ? backupProgress.message : 'Create a backup of your system data. This will be downloaded as a ZIP file.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -108,11 +110,11 @@ export default function BackupDialogs({
               {/* Progress Bar */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium">Progress</span>
-                  <span className="font-bold">{backupProgress.percentage.toFixed(0)}%</span>
+                  <span className="font-medium dark:text-gray-300">Progress</span>
+                  <span className="font-bold dark:text-gray-200">{backupProgress.percentage.toFixed(0)}%</span>
                 </div>
-                <Progress value={backupProgress.percentage} className="h-2" />
-                <div className="flex justify-between text-xs text-gray-500">
+                <Progress value={backupProgress.percentage} className="h-2 dark:bg-gray-700" />
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                   <span>0%</span>
                   <span>100%</span>
                 </div>
@@ -129,7 +131,11 @@ export default function BackupDialogs({
                     ? 'bg-red-100 dark:bg-red-800/30' 
                     : 'bg-blue-100 dark:bg-blue-800/30'
                 }`}>
-                  {ProgressIcon && <ProgressIcon className="h-5 w-5" />}
+                  {ProgressIcon && <ProgressIcon className={`h-5 w-5 ${
+                    backupProgress.status === 'failed' 
+                      ? 'text-red-600 dark:text-red-400' 
+                      : 'text-blue-600 dark:text-blue-400'
+                  }`} />}
                 </div>
                 <div className="flex-1">
                   <div className="flex justify-between">
@@ -141,12 +147,12 @@ export default function BackupDialogs({
                       {backupProgress.currentStep || backupProgress.status.charAt(0).toUpperCase() + backupProgress.status.slice(1)}
                     </span>
                     <Badge variant="outline" className={`
-                      ${backupProgress.status === 'pending' ? 'bg-gray-100 text-gray-700' : ''}
-                      ${backupProgress.status === 'processing' ? 'bg-blue-100 text-blue-700' : ''}
-                      ${backupProgress.status === 'compressing' ? 'bg-purple-100 text-purple-700' : ''}
-                      ${backupProgress.status === 'finalizing' ? 'bg-amber-100 text-amber-700' : ''}
-                      ${backupProgress.status === 'completed' ? 'bg-green-100 text-green-700' : ''}
-                      ${backupProgress.status === 'failed' ? 'bg-red-100 text-red-700' : ''}
+                      ${backupProgress.status === 'pending' ? 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300' : ''}
+                      ${backupProgress.status === 'processing' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : ''}
+                      ${backupProgress.status === 'compressing' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' : ''}
+                      ${backupProgress.status === 'finalizing' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : ''}
+                      ${backupProgress.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : ''}
+                      ${backupProgress.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : ''}
                     `}>
                       {backupProgress.status}
                     </Badge>
@@ -156,7 +162,7 @@ export default function BackupDialogs({
                   </p>
                   {backupProgress.estimatedTimeRemaining && (
                     <div className="flex items-center gap-2 mt-2 text-xs">
-                      <Clock className="h-3 w-3" />
+                      <Clock className="h-3 w-3 text-gray-500 dark:text-gray-400" />
                       <span className="text-gray-500 dark:text-gray-400">
                         {backupProgress.estimatedTimeRemaining}
                       </span>
@@ -167,7 +173,7 @@ export default function BackupDialogs({
               
               {/* Detailed Steps */}
               <div className="space-y-2">
-                <h4 className="text-sm font-medium">Backup Steps</h4>
+                <h4 className="text-sm font-medium dark:text-gray-300">Backup Steps</h4>
                 <div className="space-y-2">
                   {[
                     { step: 'Database Export', completed: backupProgress.percentage >= 20 },
@@ -180,13 +186,17 @@ export default function BackupDialogs({
                       <div className={`
                         w-5 h-5 rounded-full flex items-center justify-center
                         ${item.completed 
-                          ? 'bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400' 
-                          : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600'
+                          ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
+                          : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
                         }
                       `}>
                         {item.completed ? <CheckCircle className="h-3 w-3" /> : <span className="text-xs">{index + 1}</span>}
                       </div>
-                      <span className={`text-sm ${item.completed ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                      <span className={`text-sm ${
+                        item.completed 
+                          ? 'text-green-600 dark:text-green-400' 
+                          : 'text-gray-500 dark:text-gray-400'
+                      }`}>
                         {item.step}
                       </span>
                     </div>
@@ -196,43 +206,43 @@ export default function BackupDialogs({
               
               {/* Stats Section */}
               <div className="grid grid-cols-2 gap-2 pt-2 border-t dark:border-gray-700">
-                <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                <div className="text-center p-2 bg-gray-50 dark:bg-gray-900 rounded-lg">
                   <div className="text-xs text-gray-500 dark:text-gray-400">Type</div>
-                  <div className="font-medium capitalize">{backupType}</div>
+                  <div className="font-medium capitalize dark:text-gray-300">{backupType}</div>
                 </div>
-                <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                <div className="text-center p-2 bg-gray-50 dark:bg-gray-900 rounded-lg">
                   <div className="text-xs text-gray-500 dark:text-gray-400">Started</div>
-                  <div className="font-medium">{format(new Date(), 'HH:mm:ss')}</div>
+                  <div className="font-medium dark:text-gray-300">{format(new Date(), 'HH:mm:ss')}</div>
                 </div>
               </div>
             </div>
           ) : (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="backup-type">Backup Type</Label>
+                <Label htmlFor="backup-type" className="dark:text-gray-300">Backup Type</Label>
                 <Select 
                   value={backupType} 
                   onValueChange={(value: string) => setBackupType(value as any)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                     <SelectValue placeholder="Select backup type" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="full">
+                  <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                    <SelectItem value="full" className="dark:text-gray-300 dark:focus:bg-gray-700">
                       <div className="flex items-center gap-2">
-                        <DatabaseBackup className="h-4 w-4" />
+                        <DatabaseBackup className="h-4 w-4 dark:text-gray-400" />
                         <span>Full System Backup</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="database">
+                    <SelectItem value="database" className="dark:text-gray-300 dark:focus:bg-gray-700">
                       <div className="flex items-center gap-2">
-                        <ServerCog className="h-4 w-4" />
+                        <ServerCog className="h-4 w-4 dark:text-gray-400" />
                         <span>Database Only</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="files">
+                    <SelectItem value="files" className="dark:text-gray-300 dark:focus:bg-gray-700">
                       <div className="flex items-center gap-2">
-                        <FileLock className="h-4 w-4" />
+                        <FileLock className="h-4 w-4 dark:text-gray-400" />
                         <span>Files Only</span>
                       </div>
                     </SelectItem>
@@ -241,17 +251,18 @@ export default function BackupDialogs({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description (Optional)</Label>
+                <Label htmlFor="description" className="dark:text-gray-300">Description (Optional)</Label>
                 <Textarea
                   id="description"
                   placeholder="E.g.: 'Pre-update backup' or 'Weekly backup'"
                   value={backupDescription}
                   onChange={(e) => setBackupDescription(e.target.value)}
                   rows={2}
+                  className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:placeholder-gray-500"
                 />
               </div>
 
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3">
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 border border-blue-200 dark:border-blue-800">
                 <div className="flex items-start gap-2">
                   <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
                   <div className="text-sm text-blue-700 dark:text-blue-300">
@@ -284,15 +295,16 @@ export default function BackupDialogs({
             </div>
           )}
 
-          <AlertDialogFooter>
+          <AlertDialogFooter className="dark:border-gray-700">
             {backupProgress ? (
               backupProgress.status === 'completed' ? (
                 <AlertDialogAction
                   onClick={() => {
                     setShowCreateDialog(false);
                     setBackupDescription('');
+                    if (setBackupProgress) setBackupProgress(null);
                   }}
-                  className="gap-2 bg-green-600 hover:bg-green-700"
+                  className="gap-2 bg-green-600 hover:bg-green-700 text-white"
                 >
                   <CheckCircle className="h-4 w-4" />
                   Done
@@ -302,14 +314,15 @@ export default function BackupDialogs({
                   <AlertDialogCancel
                     onClick={() => {
                       setShowCreateDialog(false);
-                      setBackupProgress(null);
+                      if (setBackupProgress) setBackupProgress(null);
                     }}
+                    className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                   >
                     Close
                   </AlertDialogCancel>
                   <AlertDialogAction
                     onClick={onCreateBackup}
-                    className="gap-2"
+                    className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
                   >
                     <RotateCcw className="h-4 w-4" />
                     Retry
@@ -321,20 +334,26 @@ export default function BackupDialogs({
                   onClick={() => {
                     if (confirm('Are you sure you want to cancel the backup?')) {
                       setShowCreateDialog(false);
-                      setBackupProgress(null);
+                      if (setBackupProgress) setBackupProgress(null);
                     }
                   }}
+                  className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                 >
                   Cancel Backup
                 </AlertDialogCancel>
               )
             ) : (
               <>
-                <AlertDialogCancel disabled={creatingBackup}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel 
+                  disabled={creatingBackup}
+                  className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </AlertDialogCancel>
                 <AlertDialogAction
                   onClick={onCreateBackup}
                   disabled={creatingBackup}
-                  className="gap-2"
+                  className="gap-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white"
                 >
                   {creatingBackup ? (
                     <>
@@ -356,16 +375,16 @@ export default function BackupDialogs({
 
       {/* Bulk Delete Confirmation Dialog */}
       <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="dark:bg-gray-900 dark:border-gray-700">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Selected Backups</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="dark:text-gray-100">Delete Selected Backups</AlertDialogTitle>
+            <AlertDialogDescription className="dark:text-gray-400">
               Are you sure you want to delete {selectedBackupsCount} selected backup{selectedBackupsCount !== 1 ? 's' : ''}?
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {selectionStats.protectedCount > 0 && (
-            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
               <p className="text-sm text-yellow-700 dark:text-yellow-400">
                 <AlertTriangle className="inline h-4 w-4 mr-1" />
                 Warning: {selectionStats.protectedCount} selected backup(s) are protected
@@ -373,11 +392,16 @@ export default function BackupDialogs({
               </p>
             </div>
           )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPerformingBulkAction}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="dark:border-gray-700">
+            <AlertDialogCancel 
+              disabled={isPerformingBulkAction}
+              className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={onBulkDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800"
               disabled={isPerformingBulkAction}
             >
               {isPerformingBulkAction ? (
@@ -395,26 +419,31 @@ export default function BackupDialogs({
 
       {/* Bulk Restore Confirmation Dialog */}
       <AlertDialog open={showBulkRestoreDialog} onOpenChange={setShowBulkRestoreDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="dark:bg-gray-900 dark:border-gray-700">
           <AlertDialogHeader>
-            <AlertDialogTitle>Restore Selected Backups</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="dark:text-gray-100">Restore Selected Backups</AlertDialogTitle>
+            <AlertDialogDescription className="dark:text-gray-400">
               Are you sure you want to restore {selectedBackupsCount} selected backup{selectedBackupsCount !== 1 ? 's' : ''}?
               This will overwrite current data and cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
             <p className="text-sm text-red-700 dark:text-red-400">
               <AlertTriangle className="inline h-4 w-4 mr-1" />
               Critical: This action will overwrite existing system data.
               Make sure you have a current backup before proceeding.
             </p>
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPerformingBulkAction}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="dark:border-gray-700">
+            <AlertDialogCancel 
+              disabled={isPerformingBulkAction}
+              className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={onBulkRestore}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800"
               disabled={isPerformingBulkAction}
             >
               {isPerformingBulkAction ? (

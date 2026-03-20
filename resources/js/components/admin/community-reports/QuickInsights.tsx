@@ -29,9 +29,9 @@ export default function QuickInsights({ filteredReports }: QuickInsightsProps) {
     };
 
     return (
-        <Card className="overflow-hidden border shadow-sm">
+        <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900">
             <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
+                <CardTitle className="text-lg flex items-center gap-2 text-gray-900 dark:text-white">
                     <BarChart3 className="h-5 w-5 text-green-500" />
                     Quick Insights
                 </CardTitle>
@@ -39,41 +39,43 @@ export default function QuickInsights({ filteredReports }: QuickInsightsProps) {
             <CardContent>
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Filtered Stats:</span>
-                        <span className="font-medium">{stats.total} total</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Filtered Stats:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{stats.total} total</span>
                     </div>
                     <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Pending:</span>
-                        <span className="font-medium text-amber-600">{stats.pending}</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Pending:</span>
+                        <span className="font-medium text-amber-600 dark:text-amber-400">{stats.pending}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Resolved:</span>
-                        <span className="font-medium text-green-600">{stats.resolved}</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Resolved:</span>
+                        <span className="font-medium text-green-600 dark:text-green-400">{stats.resolved}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Critical/High:</span>
-                        <span className="font-medium text-red-600">{stats.critical + stats.high}</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Critical/High:</span>
+                        <span className="font-medium text-red-600 dark:text-red-400">{stats.critical + stats.high}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Safety Concerns:</span>
-                        <span className="font-medium text-orange-600">{stats.safetyConcern}</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Safety Concerns:</span>
+                        <span className="font-medium text-orange-600 dark:text-orange-400">{stats.safetyConcern}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Estimated Affected:</span>
-                        <span className="font-medium">{stats.totalEstimatedAffected}</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Estimated Affected:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{stats.totalEstimatedAffected}</span>
                     </div>
                 </div>
-                <div className="mt-4 pt-4 border-t">
-                    <p className="text-sm text-gray-500 mb-2">Distribution by Status:</p>
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Distribution by Status:</p>
                     <div className="space-y-1 text-sm">
                         {Object.entries(statusCounts).map(([status, count]) => {
                             if (count === 0) return null;
                             return (
                                 <div key={status} className="flex items-center justify-between">
-                                    <span className="truncate max-w-[100px]" title={status}>
+                                    <span className="truncate max-w-[100px] text-gray-700 dark:text-gray-300" title={status}>
                                         {status.replace('_', ' ').toUpperCase()}
                                     </span>
-                                    <Badge variant="outline">{count}</Badge>
+                                    <Badge variant="outline" className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600">
+                                        {count}
+                                    </Badge>
                                 </div>
                             );
                         })}

@@ -381,7 +381,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                     {/* Log Details */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Log Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="p-6">
                                 <div className="flex items-start gap-4">
                                     <div className="p-3 rounded-lg bg-gray-100 dark:bg-gray-900">
@@ -485,7 +485,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                                                     {getPaymentDetails(log.properties).map((detail, index) => (
                                                         <div key={index} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded">
+                                                                <div className="p-2 bg-gray-100 dark:bg-gray-900 rounded">
                                                                     {detail.icon}
                                                                 </div>
                                                                 <div className="flex-1">
@@ -507,7 +507,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                                                     {getClearanceDetails(log.properties).map((detail, index) => (
                                                         <div key={index} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded">
+                                                                <div className="p-2 bg-gray-100 dark:bg-gray-900 rounded">
                                                                     {detail.icon}
                                                                 </div>
                                                                 <div className="flex-1">
@@ -526,7 +526,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                                             <div>
                                                 <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Raw Data</h3>
                                                 <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
-                                                    <pre className="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded overflow-x-auto max-h-96 overflow-y-auto">
+                                                    <pre className="text-xs bg-gray-100 dark:bg-gray-900 p-3 rounded overflow-x-auto max-h-96 overflow-y-auto">
                                                         {JSON.stringify(log.properties, null, 2)}
                                                     </pre>
                                                 </div>
@@ -551,7 +551,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                     {/* Sidebar with Quick Info */}
                     <div className="space-y-6">
                         {/* Quick Info Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Information</h3>
                             
                             <div className="space-y-3">
@@ -593,7 +593,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                         </div>
                         
                         {/* Actions Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Actions</h3>
                             
                             <div className="space-y-3">
@@ -608,7 +608,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                                 {log.causer && (
                                     <Link
                                         href={`/users/${log.causer.id}`}
-                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                                     >
                                         <UserIcon className="h-4 w-4" />
                                         View User Profile
@@ -617,7 +617,7 @@ export default function ActivityLogShow({ log }: ActivityLogShowProps) {
                                 
                                 <Link
                                     href="/admin/reports/activity-logs"
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
                                 >
                                     <ArrowLeft className="h-4 w-4" />
                                     Back to Logs

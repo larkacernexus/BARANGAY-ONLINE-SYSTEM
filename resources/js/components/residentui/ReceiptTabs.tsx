@@ -21,7 +21,7 @@ const RECEIPT_TABS = [
     icon: Receipt, 
     color: 'text-gray-500',
     activeColor: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-gray-100 dark:bg-gray-800',
+    bgColor: 'bg-gray-100 dark:bg-gray-900',
     activeBgColor: 'bg-blue-50 dark:bg-blue-900/30',
     borderColor: 'border-gray-200 dark:border-gray-700',
     activeBorderColor: 'border-blue-200 dark:border-blue-800'
@@ -202,7 +202,7 @@ export function ReceiptTabs({
                         "hover:scale-105 transform",
                         isActive 
                             ? tab.activeBgColor || 'bg-blue-50 dark:bg-blue-900/30' 
-                            : tab.bgColor || 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700',
+                            : tab.bgColor || 'bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-700',
                         isActive && (tab.activeBorderColor || 'border border-blue-200 dark:border-blue-800'),
                         !isActive && (tab.borderColor || 'border border-transparent')
                     );
@@ -271,7 +271,7 @@ export function CompactReceiptTabs({
                             "flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors",
                             isActive 
                                 ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300' 
-                                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                : 'bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                         )}
                     >
                         <Icon className="h-3 w-3" />

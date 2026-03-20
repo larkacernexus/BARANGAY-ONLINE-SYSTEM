@@ -227,7 +227,7 @@ export default function CollectionsReport() {
                     <div className="flex items-center gap-3 flex-wrap">
                         <button 
                             onClick={handleReset}
-                            className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
                         >
                             <RefreshCw className="h-4 w-4" />
                             Reset
@@ -242,7 +242,7 @@ export default function CollectionsReport() {
                                 Export
                                 <ChevronDown className="h-4 w-4" />
                             </button>
-                            <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-10 hidden group-hover:block">
+                            <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-10 hidden group-hover:block">
                                 <button 
                                     onClick={() => setExportFormat('csv')}
                                     className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -272,7 +272,7 @@ export default function CollectionsReport() {
                         <button
                             key={index}
                             onClick={() => handleQuickPeriod(quickPeriod)}
-                            className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
                         >
                             {quickPeriod.label}
                         </button>
@@ -291,7 +291,7 @@ export default function CollectionsReport() {
 
                 {/* Stats Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -312,7 +312,7 @@ export default function CollectionsReport() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                                 <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -329,7 +329,7 @@ export default function CollectionsReport() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-amber-600 dark:text-amber-400" />
@@ -346,7 +346,7 @@ export default function CollectionsReport() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                                 <Calendar className="h-6 w-6 text-purple-600 dark:text-purple-400" />
@@ -365,7 +365,7 @@ export default function CollectionsReport() {
                 </div>
 
                 {/* Period Selection and Chart */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -390,7 +390,7 @@ export default function CollectionsReport() {
                                 </select>
                                 <button
                                     onClick={() => setShowDatePicker(!showDatePicker)}
-                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
                                 >
                                     <Calendar className="h-4 w-4" />
                                 </button>
@@ -514,7 +514,7 @@ export default function CollectionsReport() {
                 {/* Category Breakdown and Summary */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Category Breakdown */}
-                    <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                 Collections by Category
@@ -580,7 +580,7 @@ export default function CollectionsReport() {
                     </div>
 
                     {/* Summary Card */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
                             Report Summary
                         </h2>
@@ -642,7 +642,7 @@ export default function CollectionsReport() {
                 </div>
 
                 {/* Recent Collections Table */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                             Daily Collections
@@ -708,7 +708,7 @@ export default function CollectionsReport() {
                                                             {item.count} transaction{item.count !== 1 ? 's' : ''}
                                                         </span>
                                                         {item.count > 0 && (
-                                                            <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                                                            <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400">
                                                                 Avg: {formatCurrency(dailyAvg)}
                                                             </span>
                                                         )}

@@ -74,7 +74,7 @@ export const ModernReportTable = ({
                         const StatusIcon = statusConfig?.icon;
 
                         return (
-                            <TableRow key={report.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+                            <TableRow key={report.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                                 {selectMode && (
                                     <TableCell>
                                         <input

@@ -47,7 +47,8 @@ export default function QuickFilters({
                 onFilterChange.setStatusFilter('all');
             },
             active: filters.priorityFilter === 'critical',
-            color: 'text-red-700 bg-red-50 border-red-200'
+            lightColor: 'text-red-700 bg-red-50 border-red-200',
+            darkColor: 'dark:text-red-400 dark:bg-red-950/50 dark:border-red-800'
         },
         {
             label: 'Safety Concerns',
@@ -57,7 +58,8 @@ export default function QuickFilters({
                 onFilterChange.setPriorityFilter('all');
             },
             active: filters.safetyConcernFilter,
-            color: 'text-orange-700 bg-orange-50 border-orange-200'
+            lightColor: 'text-orange-700 bg-orange-50 border-orange-200',
+            darkColor: 'dark:text-orange-400 dark:bg-orange-950/50 dark:border-orange-800'
         },
         {
             label: 'High Urgency',
@@ -67,7 +69,8 @@ export default function QuickFilters({
                 onFilterChange.setStatusFilter('all');
             },
             active: filters.urgencyFilter === 'high',
-            color: 'text-red-700 bg-red-50 border-red-200'
+            lightColor: 'text-red-700 bg-red-50 border-red-200',
+            darkColor: 'dark:text-red-400 dark:bg-red-950/50 dark:border-red-800'
         },
         {
             label: 'Unassigned',
@@ -77,7 +80,8 @@ export default function QuickFilters({
                 onFilterChange.setStatusFilter('all');
             },
             active: filters.assignedFilter === 'unassigned',
-            color: 'text-gray-700 bg-gray-50 border-gray-200'
+            lightColor: 'text-gray-700 bg-gray-50 border-gray-200',
+            darkColor: 'dark:text-gray-400 dark:bg-gray-900/50 dark:border-gray-700'
         },
         {
             label: 'With Evidence',
@@ -87,7 +91,8 @@ export default function QuickFilters({
                 onFilterChange.setStatusFilter('all');
             },
             active: filters.hasEvidencesFilter,
-            color: 'text-blue-700 bg-blue-50 border-blue-200'
+            lightColor: 'text-blue-700 bg-blue-50 border-blue-200',
+            darkColor: 'dark:text-blue-400 dark:bg-blue-950/50 dark:border-blue-800'
         },
         {
             label: 'Community Impact',
@@ -97,7 +102,8 @@ export default function QuickFilters({
                 onFilterChange.setStatusFilter('all');
             },
             active: filters.affectedPeopleFilter === 'community',
-            color: 'text-purple-700 bg-purple-50 border-purple-200'
+            lightColor: 'text-purple-700 bg-purple-50 border-purple-200',
+            darkColor: 'dark:text-purple-400 dark:bg-purple-950/50 dark:border-purple-800'
         },
         {
             label: 'Environmental Impact',
@@ -107,7 +113,8 @@ export default function QuickFilters({
                 onFilterChange.setStatusFilter('all');
             },
             active: filters.environmentalFilter,
-            color: 'text-green-700 bg-green-50 border-green-200'
+            lightColor: 'text-green-700 bg-green-50 border-green-200',
+            darkColor: 'dark:text-green-400 dark:bg-green-950/50 dark:border-green-800'
         },
         {
             label: 'Recurring Issues',
@@ -117,7 +124,8 @@ export default function QuickFilters({
                 onFilterChange.setStatusFilter('all');
             },
             active: filters.recurringFilter,
-            color: 'text-yellow-700 bg-yellow-50 border-yellow-200'
+            lightColor: 'text-yellow-700 bg-yellow-50 border-yellow-200',
+            darkColor: 'dark:text-yellow-400 dark:bg-yellow-950/50 dark:border-yellow-800'
         },
     ];
 
@@ -129,7 +137,14 @@ export default function QuickFilters({
                     variant="outline"
                     size="sm"
                     onClick={filter.action}
-                    className={`h-7 text-xs ${filter.active ? filter.color : ''}`}
+                    className={`
+                        h-7 text-xs
+                        bg-white dark:bg-gray-900
+                        text-gray-700 dark:text-gray-300
+                        border-gray-200 dark:border-gray-700
+                        hover:bg-gray-100 dark:hover:bg-gray-700
+                        ${filter.active ? `${filter.lightColor} ${filter.darkColor}` : ''}
+                    `}
                 >
                     {filter.icon}
                     <span className="ml-1">{filter.label}</span>

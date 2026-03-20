@@ -278,38 +278,7 @@ export default function ClearanceTypesIndex() {
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get(route('clearance-types.index'), params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== filters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch]);
+   
 
     // Handle window resize
     useEffect(() => {
@@ -687,7 +656,7 @@ export default function ClearanceTypesIndex() {
         params.sort = column;
         params.direction = direction;
         
-        router.get(route('clearance-types.index'), params, {
+        router.get(route('admin.clearance-types.index'), params, {
             preserveState: true,
             preserveScroll: true,
         });
@@ -704,7 +673,7 @@ export default function ClearanceTypesIndex() {
             }
         });
         
-        router.get(route('clearance-types.index'), params, {
+        router.get(route('admin.clearance-types.index'), params, {
             preserveState: true,
             replace: true,
             preserveScroll: true,
@@ -722,7 +691,7 @@ export default function ClearanceTypesIndex() {
             direction: 'asc'
         });
         
-        router.get(route('clearance-types.index'), {}, {
+        router.get(route('admin.clearance-types.index'), {}, {
             preserveState: true,
             preserveScroll: true,
         });
@@ -870,7 +839,7 @@ export default function ClearanceTypesIndex() {
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <KeyRound className="h-4 w-4 text-gray-500" />

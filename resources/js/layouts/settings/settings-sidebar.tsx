@@ -306,7 +306,7 @@ export default function SettingsSidebar({ currentPath, isAdmin = true }: Setting
                         asChild
                         className={cn(
                           'w-full justify-start h-auto py-2.5 px-3',
-                          'transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800',
+                          'transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-900',
                           'hover:translate-x-1',
                           {
                             'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-l-2 border-blue-500': 
@@ -321,7 +321,7 @@ export default function SettingsSidebar({ currentPath, isAdmin = true }: Setting
                               "h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
                               isActive
                                 ? "bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400"
-                                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                                : "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400"
                             )}>
                               <item.icon className="h-4.5 w-4.5" />
                             </div>
@@ -350,7 +350,7 @@ export default function SettingsSidebar({ currentPath, isAdmin = true }: Setting
                                 asChild
                                 className={cn(
                                   'w-full justify-start h-auto py-1.5 px-2 text-xs',
-                                  'transition-colors hover:bg-gray-100 dark:hover:bg-gray-800',
+                                  'transition-colors hover:bg-gray-100 dark:hover:bg-gray-900',
                                   isSubActive && 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
                                 )}
                               >
@@ -379,7 +379,7 @@ export default function SettingsSidebar({ currentPath, isAdmin = true }: Setting
                                 asChild
                                 className={cn(
                                   'w-full justify-start h-auto py-1.5 px-2 text-xs',
-                                  'transition-colors hover:bg-gray-100 dark:hover:bg-gray-800',
+                                  'transition-colors hover:bg-gray-100 dark:hover:bg-gray-900',
                                   isSubActive && 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
                                 )}
                               >
@@ -404,7 +404,7 @@ export default function SettingsSidebar({ currentPath, isAdmin = true }: Setting
         
         {/* Quick Stats for Admin */}
         {isAdmin && (
-          <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
             <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
               System Overview
             </h4>

@@ -119,7 +119,7 @@ export function PurposeDropdown({
 
             {showPurposeDropdown && !disabled && (
                 <div className="absolute z-50 mt-2 w-full rounded-lg border bg-white dark:bg-gray-900 shadow-xl max-h-[60vh]">
-                    <div className="p-3 border-b bg-gray-50 dark:bg-gray-800 sticky top-0">
+                    <div className="p-3 border-b bg-gray-50 dark:bg-gray-900 sticky top-0">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                             <Input
@@ -144,11 +144,11 @@ export function PurposeDropdown({
                                         <button
                                             key={purpose.value}
                                             type="button"
-                                            className={`w-full flex items-center justify-between px-3 py-3 text-sm transition-colors text-left hover:bg-gray-100 dark:hover:bg-gray-800 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                                            className={`w-full flex items-center justify-between px-3 py-3 text-sm transition-colors text-left hover:bg-gray-100 dark:hover:bg-gray-900 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
                                             onClick={() => onSelect(purpose.value, purpose.label)}
                                         >
                                             <div className="flex items-center gap-3 flex-1">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-900'}`}>
                                                     <IconComponent className={`h-4 w-4 ${isSelected ? 'text-blue-600' : 'text-gray-600'}`} />
                                                 </div>
                                                 <div className="text-left">
@@ -174,7 +174,7 @@ export function PurposeDropdown({
                         )}
                     </div>
                     
-                    <div className="p-3 border-t bg-gray-50 dark:bg-gray-800">
+                    <div className="p-3 border-t bg-gray-50 dark:bg-gray-900">
                         <p className="text-xs text-gray-500">
                             {filteredPurposes.length} purpose{filteredPurposes.length !== 1 ? 's' : ''} found
                         </p>

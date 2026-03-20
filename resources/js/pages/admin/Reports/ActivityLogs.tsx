@@ -679,27 +679,7 @@ export default function ActivityLogs() {
         return params;
     };
 
-    // Debounced search function
-    const debouncedSearch = useMemo(
-        () => debounce(() => {
-            const params = buildFilterParams();
-            router.get('/admin/reports/activity-logs', params, {
-                preserveScroll: true,
-                preserveState: true,
-                onStart: () => setIsLoading(true),
-                onFinish: () => setIsLoading(false),
-            });
-        }, 500),
-        [search, eventType, logName, userId, dateFrom, dateTo, perPage]
-    );
-
-    // Update search with debounce
-    useEffect(() => {
-        if (search !== undefined) {
-            debouncedSearch();
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch]);
+ 
 
     // Handle filter changes
     const handleEventTypeChange = (value: string) => {
@@ -888,7 +868,7 @@ export default function ActivityLogs() {
                     </div>
                     
                     <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg p-1">
+                        <div className="flex items-center gap-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-1">
                             <button
                                 onClick={() => setViewMode('list')}
                                 className={`px-3 py-1 rounded text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
@@ -905,7 +885,7 @@ export default function ActivityLogs() {
                         
                         <button
                             onClick={() => setShowFilters(!showFilters)}
-                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900"
                         >
                             <Filter className="h-4 w-4" />
                             {showFilters ? 'Hide Filters' : 'Show Filters'}
@@ -914,7 +894,7 @@ export default function ActivityLogs() {
                         <button
                             onClick={handleRefresh}
                             disabled={isLoading}
-                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900 disabled:opacity-50"
                         >
                             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                             Refresh
@@ -933,7 +913,7 @@ export default function ActivityLogs() {
 
                 {/* Stats Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Logs</p>
@@ -951,7 +931,7 @@ export default function ActivityLogs() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Today's Activities</p>
@@ -969,7 +949,7 @@ export default function ActivityLogs() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">User Activities</p>
@@ -987,7 +967,7 @@ export default function ActivityLogs() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Last 7 Days</p>
@@ -1007,7 +987,7 @@ export default function ActivityLogs() {
                 </div>
 
                 {/* Log Type Tabs */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div className="px-6 pt-6">
                         <div className="flex items-center gap-2 mb-4">
                             <FolderTree className="h-5 w-5 text-gray-500" />
@@ -1047,7 +1027,7 @@ export default function ActivityLogs() {
                                         placeholder={`Search ${activeTab !== 'all' ? logTypeTabs.find(t => t.id === activeTab)?.displayName : ''} activities, users, IP addresses, events...`}
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                     />
                                     {search && (
                                         <button
@@ -1074,7 +1054,7 @@ export default function ActivityLogs() {
                                             <select
                                                 value={logName}
                                                 onChange={(e) => handleLogNameChange(e.target.value)}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                             >
                                                 <option value="">All Log Types</option>
                                                 {log_names?.map((log) => (
@@ -1094,7 +1074,7 @@ export default function ActivityLogs() {
                                         <select
                                             value={eventType}
                                             onChange={(e) => handleEventTypeChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         >
                                             <option value="">All Events</option>
                                             {event_types?.map((event) => (
@@ -1113,7 +1093,7 @@ export default function ActivityLogs() {
                                         <select
                                             value={userId}
                                             onChange={(e) => handleUserIdChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         >
                                             <option value="">All Users</option>
                                             {users?.map((user) => (
@@ -1132,7 +1112,7 @@ export default function ActivityLogs() {
                                         <select
                                             value={perPage.toString()}
                                             onChange={(e) => handlePerPageChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         >
                                             <option value="10">10 per page</option>
                                             <option value="25">25 per page</option>
@@ -1152,7 +1132,7 @@ export default function ActivityLogs() {
                                             type="date"
                                             value={dateFrom}
                                             onChange={(e) => handleDateFromChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         />
                                     </div>
                                     <div>
@@ -1163,7 +1143,7 @@ export default function ActivityLogs() {
                                             type="date"
                                             value={dateTo}
                                             onChange={(e) => handleDateToChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         />
                                     </div>
                                 </div>
@@ -1250,7 +1230,7 @@ export default function ActivityLogs() {
 
                         {/* Activity Logs Table/Grid */}
                         {viewMode === 'list' ? (
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                                 {isLoading ? (
                                     <div className="h-64 flex items-center justify-center">
                                         <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
@@ -1428,7 +1408,7 @@ export default function ActivityLogs() {
                                                                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                                                             Changes Made
                                                                         </h4>
-                                                                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                                                                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                                                                             <div className="space-y-3">
                                                                                 {log.formatted_changes.map((change, index) => (
                                                                                     <div key={index} className="flex items-start justify-between p-2 bg-gray-50 dark:bg-gray-900 rounded">
@@ -1461,7 +1441,7 @@ export default function ActivityLogs() {
                                                                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                                                             Payment Details
                                                                         </h4>
-                                                                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                                                                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                                                 {getPaymentDetails(log).map((detail, index) => (
                                                                                     <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900 rounded">
@@ -1499,7 +1479,7 @@ export default function ActivityLogs() {
                                                                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                                                             Clearance Request Details
                                                                         </h4>
-                                                                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                                                                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                                                 {getClearanceDetails(log).map((detail, index) => (
                                                                                     <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900 rounded">
@@ -1567,7 +1547,7 @@ export default function ActivityLogs() {
                                                                     {log.causer && (
                                                                         <Link
                                                                             href={`/admin/users/${log.causer.id}`}
-                                                                            className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+                                                                            className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 rounded"
                                                                         >
                                                                             <UserIcon className="h-3 w-3" />
                                                                             View User Profile
@@ -1629,7 +1609,7 @@ export default function ActivityLogs() {
                                                             link.active
                                                                 ? 'bg-primary-600 text-white'
                                                                 : link.url
-                                                                ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                                                ? 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                                                                 : 'bg-gray-50 dark:bg-gray-900 text-gray-400 dark:text-gray-600 cursor-not-allowed'
                                                         }`}
                                                         dangerouslySetInnerHTML={{ __html: link.label }}
@@ -1646,7 +1626,7 @@ export default function ActivityLogs() {
                                 {logs.data.map((log) => (
                                     <div 
                                         key={log.id} 
-                                        className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow"
+                                        className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow"
                                     >
                                         <div className="flex items-start gap-3">
                                             <div className={`p-2 rounded-lg ${getLogTypeClass(log.log_name)}`}>
@@ -1756,7 +1736,7 @@ export default function ActivityLogs() {
                     {/* Sidebar with Analytics */}
                     <div className="space-y-6">
                         {/* Recent Activities */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
                                     <Clock className="h-5 w-5 text-primary-600 dark:text-primary-400" />
@@ -1805,7 +1785,7 @@ export default function ActivityLogs() {
                         </div>
 
                         {/* Activity by Log Type */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                     <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -1852,7 +1832,7 @@ export default function ActivityLogs() {
                         </div>
 
                         {/* Event Type Distribution */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
                                     <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -1884,7 +1864,7 @@ export default function ActivityLogs() {
                         </div>
 
                         {/* Top Active Users */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                                     <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />

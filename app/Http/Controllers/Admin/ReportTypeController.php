@@ -400,7 +400,7 @@ class ReportTypeController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return redirect()->route('report-types.index')
+            return redirect()->route('admin.report-types.index')
                 ->with('error', 'Failed to load report type details.');
         }
     }
@@ -470,7 +470,7 @@ class ReportTypeController extends Controller
                 'report_type_id' => $reportType->id,
             ]);
 
-            return redirect()->route('report-types.index')
+            return redirect()->route('admin.report-types.index')
                 ->with('error', 'Failed to load report type for editing.');
         }
     }
@@ -600,7 +600,7 @@ class ReportTypeController extends Controller
                 'report_type_name' => $reportType->name,
             ]);
 
-            return redirect()->route('report-types.index')
+            return redirect()->route('admin.report-types.index')
                 ->with('success', 'Report type deleted successfully.');
 
         } catch (\Exception $e) {

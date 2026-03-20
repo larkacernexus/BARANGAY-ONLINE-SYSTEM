@@ -31,9 +31,9 @@ class Payment extends Model
         'subtotal',
         'surcharge',
         'penalty',
-        'discount', // ADDED: Discount amount applied
-        'total_amount', // subtotal + surcharge + penalty (BEFORE discount)
-        'amount_paid', // Actual cash received from payer
+        'discount',
+        'total_amount',
+        'amount_paid',
         'purpose',
         'remarks',
         'is_cleared',
@@ -42,8 +42,10 @@ class Payment extends Model
         'validity_date',
         'method_details',
         'recorded_by',
-        'discount_code', // ADDED: For tracking which discount was applied
-        'discount_type', // ADDED: Type of discount (percentage/fixed)
+        'discount_code',
+        'discount_type',
+        // DYNAMIC: Store privilege info at time of payment
+        'payer_privileges', // JSON field to store privileges snapshot
     ];
 
     protected $casts = [
@@ -52,11 +54,12 @@ class Payment extends Model
         'subtotal' => 'decimal:2',
         'surcharge' => 'decimal:2',
         'penalty' => 'decimal:2',
-        'discount' => 'decimal:2', // ADDED: Cast as decimal
+        'discount' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'amount_paid' => 'decimal:2',
         'is_cleared' => 'boolean',
         'method_details' => 'array',
+        'payer_privileges' => 'array', // ADDED: Cast to array
     ];
 
     protected $appends = [
@@ -82,20 +85,25 @@ class Payment extends Model
         'has_clearance_request',
         'total_discount',
         'discounts_summary',
-        'amount_due', // NEW: total_amount - discount
+        'amount_due',
         'is_fully_paid',
         'balance',
         'change_due',
         'payment_status',
-        'formatted_amount_due', // NEW
-        'formatted_change_due', // NEW
+        'formatted_amount_due',
+        'formatted_change_due',
+        // DYNAMIC: Add privilege-related fields
+        'payer_privileges_list',
+        'privileges_count',
+        'has_privileges',
     ];
 
     protected $attributes = [
         'status' => 'completed',
         'collection_type' => 'manual',
         'amount_paid' => 0.00,
-        'discount' => 0.00, // ADDED: Default value
+        'discount' => 0.00,
+        'payer_privileges' => '[]', // Default empty JSON array
     ];
 
     /**
@@ -133,12 +141,10 @@ class Payment extends Model
         parent::boot();
         
         static::saving(function ($payment) {
-            // Ensure amount_paid is not negative
             if ($payment->amount_paid < 0) {
                 throw new \Exception('Amount paid cannot be negative.');
             }
             
-            // Auto-update status based on payment
             $payment->updatePaymentStatus();
         });
         
@@ -149,6 +155,13 @@ class Payment extends Model
                         $item->fee->recalculate()->save();
                     }
                 }
+            }
+        });
+        
+        // ADDED: Capture payer privileges at time of payment
+        static::creating(function ($payment) {
+            if (!$payment->payer_privileges && $payment->payer_id && $payment->payer_type) {
+                $payment->capturePayerPrivileges();
             }
         });
     }
@@ -221,7 +234,128 @@ class Payment extends Model
             ?->clearanceRequest;
     }
 
-    // ==================== CORRECTED ACCESSORS ====================
+    // ==================== PRIVILEGE METHODS ====================
+
+    /**
+     * Capture payer's privileges at time of payment
+     */
+    public function capturePayerPrivileges()
+    {
+        if (!$this->payer_id || !$this->payer_type) {
+            return $this;
+        }
+
+        $privileges = [];
+
+        if ($this->payer_type === 'App\Models\Resident' || $this->payer_type === 'resident') {
+            $resident = Resident::with(['residentPrivileges.privilege'])->find($this->payer_id);
+            
+            if ($resident) {
+                $privileges = $resident->residentPrivileges
+                    ->filter(function ($rp) {
+                        return $rp->isActive();
+                    })
+                    ->map(function ($rp) {
+                        $privilege = $rp->privilege;
+                        return [
+                            'id' => $rp->id,
+                            'privilege_id' => $privilege->id,
+                            'code' => $privilege->code,
+                            'name' => $privilege->name,
+                            'id_number' => $rp->id_number,
+                            'discount_percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
+                            'verified_at' => $rp->verified_at?->toISOString(),
+                            'expires_at' => $rp->expires_at?->toISOString(),
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+            }
+        } elseif ($this->payer_type === 'App\Models\Household' || $this->payer_type === 'household') {
+            $household = Household::with(['householdMembers' => function ($query) {
+                $query->where('is_head', true)->with('resident.residentPrivileges.privilege');
+            }])->find($this->payer_id);
+
+            if ($household) {
+                $headMember = $household->householdMembers->first();
+                if ($headMember && $headMember->resident) {
+                    $privileges = $headMember->resident->residentPrivileges
+                        ->filter(function ($rp) {
+                            return $rp->isActive();
+                        })
+                        ->map(function ($rp) {
+                            $privilege = $rp->privilege;
+                            return [
+                                'id' => $rp->id,
+                                'privilege_id' => $privilege->id,
+                                'code' => $privilege->code,
+                                'name' => $privilege->name,
+                                'id_number' => $rp->id_number,
+                                'discount_percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
+                                'verified_at' => $rp->verified_at?->toISOString(),
+                                'expires_at' => $rp->expires_at?->toISOString(),
+                            ];
+                        })
+                        ->values()
+                        ->toArray();
+                }
+            }
+        }
+
+        $this->payer_privileges = $privileges;
+        return $this;
+    }
+
+    /**
+     * Get payer privileges list
+     */
+    public function getPayerPrivilegesListAttribute()
+    {
+        return $this->payer_privileges ?? [];
+    }
+
+    /**
+     * Get privileges count
+     */
+    public function getPrivilegesCountAttribute()
+    {
+        return count($this->payer_privileges ?? []);
+    }
+
+    /**
+     * Check if payer has privileges
+     */
+    public function getHasPrivilegesAttribute()
+    {
+        return $this->privileges_count > 0;
+    }
+
+    /**
+     * Check if payer has specific privilege code at time of payment
+     */
+    public function hadPrivilege($code)
+    {
+        if (!$this->payer_privileges) {
+            return false;
+        }
+
+        return collect($this->payer_privileges)->contains('code', $code);
+    }
+
+    /**
+     * Get privilege ID number
+     */
+    public function getPrivilegeIdNumber($code)
+    {
+        if (!$this->payer_privileges) {
+            return null;
+        }
+
+        $privilege = collect($this->payer_privileges)->firstWhere('code', $code);
+        return $privilege['id_number'] ?? null;
+    }
+
+    // ==================== ACCESSORS ====================
     
     /**
      * Get the amount due after discount (what the payer should pay)
@@ -467,18 +601,40 @@ class Payment extends Model
     public function getPayerDetailsAttribute()
     {
         if ($this->payer_type === 'resident' && $this->resident) {
-            return [
+            // Get active privileges
+            $activePrivileges = $this->resident->residentPrivileges
+                ?->filter(function ($rp) {
+                    return $rp->isActive();
+                })
+                ->map(function ($rp) {
+                    return [
+                        'code' => $rp->privilege->code,
+                        'name' => $rp->privilege->name,
+                        'id_number' => $rp->id_number,
+                    ];
+                })
+                ->values()
+                ->toArray() ?? [];
+
+            // DYNAMIC privilege flags
+            $privilegeFlags = [];
+            foreach ($activePrivileges as $priv) {
+                $code = strtolower($priv['code']);
+                $privilegeFlags["is_{$code}"] = true;
+            }
+
+            return array_merge([
                 'id' => $this->resident->id,
                 'name' => $this->resident->name ?? $this->resident->full_name ?? 'Unknown',
                 'contact_number' => $this->resident->contact_number,
                 'email' => $this->resident->email,
                 'address' => $this->resident->address,
                 'purok' => $this->resident->purok,
-                'is_senior' => $this->resident->is_senior,
-                'is_pwd' => $this->resident->is_pwd,
-                'is_solo_parent' => $this->resident->is_solo_parent,
-                'is_indigent' => $this->resident->is_indigent,
-            ];
+                'privileges' => $activePrivileges,
+                'privileges_count' => count($activePrivileges),
+                'has_privileges' => count($activePrivileges) > 0,
+                'snapshot_privileges' => $this->payer_privileges, // Include snapshot
+            ], $privilegeFlags);
         }
 
         if ($this->payer_type === 'household' && $this->household) {
@@ -490,10 +646,13 @@ class Payment extends Model
                 'address' => $this->household->address,
                 'purok' => $this->household->purok,
                 'member_count' => $this->household->members_count,
+                'snapshot_privileges' => $this->payer_privileges,
             ];
         }
 
-        return null;
+        return [
+            'snapshot_privileges' => $this->payer_privileges,
+        ];
     }
 
     public function getIsClearancePaymentAttribute()
@@ -711,6 +870,7 @@ class Payment extends Model
             'method' => $this->payment_method_display,
             'discounts' => $this->discounts_summary,
             'status' => $this->status_display,
+            'payer_privileges' => $this->payer_privileges, // Include snapshot
         ];
     }
     
@@ -734,7 +894,8 @@ class Payment extends Model
                 'amount_paid' => $this->formatted_amount_paid,
                 'balance' => $this->formatted_balance,
                 'change' => $this->formatted_change_due,
-            ]
+            ],
+            'payer_privileges' => $this->payer_privileges,
         ];
     }
 }

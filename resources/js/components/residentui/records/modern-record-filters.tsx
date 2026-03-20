@@ -86,7 +86,7 @@ export const ModernRecordFilters = ({
                                         "flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap",
                                         activeTab === category.id
                                             ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700'
                                     )}
                                     onClick={() => handleTabChange(category.id)}
                                 >
@@ -114,7 +114,7 @@ export const ModernRecordFilters = ({
                         )}
 
                         {/* View Toggle */}
-                        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                        <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
                             <Button
                                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                 size="sm"

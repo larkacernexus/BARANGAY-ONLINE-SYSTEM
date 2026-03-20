@@ -530,7 +530,7 @@ class ResidentPaymentController extends Controller
         // Get head resident
         $headResident = $this->getHeadResident($household);
         
-        return Inertia::render('Resident/Payments/Pay', [
+        return Inertia::render('resident/Payments/Pay', [
             'paymentTypes' => $paymentTypes,
             'certificateTypes' => $certificateTypes,
             'household' => $household,
@@ -741,7 +741,7 @@ class ResidentPaymentController extends Controller
         $payment->load(['items', 'resident', 'household']);
         $formattedPayment = $this->formatPaymentForFrontend($payment);
         
-        return Inertia::render('Resident/Payments/Receipt', [
+        return Inertia::render('resident/Payments/Receipt', [
             'payment' => $formattedPayment,
         ]);
     }

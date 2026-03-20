@@ -1,13 +1,15 @@
+// components/admin/feesCreate/RightColumn.tsx
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Building, Home, Phone, MapPin, FileText, Info, Search } from 'lucide-react';
-import { FeeFormData, Resident, Household } from '@/types/fees';
-import { getEligibilityBadges } from '@/admin-utils/fees/discount-display-utils';
+import { User, Building, Home, Phone, MapPin, FileText, Info, Search, Award, Calendar } from 'lucide-react';
+import { FeeFormData, Resident, Household, Privilege } from '@/types/fees';
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface RightColumnProps {
     data: FeeFormData;
@@ -16,6 +18,7 @@ interface RightColumnProps {
     residents: Resident[];
     households: Household[];
     puroks: string[];
+    allPrivileges?: Privilege[]; // Added
     errors?: Record<string, string>;
     handlePayerTypeChange: (payerType: string) => void;
     handleResidentSelect: (residentId: string) => void;
@@ -38,6 +41,7 @@ export default function RightColumn({
     residents,
     households,
     puroks,
+    allPrivileges = [],
     errors,
     handlePayerTypeChange,
     handleResidentSelect,
@@ -109,13 +113,66 @@ export default function RightColumn({
         };
     }, []);
 
-    const residentBadges = selectedPayer && 'is_senior' in selectedPayer 
-        ? getEligibilityBadges(selectedPayer as Resident)
-        : [];
+    // Get resident privileges badges
+    const getResidentBadges = (resident: Resident) => {
+        const badges = [];
+        
+        if (resident.privileges && resident.privileges.length > 0) {
+            resident.privileges.forEach((rp: any) => {
+                badges.push({
+                    code: rp.code,
+                    label: rp.name,
+                    icon: getPrivilegeIcon(rp.code),
+                    color: getPrivilegeColor(rp.code),
+                    id_number: rp.id_number
+                });
+            });
+        }
+        
+        return badges;
+    };
+
+    // Helper to get privilege icon
+    const getPrivilegeIcon = (code: string): string => {
+        const icons: Record<string, string> = {
+            'SC': '👴',
+            'OSP': '👴',
+            'PWD': '♿',
+            'SP': '👨‍👧',
+            'IND': '🏠',
+            '4PS': '📦',
+            'IP': '🌿',
+            'FRM': '🌾',
+            'FSH': '🎣',
+            'OFW': '✈️',
+            'SCH': '📚',
+            'UNE': '💼',
+        };
+        return icons[code] || '🎫';
+    };
+
+    // Helper to get privilege color
+    const getPrivilegeColor = (code: string): string => {
+        const colors: Record<string, string> = {
+            'SC': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+            'OSP': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+            'PWD': 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+            'SP': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+            'IND': 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+            '4PS': 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
+            'IP': 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800',
+            'FRM': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+            'FSH': 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800',
+            'OFW': 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800',
+            'SCH': 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800',
+            'UNE': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700',
+        };
+        return colors[code] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
+    };
 
     // Handle resident selection
     const handleResidentSelectWithSearch = (residentId: string) => {
-        console.log('Selected resident ID:', residentId); // For debugging
+        console.log('Selected resident ID:', residentId);
         
         // Find the selected resident
         const selected = residents.find(r => r.id === residentId);
@@ -128,7 +185,7 @@ export default function RightColumn({
             setData('payer_name', selected.full_name);
             setData('contact_number', selected.contact_number || '');
             setData('purok', selected.purok || '');
-            setData('payer_type', 'resident'); // Ensure payer type is set
+            setData('payer_type', 'resident');
             
             // Also call the parent handler for consistency
             handleResidentSelect(residentId);
@@ -151,7 +208,7 @@ export default function RightColumn({
 
     // Handle household selection
     const handleHouseholdSelectWithSearch = (householdId: string) => {
-        console.log('Selected household ID:', householdId); // For debugging
+        console.log('Selected household ID:', householdId);
         
         // Find the selected household
         const selected = households.find(h => h.id === householdId);
@@ -164,7 +221,7 @@ export default function RightColumn({
             setData('payer_name', selected.name);
             setData('contact_number', selected.contact_number || '');
             setData('purok', selected.purok || '');
-            setData('payer_type', 'household'); // Ensure payer type is set
+            setData('payer_type', 'household');
             
             // Also call the parent handler for consistency
             handleHouseholdSelect(householdId);
@@ -189,7 +246,6 @@ export default function RightColumn({
     const handleClearResident = () => {
         setResidentSearch('');
         setShowResidentDropdown(false);
-        // Clear selection properly
         setData('resident_id', '');
         setData('payer_name', '');
         setData('contact_number', '');
@@ -201,7 +257,6 @@ export default function RightColumn({
     const handleClearHousehold = () => {
         setHouseholdSearch('');
         setShowHouseholdDropdown(false);
-        // Clear selection properly
         setData('household_id', '');
         setData('payer_name', '');
         setData('contact_number', '');
@@ -226,25 +281,31 @@ export default function RightColumn({
         }
     }, [selectedPayer, data.payer_type]);
 
+    const residentBadges = selectedPayer && 'full_name' in selectedPayer 
+        ? getResidentBadges(selectedPayer as Resident)
+        : [];
+
     return (
         <div className="space-y-6">
             {/* Payer Information Card */}
-            <Card>
+            <Card className="dark:bg-gray-900">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <User className="h-5 w-5" />
+                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center">
+                            <User className="h-3 w-3 text-white" />
+                        </div>
                         Payer Information
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="dark:text-gray-400">
                         Select or enter payer details
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {hideIndividualSelection ? (
-                        <div className="rounded-md bg-blue-50 border border-blue-200 p-4">
+                        <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4">
                             <div className="flex items-start gap-3">
-                                <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                                <div className="text-sm text-blue-700">
+                                <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                                <div className="text-sm text-blue-700 dark:text-blue-300">
                                     <p className="font-medium">Bulk Fee Mode Active</p>
                                     <p className="mt-1">
                                         Payer selection is managed in the bulk selection panel. 
@@ -258,7 +319,7 @@ export default function RightColumn({
                         <>
                             <div className="space-y-4">
                                 <div>
-                                    <Label>Payer Type *</Label>
+                                    <Label className="dark:text-gray-300">Payer Type *</Label>
                                     <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3">
                                         {payerTypes.map((type) => {
                                             const IconComponent = type.icon;
@@ -268,7 +329,6 @@ export default function RightColumn({
                                                     type="button"
                                                     onClick={() => {
                                                         handlePayerTypeChange(type.value);
-                                                        // Clear any previous selections
                                                         if (type.value !== 'resident') {
                                                             handleClearResident();
                                                         }
@@ -278,12 +338,12 @@ export default function RightColumn({
                                                     }}
                                                     className={`flex flex-col items-center justify-center rounded-md border p-3 transition-colors ${
                                                         data.payer_type === type.value
-                                                            ? 'border-primary bg-primary/10 text-primary'
-                                                            : 'border-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                                            ? 'border-primary bg-primary/10 text-primary dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                            : 'border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
                                                     }`}
                                                 >
-                                                    <IconComponent className="mb-1 h-5 w-5" />
-                                                    <span className="text-xs font-medium">
+                                                    <IconComponent className="mb-1 h-5 w-5 dark:text-gray-400" />
+                                                    <span className="text-xs font-medium dark:text-gray-300">
                                                         {type.label}
                                                     </span>
                                                 </button>
@@ -291,7 +351,7 @@ export default function RightColumn({
                                         })}
                                     </div>
                                     {errors?.payer_type && (
-                                        <p className="text-sm text-red-500">
+                                        <p className="text-sm text-red-500 dark:text-red-400">
                                             {errors.payer_type}
                                         </p>
                                     )}
@@ -300,13 +360,13 @@ export default function RightColumn({
                                 {/* Resident Selection with Search */}
                                 {data.payer_type === 'resident' && (
                                     <div className="space-y-2">
-                                        <Label htmlFor="resident_search">
+                                        <Label htmlFor="resident_search" className="dark:text-gray-300">
                                             Select Resident *
                                         </Label>
                                         
                                         {/* Search input */}
                                         <div className="relative">
-                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400 dark:text-gray-500" />
                                             <Input
                                                 ref={residentInputRef}
                                                 id="resident_search"
@@ -318,14 +378,14 @@ export default function RightColumn({
                                                     setShowResidentDropdown(true);
                                                 }}
                                                 onFocus={() => setShowResidentDropdown(true)}
-                                                className="pl-8"
+                                                className="pl-8 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                                 autoComplete="off"
                                             />
                                             {residentSearch && (
                                                 <button
                                                     type="button"
                                                     onClick={handleClearResident}
-                                                    className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+                                                    className="absolute right-2 top-2.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400"
                                                 >
                                                     ×
                                                 </button>
@@ -336,42 +396,56 @@ export default function RightColumn({
                                         {showResidentDropdown && (
                                             <div 
                                                 ref={residentDropdownRef}
-                                                className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg"
+                                                className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg"
                                                 style={{ width: 'calc(100% - 2rem)' }}
                                             >
                                                 {filteredResidents.length > 0 ? (
-                                                    filteredResidents.map((resident) => (
-                                                        <button
-                                                            key={resident.id}
-                                                            type="button"
-                                                            onClick={() => handleResidentSelectWithSearch(resident.id)}
-                                                            className="w-full px-4 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b last:border-b-0"
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <div>
-                                                                    <span className="font-medium">{resident.full_name}</span>
-                                                                    {resident.purok && (
-                                                                        <span className="ml-2 text-sm text-gray-500">
-                                                                            (Purok {resident.purok})
-                                                                        </span>
-                                                                    )}
+                                                    filteredResidents.map((resident) => {
+                                                        const badges = getResidentBadges(resident);
+                                                        return (
+                                                            <button
+                                                                key={resident.id}
+                                                                type="button"
+                                                                onClick={() => handleResidentSelectWithSearch(resident.id)}
+                                                                className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none border-b dark:border-gray-700 last:border-b-0"
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <div>
+                                                                        <span className="font-medium dark:text-gray-200">{resident.full_name}</span>
+                                                                        {resident.purok && (
+                                                                            <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                                                                                (Purok {resident.purok})
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex gap-1">
+                                                                        {badges.slice(0, 3).map((badge, idx) => (
+                                                                            <TooltipProvider key={idx}>
+                                                                                <Tooltip>
+                                                                                    <TooltipTrigger asChild>
+                                                                                        <span className="text-sm cursor-help" title={badge.label}>
+                                                                                            {badge.icon}
+                                                                                        </span>
+                                                                                    </TooltipTrigger>
+                                                                                    <TooltipContent>
+                                                                                        <p>{badge.label}</p>
+                                                                                        {badge.id_number && <p className="text-xs">ID: {badge.id_number}</p>}
+                                                                                    </TooltipContent>
+                                                                                </Tooltip>
+                                                                            </TooltipProvider>
+                                                                        ))}
+                                                                    </div>
                                                                 </div>
-                                                                <div className="flex gap-1">
-                                                                    {resident.is_senior && <span className="text-sm" title="Senior Citizen">👵</span>}
-                                                                    {resident.is_pwd && <span className="text-sm" title="PWD">♿</span>}
-                                                                    {resident.is_solo_parent && <span className="text-sm" title="Solo Parent">👨‍👧‍👦</span>}
-                                                                    {resident.is_indigent && <span className="text-sm" title="Indigent">🏠</span>}
-                                                                </div>
-                                                            </div>
-                                                            {resident.address && (
-                                                                <div className="text-xs text-gray-500 mt-1">
-                                                                    {resident.address}
-                                                                </div>
-                                                            )}
-                                                        </button>
-                                                    ))
+                                                                {resident.address && (
+                                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                                        {resident.address}
+                                                                    </div>
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })
                                                 ) : (
-                                                    <div className="px-4 py-3 text-sm text-gray-500">
+                                                    <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                                                         No residents found matching "{residentSearch}"
                                                     </div>
                                                 )}
@@ -399,13 +473,13 @@ export default function RightColumn({
 
                                         {/* Selected resident details */}
                                         {selectedPayer && 'full_name' in selectedPayer && data.resident_id && (
-                                            <div className="mt-2 rounded-md bg-green-50 border border-green-200 p-3">
+                                            <div className="mt-2 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                                                    <span className="text-sm font-medium text-green-700">Selected:</span>
+                                                    <div className="h-2 w-2 rounded-full bg-green-500 dark:bg-green-400"></div>
+                                                    <span className="text-sm font-medium text-green-700 dark:text-green-400">Selected:</span>
                                                 </div>
-                                                <div className="mt-1 font-medium">{selectedPayer.full_name}</div>
-                                                <div className="text-sm text-gray-600 mt-1">
+                                                <div className="mt-1 font-medium dark:text-gray-200">{selectedPayer.full_name}</div>
+                                                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                                     {selectedPayer.purok && `Purok ${selectedPayer.purok}`}
                                                     {selectedPayer.address && ` • ${selectedPayer.address}`}
                                                 </div>
@@ -417,13 +491,13 @@ export default function RightColumn({
                                 {/* Household Selection with Search */}
                                 {data.payer_type === 'household' && (
                                     <div className="space-y-2">
-                                        <Label htmlFor="household_search">
+                                        <Label htmlFor="household_search" className="dark:text-gray-300">
                                             Select Household *
                                         </Label>
                                         
                                         {/* Search input */}
                                         <div className="relative">
-                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400 dark:text-gray-500" />
                                             <Input
                                                 ref={householdInputRef}
                                                 id="household_search"
@@ -435,14 +509,14 @@ export default function RightColumn({
                                                     setShowHouseholdDropdown(true);
                                                 }}
                                                 onFocus={() => setShowHouseholdDropdown(true)}
-                                                className="pl-8"
+                                                className="pl-8 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                                 autoComplete="off"
                                             />
                                             {householdSearch && (
                                                 <button
                                                     type="button"
                                                     onClick={handleClearHousehold}
-                                                    className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+                                                    className="absolute right-2 top-2.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400"
                                                 >
                                                     ×
                                                 </button>
@@ -453,7 +527,7 @@ export default function RightColumn({
                                         {showHouseholdDropdown && (
                                             <div 
                                                 ref={householdDropdownRef}
-                                                className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg"
+                                                className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg"
                                                 style={{ width: 'calc(100% - 2rem)' }}
                                             >
                                                 {filteredHouseholds.length > 0 ? (
@@ -462,32 +536,42 @@ export default function RightColumn({
                                                             key={household.id}
                                                             type="button"
                                                             onClick={() => handleHouseholdSelectWithSearch(household.id)}
-                                                            className="w-full px-4 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b last:border-b-0"
+                                                            className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none border-b dark:border-gray-700 last:border-b-0"
                                                         >
                                                             <div className="flex items-center justify-between">
                                                                 <div>
-                                                                    <span className="font-medium">{household.name}</span>
+                                                                    <span className="font-medium dark:text-gray-200">{household.name}</span>
                                                                     {household.purok && (
-                                                                        <span className="ml-2 text-sm text-gray-500">
+                                                                        <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
                                                                             (Purok {household.purok})
                                                                         </span>
                                                                     )}
                                                                 </div>
                                                                 {household.member_count && (
-                                                                    <span className="text-xs text-gray-500">
+                                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
                                                                         {household.member_count} members
                                                                     </span>
                                                                 )}
                                                             </div>
                                                             {household.address && (
-                                                                <div className="text-xs text-gray-500 mt-1">
+                                                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                                     {household.address}
+                                                                </div>
+                                                            )}
+                                                            {/* Show head's privileges if any */}
+                                                            {household.head_privileges && household.head_privileges.length > 0 && (
+                                                                <div className="mt-1 flex gap-1">
+                                                                    {household.head_privileges.slice(0, 2).map((p: any, idx: number) => (
+                                                                        <Badge key={idx} variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
+                                                                            {p.name}
+                                                                        </Badge>
+                                                                    ))}
                                                                 </div>
                                                             )}
                                                         </button>
                                                     ))
                                                 ) : (
-                                                    <div className="px-4 py-3 text-sm text-gray-500">
+                                                    <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                                                         No households found matching "{householdSearch}"
                                                     </div>
                                                 )}
@@ -515,17 +599,26 @@ export default function RightColumn({
 
                                         {/* Selected household details */}
                                         {selectedPayer && 'name' in selectedPayer && data.household_id && (
-                                            <div className="mt-2 rounded-md bg-green-50 border border-green-200 p-3">
+                                            <div className="mt-2 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                                                    <span className="text-sm font-medium text-green-700">Selected:</span>
+                                                    <div className="h-2 w-2 rounded-full bg-green-500 dark:bg-green-400"></div>
+                                                    <span className="text-sm font-medium text-green-700 dark:text-green-400">Selected:</span>
                                                 </div>
-                                                <div className="mt-1 font-medium">{selectedPayer.name}</div>
-                                                <div className="text-sm text-gray-600 mt-1">
+                                                <div className="mt-1 font-medium dark:text-gray-200">{selectedPayer.name}</div>
+                                                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                                     {selectedPayer.purok && `Purok ${selectedPayer.purok}`}
                                                     {selectedPayer.address && ` • ${selectedPayer.address}`}
                                                     {selectedPayer.member_count && ` • ${selectedPayer.member_count} members`}
                                                 </div>
+                                                {selectedPayer.head_privileges && selectedPayer.head_privileges.length > 0 && (
+                                                    <div className="mt-2 flex gap-1">
+                                                        {selectedPayer.head_privileges.map((p: any, idx: number) => (
+                                                            <Badge key={idx} variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
+                                                                {p.name}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -534,7 +627,7 @@ export default function RightColumn({
                                 {/* Business Name */}
                                 {data.payer_type === 'business' && (
                                     <div className="space-y-2">
-                                        <Label htmlFor="business_name">
+                                        <Label htmlFor="business_name" className="dark:text-gray-300">
                                             Business Name *
                                         </Label>
                                         <Input
@@ -546,6 +639,7 @@ export default function RightColumn({
                                                 setData('payer_name', e.target.value);
                                             }}
                                             placeholder="Enter business name"
+                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                         />
                                     </div>
                                 )}
@@ -553,7 +647,7 @@ export default function RightColumn({
                                 {/* Manual Payer Name */}
                                 {(data.payer_type === 'visitor' || data.payer_type === 'other') && (
                                     <div className="space-y-2">
-                                        <Label htmlFor="payer_name">
+                                        <Label htmlFor="payer_name" className="dark:text-gray-300">
                                             Payer Name *
                                         </Label>
                                         <Input
@@ -562,6 +656,7 @@ export default function RightColumn({
                                             value={safeString(data.payer_name)}
                                             onChange={(e) => setData('payer_name', e.target.value)}
                                             placeholder="Enter payer's full name"
+                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                         />
                                     </div>
                                 )}
@@ -569,8 +664,8 @@ export default function RightColumn({
                                 {/* Contact Information */}
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="contact_number" className="flex items-center">
-                                            <Phone className="mr-1 h-4 w-4" />
+                                        <Label htmlFor="contact_number" className="flex items-center dark:text-gray-300">
+                                            <Phone className="mr-1 h-4 w-4 dark:text-gray-400" />
                                             Contact Number
                                         </Label>
                                         <Input
@@ -578,24 +673,25 @@ export default function RightColumn({
                                             value={safeString(data.contact_number)}
                                             onChange={(e) => setData('contact_number', e.target.value)}
                                             placeholder="09XXXXXXXXX"
+                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="purok" className="flex items-center">
-                                            <MapPin className="mr-1 h-4 w-4" />
+                                        <Label htmlFor="purok" className="flex items-center dark:text-gray-300">
+                                            <MapPin className="mr-1 h-4 w-4 dark:text-gray-400" />
                                             Purok
                                         </Label>
                                         <Select
                                             value={safeString(data.purok) || 'none'}
                                             onValueChange={(value) => setData('purok', value === 'none' ? '' : value)}
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                                 <SelectValue placeholder="Select Purok" />
                                             </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">Select Purok</SelectItem>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                <SelectItem value="none" className="dark:text-gray-300 dark:focus:bg-gray-700">Select Purok</SelectItem>
                                                 {puroks.map((purok) => (
-                                                    <SelectItem key={purok} value={purok}>
+                                                    <SelectItem key={purok} value={purok} className="dark:text-gray-300 dark:focus:bg-gray-700">
                                                         Purok {purok}
                                                     </SelectItem>
                                                 ))}
@@ -605,7 +701,7 @@ export default function RightColumn({
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="address">
+                                    <Label htmlFor="address" className="dark:text-gray-300">
                                         Address
                                     </Label>
                                     <Textarea
@@ -614,46 +710,52 @@ export default function RightColumn({
                                         value={safeString(data.address)}
                                         onChange={(e) => setData('address', e.target.value)}
                                         placeholder="Complete address"
+                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                     />
                                 </div>
                             </div>
 
-                            {/* Payer Eligibility Information - Informational Only */}
-                            {data.payer_type === 'resident' && selectedPayer && 'is_senior' in selectedPayer && (
-                                <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-4">
+                            {/* Payer Eligibility Information - Dynamically from Privileges */}
+                            {data.payer_type === 'resident' && selectedPayer && 'full_name' in selectedPayer && (
+                                <div className="mt-4 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-4">
                                     <div className="flex items-center gap-2 mb-3">
-                                        <Info className="h-4 w-4 text-blue-600" />
-                                        <h4 className="font-medium text-sm text-blue-700">Payer Eligibility Information</h4>
+                                        <Award className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                        <h4 className="font-medium text-sm text-purple-700 dark:text-purple-300">Privileges & Discount Eligibility</h4>
                                     </div>
                                     
                                     {residentBadges.length > 0 ? (
                                         <div className="space-y-2">
                                             <div className="flex flex-wrap gap-2">
                                                 {residentBadges.map((badge, idx) => (
-                                                    <Badge 
-                                                        key={idx} 
-                                                        variant="outline"
-                                                        className={`text-xs px-2 py-1 ${badge.color}`}
-                                                    >
-                                                        <span className="mr-1">{badge.icon}</span>
-                                                        {badge.label}
-                                                    </Badge>
+                                                    <TooltipProvider key={idx}>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Badge 
+                                                                    variant="outline"
+                                                                    className={`text-xs px-2 py-1 cursor-help ${badge.color}`}
+                                                                >
+                                                                    <span className="mr-1">{badge.icon}</span>
+                                                                    {badge.label}
+                                                                </Badge>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>Privilege: {badge.code}</p>
+                                                                {badge.id_number && <p>ID: {badge.id_number}</p>}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
                                                 ))}
                                             </div>
-                                            <div className="mt-2 text-xs text-gray-500">
+                                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                                 <p>
-                                                    <strong>Note:</strong> These eligibility markers are for reference only. 
-                                                    Actual discounts will be applied during payment processing upon presentation 
-                                                    of valid government-issued IDs, as required by Philippine law.
-                                                </p>
-                                                <p className="mt-1 italic">
-                                                    RA 9994 (Senior Citizens) • RA 10754 (PWDs) • RA 8972 (Solo Parents)
+                                                    <strong>Note:</strong> These privileges are for reference only. 
+                                                    Actual discounts will be applied during payment processing upon verification.
                                                 </p>
                                             </div>
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-gray-500">
-                                            No special eligibility markers for this resident.
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            No active privileges for this resident.
                                         </p>
                                     )}
                                 </div>
@@ -664,19 +766,21 @@ export default function RightColumn({
             </Card>
 
             {/* Additional Information Card */}
-            <Card>
+            <Card className="dark:bg-gray-900">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
+                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 flex items-center justify-center">
+                            <FileText className="h-3 w-3 text-white" />
+                        </div>
                         Additional Information
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="dark:text-gray-400">
                         Provide additional details and remarks
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="purpose">
+                        <Label htmlFor="purpose" className="dark:text-gray-300">
                             Purpose / Description
                         </Label>
                         <Textarea
@@ -685,13 +789,14 @@ export default function RightColumn({
                             value={safeString(data.purpose)}
                             onChange={(e) => setData('purpose', e.target.value)}
                             placeholder="Describe the purpose of this fee or provide additional details..."
+                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                         />
                     </div>
 
                     {data.payer_type === 'business' && (
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="business_type">
+                                <Label htmlFor="business_type" className="dark:text-gray-300">
                                     Business Type
                                 </Label>
                                 <Input
@@ -699,14 +804,15 @@ export default function RightColumn({
                                     value={safeString(data.business_type)}
                                     onChange={(e) => setData('business_type', e.target.value)}
                                     placeholder="e.g., Retail, Restaurant, Service"
+                                    className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="area">
+                                <Label htmlFor="area" className="dark:text-gray-300">
                                     Area (sq.m.)
                                 </Label>
                                 <div className="relative">
-                                    <span className="absolute top-1/2 left-3 -translate-y-1/2 transform text-gray-500">
+                                    <span className="absolute top-1/2 left-3 -translate-y-1/2 transform text-gray-500 dark:text-gray-400">
                                         m²
                                     </span>
                                     <Input
@@ -714,7 +820,7 @@ export default function RightColumn({
                                         type="number"
                                         step="0.01"
                                         min="0"
-                                        className="pl-10"
+                                        className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                         value={data.area}
                                         onChange={(e) =>
                                             setData('area', parseNumber(e.target.value))
@@ -726,7 +832,7 @@ export default function RightColumn({
                     )}
 
                     <div className="space-y-2">
-                        <Label htmlFor="property_description">
+                        <Label htmlFor="property_description" className="dark:text-gray-300">
                             Property Description (for property-related fees)
                         </Label>
                         <Textarea
@@ -735,11 +841,12 @@ export default function RightColumn({
                             value={safeString(data.property_description)}
                             onChange={(e) => setData('property_description', e.target.value)}
                             placeholder="Describe the property, lot, or structure..."
+                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="remarks">
+                        <Label htmlFor="remarks" className="dark:text-gray-300">
                             Remarks / Notes
                         </Label>
                         <Textarea
@@ -748,25 +855,31 @@ export default function RightColumn({
                             value={safeString(data.remarks)}
                             onChange={(e) => setData('remarks', e.target.value)}
                             placeholder="Any additional remarks or instructions..."
+                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                         />
                     </div>
                 </CardContent>
             </Card>
 
             {/* Billing Period Card */}
-            <Card>
+            <Card className="dark:bg-gray-900">
                 <CardHeader>
-                    <CardTitle>
-                        Billing Period (Optional)
+                    <CardTitle className="dark:text-gray-100">
+                        <div className="flex items-center gap-2">
+                            <div className="h-5 w-5 rounded-lg bg-gradient-to-r from-gray-600 to-slate-600 dark:from-gray-700 dark:to-slate-700 flex items-center justify-center">
+                                <Calendar className="h-3 w-3 text-white" />
+                            </div>
+                            Billing Period (Optional)
+                        </div>
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="dark:text-gray-400">
                         Set the billing period for recurring fees
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div className="space-y-2">
-                            <Label htmlFor="billing_period">
+                            <Label htmlFor="billing_period" className="dark:text-gray-300">
                                 Billing Period Description
                             </Label>
                             <Input
@@ -776,10 +889,11 @@ export default function RightColumn({
                                     setData('billing_period', e.target.value)
                                 }
                                 placeholder="e.g., January 2024, Q1 2024"
+                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="period_start">
+                            <Label htmlFor="period_start" className="dark:text-gray-300">
                                 Period Start
                             </Label>
                             <Input
@@ -789,10 +903,11 @@ export default function RightColumn({
                                 onChange={(e) =>
                                     setData('period_start', e.target.value)
                                 }
+                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="period_end">
+                            <Label htmlFor="period_end" className="dark:text-gray-300">
                                 Period End
                             </Label>
                             <Input
@@ -803,6 +918,7 @@ export default function RightColumn({
                                     setData('period_end', e.target.value)
                                 }
                                 min={data.period_start}
+                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                             />
                         </div>
                     </div>

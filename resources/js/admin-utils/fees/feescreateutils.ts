@@ -6,7 +6,61 @@ export const formatCurrency = (amount: any): string => {
     return `₱${num.toFixed(2)}`;
 };
 
-// Philippine Legal Discount Rules
+// ========== DYNAMIC PRIVILEGE HELPER FUNCTIONS ==========
+
+/**
+ * Get resident's active privileges
+ */
+export const getActivePrivileges = (resident: Resident | null): any[] => {
+    if (!resident || !resident.privileges || !Array.isArray(resident.privileges)) {
+        return [];
+    }
+    
+    return resident.privileges.filter((p: any) => 
+        p.status === 'active' || p.status === 'expiring_soon'
+    );
+};
+
+/**
+ * Check if resident has a specific privilege
+ */
+export const hasPrivilege = (resident: Resident | null, privilegeCode: string): boolean => {
+    if (!resident || !resident.privileges) return false;
+    
+    return resident.privileges.some((p: any) => 
+        p.code?.toUpperCase() === privilegeCode?.toUpperCase() &&
+        (p.status === 'active' || p.status === 'expiring_soon')
+    );
+};
+
+/**
+ * Get privilege ID number if available
+ */
+export const getPrivilegeIdNumber = (resident: Resident | null, privilegeCode: string): string | null => {
+    if (!resident || !resident.privileges) return null;
+    
+    const priv = resident.privileges.find((p: any) => 
+        p.code?.toUpperCase() === privilegeCode?.toUpperCase()
+    );
+    
+    return priv?.id_number || null;
+};
+
+/**
+ * Get privilege expiry date if available
+ */
+export const getPrivilegeExpiry = (resident: Resident | null, privilegeCode: string): string | null => {
+    if (!resident || !resident.privileges) return null;
+    
+    const priv = resident.privileges.find((p: any) => 
+        p.code?.toUpperCase() === privilegeCode?.toUpperCase()
+    );
+    
+    return priv?.expires_at || null;
+};
+
+// ========== PHILIPPINE LEGAL DISCOUNT RULES (Still needed for legal compliance) ==========
+
 export const PHILIPPINE_DISCOUNT_LAWS = {
     SENIOR: {
         code: 'RA 9994',
@@ -52,33 +106,33 @@ export const isDiscountLegallyValid = (
 
     switch (discount.code) {
         case 'SENIOR':
-            if (!resident?.is_senior) {
+            if (!hasPrivilege(resident, 'SENIOR') && !hasPrivilege(resident, 'SC') && !hasPrivilege(resident, 'OSP')) {
                 return {
                     valid: false,
-                    reason: 'Resident is not registered as a senior citizen',
+                    reason: 'Resident does not have Senior Citizen privilege',
                 };
             }
-            if (
-                resident.senior_id_number &&
-                resident.senior_id_number.trim() === ''
-            ) {
+            const seniorId = getPrivilegeIdNumber(resident, 'SENIOR') || 
+                            getPrivilegeIdNumber(resident, 'SC') || 
+                            getPrivilegeIdNumber(resident, 'OSP');
+            if (!seniorId) {
                 return {
                     valid: false,
                     reason: 'No valid Senior Citizen ID number provided',
                 };
             }
-            if (resident.senior_discount_valid_until) {
-                const validUntil = new Date(
-                    resident.senior_discount_valid_until,
-                );
+            const seniorExpiry = getPrivilegeExpiry(resident, 'SENIOR') || 
+                                getPrivilegeExpiry(resident, 'SC') || 
+                                getPrivilegeExpiry(resident, 'OSP');
+            if (seniorExpiry) {
+                const validUntil = new Date(seniorExpiry);
                 if (today > validUntil) {
                     return {
                         valid: false,
-                        reason: `Senior Citizen discount validity expired on ${validUntil.toLocaleDateString()}`,
+                        reason: `Senior Citizen privilege expired on ${validUntil.toLocaleDateString()}`,
                     };
                 }
             }
-            // Senior discount is 20% by law (RA 9994)
             if (discount.default_percentage > 20) {
                 return {
                     valid: true,
@@ -89,31 +143,29 @@ export const isDiscountLegallyValid = (
             break;
 
         case 'PWD':
-            if (!resident?.is_pwd) {
+            if (!hasPrivilege(resident, 'PWD')) {
                 return {
                     valid: false,
-                    reason: 'Resident is not registered as PWD',
+                    reason: 'Resident does not have PWD privilege',
                 };
             }
-            if (
-                resident.pwd_id_number &&
-                resident.pwd_id_number.trim() === ''
-            ) {
+            const pwdId = getPrivilegeIdNumber(resident, 'PWD');
+            if (!pwdId) {
                 return {
                     valid: false,
                     reason: 'No valid PWD ID number provided',
                 };
             }
-            if (resident.pwd_discount_valid_until) {
-                const validUntil = new Date(resident.pwd_discount_valid_until);
+            const pwdExpiry = getPrivilegeExpiry(resident, 'PWD');
+            if (pwdExpiry) {
+                const validUntil = new Date(pwdExpiry);
                 if (today > validUntil) {
                     return {
                         valid: false,
-                        reason: `PWD discount validity expired on ${validUntil.toLocaleDateString()}`,
+                        reason: `PWD privilege expired on ${validUntil.toLocaleDateString()}`,
                     };
                 }
             }
-            // PWD discount is 20% by law (RA 10754)
             if (discount.default_percentage > 20) {
                 return {
                     valid: true,
@@ -124,37 +176,32 @@ export const isDiscountLegallyValid = (
             break;
 
         case 'SOLO_PARENT':
-            if (!resident?.is_solo_parent) {
+            if (!hasPrivilege(resident, 'SOLO_PARENT') && !hasPrivilege(resident, 'SP')) {
                 return {
                     valid: false,
-                    reason: 'Resident is not registered as solo parent',
+                    reason: 'Resident does not have Solo Parent privilege',
                 };
             }
-            if (
-                resident.solo_parent_id_number &&
-                resident.solo_parent_id_number.trim() === ''
-            ) {
+            const soloId = getPrivilegeIdNumber(resident, 'SOLO_PARENT') || 
+                          getPrivilegeIdNumber(resident, 'SP');
+            if (!soloId) {
                 return {
                     valid: false,
                     reason: 'No valid Solo Parent ID number provided',
                 };
             }
-            if (resident.solo_parent_discount_valid_until) {
-                const validUntil = new Date(
-                    resident.solo_parent_discount_valid_until,
-                );
+            const soloExpiry = getPrivilegeExpiry(resident, 'SOLO_PARENT') || 
+                              getPrivilegeExpiry(resident, 'SP');
+            if (soloExpiry) {
+                const validUntil = new Date(soloExpiry);
                 if (today > validUntil) {
                     return {
                         valid: false,
-                        reason: `Solo Parent discount validity expired on ${validUntil.toLocaleDateString()}`,
+                        reason: `Solo Parent privilege expired on ${validUntil.toLocaleDateString()}`,
                     };
                 }
             }
-            // Solo Parent discount is typically 10% but varies
-            if (
-                discount.ph_max_percentage &&
-                discount.default_percentage > discount.ph_max_percentage
-            ) {
+            if (discount.ph_max_percentage && discount.default_percentage > discount.ph_max_percentage) {
                 return {
                     valid: true,
                     warning: `Solo Parent discount exceeds legal maximum of ${discount.ph_max_percentage}%`,
@@ -163,39 +210,64 @@ export const isDiscountLegallyValid = (
             break;
 
         case 'INDIGENT':
-            if (!resident?.is_indigent) {
+            if (!hasPrivilege(resident, 'INDIGENT') && !hasPrivilege(resident, 'IND')) {
                 return {
                     valid: false,
-                    reason: 'Resident is not registered as indigent',
+                    reason: 'Resident does not have Indigent privilege',
                 };
             }
-            if (
-                resident.indigent_id_number &&
-                resident.indigent_id_number.trim() === ''
-            ) {
+            const indigentId = getPrivilegeIdNumber(resident, 'INDIGENT') || 
+                              getPrivilegeIdNumber(resident, 'IND');
+            if (!indigentId) {
                 return {
                     valid: false,
                     reason: 'No valid Certificate of Indigency number provided',
                 };
             }
-            if (resident.indigent_discount_valid_until) {
-                const validUntil = new Date(
-                    resident.indigent_discount_valid_until,
-                );
+            const indigentExpiry = getPrivilegeExpiry(resident, 'INDIGENT') || 
+                                  getPrivilegeExpiry(resident, 'IND');
+            if (indigentExpiry) {
+                const validUntil = new Date(indigentExpiry);
                 if (today > validUntil) {
                     return {
                         valid: false,
-                        reason: `Indigent discount validity expired on ${validUntil.toLocaleDateString()}`,
+                        reason: `Indigent privilege expired on ${validUntil.toLocaleDateString()}`,
                     };
                 }
             }
             break;
+            
+        default:
+            // For any other discount type, check if resident has the privilege
+            if (!hasPrivilege(resident, discount.code)) {
+                return {
+                    valid: false,
+                    reason: `Resident does not have ${discount.name || discount.code} privilege`,
+                };
+            }
+            const id = getPrivilegeIdNumber(resident, discount.code);
+            if (discount.requires_verification && !id) {
+                return {
+                    valid: false,
+                    reason: `No valid ID number provided for ${discount.name || discount.code}`,
+                };
+            }
+            const expiry = getPrivilegeExpiry(resident, discount.code);
+            if (expiry) {
+                const validUntil = new Date(expiry);
+                if (today > validUntil) {
+                    return {
+                        valid: false,
+                        reason: `${discount.name || discount.code} privilege expired on ${validUntil.toLocaleDateString()}`,
+                    };
+                }
+            }
     }
 
     return { valid: true };
 };
 
-// Get active discount types for a fee type with Philippine legal considerations
+// Get active discount types for a fee type - DYNAMIC
 export const getActiveDiscountsForFeeType = (
     feeType: FeeType | null,
 ): DiscountType[] => {
@@ -209,84 +281,53 @@ export const getActiveDiscountsForFeeType = (
             if (dft.is_active && dft.discount_type) {
                 activeDiscounts.push({
                     ...dft.discount_type,
-                    // Use the percentage from the pivot table
                     default_percentage: dft.percentage,
                 });
             }
         });
     }
 
-    // Also include legacy discounts for backward compatibility
-    const addLegacyDiscount = (
-        hasDiscount: boolean,
-        code: string,
-        name: string,
-        description: string,
-        percentage: number,
-    ) => {
-        if (hasDiscount) {
-            const law =
-                PHILIPPINE_DISCOUNT_LAWS[
-                    code as keyof typeof PHILIPPINE_DISCOUNT_LAWS
-                ];
+    // DYNAMIC: Look for any discount-related fields in feeType
+    Object.keys(feeType).forEach(key => {
+        // Check for has_X_discount pattern
+        if (key.startsWith('has_') && key.endsWith('_discount') && feeType[key] === true) {
+            const privilegeCode = key.replace('has_', '').replace('_discount', '').toUpperCase();
+            
+            // Find the percentage field
+            const percentageKey = `${privilegeCode.toLowerCase()}_discount_percentage`;
+            const percentage = feeType[percentageKey] || 20;
+            
+            // Check if this matches any known Philippine law
+            const lawKey = Object.keys(PHILIPPINE_DISCOUNT_LAWS).find(
+                law => law.toLowerCase() === privilegeCode.toLowerCase()
+            );
+            const law = lawKey ? PHILIPPINE_DISCOUNT_LAWS[lawKey as keyof typeof PHILIPPINE_DISCOUNT_LAWS] : null;
+            
             activeDiscounts.push({
-                id: `${code.toLowerCase()}_legacy`,
-                code: code,
-                name: name,
-                description: description,
-                default_percentage: Math.min(
-                    percentage,
-                    law?.maxPercentage || 100,
-                ),
+                id: `${privilegeCode.toLowerCase()}_dynamic`,
+                code: privilegeCode,
+                name: feeType[`${privilegeCode.toLowerCase()}_discount_name`] || 
+                      (law?.name || privilegeCode),
+                description: feeType[`${privilegeCode.toLowerCase()}_discount_description`] || 
+                            (law?.description || `Discount for ${privilegeCode}`),
+                default_percentage: Math.min(percentage, law?.maxPercentage || 100),
                 legal_basis: law?.code || null,
                 requirements: law?.requirements || null,
                 is_active: true,
                 is_mandatory: false,
-                ph_law_applicable: true,
+                ph_law_applicable: !!law,
                 ph_law_code: law?.code,
                 ph_law_description: law?.description,
                 ph_max_percentage: law?.maxPercentage,
                 ph_requirements_ph: law?.requirements,
             });
         }
-    };
-
-    addLegacyDiscount(
-        feeType.has_senior_discount,
-        'SENIOR',
-        'Senior Citizen',
-        'For senior citizens aged 60+',
-        feeType.discount_percentage || 20,
-    );
-
-    addLegacyDiscount(
-        feeType.has_pwd_discount,
-        'PWD',
-        'Person With Disability',
-        'For persons with disabilities',
-        feeType.discount_percentage || 20,
-    );
-
-    addLegacyDiscount(
-        feeType.has_solo_parent_discount,
-        'SOLO_PARENT',
-        'Solo Parent',
-        'For solo parents',
-        feeType.discount_percentage || 10,
-    );
-
-    addLegacyDiscount(
-        feeType.has_indigent_discount,
-        'INDIGENT',
-        'Indigent',
-        'For indigent families',
-        feeType.discount_percentage || 20,
-    );
+    });
 
     return activeDiscounts;
 };
 
-// Get resident's eligible discounts based on their profile with Philippine legal validation
+// Get resident's eligible discounts based on their privileges - DYNAMIC
 export const getResidentEligibleDiscounts = (
     resident: Resident | null,
     issueDate?: string,
@@ -301,54 +342,35 @@ export const getResidentEligibleDiscounts = (
     const warnings: string[] = [];
     const reasons: Record<string, string> = {};
 
-    // Check each discount type for eligibility
-    const checkDiscount = (
-        code: string,
-        hasDiscount: boolean,
-        idNumber?: string,
-    ) => {
-        if (hasDiscount) {
-            const discountInfo = {
-                code,
-                ph_law_applicable: true,
-                default_percentage: 20,
-            } as DiscountType;
+    // Get all active privileges
+    const activePrivileges = getActivePrivileges(resident);
+    
+    // Check each privilege for discount eligibility
+    activePrivileges.forEach(priv => {
+        const discountInfo = {
+            code: priv.code,
+            ph_law_applicable: true,
+            default_percentage: priv.discount_percentage || 20,
+            requires_verification: !!priv.requires_verification,
+        } as DiscountType;
 
-            const validation = isDiscountLegallyValid(
-                discountInfo,
-                resident,
-                issueDate,
-            );
+        const validation = isDiscountLegallyValid(
+            discountInfo,
+            resident,
+            issueDate,
+        );
 
-            if (validation.valid) {
-                eligibleDiscounts.push(code);
-                if (validation.warning) {
-                    warnings.push(`${code}: ${validation.warning}`);
-                }
-            } else if (validation.reason) {
-                reasons[code] = validation.reason;
+        if (validation.valid) {
+            eligibleDiscounts.push(priv.code);
+            if (validation.warning) {
+                warnings.push(`${priv.name || priv.code}: ${validation.warning}`);
             }
+        } else if (validation.reason) {
+            reasons[priv.code] = validation.reason;
         }
-    };
+    });
 
-    checkDiscount(
-        'SENIOR',
-        resident.is_senior || false,
-        resident.senior_id_number,
-    );
-    checkDiscount('PWD', resident.is_pwd || false, resident.pwd_id_number);
-    checkDiscount(
-        'SOLO_PARENT',
-        resident.is_solo_parent || false,
-        resident.solo_parent_id_number,
-    );
-    checkDiscount(
-        'INDIGENT',
-        resident.is_indigent || false,
-        resident.indigent_id_number,
-    );
-
-    // Also check the eligible_discounts array if provided
+    // Also check eligible_discounts array if provided (backward compatibility)
     if (resident.eligible_discounts && resident.eligible_discounts.length > 0) {
         resident.eligible_discounts.forEach((discountCode) => {
             if (!eligibleDiscounts.includes(discountCode)) {
@@ -360,7 +382,7 @@ export const getResidentEligibleDiscounts = (
     return { eligible: eligibleDiscounts, warnings, reasons };
 };
 
-// PHILIPPINE LAW: Calculate discounted amount with Senior+PWD rule according to Philippine jurisprudence
+// PHILIPPINE LAW: Calculate discounted amount with Senior+PWD rule
 export const calculateDiscountedAmount = (
     baseAmount: number,
     selectedDiscountTypeIds: string[],
@@ -384,17 +406,14 @@ export const calculateDiscountedAmount = (
     let warnings: string[] = [];
     let legalNotes = '';
 
-    // PHILIPPINE RULE: Senior + PWD combination - According to Philippine jurisprudence,
-    // they are considered separate and distinct benefits but cannot be combined cumulatively.
-    // Most LGU interpretations: Apply the higher discount or 20% (not cumulative)
+    // PHILIPPINE RULE: Senior + PWD combination
     const hasSeniorDiscount = selectedDiscounts.some(
-        (d) => d.code === 'SENIOR',
+        (d) => d.code === 'SENIOR' || d.code === 'SC' || d.code === 'OSP',
     );
     const hasPWDDiscount = selectedDiscounts.some((d) => d.code === 'PWD');
 
     if (hasSeniorDiscount && hasPWDDiscount) {
-        // PHILIPPINE JURISPRUDENCE: Senior and PWD discounts cannot be stacked
-        // Common LGU practice: Apply 20% (maximum allowed by both laws)
+        // Senior and PWD discounts cannot be stacked
         totalDiscountPercentage = 20;
         legalNotes =
             'Philippine Law Interpretation: Senior Citizen and PWD discounts cannot be combined cumulatively. Applying maximum allowable discount of 20% as per RA 9994 and RA 10754.';
@@ -402,27 +421,26 @@ export const calculateDiscountedAmount = (
             'Senior + PWD discounts combined: Applying 20% maximum discount (not 40%) per Philippine law interpretation.',
         );
     } else if (hasSeniorDiscount) {
-        // Senior Citizen discount: 20% by law (RA 9994)
+        // Senior Citizen discount: 20% by law
         const seniorDiscount = selectedDiscounts.find(
-            (d) => d.code === 'SENIOR',
+            (d) => d.code === 'SENIOR' || d.code === 'SC' || d.code === 'OSP',
         );
         totalDiscountPercentage = Math.min(
-            seniorDiscount?.default_percentage || 0,
+            seniorDiscount?.default_percentage || 20,
             20,
         );
         legalNotes = `Senior Citizen Discount (RA 9994): ${totalDiscountPercentage}% applied.`;
     } else if (hasPWDDiscount) {
-        // PWD discount: 20% by law (RA 10754)
+        // PWD discount: 20% by law
         const pwdDiscount = selectedDiscounts.find((d) => d.code === 'PWD');
         totalDiscountPercentage = Math.min(
-            pwdDiscount?.default_percentage || 0,
+            pwdDiscount?.default_percentage || 20,
             20,
         );
         legalNotes = `PWD Discount (RA 10754): ${totalDiscountPercentage}% applied.`;
     } else {
         // Normal discount calculation for other combinations
         selectedDiscounts.forEach((discount) => {
-            // Check if discount exceeds Philippine legal maximum
             if (
                 discount.ph_max_percentage &&
                 discount.default_percentage > discount.ph_max_percentage
@@ -436,7 +454,6 @@ export const calculateDiscountedAmount = (
             }
         });
 
-        // Cap discount at 100%
         totalDiscountPercentage = Math.min(totalDiscountPercentage, 100);
     }
 
@@ -461,7 +478,7 @@ export const getDiscountNote = (
     );
 
     const hasSeniorDiscount = selectedDiscounts.some(
-        (d) => d.code === 'SENIOR',
+        (d) => d.code === 'SENIOR' || d.code === 'SC' || d.code === 'OSP',
     );
     const hasPWDDiscount = selectedDiscounts.some((d) => d.code === 'PWD');
 
@@ -483,7 +500,6 @@ export const isFeeTypeExemptFromDiscount = (
     if (!feeType) return false;
 
     // Some fees may be exempt from certain discounts per Philippine law
-    // Example: Real property taxes, special assessments, etc.
     if (feeType.ph_law_exempt) {
         return true;
     }
@@ -510,12 +526,16 @@ export const getPhilippineLegalBasis = (discount: DiscountType): string => {
 
     switch (discount.code) {
         case 'SENIOR':
+        case 'SC':
+        case 'OSP':
             return 'RA 9994 (Expanded Senior Citizens Act)';
         case 'PWD':
             return 'RA 10754 (Expanded PWD Benefits Act)';
         case 'SOLO_PARENT':
+        case 'SP':
             return 'RA 8972 (Solo Parents Welfare Act)';
         case 'INDIGENT':
+        case 'IND':
             return 'RA 8425 (Social Reform Act)';
         default:
             return discount.legal_basis || 'Local Ordinance';

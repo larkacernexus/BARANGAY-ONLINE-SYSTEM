@@ -154,7 +154,7 @@ const CompactMenuItem = ({
             <Link
                 href={item.href}
                 className={cn(
-                    'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors hover:bg-gray-100 dark:hover:bg-gray-800',
+                    'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors hover:bg-gray-100 dark:hover:bg-gray-900',
                     isActive &&
                         cn(currentColors.activeBg, currentColors.activeText),
                 )}
@@ -167,7 +167,7 @@ const CompactMenuItem = ({
                                   (type === 'operations'
                                       ? 'bg-blue-100 text-blue-600 dark:bg-blue-800 dark:text-blue-400'
                                       : 'bg-purple-100 text-purple-600 dark:bg-purple-800 dark:text-purple-400')
-                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+                            : 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400',
                     )}
                 >
                     <item.icon className="h-3 w-3" />
@@ -213,7 +213,7 @@ const CompactMenuItem = ({
     );
 };
 
-// Regular Menu Item Component
+// Regular Menu Item Component - For direct links (NO DROPDOWN)
 const RegularMenuItem = ({
     item,
     isCollapsed,
@@ -257,7 +257,7 @@ const RegularMenuItem = ({
                         <Link
                             href={item.href}
                             className={cn(
-                                'relative flex items-center gap-1.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50',
+                                'relative flex items-center gap-1.5 transition-colors hover:bg-gray-50 dark:hover:bg-gray-900/50',
                                 isCollapsed ? 'justify-center px-1' : 'px-2',
                                 isActive &&
                                     cn(
@@ -281,7 +281,7 @@ const RegularMenuItem = ({
                                         isCollapsed ? 'h-6 w-6' : 'h-7 w-7',
                                         isActive
                                             ? currentColors.iconBg
-                                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+                                            : 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400',
                                     )}
                                 >
                                     <item.icon
@@ -370,7 +370,7 @@ const RegularMenuItem = ({
     );
 };
 
-// Category Component
+// Category Component - For categories with multiple items (uses dropdown)
 const CategoryItem = ({
     category,
     type = 'operations',
@@ -478,7 +478,7 @@ const CategoryItem = ({
                     <Button
                         variant="ghost"
                         className={cn(
-                            'w-full justify-start px-2 py-1.5 text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-800',
+                            'w-full justify-start px-2 py-1.5 text-xs font-medium transition-colors hover:bg-gray-50 dark:hover:bg-gray-900',
                             isAnyActive && currentColors.activeBg,
                         )}
                     >
@@ -488,7 +488,7 @@ const CategoryItem = ({
                                     'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded',
                                     isAnyActive
                                         ? currentColors.iconBg
-                                        : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+                                        : 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400',
                                 )}
                             >
                                 <category.icon className="h-3 w-3" />
@@ -625,7 +625,7 @@ const QuickActionItem = ({
                     href={action.href}
                     className={cn(
                         'group flex items-center gap-2 px-2 py-1.5 transition-all',
-                        'rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/50',
+                        'rounded-md hover:bg-gray-50 dark:hover:bg-gray-900/50',
                     )}
                 >
                     <div
@@ -675,7 +675,7 @@ const TabSwitcher = ({
                         'h-7 w-7 transition-all',
                         activeTab === 'operations'
                             ? 'bg-gradient-to-br from-blue-600 to-blue-800 text-white hover:from-blue-700 hover:to-blue-900'
-                            : 'hover:bg-gray-100 dark:hover:bg-gray-800',
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-900',
                     )}
                     onClick={() => handleTabChange('operations')}
                 >
@@ -688,7 +688,7 @@ const TabSwitcher = ({
                         'h-7 w-7 transition-all',
                         activeTab === 'settings'
                             ? 'bg-gradient-to-br from-purple-600 to-purple-800 text-white hover:from-purple-700 hover:to-purple-900'
-                            : 'hover:bg-gray-100 dark:hover:bg-gray-800',
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-900',
                     )}
                     onClick={() => handleTabChange('settings')}
                 >
@@ -699,7 +699,7 @@ const TabSwitcher = ({
     }
 
     return (
-        <div className="mb-3 flex rounded-lg bg-gray-100 p-0.5 dark:bg-gray-800">
+        <div className="mb-3 flex rounded-lg bg-gray-100 p-0.5 dark:bg-gray-900">
             <Button
                 variant="ghost"
                 size="sm"
@@ -750,7 +750,7 @@ const StatsCard = ({
         return (
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-900">
                         <Icon className="h-3 w-3 text-gray-600 dark:text-gray-400" />
                     </div>
                 </TooltipTrigger>
@@ -763,7 +763,7 @@ const StatsCard = ({
     }
 
     return (
-        <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1.5 dark:bg-gray-800/50">
+        <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1.5 dark:bg-gray-900/50">
             <div
                 className={cn(
                     'flex h-6 w-6 items-center justify-center rounded',
@@ -806,7 +806,7 @@ export function AppSidebar({ className }: { className?: string }) {
         resolved: 0,
         rejected: 0,
         high_priority: 0,
-        pending_clearances: 0, // Added for clearance approval requests
+        pending_clearances: 0,
     };
 
     // Helper function to check if user has permission
@@ -848,7 +848,7 @@ export function AppSidebar({ className }: { className?: string }) {
         }
     }, [currentUrl]);
 
-    // Operations navigation - categorized WITH PERMISSIONS (UPDATED WITH /admin PREFIX)
+    // Operations navigation - categorized WITH PERMISSIONS
     const operationsCategories = useMemo(() => {
         const allCategories: SidebarCategory[] = [
             {
@@ -986,6 +986,17 @@ export function AppSidebar({ className }: { className?: string }) {
                         requiredPermission: 'manage-forms',
                     },
                     {
+                        title: 'Privileges',
+                        href: '/admin/privileges',
+                        icon: Award,
+                        description: 'Manage resident privileges & discounts',
+                        color: 'bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-400',
+                        isActive: (url: string) =>
+                            url.startsWith('/admin/privileges') &&
+                            !url.includes('/create'),
+                        requiredPermission: 'manage-privileges',
+                    },
+                    {
                         title: 'Announcements',
                         href: '/admin/announcements',
                         icon: Megaphone,
@@ -1009,7 +1020,7 @@ export function AppSidebar({ className }: { className?: string }) {
                         requiredPermission: 'view-clearances',
                     },
                     {
-                        title: 'Approval Requests', // Added clearance approval requests
+                        title: 'Approval Requests',
                         href: '/admin/clearances/approval/requests',
                         icon: CheckCircle,
                         description: 'Review clearance requests',
@@ -1096,11 +1107,11 @@ export function AppSidebar({ className }: { className?: string }) {
             .filter((category) => category.items.length > 0);
     }, [userPermissions, userRoleName, reportStats]);
 
-    // Settings navigation WITH PERMISSIONS (UPDATED WITH /admin PREFIX)
+    // Settings navigation - Personal category with DIRECT LINKS (NO DROPDOWN)
     const settingsCategories = useMemo(() => {
         const allCategories: SidebarCategory[] = [
             {
-                title: 'Personal',
+                title: 'Personal', // KEPT Personal category
                 icon: UserCog,
                 items: [
                     {
@@ -1113,26 +1124,7 @@ export function AppSidebar({ className }: { className?: string }) {
                             url === '/admin/settings/profile',
                         requiredPermission: undefined,
                     },
-                    {
-                        title: 'Password',
-                        href: '/admin/settings/password',
-                        icon: Lock,
-                        description: 'Change password',
-                        color: 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-400',
-                        isActive: (url: string) =>
-                            url === '/admin/settings/password',
-                        requiredPermission: undefined,
-                    },
-                    {
-                        title: 'Theme',
-                        href: '/admin/settings/appearance',
-                        icon: Palette,
-                        description: 'Appearance',
-                        color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
-                        isActive: (url: string) =>
-                            url === '/admin/settings/appearance',
-                        requiredPermission: undefined,
-                    },
+                   
                 ],
             },
             {
@@ -1356,7 +1348,7 @@ export function AppSidebar({ className }: { className?: string }) {
             .filter((category) => category.items.length > 0);
     }, [userPermissions, userRoleName]);
 
-    // Grouped Quick Actions for Operations tab (UPDATED WITH /admin PREFIX)
+    // Grouped Quick Actions for Operations tab
     const operationsQuickActionGroups = useMemo(() => {
         const groups = {
             reports: [
@@ -1414,7 +1406,7 @@ export function AppSidebar({ className }: { className?: string }) {
                     description: 'Issue barangay clearance',
                 },
                 {
-                    title: 'Approval Requests', // Added clearance approval requests
+                    title: 'Approval Requests',
                     href: '/admin/clearances/approval/requests',
                     icon: CheckCircle,
                     color: 'violet' as const,
@@ -1455,6 +1447,23 @@ export function AppSidebar({ className }: { className?: string }) {
                     requiredPermission: 'manage-announcements',
                     description: 'Create announcement',
                 },
+                {
+                    title: 'Add Privilege',
+                    href: '/admin/privileges/create',
+                    icon: Award,
+                    color: 'amber' as const,
+                    requiredPermission: 'manage-privileges',
+                    description: 'Create new privilege',
+                },
+                {
+                    title: 'Assign Privilege',
+                    href: '/admin/privileges/assign',
+                    icon: UserCheck,
+                    color: 'violet' as const,
+                    requiredPermission: 'assign-privileges',
+                    description: 'Assign privilege to resident',
+                    isNew: true,
+                },
             ],
         };
 
@@ -1466,10 +1475,10 @@ export function AppSidebar({ className }: { className?: string }) {
         };
     }, [userPermissions, userRoleName, reportStats]);
 
-    // Grouped Quick Actions for Settings tab (UPDATED WITH /admin PREFIX)
+    // Grouped Quick Actions for Settings tab
     const settingsQuickActionGroups = useMemo(() => {
         const groups = {
-            personal: [
+            personal: [ // KEPT Personal quick actions
                 {
                     title: 'Edit Profile',
                     href: '/admin/settings/profile',
@@ -1642,7 +1651,7 @@ export function AppSidebar({ className }: { className?: string }) {
         const allActions = [
             ...operationsQuickActionGroups.reports.slice(0, 1),
             ...operationsQuickActionGroups.residents.slice(0, 1),
-            ...operationsQuickActionGroups.services.slice(0, 2), // Will include Approval Requests if it's in top 2
+            ...operationsQuickActionGroups.services.slice(0, 2),
         ].slice(0, 5);
 
         return allActions;
@@ -1891,7 +1900,7 @@ export function AppSidebar({ className }: { className?: string }) {
                                     <Button 
                                         variant="ghost" 
                                         size="sm" 
-                                        className="mt-1 w-full justify-start gap-2 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                        className="mt-1 w-full justify-start gap-2 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-900"
                                     >
                                         <PlusCircle className="h-3.5 w-3.5" />
                                         More Actions ({remainingOperationsActions.length})
@@ -1979,7 +1988,7 @@ export function AppSidebar({ className }: { className?: string }) {
                                     <Button 
                                         variant="ghost" 
                                         size="sm" 
-                                        className="mt-1 w-full justify-start gap-2 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                        className="mt-1 w-full justify-start gap-2 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-900"
                                     >
                                         <PlusCircle className="h-3.5 w-3.5" />
                                         More Settings ({remainingSettingsActions.length})
@@ -2022,14 +2031,29 @@ export function AppSidebar({ className }: { className?: string }) {
                         </SidebarGroupLabel>
                     )}
                     <SidebarMenu className="space-y-0.5">
-                        {settingsCategories.map((category) => (
-                            <CategoryItem
-                                key={`settings-${category.title}`}
-                                category={category}
-                                type="settings"
-                                isCollapsed={isCollapsed}
-                            />
-                        ))}
+                        {settingsCategories.map((category) => {
+                            // For Personal category, render each item as a direct link (NO DROPDOWN)
+                            if (category.title === 'Personal') {
+                                return category.items.map((item) => (
+                                    <RegularMenuItem
+                                        key={item.title}
+                                        item={item}
+                                        isCollapsed={isCollapsed}
+                                        type="settings"
+                                    />
+                                ));
+                            }
+                            
+                            // For other categories with multiple items, use dropdown
+                            return (
+                                <CategoryItem
+                                    key={`settings-${category.title}`}
+                                    category={category}
+                                    type="settings"
+                                    isCollapsed={isCollapsed}
+                                />
+                            );
+                        })}
                     </SidebarMenu>
                 </SidebarGroup>
             )}

@@ -90,12 +90,12 @@ const ANNOUNCEMENT_TYPE_COLORS: Record<string, string> = {
     important: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/40',
     event: 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/40',
     maintenance: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/40',
-    general: 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 dark:bg-gray-800/50 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-800',
+    general: 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 dark:bg-gray-900/50 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-900',
     other: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/40',
 };
 
 const PRIORITY_COLORS: Record<number, string> = {
-    0: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
+    0: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700',
     1: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800',
     2: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/50 dark:text-yellow-400 dark:border-yellow-800',
     3: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950/50 dark:text-orange-400 dark:border-orange-800',
@@ -308,7 +308,6 @@ export default function AnnouncementsIndex({
     const [selectedType, setSelectedType] = useState(filters.type || 'all');
     const [selectedPriority, setSelectedPriority] = useState(filters.priority || 'all');
     const [selectedStatus, setSelectedStatus] = useState(filters.status || 'all');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
@@ -349,25 +348,9 @@ export default function AnnouncementsIndex({
         return () => window.removeEventListener('resize', checkMobile);
     }, [mounted]);
 
-    // Debounce search input
-    useEffect(() => {
-        if (!mounted) return;
-        
-        const timer = setTimeout(() => {
-            setDebouncedSearch(search);
-        }, 500);
+   
 
-        return () => clearTimeout(timer);
-    }, [search, mounted]);
-
-    // Apply filters when debounced search changes
-    useEffect(() => {
-        if (!mounted) return;
-        
-        if (debouncedSearch !== filters.search) {
-            applyFilters();
-        }
-    }, [debouncedSearch]);
+  
 
     const applyFilters = () => {
         if (loading) return;
@@ -376,7 +359,6 @@ export default function AnnouncementsIndex({
         
         const params: Record<string, string> = {};
         
-        if (debouncedSearch) params.search = debouncedSearch;
         if (selectedType !== 'all') params.type = selectedType;
         if (selectedPriority !== 'all') params.priority = selectedPriority;
         if (selectedStatus !== 'all') params.status = selectedStatus;
@@ -459,7 +441,6 @@ export default function AnnouncementsIndex({
 
     const handleSearchClear = () => {
         setSearch('');
-        setDebouncedSearch('');
         
         const params: Record<string, string> = {};
         if (selectedType !== 'all') params.type = selectedType;
@@ -484,7 +465,6 @@ export default function AnnouncementsIndex({
 
     const clearFilters = () => {
         setSearch('');
-        setDebouncedSearch('');
         setSelectedType('all');
         setSelectedPriority('all');
         setSelectedStatus('all');
@@ -559,8 +539,8 @@ export default function AnnouncementsIndex({
     };
 
     const hasActiveFilters = useMemo(() => {
-        return debouncedSearch || selectedType !== 'all' || selectedPriority !== 'all' || selectedStatus !== 'all';
-    }, [debouncedSearch, selectedType, selectedPriority, selectedStatus]);
+        return  selectedType !== 'all' || selectedPriority !== 'all' || selectedStatus !== 'all';
+    }, [ selectedType, selectedPriority, selectedStatus]);
 
     // Process type options for display
     const typeOptions = useMemo(() => {
@@ -690,7 +670,7 @@ export default function AnnouncementsIndex({
                                     <Button 
                                         variant="outline" 
                                         size="sm"
-                                        className="relative dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+                                        className="relative dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                     >
                                         <FilterIcon className="h-4 w-4 mr-2" />
                                         Filters
@@ -819,8 +799,8 @@ export default function AnnouncementsIndex({
                                                                     : key === 'upcoming'
                                                                     ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400'
                                                                     : key === 'expired'
-                                                                    ? 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400'
-                                                                    : 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400'
+                                                                    ? 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
+                                                                    : 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
                                                                 : "dark:border-gray-700 dark:text-gray-300"
                                                         )}
                                                     >
@@ -847,7 +827,7 @@ export default function AnnouncementsIndex({
                             </Sheet>
                         )}
                         
-                        <Badge variant="outline" className="text-sm px-3 py-1.5 bg-white dark:bg-gray-800 shadow-sm dark:border-gray-700">
+                        <Badge variant="outline" className="text-sm px-3 py-1.5 bg-white dark:bg-gray-900 shadow-sm dark:border-gray-700">
                             <TrendingUpIcon className="h-3 w-3 mr-1.5 text-gray-600 dark:text-gray-400" />
                             <span className="dark:text-gray-300">{initialAnnouncements.total} Total</span>
                         </Badge>
@@ -863,7 +843,7 @@ export default function AnnouncementsIndex({
                             placeholder="Search announcements..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="pl-10 pr-10 h-11 md:h-12 rounded-lg md:rounded-xl shadow-sm border-gray-200 dark:border-gray-700 focus:border-primary dark:focus:border-primary-400 text-sm md:text-base dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400"
+                            className="pl-10 pr-10 h-11 md:h-12 rounded-lg md:rounded-xl shadow-sm border-gray-200 dark:border-gray-700 focus:border-primary dark:focus:border-primary-400 text-sm md:text-base dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-400"
                             disabled={loading}
                         />
                         {search && (
@@ -902,7 +882,7 @@ export default function AnnouncementsIndex({
                                         "h-8 px-4 text-xs font-medium whitespace-nowrap",
                                         selectedType === 'all' 
                                             ? 'bg-primary text-primary-foreground shadow-sm border-0 rounded-lg dark:bg-primary-600 dark:hover:bg-primary-700' 
-                                            : 'bg-white border hover:bg-gray-50 rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
+                                            : 'bg-white border hover:bg-gray-50 rounded-lg dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700'
                                     )}
                                 >
                                     All Announcements
@@ -919,7 +899,7 @@ export default function AnnouncementsIndex({
                                             "h-8 px-4 text-xs font-medium whitespace-nowrap border rounded-lg",
                                             selectedType === key 
                                                 ? 'shadow-sm border-transparent' 
-                                                : 'bg-white hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700',
+                                                : 'bg-white hover:bg-gray-50 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700',
                                             selectedType === key ? ANNOUNCEMENT_TYPE_COLORS[key] : ''
                                         )}
                                     >
@@ -946,7 +926,7 @@ export default function AnnouncementsIndex({
                                             "h-8 px-3 text-xs",
                                             selectedPriority === 'all' 
                                                 ? "bg-primary text-primary-foreground dark:bg-primary-600 dark:hover:bg-primary-700" 
-                                                : "dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                                                : "dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                         )}
                                     >
                                         All
@@ -962,7 +942,7 @@ export default function AnnouncementsIndex({
                                                 "h-8 px-3 text-xs",
                                                 selectedPriority === key 
                                                     ? PRIORITY_COLORS[parseInt(key)] 
-                                                    : "dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                                                    : "dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                             )}
                                         >
                                             {value}
@@ -983,7 +963,7 @@ export default function AnnouncementsIndex({
                                             "h-8 px-3 text-xs",
                                             selectedStatus === 'all' 
                                                 ? "bg-primary text-primary-foreground dark:bg-primary-600 dark:hover:bg-primary-700" 
-                                                : "dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                                                : "dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                         )}
                                     >
                                         All
@@ -1003,9 +983,9 @@ export default function AnnouncementsIndex({
                                                         : key === 'upcoming'
                                                         ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400'
                                                         : key === 'expired'
-                                                        ? 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400'
-                                                        : 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400'
-                                                    : "dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                                                        ? 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
+                                                        : 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
+                                                    : "dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                             )}
                                         >
                                             {value}
@@ -1020,21 +1000,10 @@ export default function AnnouncementsIndex({
                 {/* Active filters indicator */}
                 {hasActiveFilters && (
                     <div className="px-4 sm:px-0">
-                        <div className="flex flex-wrap items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border dark:border-gray-700">
+                        <div className="flex flex-wrap items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg border dark:border-gray-700">
                             <FilterIcon className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                             <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Active filters:</span>
-                            
-                            {debouncedSearch && (
-                                <Badge variant="secondary" className="flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800">
-                                    <span className="truncate max-w-[100px]">Search: "{debouncedSearch}"</span>
-                                    <button 
-                                        onClick={handleSearchClear}
-                                        className="ml-1 hover:text-blue-900 dark:hover:text-blue-300"
-                                    >
-                                        <XIcon className="h-2.5 w-2.5" />
-                                    </button>
-                                </Badge>
-                            )}
+                     
                             
                             {selectedType !== 'all' && (
                                 <Badge variant="secondary" className={cn("flex items-center gap-1 text-xs px-2 py-0.5", ANNOUNCEMENT_TYPE_COLORS[selectedType])}>
@@ -1067,7 +1036,7 @@ export default function AnnouncementsIndex({
                                         ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-400'
                                         : selectedStatus === 'upcoming'
                                         ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400'
-                                        : 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400'
+                                        : 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-400'
                                 )}>
                                     <span className="truncate max-w-[80px]">{statusOptions[selectedStatus]}</span>
                                     <button 
@@ -1127,7 +1096,7 @@ export default function AnnouncementsIndex({
                                     return (
                                         <Card 
                                             key={announcement.id} 
-                                            className="group hover:shadow-lg transition-all duration-300 border shadow-sm hover:-translate-y-0.5 cursor-pointer overflow-hidden dark:bg-gray-800 dark:border-gray-700 dark:hover:shadow-gray-900/50"
+                                            className="group hover:shadow-lg transition-all duration-300 border shadow-sm hover:-translate-y-0.5 cursor-pointer overflow-hidden dark:bg-gray-900 dark:border-gray-700 dark:hover:shadow-gray-900/50"
                                         >
                                             {/* Type Indicator Bar */}
                                             <div className={cn("h-0.5 w-full", typeColor.split(' ')[0] || 'bg-gray-500')} />
@@ -1278,14 +1247,7 @@ export default function AnnouncementsIndex({
                             hasFilters={hasActiveFilters}
                             onClearFilters={clearFilters}
                             icon={MegaphoneIcon}
-                            title={debouncedSearch 
-                                ? `No announcements match your search "${debouncedSearch}"` 
-                                : selectedType !== 'all' 
-                                    ? `No announcements found in ${types[selectedType] || 'this category'}`
-                                    : 'No announcements found'}
-                            message={hasActiveFilters
-                                ? 'Try adjusting your filters or clear them to see all announcements'
-                                : 'Check back later for new announcements'}
+                          
                         />
                     )}
                 </div>

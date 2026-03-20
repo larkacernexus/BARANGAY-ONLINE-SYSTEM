@@ -373,7 +373,7 @@ const Instructions: React.FC = () => {
 
           {/* Key Features Grid */}
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
                   <Zap className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -384,7 +384,7 @@ const Instructions: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
                   <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -395,7 +395,7 @@ const Instructions: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
                   <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
@@ -410,19 +410,19 @@ const Instructions: React.FC = () => {
 
           {/* System Statistics */}
           <div className="grid gap-4 md:grid-cols-4">
-            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
               <div className="text-2xl font-bold text-gray-900 dark:text-white">5,234</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Active Residents</div>
             </div>
-            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
               <div className="text-2xl font-bold text-gray-900 dark:text-white">1,245</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Households</div>
             </div>
-            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
               <div className="text-2xl font-bold text-gray-900 dark:text-white">156</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Clearances Today</div>
             </div>
-            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
               <div className="text-2xl font-bold text-gray-900 dark:text-white">₱45.2K</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">Today's Collection</div>
             </div>
@@ -489,28 +489,28 @@ const Instructions: React.FC = () => {
             <div className="grid gap-3 md:grid-cols-4">
               <Link
                 href="/admin/residents/create"
-                className="flex items-center gap-2 rounded-lg bg-white p-3 text-blue-700 hover:bg-blue-100 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700"
+                className="flex items-center gap-2 rounded-lg bg-white p-3 text-blue-700 hover:bg-blue-100 dark:bg-gray-900 dark:text-blue-400 dark:hover:bg-gray-700"
               >
                 <UserPlus className="h-4 w-4" />
                 <span>Add Resident</span>
               </Link>
               <Link
                 href="/admin/clearances/create"
-                className="flex items-center gap-2 rounded-lg bg-white p-3 text-purple-700 hover:bg-purple-100 dark:bg-gray-800 dark:text-purple-400 dark:hover:bg-gray-700"
+                className="flex items-center gap-2 rounded-lg bg-white p-3 text-purple-700 hover:bg-purple-100 dark:bg-gray-900 dark:text-purple-400 dark:hover:bg-gray-700"
               >
                 <FileText className="h-4 w-4" />
                 <span>New Clearance</span>
               </Link>
               <Link
                 href="/admin/payments/create"
-                className="flex items-center gap-2 rounded-lg bg-white p-3 text-green-700 hover:bg-green-100 dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700"
+                className="flex items-center gap-2 rounded-lg bg-white p-3 text-green-700 hover:bg-green-100 dark:bg-gray-900 dark:text-green-400 dark:hover:bg-gray-700"
               >
                 <CreditCard className="h-4 w-4" />
                 <span>Record Payment</span>
               </Link>
               <Link
                 href="/admin/reports"
-                className="flex items-center gap-2 rounded-lg bg-white p-3 text-amber-700 hover:bg-amber-100 dark:bg-gray-800 dark:text-amber-400 dark:hover:bg-gray-700"
+                className="flex items-center gap-2 rounded-lg bg-white p-3 text-amber-700 hover:bg-amber-100 dark:bg-gray-900 dark:text-amber-400 dark:hover:bg-gray-700"
               >
                 <BarChart3 className="h-4 w-4" />
                 <span>Generate Report</span>
@@ -542,7 +542,7 @@ const Instructions: React.FC = () => {
           <div>
             <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">Step 1: Access the System</h3>
             <p className="text-gray-600 dark:text-gray-400">
-              Open your web browser and navigate to: <code className="rounded bg-gray-100 px-2 py-1 dark:bg-gray-800">https://bms-kibawe.gov.ph</code>
+              Open your web browser and navigate to: <code className="rounded bg-gray-100 px-2 py-1 dark:bg-gray-900">https://bms-kibawe.gov.ph</code>
             </p>
           </div>
 
@@ -674,15 +674,15 @@ const Instructions: React.FC = () => {
             <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
               <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">Clearance Types</h3>
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded bg-gray-50 p-3 text-center dark:bg-gray-800">
+                <div className="rounded bg-gray-50 p-3 text-center dark:bg-gray-900">
                   <div className="font-medium text-gray-900 dark:text-white">Barangay Clearance</div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">General purpose</div>
                 </div>
-                <div className="rounded bg-gray-50 p-3 text-center dark:bg-gray-800">
+                <div className="rounded bg-gray-50 p-3 text-center dark:bg-gray-900">
                   <div className="font-medium text-gray-900 dark:text-white">Business Clearance</div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">For business permits</div>
                 </div>
-                <div className="rounded bg-gray-50 p-3 text-center dark:bg-gray-800">
+                <div className="rounded bg-gray-50 p-3 text-center dark:bg-gray-900">
                   <div className="font-medium text-gray-900 dark:text-white">Indigency</div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">For financial assistance</div>
                 </div>
@@ -1132,7 +1132,7 @@ const Instructions: React.FC = () => {
                   placeholder="Search help articles..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400"
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder-gray-400"
                 />
               </div>
 
@@ -1155,7 +1155,7 @@ const Instructions: React.FC = () => {
                 </button>
 
                 {showDownloadOptions && (
-                  <div className="absolute right-0 mt-2 w-64 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800 z-10">
+                  <div className="absolute right-0 mt-2 w-64 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900 z-10">
                     <div className="p-2">
                       <div className="mb-2 px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
                         SELECT FORMAT
@@ -1251,7 +1251,7 @@ const Instructions: React.FC = () => {
               <div className="grid grid-cols-12 gap-6">
                 {/* Sidebar Navigation */}
                 <div className="col-span-3">
-                  <div className="sticky top-20 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+                  <div className="sticky top-20 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
                     <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
                       All Sections
                     </h3>
@@ -1273,7 +1273,7 @@ const Instructions: React.FC = () => {
                               'mt-0.5 rounded p-1',
                               isSelected
                                 ? 'bg-blue-100 text-blue-600 dark:bg-blue-800 dark:text-blue-400'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                                : 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400'
                             )}>
                               {getIcon(section.icon)}
                             </div>
@@ -1321,7 +1321,7 @@ const Instructions: React.FC = () => {
 
                 {/* Main Content */}
                 <div className="col-span-9">
-                  <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+                  <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
                     {/* Breadcrumb */}
                     <nav className="mb-4 flex items-center gap-2 text-sm">
                       <Link href="/admin/dashboard" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
@@ -1405,7 +1405,7 @@ const Instructions: React.FC = () => {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Video Tutorials</h2>
                 <div className="grid gap-6 md:grid-cols-2">
                   {videoTutorials.map((video, idx) => (
-                    <div key={idx} className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-4 transition hover:shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                    <div key={idx} className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-4 transition hover:shadow-lg dark:border-gray-700 dark:bg-gray-900">
                       <div className="relative mb-3 aspect-video w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700">
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="rounded-full bg-black/50 p-3 text-white group-hover:bg-black/70">
@@ -1436,7 +1436,7 @@ const Instructions: React.FC = () => {
                   {faqItems.map((faq, idx) => (
                     <div
                       key={idx}
-                      className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800"
+                      className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900"
                     >
                       <button
                         onClick={() => toggleSection(`faq-${idx}`)}
@@ -1467,7 +1467,7 @@ const Instructions: React.FC = () => {
                   {shortcuts.map((shortcut, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
                     >
                       <span className="text-gray-600 dark:text-gray-400">{shortcut.description}</span>
                       <kbd className="rounded bg-gray-100 px-3 py-1.5 font-mono text-sm font-semibold text-gray-900 dark:bg-gray-700 dark:text-white">

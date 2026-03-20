@@ -62,6 +62,16 @@ export default function PuroksGridView({
         return variants[status.toLowerCase()] || 'outline';
     };
 
+    const getStatusBadgeClass = (status: string): string => {
+        const classes: Record<string, string> = {
+            'active': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+            'inactive': 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
+            'pending': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            'archived': 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
+        };
+        return classes[status.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
+    };
+
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-PH', {
@@ -77,7 +87,7 @@ export default function PuroksGridView({
             description={hasActiveFilters 
                 ? 'Try changing your filters or search criteria.'
                 : 'Get started by creating a purok.'}
-            icon={<MapPin className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
+            icon={<MapPin className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
             hasFilters={hasActiveFilters}
             onClearFilters={onClearFilters}
             onCreateNew={() => window.location.href = '/admin/puroks/create'}
@@ -99,8 +109,10 @@ export default function PuroksGridView({
                 return (
                     <Card 
                         key={purok.id}
-                        className={`overflow-hidden transition-all hover:shadow-md ${
-                            isSelected ? 'border-blue-500 border-2 bg-blue-50 dark:bg-blue-900/10' : ''
+                        className={`overflow-hidden transition-all hover:shadow-md bg-white dark:bg-gray-900 border ${
+                            isSelected 
+                                ? 'border-blue-500 border-2 bg-blue-50 dark:bg-blue-900/20' 
+                                : 'border-gray-200 dark:border-gray-700'
                         }`}
                         onClick={(e) => {
                             if (isBulkMode && e.target instanceof HTMLElement && 
@@ -115,16 +127,16 @@ export default function PuroksGridView({
                             {/* Header with Checkbox and ActionDropdown */}
                             <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-2">
-                                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                        <MapPin className="h-5 w-5 text-blue-600" />
+                                    <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                                        <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-medium truncate">
+                                        <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
                                             {purok.name}
                                         </div>
                                         <Badge 
                                             variant={getStatusBadgeVariant(purok.status)} 
-                                            className="mt-1 text-xs"
+                                            className={`mt-1 text-xs ${getStatusBadgeClass(purok.status)}`}
                                         >
                                             {purok.status}
                                         </Badge>
@@ -137,10 +149,9 @@ export default function PuroksGridView({
                                             checked={isSelected}
                                             onCheckedChange={() => onItemSelect(purok.id)}
                                             onClick={(e) => e.stopPropagation()}
-                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-gray-300 dark:border-gray-600"
                                         />
                                     )}
-                                    {/* USE ACTIONDROPDOWN - THREE DOTS MENU */}
                                     <ActionDropdown>
                                         <ActionDropdownItem
                                             icon={<Eye className="h-4 w-4" />}
@@ -192,8 +203,8 @@ export default function PuroksGridView({
                                 {/* Description */}
                                 {purok.description && (
                                     <div className="space-y-1">
-                                        <div className="text-sm font-medium text-gray-700">Description</div>
-                                        <div className="text-sm text-gray-600 line-clamp-2">
+                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</div>
+                                        <div className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
                                             {purok.description}
                                         </div>
                                     </div>
@@ -202,12 +213,12 @@ export default function PuroksGridView({
                                 {/* Leader Info */}
                                 {purok.leader_name && (
                                     <div className="space-y-1">
-                                        <div className="text-sm font-medium text-gray-700">Leader</div>
-                                        <div className="text-gray-900">
+                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Leader</div>
+                                        <div className="text-gray-900 dark:text-gray-100 font-medium">
                                             {purok.leader_name}
                                         </div>
                                         {purok.leader_contact && (
-                                            <div className="flex items-center gap-1 text-sm text-gray-600">
+                                            <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
                                                 <Phone className="h-3.5 w-3.5" />
                                                 {purok.leader_contact}
                                             </div>
@@ -216,42 +227,42 @@ export default function PuroksGridView({
                                 )}
 
                                 {/* Stats */}
-                                <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
                                     <div className="space-y-1">
-                                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                                        <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
                                             <Home className="h-3.5 w-3.5" />
                                             <span className="font-medium">Households</span>
                                         </div>
-                                        <div className="text-lg font-semibold text-center">
+                                        <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 text-center">
                                             {purok.total_households?.toLocaleString() || 0}
                                         </div>
                                     </div>
                                     <div className="space-y-1">
-                                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                                        <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
                                             <UsersIcon className="h-3.5 w-3.5" />
                                             <span className="font-medium">Residents</span>
                                         </div>
-                                        <div className="text-lg font-semibold text-center">
+                                        <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 text-center">
                                             {purok.total_residents?.toLocaleString() || 0}
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Quick Links & Created Date */}
-                                <div className="pt-2 border-t">
+                                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                                             <Calendar className="h-3 w-3" />
                                             {formatDate(purok.created_at)}
                                         </div>
                                         <div className="flex gap-1">
                                             <Link href={`/residents?purok_id=${purok.id}`}>
-                                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
                                                     Residents
                                                 </Button>
                                             </Link>
                                             <Link href={`/households?purok_id=${purok.id}`}>
-                                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                                                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
                                                     Households
                                                 </Button>
                                             </Link>

@@ -173,11 +173,13 @@ const HouseholdInstructions: React.FC = () => {
   const [copied, setCopied] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
 
   // Check if mobile on mount and resize
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
+      setWindowWidth(window.innerWidth);
     };
     
     checkMobile();
@@ -214,7 +216,7 @@ const HouseholdInstructions: React.FC = () => {
     return classes.filter(Boolean).join(' ');
   };
 
-  // Sections data (keep all your existing sections - I'll keep them as is)
+  // Sections data
   const sections: Section[] = [
     {
       id: 'overview',
@@ -227,17 +229,17 @@ const HouseholdInstructions: React.FC = () => {
           <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 p-4 sm:p-8 text-white">
             <div className="absolute right-0 top-0 -mt-10 -mr-10 h-40 w-40 rounded-full bg-white/10"></div>
             <div className="absolute bottom-0 left-0 -mb-10 -ml-10 h-40 w-40 rounded-full bg-white/10"></div>
-            <h2 className="relative text-lg sm:text-2xl font-bold">Household Management System</h2>
-            <p className="relative mt-2 text-xs sm:text-sm text-emerald-100">
+            <h2 className="relative text-lg sm:text-2xl font-bold break-words">Household Management System</h2>
+            <p className="relative mt-2 text-xs sm:text-sm text-emerald-100 break-words">
               Efficiently manage and track all households in Barangay Kibawe
             </p>
             <div className="relative mt-3 sm:mt-4 flex flex-wrap gap-3 sm:gap-4">
               <div className="flex items-center gap-1 sm:gap-2">
-                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                 <span className="text-xs sm:text-sm">Version 2.0</span>
               </div>
               <div className="flex items-center gap-1 sm:gap-2">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                 <span className="text-xs sm:text-sm">Last Updated: March 2024</span>
               </div>
             </div>
@@ -251,14 +253,14 @@ const HouseholdInstructions: React.FC = () => {
               { icon: Users2, value: '4.2', label: 'Avg. Household Size', color: 'purple' },
               { icon: Building2, value: '7', label: 'Puroks', color: 'amber' },
             ].map((stat, idx) => (
-              <div key={idx} className="rounded-lg border border-gray-200 bg-white p-2 sm:p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-3">
+              <div key={idx} className="rounded-lg border border-gray-200 bg-white p-2 sm:p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+                <div className="flex flex-col items-center sm:items-start gap-1 sm:gap-3">
                   <div className={`rounded-lg bg-${stat.color}-100 p-1.5 sm:p-2 dark:bg-${stat.color}-900/30`}>
-                    <stat.icon className={`h-4 w-4 sm:h-5 sm:w-5 text-${stat.color}-600 dark:text-${stat.color}-400`} />
+                    <stat.icon className={`h-4 w-4 sm:h-5 sm:w-5 text-${stat.color}-600 dark:text-${stat.color}-400 flex-shrink-0`} />
                   </div>
-                  <div className="text-center sm:text-left">
-                    <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">{stat.value}</h3>
-                    <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">{stat.label}</p>
+                  <div className="text-center sm:text-left w-full">
+                    <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white break-words">{stat.value}</h3>
+                    <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 break-words">{stat.label}</p>
                   </div>
                 </div>
               </div>
@@ -267,35 +269,35 @@ const HouseholdInstructions: React.FC = () => {
 
           {/* Quick Actions */}
           <div className="rounded-lg bg-emerald-50 p-4 sm:p-6 dark:bg-emerald-900/20">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-emerald-900 dark:text-emerald-300">
-              <Zap className="h-4 w-4 sm:h-5 sm:w-5" />
+            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-emerald-900 dark:text-emerald-300 break-words">
+              <Zap className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
               Quick Actions
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
               <Link
                 href="/admin/households/create"
-                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-emerald-700 hover:bg-emerald-100 dark:bg-gray-800 dark:text-emerald-400 dark:hover:bg-gray-700"
+                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-emerald-700 hover:bg-emerald-100 dark:bg-gray-900 dark:text-emerald-400 dark:hover:bg-gray-700"
               >
                 <Home className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span className="truncate">Add Household</span>
               </Link>
               <Link
                 href="/admin/households?filter=pending"
-                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-amber-700 hover:bg-amber-100 dark:bg-gray-800 dark:text-amber-400 dark:hover:bg-gray-700"
+                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-amber-700 hover:bg-amber-100 dark:bg-gray-900 dark:text-amber-400 dark:hover:bg-gray-700"
               >
                 <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span className="truncate">Pending</span>
               </Link>
               <Link
                 href="/admin/reports/households"
-                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-purple-700 hover:bg-purple-100 dark:bg-gray-800 dark:text-purple-400 dark:hover:bg-gray-700"
+                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-purple-700 hover:bg-purple-100 dark:bg-gray-900 dark:text-purple-400 dark:hover:bg-gray-700"
               >
                 <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span className="truncate">Reports</span>
               </Link>
               <Link
                 href="/admin/households/export"
-                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-blue-700 hover:bg-blue-100 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700"
+                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-blue-700 hover:bg-blue-100 dark:bg-gray-900 dark:text-blue-400 dark:hover:bg-gray-700"
               >
                 <Download className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span className="truncate">Export</span>
@@ -305,38 +307,38 @@ const HouseholdInstructions: React.FC = () => {
 
           {/* Important Information */}
           <div className="rounded-lg border border-gray-200 p-4 sm:p-6 dark:border-gray-700">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
-              <Info className="h-4 w-4 sm:h-5 sm:w-5" />
+            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-gray-900 dark:text-white break-words">
+              <Info className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
               Important Information
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <h4 className="mb-2 text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-300">Household Data Includes</h4>
-                <ul className="space-y-1 sm:space-y-2 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+                <h4 className="mb-2 text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-300 break-words">Household Data Includes</h4>
+                <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   <li className="flex items-start gap-1 sm:gap-2">
                     <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-green-500" />
-                    <span>Household head information</span>
+                    <span className="break-words flex-1">Household head information</span>
                   </li>
                   <li className="flex items-start gap-1 sm:gap-2">
                     <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-green-500" />
-                    <span>Complete address and purok</span>
+                    <span className="break-words flex-1">Complete address and purok</span>
                   </li>
                   <li className="flex items-start gap-1 sm:gap-2">
                     <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-green-500" />
-                    <span>List of all household members</span>
+                    <span className="break-words flex-1">List of all household members</span>
                   </li>
                 </ul>
               </div>
               <div>
-                <h4 className="mb-2 text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-300">Benefits</h4>
-                <ul className="space-y-1 sm:space-y-2 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+                <h4 className="mb-2 text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-300 break-words">Benefits</h4>
+                <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   <li className="flex items-start gap-1 sm:gap-2">
                     <TrendingUp className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-blue-500" />
-                    <span>Accurate population tracking</span>
+                    <span className="break-words flex-1">Accurate population tracking</span>
                   </li>
                   <li className="flex items-start gap-1 sm:gap-2">
                     <TrendingUp className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-blue-500" />
-                    <span>Efficient service delivery</span>
+                    <span className="break-words flex-1">Efficient service delivery</span>
                   </li>
                 </ul>
               </div>
@@ -403,14 +405,14 @@ const HouseholdInstructions: React.FC = () => {
                   <div className="absolute left-0 flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-emerald-600 text-xs sm:text-sm text-white">
                     {item.step}
                   </div>
-                  <div className="flex-1 rounded-lg border border-gray-200 bg-white p-3 sm:p-4 dark:border-gray-700 dark:bg-gray-800">
-                    <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">{item.title}</h3>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{item.description}</p>
+                  <div className="flex-1 rounded-lg border border-gray-200 bg-white p-3 sm:p-4 dark:border-gray-700 dark:bg-gray-900">
+                    <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white break-words">{item.title}</h3>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{item.description}</p>
                     <ul className="mt-2 sm:mt-3 space-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       {item.details.map((detail, idx) => (
                         <li key={idx} className="flex items-start gap-1 sm:gap-2">
                           <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-green-500" />
-                          <span className="text-xs sm:text-sm">{detail}</span>
+                          <span className="break-words flex-1">{detail}</span>
                         </li>
                       ))}
                     </ul>
@@ -431,8 +433,8 @@ const HouseholdInstructions: React.FC = () => {
         <div className="space-y-4 sm:space-y-6">
           {/* Registration Process */}
           <div className="rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 p-4 sm:p-6 dark:from-emerald-900/20 dark:to-teal-900/20">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-emerald-900 dark:text-emerald-300">
-              <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" />
+            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-emerald-900 dark:text-emerald-300 break-words">
+              <UserPlus className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
               New Household Registration
             </h3>
             
@@ -502,21 +504,21 @@ const HouseholdInstructions: React.FC = () => {
                   icon: FileText
                 }
               ].map((section, idx) => (
-                <div key={idx} className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-800">
+                <div key={idx} className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                    <div className="flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    <div className="flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex-shrink-0">
                       <section.icon className="h-3 w-3 sm:h-4 sm:w-4" />
                     </div>
-                    <div className="flex-1">
-                      <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Step {idx + 1}: {section.step}</h4>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Step {idx + 1}: {section.step}</h4>
                       <div className="mt-1 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
                         {section.fields.slice(0, isMobile ? 2 : section.fields.length).map((field, fieldIdx) => (
-                          <span key={fieldIdx} className="rounded-full bg-gray-100 px-2 sm:px-3 py-0.5 sm:py-1 text-[8px] sm:text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                          <span key={fieldIdx} className="rounded-full bg-gray-100 px-2 sm:px-3 py-0.5 sm:py-1 text-[8px] sm:text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300 whitespace-nowrap">
                             {field}
                           </span>
                         ))}
                         {isMobile && section.fields.length > 2 && (
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[8px] text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[8px] text-gray-700 dark:bg-gray-700 dark:text-gray-300 whitespace-nowrap">
                             +{section.fields.length - 2} more
                           </span>
                         )}
@@ -532,12 +534,12 @@ const HouseholdInstructions: React.FC = () => {
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4 dark:border-amber-800 dark:bg-amber-900/20">
             <div className="flex items-start gap-2 sm:gap-3">
               <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-xs sm:text-sm font-medium text-amber-800 dark:text-amber-400">Important Notes</h4>
-                <ul className="mt-1 sm:mt-2 space-y-1 text-[10px] sm:text-xs text-amber-700 dark:text-amber-300">
-                  <li>• Household numbers are auto-generated</li>
-                  <li>• Must have a household head</li>
-                  <li>• Verify all information before saving</li>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-xs sm:text-sm font-medium text-amber-800 dark:text-amber-400 break-words">Important Notes</h4>
+                <ul className="mt-1 sm:mt-2 space-y-1 text-xs sm:text-sm text-amber-700 dark:text-amber-300">
+                  <li className="break-words">• Household numbers are auto-generated</li>
+                  <li className="break-words">• Must have a household head</li>
+                  <li className="break-words">• Verify all information before saving</li>
                 </ul>
               </div>
             </div>
@@ -554,30 +556,30 @@ const HouseholdInstructions: React.FC = () => {
         <div className="space-y-4 sm:space-y-6">
           {/* Member Management Overview */}
           <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:p-6 dark:from-blue-900/20 dark:to-indigo-900/20">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-blue-900 dark:text-blue-300">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-blue-900 dark:text-blue-300 break-words">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
               Household Member Management
             </h3>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-800">
-                <UserPlus className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                <h4 className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-400">Add Members</h4>
-                <p className="mt-1 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
+                <UserPlus className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
+                <h4 className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-400 break-words">Add Members</h4>
+                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
                   Add existing residents or register new ones
                 </p>
               </div>
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-800">
-                <UserCheck className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-                <h4 className="text-xs sm:text-sm font-medium text-green-800 dark:text-green-400">Update Roles</h4>
-                <p className="mt-1 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
+                <UserCheck className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
+                <h4 className="text-xs sm:text-sm font-medium text-green-800 dark:text-green-400 break-words">Update Roles</h4>
+                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
                   Change relationships and member status
                 </p>
               </div>
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-800">
-                <User className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-                <h4 className="text-xs sm:text-sm font-medium text-purple-800 dark:text-purple-400">Member Profiles</h4>
-                <p className="mt-1 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
+                <User className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
+                <h4 className="text-xs sm:text-sm font-medium text-purple-800 dark:text-purple-400 break-words">Member Profiles</h4>
+                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
                   View detailed member information
                 </p>
               </div>
@@ -586,8 +588,8 @@ const HouseholdInstructions: React.FC = () => {
 
           {/* Member Roles Table - Mobile Optimized */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-800/50">
-              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Member Roles</h4>
+            <div className="rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-900/50">
+              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Member Roles</h4>
               <div className="space-y-1 sm:space-y-2">
                 {[
                   { role: 'Household Head', badge: 'Primary', color: 'blue' },
@@ -595,9 +597,9 @@ const HouseholdInstructions: React.FC = () => {
                   { role: 'Child', badge: 'Dependent', color: 'purple' },
                   { role: 'Parent', badge: 'Senior', color: 'amber' },
                 ].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between rounded-lg bg-white p-1.5 sm:p-2 text-xs sm:text-sm dark:bg-gray-800">
-                    <span>{item.role}</span>
-                    <span className={`rounded-full bg-${item.color}-100 px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-xs text-${item.color}-800 dark:bg-${item.color}-900/40 dark:text-${item.color}-300`}>
+                  <div key={idx} className="flex items-center justify-between rounded-lg bg-white p-1.5 sm:p-2 text-xs sm:text-sm dark:bg-gray-900">
+                    <span className="break-words pr-2">{item.role}</span>
+                    <span className={`rounded-full bg-${item.color}-100 px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-xs text-${item.color}-800 dark:bg-${item.color}-900/40 dark:text-${item.color}-300 whitespace-nowrap flex-shrink-0`}>
                       {item.badge}
                     </span>
                   </div>
@@ -605,8 +607,8 @@ const HouseholdInstructions: React.FC = () => {
               </div>
             </div>
 
-            <div className="rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-800/50">
-              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Special Categories</h4>
+            <div className="rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-900/50">
+              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Special Categories</h4>
               <div className="space-y-1 sm:space-y-2">
                 {[
                   { category: 'Senior Citizen', desc: '60+ years' },
@@ -614,9 +616,9 @@ const HouseholdInstructions: React.FC = () => {
                   { category: 'Solo Parent', desc: 'Single parent' },
                   { category: '4Ps', desc: 'Beneficiary' },
                 ].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between rounded-lg bg-white p-1.5 sm:p-2 text-xs sm:text-sm dark:bg-gray-800">
-                    <span>{item.category}</span>
-                    <span className="text-[8px] sm:text-xs text-gray-500">{item.desc}</span>
+                  <div key={idx} className="flex items-center justify-between rounded-lg bg-white p-1.5 sm:p-2 text-xs sm:text-sm dark:bg-gray-900">
+                    <span className="break-words pr-2">{item.category}</span>
+                    <span className="text-[8px] sm:text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{item.desc}</span>
                   </div>
                 ))}
               </div>
@@ -634,30 +636,30 @@ const HouseholdInstructions: React.FC = () => {
         <div className="space-y-4 sm:space-y-6">
           {/* Household Types */}
           <div className="rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 p-4 sm:p-6 dark:from-purple-900/20 dark:to-pink-900/20">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-purple-900 dark:text-purple-300">
-              <Layers className="h-4 w-4 sm:h-5 sm:w-5" />
+            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-purple-900 dark:text-purple-300 break-words">
+              <Layers className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
               Household Types
             </h3>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-800">
-                <Home className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                <h4 className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-400">Single Family</h4>
-                <p className="mt-1 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
+                <Home className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
+                <h4 className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-400 break-words">Single Family</h4>
+                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
                   Nuclear family with parents and children
                 </p>
               </div>
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-800">
-                <Users className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-                <h4 className="text-xs sm:text-sm font-medium text-green-800 dark:text-green-400">Extended Family</h4>
-                <p className="mt-1 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
+                <Users className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
+                <h4 className="text-xs sm:text-sm font-medium text-green-800 dark:text-green-400 break-words">Extended Family</h4>
+                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
                   Multiple generations living together
                 </p>
               </div>
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-800">
-                <Users2 className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-                <h4 className="text-xs sm:text-sm font-medium text-purple-800 dark:text-purple-400">Multi-family</h4>
-                <p className="mt-1 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
+                <Users2 className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
+                <h4 className="text-xs sm:text-sm font-medium text-purple-800 dark:text-purple-400 break-words">Multi-family</h4>
+                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
                   Multiple families sharing one household
                 </p>
               </div>
@@ -666,7 +668,7 @@ const HouseholdInstructions: React.FC = () => {
 
           {/* Tenure Status - Mobile Optimized */}
           <div className="rounded-lg border border-gray-200 p-4 sm:p-6 dark:border-gray-700">
-            <h3 className="mb-3 sm:mb-4 text-sm sm:text-lg font-semibold text-gray-900 dark:text-white">Tenure Status</h3>
+            <h3 className="mb-3 sm:mb-4 text-sm sm:text-lg font-semibold text-gray-900 dark:text-white break-words">Tenure Status</h3>
             
             <div className="space-y-2 sm:space-y-4">
               {[
@@ -676,12 +678,12 @@ const HouseholdInstructions: React.FC = () => {
                 { icon: AlertCircle, title: 'Informal Settler', desc: 'No legal claim', color: 'amber' },
               ].map((item, idx) => (
                 <div key={idx} className="flex items-start gap-2 sm:gap-3">
-                  <div className={`rounded-full bg-${item.color}-100 p-1.5 sm:p-2 dark:bg-${item.color}-900/30`}>
+                  <div className={`rounded-full bg-${item.color}-100 p-1.5 sm:p-2 dark:bg-${item.color}-900/30 flex-shrink-0`}>
                     <item.icon className={`h-3 w-3 sm:h-4 sm:w-4 text-${item.color}-600 dark:text-${item.color}-400`} />
                   </div>
-                  <div className="flex-1">
-                    <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">{item.title}</h4>
-                    <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">{item.desc}</p>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">{item.title}</h4>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{item.desc}</p>
                   </div>
                 </div>
               ))}
@@ -699,8 +701,8 @@ const HouseholdInstructions: React.FC = () => {
         <div className="space-y-4 sm:space-y-6">
           {/* Available Reports */}
           <div className="rounded-lg bg-gradient-to-r from-indigo-50 to-indigo-100 p-4 sm:p-6 dark:from-indigo-900/20 dark:to-indigo-800/20">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-indigo-900 dark:text-indigo-300">
-              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
+            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-indigo-900 dark:text-indigo-300 break-words">
+              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
               Household Reports
             </h3>
             
@@ -715,9 +717,9 @@ const HouseholdInstructions: React.FC = () => {
               ].map((report, idx) => {
                 const Icon = report.icon;
                 return (
-                  <div key={idx} className="rounded-lg bg-white p-2 sm:p-3 dark:bg-gray-800">
-                    <Icon className="mb-1 h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
-                    <h4 className="text-[10px] sm:text-xs font-medium text-indigo-800 dark:text-indigo-400">{report.title}</h4>
+                  <div key={idx} className="rounded-lg bg-white p-2 sm:p-3 dark:bg-gray-900">
+                    <Icon className="mb-1 h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 flex-shrink-0" />
+                    <h4 className="text-[10px] sm:text-xs font-medium text-indigo-800 dark:text-indigo-400 break-words">{report.title}</h4>
                   </div>
                 );
               })}
@@ -727,7 +729,7 @@ const HouseholdInstructions: React.FC = () => {
           {/* Sample Data - Mobile Optimized */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-lg border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
-              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Households by Purok</h4>
+              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Households by Purok</h4>
               <div className="space-y-1 sm:space-y-2">
                 {[
                   { name: 'Purok 1', count: 245, percent: 35 },
@@ -735,12 +737,12 @@ const HouseholdInstructions: React.FC = () => {
                   { name: 'Purok 3', count: 312, percent: 45 },
                 ].map((item, idx) => (
                   <div key={idx}>
-                    <div className="flex justify-between text-[10px] sm:text-xs">
-                      <span>{item.name}</span>
-                      <span className="font-medium">{item.count}</span>
+                    <div className="flex justify-between text-xs sm:text-sm">
+                      <span className="break-words pr-2">{item.name}</span>
+                      <span className="font-medium whitespace-nowrap flex-shrink-0">{item.count}</span>
                     </div>
                     <div className="mt-1 h-1.5 sm:h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                      <div className={`h-1.5 sm:h-2 w-[${item.percent}%] rounded-full bg-${idx === 0 ? 'blue' : idx === 1 ? 'green' : 'purple'}-500`}></div>
+                      <div className={`h-1.5 sm:h-2 rounded-full bg-${idx === 0 ? 'blue' : idx === 1 ? 'green' : 'purple'}-500`} style={{ width: `${item.percent}%` }}></div>
                     </div>
                   </div>
                 ))}
@@ -748,7 +750,7 @@ const HouseholdInstructions: React.FC = () => {
             </div>
 
             <div className="rounded-lg border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
-              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Household Types</h4>
+              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Household Types</h4>
               <div className="space-y-2">
                 {[
                   { type: 'Single Family', percent: 58 },
@@ -756,11 +758,11 @@ const HouseholdInstructions: React.FC = () => {
                   { type: 'Multi-family', percent: 10 },
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 sm:gap-2">
-                      <div className={`h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-${idx === 0 ? 'blue' : idx === 1 ? 'green' : 'purple'}-500`}></div>
-                      <span className="text-[10px] sm:text-xs">{item.type}</span>
+                    <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                      <div className={`h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-${idx === 0 ? 'blue' : idx === 1 ? 'green' : 'purple'}-500 flex-shrink-0`}></div>
+                      <span className="text-xs sm:text-sm break-words">{item.type}</span>
                     </div>
-                    <span className="text-[10px] sm:text-xs font-medium">{item.percent}%</span>
+                    <span className="text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0">{item.percent}%</span>
                   </div>
                 ))}
               </div>
@@ -768,23 +770,23 @@ const HouseholdInstructions: React.FC = () => {
           </div>
 
           {/* Export Options - Mobile Optimized */}
-          <div className="rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-800/50">
-            <h4 className="mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
-              <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+          <div className="rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-900/50">
+            <h4 className="mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">
+              <Download className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               Export Options
             </h4>
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-              <button className="flex items-center justify-center gap-1 rounded-lg bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-                <PdfIcon className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-                PDF
+              <button className="flex items-center justify-center gap-1 rounded-lg bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700">
+                <PdfIcon className="h-3 w-3 sm:h-4 sm:w-4 text-red-500 flex-shrink-0" />
+                <span className="break-words">PDF</span>
               </button>
-              <button className="flex items-center justify-center gap-1 rounded-lg bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-                <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-                Excel
+              <button className="flex items-center justify-center gap-1 rounded-lg bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700">
+                <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
+                <span className="break-words">Excel</span>
               </button>
-              <button className="flex items-center justify-center gap-1 rounded-lg bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-                <Printer className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500" />
-                Print
+              <button className="flex items-center justify-center gap-1 rounded-lg bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700">
+                <Printer className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500 flex-shrink-0" />
+                <span className="break-words">Print</span>
               </button>
             </div>
           </div>
@@ -808,14 +810,14 @@ const HouseholdInstructions: React.FC = () => {
             ].map((practice, idx) => (
               <div key={idx} className="rounded-lg border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
                 <div className="mb-2 flex items-center gap-1 sm:gap-2">
-                  <div className={`rounded-full bg-${practice.color}-100 p-1.5 sm:p-2 dark:bg-${practice.color}-900/30`}>
+                  <div className={`rounded-full bg-${practice.color}-100 p-1.5 sm:p-2 dark:bg-${practice.color}-900/30 flex-shrink-0`}>
                     <practice.icon className={`h-3 w-3 sm:h-4 sm:w-4 text-${practice.color}-600 dark:text-${practice.color}-400`} />
                   </div>
-                  <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">{practice.title}</h4>
+                  <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">{practice.title}</h4>
                 </div>
-                <ul className="space-y-1 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">
+                <ul className="space-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   {practice.items.map((item, itemIdx) => (
-                    <li key={itemIdx}>• {item}</li>
+                    <li key={itemIdx} className="break-words">• {item}</li>
                   ))}
                 </ul>
               </div>
@@ -824,22 +826,22 @@ const HouseholdInstructions: React.FC = () => {
 
           {/* Common Mistakes - Mobile Optimized */}
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 sm:p-4 dark:border-red-800 dark:bg-red-900/20">
-            <h4 className="mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium text-red-800 dark:text-red-400">
-              <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
+            <h4 className="mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium text-red-800 dark:text-red-400 break-words">
+              <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               Common Mistakes
             </h4>
-            <div className="grid grid-cols-1 gap-1 text-[10px] sm:text-xs text-red-700 dark:text-red-300">
+            <div className="grid grid-cols-1 gap-1 text-xs sm:text-sm text-red-700 dark:text-red-300">
               <div className="flex items-start gap-1 sm:gap-2">
-                <X className="mt-0.5 h-2 w-2 sm:h-3 sm:w-3 flex-shrink-0" />
-                <span>Duplicate household entries</span>
+                <X className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="break-words flex-1">Duplicate household entries</span>
               </div>
               <div className="flex items-start gap-1 sm:gap-2">
-                <X className="mt-0.5 h-2 w-2 sm:h-3 sm:w-3 flex-shrink-0" />
-                <span>Missing household head</span>
+                <X className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="break-words flex-1">Missing household head</span>
               </div>
               <div className="flex items-start gap-1 sm:gap-2">
-                <X className="mt-0.5 h-2 w-2 sm:h-3 sm:w-3 flex-shrink-0" />
-                <span>Incorrect purok assignments</span>
+                <X className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="break-words flex-1">Incorrect purok assignments</span>
               </div>
             </div>
           </div>
@@ -919,35 +921,41 @@ const HouseholdInstructions: React.FC = () => {
 
   // Helper function to get icon component
   const getIcon = (IconComponent: LucideIcon) => {
-    return <IconComponent className="h-4 w-4 sm:h-5 sm:w-5" />;
+    return <IconComponent className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />;
   };
+
+  // Filtered sections based on search
+  const filteredSections = sections.filter(section =>
+    section.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    section.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <>
       <Head title="Household Management Instructions - Barangay Kibawe" />
       
       <AppLayout>
-        <div className="flex-1 space-y-3 sm:space-y-4 p-3 sm:p-4 pt-4 sm:pt-6 md:p-8">
+        <div className="flex-1 space-y-3 sm:space-y-4 p-3 sm:p-4 pt-4 sm:pt-6 md:p-8 max-w-full overflow-hidden">
           {/* Page Header - Mobile Optimized */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white break-words">
                 Household Instructions
               </h1>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 break-words">
                 Learn how to manage households effectively
               </p>
             </div>
             
             {/* Search - Mobile Optimized */}
             <div className="relative w-full sm:w-72 md:w-96">
-              <Search className="absolute left-2 sm:left-3 top-1/2 h-3 w-3 sm:h-4 sm:w-4 -translate-y-1/2 text-gray-400" />
+              <Search className="absolute left-2 sm:left-3 top-1/2 h-3 w-3 sm:h-4 sm:w-4 -translate-y-1/2 text-gray-400 flex-shrink-0" />
               <input
                 type="text"
                 placeholder="Search guides..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 py-1.5 sm:py-2 pl-7 sm:pl-10 pr-3 sm:pr-4 text-xs sm:text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400"
+                className="w-full rounded-lg border border-gray-300 py-1.5 sm:py-2 pl-7 sm:pl-10 pr-3 sm:pr-4 text-xs sm:text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder-gray-400"
               />
             </div>
           </div>
@@ -974,7 +982,7 @@ const HouseholdInstructions: React.FC = () => {
                         : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'
                     )}
                   >
-                    <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <Icon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                     {tab.label}
                   </button>
                 );
@@ -990,29 +998,29 @@ const HouseholdInstructions: React.FC = () => {
                 {isMobile && (
                   <button
                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="mb-3 flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-800"
+                    className="mb-3 flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900"
                   >
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
+                    <span className="font-medium text-gray-700 dark:text-gray-300 truncate max-w-[200px]">
                       {selectedContent.title}
                     </span>
                     {isMobileMenuOpen ? (
-                      <X className="h-4 w-4 text-gray-500" />
+                      <X className="h-4 w-4 text-gray-500 flex-shrink-0" />
                     ) : (
-                      <Menu className="h-4 w-4 text-gray-500" />
+                      <Menu className="h-4 w-4 text-gray-500 flex-shrink-0" />
                     )}
                   </button>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                  {/* Sidebar Navigation - Mobile Drawer */}
+                  {/* Sidebar Navigation - NO SCROLL, FULL HEIGHT */}
                   <div className={cn(
                     "md:col-span-3",
                     isMobile && !isMobileMenuOpen && "hidden",
                     isMobile && "fixed inset-0 z-50 bg-black/50",
                   )}>
                     <div className={cn(
-                      "md:sticky md:top-20 rounded-lg border border-gray-200 bg-white p-3 sm:p-4 dark:border-gray-700 dark:bg-gray-800",
-                      isMobile && "absolute top-0 left-0 h-full w-64 overflow-y-auto rounded-none"
+                      "md:sticky md:top-20 rounded-lg border border-gray-200 bg-white p-3 sm:p-4 dark:border-gray-700 dark:bg-gray-900",
+                      isMobile && "absolute top-0 left-0 h-full w-64 overflow-y-auto rounded-none" // Only scroll on mobile
                     )}>
                       {isMobile && (
                         <div className="mb-3 flex items-center justify-between">
@@ -1023,68 +1031,75 @@ const HouseholdInstructions: React.FC = () => {
                             onClick={() => setIsMobileMenuOpen(false)}
                             className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-4 w-4 flex-shrink-0" />
                           </button>
                         </div>
                       )}
                       <h3 className="mb-3 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white hidden md:block">
                         Household Guide Sections
                       </h3>
-                      <nav className="space-y-1">
-                        {sections.map((section) => {
-                          const isSelected = selectedSection === section.id;
-                          return (
-                            <button
-                              key={section.id}
-                              onClick={() => setSelectedSection(section.id)}
-                              className={cn(
-                                'flex w-full items-start gap-2 sm:gap-3 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-left text-[10px] sm:text-xs transition-colors',
-                                isSelected
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
-                                  : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                              )}
-                            >
-                              <div className={cn(
-                                'mt-0.5 rounded p-1',
-                                isSelected
-                                  ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-800 dark:text-emerald-400'
-                                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                              )}>
-                                {getIcon(section.icon)}
-                              </div>
-                              <div className="flex-1">
-                                <div className="font-medium truncate">{section.title}</div>
-                                {!isMobile && (
-                                  <div className="mt-0.5 text-[8px] sm:text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                                    {section.description}
-                                  </div>
+                      {searchQuery && filteredSections.length === 0 ? (
+                        <div className="text-center py-4">
+                          <Search className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                          <p className="text-xs text-gray-500">No sections found</p>
+                        </div>
+                      ) : (
+                        <nav className="space-y-1">
+                          {(searchQuery ? filteredSections : sections).map((section) => {
+                            const isSelected = selectedSection === section.id;
+                            return (
+                              <button
+                                key={section.id}
+                                onClick={() => setSelectedSection(section.id)}
+                                className={cn(
+                                  'flex w-full items-start gap-2 sm:gap-3 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-left text-xs sm:text-sm transition-colors',
+                                  isSelected
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                                    : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                                 )}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </nav>
+                              >
+                                <div className={cn(
+                                  'mt-0.5 rounded p-1 flex-shrink-0',
+                                  isSelected
+                                    ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-800 dark:text-emerald-400'
+                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400'
+                                )}>
+                                  {getIcon(section.icon)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium truncate">{section.title}</div>
+                                  {!isMobile && (
+                                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 break-words">
+                                      {section.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </nav>
+                      )}
 
-                      {/* Download Resources - Hide on mobile menu */}
+                      {/* Download Resources - Always visible, no scroll */}
                       {!isMobile && (
                         <div className="mt-6 rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-700/50">
-                          <h4 className="mb-2 sm:mb-3 text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                          <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Resources
                           </h4>
                           <div className="space-y-1 sm:space-y-2">
                             <a
                               href="#"
-                              className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs text-gray-600 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400"
+                              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400"
                             >
-                              <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                              Household Manual
+                              <Download className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                              <span className="truncate">Household Manual</span>
                             </a>
                             <a
                               href="#"
-                              className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs text-gray-600 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400"
+                              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400"
                             >
-                              <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                              Excel Template
+                              <Download className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                              <span className="truncate">Excel Template</span>
                             </a>
                           </div>
                         </div>
@@ -1094,20 +1109,20 @@ const HouseholdInstructions: React.FC = () => {
 
                   {/* Main Content */}
                   <div className={cn(
-                    "md:col-span-9",
+                    "md:col-span-9 min-w-0",
                     isMobile && isMobileMenuOpen && "hidden"
                   )}>
-                    <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6 dark:border-gray-700 dark:bg-gray-800">
+                    <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6 dark:border-gray-700 dark:bg-gray-900">
                       {/* Breadcrumb - Simplified on Mobile */}
-                      <nav className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs flex-wrap">
-                        <Link href="/admin/dashboard" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                      <nav className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm flex-wrap">
+                        <Link href="/admin/dashboard" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 whitespace-nowrap">
                           Home
                         </Link>
-                        <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
-                        <Link href="/admin/households" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                        <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 flex-shrink-0" />
+                        <Link href="/admin/households" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 whitespace-nowrap">
                           Households
                         </Link>
-                        <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+                        <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 flex-shrink-0" />
                         <span className="font-medium text-gray-900 dark:text-white truncate max-w-[100px] sm:max-w-none">
                           {selectedContent.title}
                         </span>
@@ -1115,15 +1130,15 @@ const HouseholdInstructions: React.FC = () => {
 
                       {/* Section Header - Mobile Optimized */}
                       <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="rounded-lg bg-emerald-100 p-2 sm:p-3 dark:bg-emerald-900/30">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div className="rounded-lg bg-emerald-100 p-2 sm:p-3 dark:bg-emerald-900/30 flex-shrink-0">
                             {getIcon(selectedContent.icon)}
                           </div>
-                          <div>
-                            <h2 className="text-sm sm:text-base md:text-2xl font-bold text-gray-900 dark:text-white">
+                          <div className="min-w-0">
+                            <h2 className="text-sm sm:text-base md:text-2xl font-bold text-gray-900 dark:text-white break-words">
                               {selectedContent.title}
                             </h2>
-                            <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 mt-0.5 sm:mt-1">
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5 sm:mt-1 break-words">
                               {selectedContent.description}
                             </p>
                           </div>
@@ -1132,20 +1147,20 @@ const HouseholdInstructions: React.FC = () => {
                         {/* Action Buttons - Stack on Mobile */}
                         <div className="flex gap-1 sm:gap-2">
                           <button className="rounded-lg border border-gray-300 p-1.5 sm:p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700">
-                            <Printer className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <Printer className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                           </button>
                           <button className="rounded-lg border border-gray-300 p-1.5 sm:p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700">
-                            <Share2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <Share2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                           </button>
-                          <button className="rounded-lg bg-emerald-600 px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600">
-                            <Download className="mr-1 inline h-3 w-3 sm:h-4 sm:w-4" />
+                          <button className="rounded-lg bg-emerald-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600">
+                            <Download className="mr-1 inline h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                             <span className="hidden sm:inline">Download</span>
                           </button>
                         </div>
                       </div>
 
                       {/* Section Content */}
-                      <div className="prose prose-xs sm:prose-sm max-w-none dark:prose-invert">
+                      <div className="prose prose-sm sm:prose-base max-w-none dark:prose-invert overflow-hidden">
                         {selectedContent.content}
                       </div>
 
@@ -1158,9 +1173,9 @@ const HouseholdInstructions: React.FC = () => {
                               setSelectedSection(sections[currentIndex - 1].id);
                             }
                           }}
-                          className="flex items-center gap-1 sm:gap-2 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                          className="flex items-center gap-1 sm:gap-2 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                         >
-                          <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                           <span className="hidden sm:inline">Previous</span>
                         </button>
                         <button
@@ -1170,10 +1185,10 @@ const HouseholdInstructions: React.FC = () => {
                               setSelectedSection(sections[currentIndex + 1].id);
                             }
                           }}
-                          className="flex items-center gap-1 sm:gap-2 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                          className="flex items-center gap-1 sm:gap-2 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                         >
                           <span className="hidden sm:inline">Next</span>
-                          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                         </button>
                       </div>
                     </div>
@@ -1184,24 +1199,24 @@ const HouseholdInstructions: React.FC = () => {
 
             {activeTab === 'videos' && (
               <div className="space-y-4 sm:space-y-6">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Video Tutorials</h2>
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white break-words">Video Tutorials</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
                   {videoTutorials.map((video, idx) => (
-                    <div key={idx} className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-3 sm:p-4 transition hover:shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                    <div key={idx} className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-3 sm:p-4 transition hover:shadow-lg dark:border-gray-700 dark:bg-gray-900">
                       <div className="relative mb-2 sm:mb-3 aspect-video w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700">
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="rounded-full bg-black/50 p-2 sm:p-3 text-white group-hover:bg-black/70">
-                            <Video className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <Video className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                           </div>
                         </div>
                         <div className="absolute bottom-1 sm:bottom-2 right-1 sm:right-2 rounded bg-black/70 px-1 sm:px-2 py-0.5 text-[8px] sm:text-xs text-white">
                           {video.duration}
                         </div>
                       </div>
-                      <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">{video.title}</h3>
-                      <div className="mt-1 flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
-                        <Eye className="h-2 w-2 sm:h-3 sm:w-3" />
-                        <span>{video.views} views</span>
+                      <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white break-words">{video.title}</h3>
+                      <div className="mt-1 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                        <Eye className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="break-words">{video.views} views</span>
                       </div>
                     </div>
                   ))}
@@ -1211,20 +1226,20 @@ const HouseholdInstructions: React.FC = () => {
 
             {activeTab === 'faq' && (
               <div className="space-y-4 sm:space-y-6">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white break-words">
                   Frequently Asked Questions
                 </h2>
                 <div className="space-y-2 sm:space-y-4">
                   {faqItems.map((faq, idx) => (
                     <div
                       key={idx}
-                      className="rounded-xl border border-gray-200 bg-white p-3 sm:p-4 dark:border-gray-700 dark:bg-gray-800"
+                      className="rounded-xl border border-gray-200 bg-white p-3 sm:p-4 dark:border-gray-700 dark:bg-gray-900"
                     >
                       <button
                         onClick={() => toggleSection(`faq-${idx}`)}
-                        className="flex w-full items-center justify-between text-left"
+                        className="flex w-full items-center justify-between text-left gap-2"
                       >
-                        <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white pr-2">
+                        <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white break-words flex-1">
                           {faq.question}
                         </h3>
                         {expandedSections.includes(`faq-${idx}`) ? (
@@ -1234,7 +1249,7 @@ const HouseholdInstructions: React.FC = () => {
                         )}
                       </button>
                       {expandedSections.includes(`faq-${idx}`) && (
-                        <p className="mt-2 sm:mt-3 text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">{faq.answer}</p>
+                        <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{faq.answer}</p>
                       )}
                     </div>
                   ))}
@@ -1244,15 +1259,15 @@ const HouseholdInstructions: React.FC = () => {
 
             {activeTab === 'shortcuts' && (
               <div className="space-y-4 sm:space-y-6">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Keyboard Shortcuts</h2>
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white break-words">Keyboard Shortcuts</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
                   {shortcuts.map((shortcut, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-2 sm:p-3 dark:border-gray-700 dark:bg-gray-800"
+                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-2 sm:p-3 dark:border-gray-700 dark:bg-gray-900 gap-2"
                     >
-                      <span className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">{shortcut.description}</span>
-                      <kbd className="rounded bg-gray-100 px-2 sm:px-2.5 py-1 sm:py-1.5 text-[8px] sm:text-xs font-mono font-semibold text-gray-900 dark:bg-gray-700 dark:text-white">
+                      <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words flex-1">{shortcut.description}</span>
+                      <kbd className="rounded bg-gray-100 px-2 sm:px-2.5 py-1 sm:py-1.5 text-xs sm:text-sm font-mono font-semibold text-gray-900 dark:bg-gray-700 dark:text-white whitespace-nowrap flex-shrink-0">
                         {shortcut.key}
                       </kbd>
                     </div>
@@ -1260,12 +1275,12 @@ const HouseholdInstructions: React.FC = () => {
                 </div>
                 
                 <div className="rounded-lg bg-emerald-50 p-3 sm:p-4 dark:bg-emerald-900/20">
-                  <h3 className="mb-1 sm:mb-2 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium text-emerald-800 dark:text-emerald-400">
-                    <Keyboard className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <h3 className="mb-1 sm:mb-2 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium text-emerald-800 dark:text-emerald-400 break-words">
+                    <Keyboard className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                     Pro Tip
                   </h3>
-                  <p className="text-[10px] sm:text-xs text-emerald-700 dark:text-emerald-400">
-                    Press <kbd className="rounded bg-emerald-200 px-1 sm:px-2 py-0.5 sm:py-1 text-[8px] sm:text-xs font-mono dark:bg-emerald-800">Ctrl + /</kbd> to see all shortcuts
+                  <p className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-400 break-words">
+                    Press <kbd className="rounded bg-emerald-200 px-1 sm:px-2 py-0.5 sm:py-1 text-xs sm:text-sm font-mono dark:bg-emerald-800">Ctrl + /</kbd> to see all shortcuts
                   </p>
                 </div>
               </div>

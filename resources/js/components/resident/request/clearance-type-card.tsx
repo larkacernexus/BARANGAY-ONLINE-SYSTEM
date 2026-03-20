@@ -144,7 +144,7 @@ export function ClearanceTypeCard({
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2 mb-3">
-                            <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-gray-800 rounded-lg">
+                            <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-gray-900 rounded-lg">
                                 <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
                                     <Clock className="h-3 w-3 text-blue-600" />
                                 </div>
@@ -153,7 +153,7 @@ export function ClearanceTypeCard({
                                     <p className="font-semibold text-xs">{selectedClearance.processing_days} days</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-gray-800 rounded-lg">
+                            <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-gray-900 rounded-lg">
                                 <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
                                     <Calendar className="h-3 w-3 text-green-600" />
                                 </div>
@@ -192,7 +192,7 @@ export function ClearanceTypeCard({
                                     {selectedClearance.document_types.map((doc, index) => {
                                         const isUploaded = selectedDocumentTypes.has(doc.id);
                                         return (
-                                            <div key={index} className="flex items-center justify-between p-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded text-xs">
+                                            <div key={index} className="flex items-center justify-between p-1.5 hover:bg-gray-50 dark:hover:bg-gray-900/50 rounded text-xs">
                                                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                                     {isUploaded ? (
                                                         <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />

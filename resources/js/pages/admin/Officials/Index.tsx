@@ -1,4 +1,4 @@
-// pages/Officials.tsx
+// pages/admin/officials/index.tsx
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -37,7 +37,7 @@ export default function Officials() {
     // State management
     const [search, setSearch] = useState(filters.search || '');
     const [filtersState, setFiltersState] = useState<FilterState>({
-        status: filters.status || 'all',
+        status: filters.status || 'active',
         position: filters.position || 'all',
         committee: filters.committee || 'all',
         type: filters.type || 'all',
@@ -63,39 +63,6 @@ export default function Officials() {
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
 
     const searchInputRef = useRef<HTMLInputElement>(null);
-
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/admin/officials', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== filters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, filters.search]);
 
     // Handle window resize
     useEffect(() => {
@@ -250,8 +217,9 @@ export default function Officials() {
         return getSelectionStats(selectedOfficialsData);
     }, [selectedOfficialsData]);
 
-    // Bulk operations
-    const handleBulkOperation = async (operation: BulkOperation) => {
+    // ========== REVISED BULK OPERATIONS ==========
+    // ONE FUNCTION FOR ALL BULK STATUS UPDATES
+    const handleBulkStatusUpdate = (status: 'active' | 'inactive' | 'former' | 'current') => {
         if (selectedOfficials.length === 0) {
             toast.error('Please select at least one official');
             return;
@@ -259,140 +227,166 @@ export default function Officials() {
 
         setIsPerformingBulkAction(true);
 
-        try {
-            switch (operation) {
-                case 'delete':
-                    if (confirm(`Are you sure you want to delete ${selectedOfficials.length} selected official(s)?`)) {
-                        await router.post('/admin/officials/bulk-delete', {
-                            ids: selectedOfficials,
-                        }, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                setSelectedOfficials([]);
-                                setShowBulkDeleteDialog(false);
-                                toast.success('Officials deleted successfully');
-                            },
-                            onError: () => {
-                                toast.error('Failed to delete officials');
-                            }
-                        });
-                    }
-                    break;
-
-                case 'activate':
-                    await router.post('/admin/officials/bulk-activate', {
-                        ids: selectedOfficials,
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setSelectedOfficials([]);
-                            toast.success('Officials activated successfully');
-                        },
-                        onError: () => {
-                            toast.error('Failed to activate officials');
-                        }
-                    });
-                    break;
-
-                case 'deactivate':
-                    await router.post('/admin/officials/bulk-deactivate', {
-                        ids: selectedOfficials,
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setSelectedOfficials([]);
-                            toast.success('Officials deactivated successfully');
-                        },
-                        onError: () => {
-                            toast.error('Failed to deactivate officials');
-                        }
-                    });
-                    break;
-
-                case 'make_current':
-                    await router.post('/admin/officials/bulk-make-current', {
-                        ids: selectedOfficials,
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setSelectedOfficials([]);
-                            toast.success('Officials marked as current');
-                        },
-                        onError: () => {
-                            toast.error('Failed to update officials');
-                        }
-                    });
-                    break;
-
-                case 'make_former':
-                    await router.post('/admin/officials/bulk-make-former', {
-                        ids: selectedOfficials,
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setSelectedOfficials([]);
-                            toast.success('Officials marked as former');
-                        },
-                        onError: () => {
-                            toast.error('Failed to update officials');
-                        }
-                    });
-                    break;
-
-                case 'export':
-                case 'export_csv':
-                    const exportData = formatForClipboard(selectedOfficialsData);
-                    const blob = new Blob([exportData], { type: 'text/csv' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `officials-export-${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    toast.success('Export completed successfully');
-                    break;
-
-                case 'print':
-                    selectedOfficials.forEach(id => {
-                        window.open(`/admin/officials/${id}/print`, '_blank');
-                    });
-                    toast.success(`${selectedOfficials.length} official(s) opened for printing`);
-                    break;
-
-                case 'generate_report':
-                    const idsParam = selectedOfficials.join(',');
-                    window.open(`/admin/officials/report?ids=${idsParam}`, '_blank');
-                    toast.success(`Generating report for ${selectedOfficials.length} official(s)`);
-                    break;
-
-                case 'message_officials':
-                    const officialsWithContacts = selectedOfficialsData
-                        .filter(o => o.contact_number || o.resident?.contact_number)
-                        .map(o => ({ 
-                            name: o.resident?.full_name || 'Official', 
-                            contact: o.contact_number || o.resident?.contact_number 
-                        }));
-                    
-                    if (officialsWithContacts.length > 0) {
-                        const contacts = officialsWithContacts.map(o => o.contact).join(',');
-                        const smsLink = `sms:${contacts}`;
-                        window.location.href = smsLink;
-                        toast.success(`Opening SMS for ${officialsWithContacts.length} official(s)`);
-                    } else {
-                        toast.error('No contact numbers available for selected officials');
-                    }
-                    break;
-
-                default:
-                    toast.error('Operation not supported');
+        router.post('/admin/officials/bulk-status', {
+            ids: selectedOfficials,
+            status: status,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                const messages = {
+                    active: 'activated',
+                    inactive: 'deactivated',
+                    former: 'marked as former',
+                    current: 'marked as current'
+                };
+                setSelectedOfficials([]);
+                toast.success(`Officials ${messages[status]} successfully`);
+                setShowBulkStatusDialog(false);
+            },
+            onError: (errors: any) => {
+                console.error('Bulk status update error:', errors);
+                toast.error('Failed to update officials status');
+            },
+            onFinish: () => {
+                setIsPerformingBulkAction(false);
             }
-        } catch (error) {
-            console.error('Bulk operation error:', error);
-            toast.error('An error occurred during the bulk operation.');
-        } finally {
-            setIsPerformingBulkAction(false);
+        });
+    };
+
+    // Bulk delete
+    const handleBulkDelete = () => {
+        if (selectedOfficials.length === 0) {
+            toast.error('Please select at least one official');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete ${selectedOfficials.length} selected official(s)?`)) {
+            return;
+        }
+
+        setIsPerformingBulkAction(true);
+
+        router.post('/admin/officials/bulk-delete', {
+            ids: selectedOfficials,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setSelectedOfficials([]);
+                setShowBulkDeleteDialog(false);
+                toast.success('Officials deleted successfully');
+            },
+            onError: (errors: any) => {
+                console.error('Bulk delete error:', errors);
+                toast.error('Failed to delete officials');
+            },
+            onFinish: () => {
+                setIsPerformingBulkAction(false);
+            }
+        });
+    };
+
+    // Export
+    const handleExport = () => {
+        if (selectedOfficials.length === 0) {
+            toast.error('Please select at least one official');
+            return;
+        }
+
+        const exportData = formatForClipboard(selectedOfficialsData);
+        const blob = new Blob([exportData], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `officials-export-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast.success('Export completed successfully');
+    };
+
+    // Print
+    const handlePrint = () => {
+        if (selectedOfficials.length === 0) {
+            toast.error('Please select at least one official');
+            return;
+        }
+
+        selectedOfficials.forEach(id => {
+            window.open(`/admin/officials/${id}/print`, '_blank');
+        });
+        toast.success(`${selectedOfficials.length} official(s) opened for printing`);
+    };
+
+    // Message
+    const handleMessage = () => {
+        if (selectedOfficials.length === 0) {
+            toast.error('Please select at least one official');
+            return;
+        }
+
+        const officialsWithContacts = selectedOfficialsData
+            .filter(o => o.contact_number || o.resident?.contact_number)
+            .map(o => ({ 
+                name: o.resident?.full_name || 'Official', 
+                contact: o.contact_number || o.resident?.contact_number 
+            }));
+        
+        if (officialsWithContacts.length > 0) {
+            const contacts = officialsWithContacts.map(o => o.contact).join(',');
+            const smsLink = `sms:${contacts}`;
+            window.location.href = smsLink;
+            toast.success(`Opening SMS for ${officialsWithContacts.length} official(s)`);
+        } else {
+            toast.error('No contact numbers available for selected officials');
+        }
+    };
+
+    // Generate report
+    const handleGenerateReport = () => {
+        if (selectedOfficials.length === 0) {
+            toast.error('Please select at least one official');
+            return;
+        }
+
+        const idsParam = selectedOfficials.join(',');
+        window.open(`/admin/officials/report?ids=${idsParam}`, '_blank');
+        toast.success(`Generating report for ${selectedOfficials.length} official(s)`);
+    };
+
+    // Main bulk operation handler
+    const handleBulkOperation = async (operation: string) => {
+        switch (operation) {
+            case 'delete':
+                setShowBulkDeleteDialog(true);
+                break;
+            case 'activate':
+                handleBulkStatusUpdate('active');
+                break;
+            case 'deactivate':
+                handleBulkStatusUpdate('inactive');
+                break;
+            case 'make_current':
+                handleBulkStatusUpdate('current');
+                break;
+            case 'make_former':
+                handleBulkStatusUpdate('former');
+                break;
+            case 'export':
+            case 'export_csv':
+                handleExport();
+                break;
+            case 'print':
+                handlePrint();
+                break;
+            case 'generate_report':
+                handleGenerateReport();
+                break;
+            case 'message_officials':
+                handleMessage();
+                break;
+            default:
+                toast.error('Operation not supported');
         }
     };
 
@@ -447,7 +441,7 @@ export default function Officials() {
     const handleClearFilters = () => {
         setSearch('');
         setFiltersState({
-            status: 'all',
+            status: 'active',
             position: 'all',
             committee: 'all',
             type: 'all',
@@ -467,7 +461,7 @@ export default function Officials() {
 
     const hasActiveFilters = 
         search || 
-        filtersState.status !== 'all' || 
+        filtersState.status !== 'active' ||
         filtersState.position !== 'all' || 
         filtersState.committee !== 'all' ||
         filtersState.type !== 'all';
@@ -555,7 +549,7 @@ export default function Officials() {
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border hidden sm:block">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border hidden sm:block">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <KeyRound className="h-4 w-4 text-gray-500" />

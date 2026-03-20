@@ -253,12 +253,12 @@ export function BarangaySearchModal({
 
   const getCategoryColor = (type: SearchResult['type']) => {
     const category = SEARCH_CATEGORIES.find(cat => cat.type === type);
-    return category?.color || 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700';
+    return category?.color || 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700';
   };
 
   const getCategoryAccent = (type: SearchResult['type']) => {
     const category = SEARCH_CATEGORIES.find(cat => cat.type === type);
-    return category?.accent || 'bg-gray-100 dark:bg-gray-800';
+    return category?.accent || 'bg-gray-100 dark:bg-gray-900';
   };
 
   const getCategoryLabel = (type: SearchResult['type']) => {

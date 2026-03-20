@@ -1,5 +1,6 @@
+// resources/js/components/admin/payment/paymentCreate/utils.ts
 
-import { OutstandingFee, BackendFee, FeeType, Resident, ResidentDiscount } from './types';
+import { OutstandingFee, BackendFee, FeeType, Resident, ResidentDiscount, ResidentPrivilege } from './types';
 
 export function generateORNumber(): string {
     const date = new Date();
@@ -113,18 +114,92 @@ export function isValidDate(dateString: string): boolean {
 }
 
 /**
- * 🔴 FIXED: Convert BackendFee to OutstandingFee format with proper payer_id mapping
+ * Get active privileges from resident
+ */
+export function getActivePrivileges(resident: Resident): any[] {
+    if (!resident.privileges || !Array.isArray(resident.privileges)) {
+        return [];
+    }
+    return resident.privileges.filter((p: any) => 
+        p.status === 'active' || p.status === 'expiring_soon'
+    );
+}
+
+/**
+ * Get privilege icon based on code
+ */
+export function getPrivilegeIcon(code: string): string {
+    const firstChar = (code?.[0] || 'A').toUpperCase();
+    
+    const iconMap: Record<string, string> = {
+        'S': '👴',
+        'P': '♿',
+        'I': '🏠',
+        'F': '🌾',
+        'O': '✈️',
+        '4': '📦',
+        'U': '💼',
+        'A': '🎫',
+        'B': '🎫',
+        'C': '🎫',
+        'D': '🎫',
+        'E': '🎫',
+    };
+    
+    return iconMap[firstChar] || '🎫';
+}
+
+/**
+ * Get privilege color based on code hash
+ */
+export function getPrivilegeColor(code: string): string {
+    const firstChar = (code?.[0] || 'A').toUpperCase().charCodeAt(0);
+    const colorIndex = firstChar % 8;
+    
+    const colors = [
+        'bg-blue-100 text-blue-800 border-blue-200',
+        'bg-green-100 text-green-800 border-green-200',
+        'bg-purple-100 text-purple-800 border-purple-200',
+        'bg-orange-100 text-orange-800 border-orange-200',
+        'bg-red-100 text-red-800 border-red-200',
+        'bg-indigo-100 text-indigo-800 border-indigo-200',
+        'bg-pink-100 text-pink-800 border-pink-200',
+        'bg-amber-100 text-amber-800 border-amber-200',
+    ];
+    
+    return colors[colorIndex] || 'bg-gray-100 text-gray-800 border-gray-200';
+}
+
+/**
+ * Check if fee allows discount for a specific privilege code
+ */
+export function feeAllowsDiscount(fee: OutstandingFee, privilegeCode: string): boolean {
+    const fieldName = `has_${privilegeCode.toLowerCase()}_discount`;
+    return (fee as any)[fieldName] === true;
+}
+
+/**
+ * Get discount percentage for a specific privilege from fee
+ */
+export function getDiscountPercentage(fee: OutstandingFee, privilegeCode: string): number {
+    const fieldName = `${privilegeCode.toLowerCase()}_discount_percentage`;
+    return (fee as any)[fieldName] || 0;
+}
+
+/**
+ * Convert BackendFee to OutstandingFee format - DYNAMIC
  */
 export function convertBackendFeeToOutstandingFee(fee: BackendFee, feeTypes: FeeType[]): OutstandingFee {
     const feeType = feeTypes.find(ft => ft.id == fee.fee_type_id);
     
-    // 🔴 CRITICAL FIX: Determine payer type and ID correctly
+    // Determine payer type and ID correctly
     let payerType = fee.payer_type;
     let payerId = fee.payer_id;
     let residentId = fee.resident_id;
     let householdId = fee.household_id;
+    let businessId = fee.business_id;
     
-    // Handle string payer types from backend (might be full class names)
+    // Handle string payer types from backend
     if (payerType === 'App\\Models\\Resident') {
         payerType = 'resident';
         payerId = fee.payer_id || fee.resident_id;
@@ -133,9 +208,12 @@ export function convertBackendFeeToOutstandingFee(fee: BackendFee, feeTypes: Fee
         payerType = 'household';
         payerId = fee.payer_id || fee.household_id;
         householdId = fee.payer_id || fee.household_id;
+    } else if (payerType === 'App\\Models\\Business') {
+        payerType = 'business';
+        payerId = fee.payer_id || fee.business_id;
+        businessId = fee.payer_id || fee.business_id;
     }
     
-    // If payer_id is missing but we have resident_id or household_id, use those
     if (!payerId) {
         if (residentId) {
             payerId = residentId;
@@ -143,20 +221,37 @@ export function convertBackendFeeToOutstandingFee(fee: BackendFee, feeTypes: Fee
         } else if (householdId) {
             payerId = householdId;
             payerType = 'household';
+        } else if (businessId) {
+            payerId = businessId;
+            payerType = 'business';
         }
     }
+
+    // Build dynamic discount fields
+    const discountFields: Record<string, any> = {};
     
-    console.log('🔄 Converting backend fee:', {
-        id: fee.id,
-        fee_code: fee.fee_code,
-        payer_name: fee.payer_name,
-        payer_type: payerType,
-        payer_id: payerId,
-        resident_id: residentId,
-        household_id: householdId,
-        balance: fee.balance
+    // Add any discount fields from the fee object
+    Object.keys(fee).forEach(key => {
+        if (key.startsWith('has_') && key.endsWith('_discount')) {
+            discountFields[key] = fee[key as keyof BackendFee];
+        }
+        if (key.endsWith('_discount_percentage')) {
+            discountFields[key] = fee[key as keyof BackendFee];
+        }
     });
     
+    // Add any discount fields from feeType
+    if (feeType) {
+        Object.keys(feeType).forEach(key => {
+            if (key.startsWith('has_') && key.endsWith('_discount')) {
+                discountFields[key] = feeType[key as keyof FeeType];
+            }
+            if (key.endsWith('_discount_percentage')) {
+                discountFields[key] = feeType[key as keyof FeeType];
+            }
+        });
+    }
+
     return {
         id: fee.id,
         fee_type_id: fee.fee_type_id,
@@ -167,6 +262,7 @@ export function convertBackendFeeToOutstandingFee(fee: BackendFee, feeTypes: Fee
         payer_id: payerId,
         resident_id: residentId,
         household_id: householdId,
+        business_id: businessId,
         due_date: fee.due_date,
         base_amount: fee.base_amount?.toString() || '0',
         surcharge_amount: fee.surcharge_amount?.toString() || '0',
@@ -183,84 +279,78 @@ export function convertBackendFeeToOutstandingFee(fee: BackendFee, feeTypes: Fee
         period_start: fee.period_start || undefined,
         period_end: fee.period_end || undefined,
         category: fee.fee_type_category || feeType?.category || 'other',
-        // Add fee type discount settings from backend
-        fee_type_has_senior_discount: fee.fee_type_has_senior_discount || feeType?.has_senior_discount || false,
-        fee_type_senior_discount_percentage: fee.fee_type_senior_discount_percentage || feeType?.senior_discount_percentage || 0,
-        fee_type_has_pwd_discount: fee.fee_type_has_pwd_discount || feeType?.has_pwd_discount || false,
-        fee_type_pwd_discount_percentage: fee.fee_type_pwd_discount_percentage || feeType?.pwd_discount_percentage || 0,
-        fee_type_has_solo_parent_discount: fee.fee_type_has_solo_parent_discount || feeType?.has_solo_parent_discount || false,
-        fee_type_solo_parent_discount_percentage: fee.fee_type_solo_parent_discount_percentage || feeType?.solo_parent_discount_percentage || 0,
-        fee_type_has_indigent_discount: fee.fee_type_has_indigent_discount || feeType?.has_indigent_discount || false,
-        fee_type_indigent_discount_percentage: fee.fee_type_indigent_discount_percentage || feeType?.indigent_discount_percentage || 0,
-        // Add these for discount handling
+        business_name: fee.business_name,
+        business_type: fee.business_type,
+        contact_number: fee.contact_number || undefined,
+        address: fee.address || undefined,
+        purok: fee.purok || undefined,
+        
+        // Add all dynamic discount fields
+        ...discountFields,
+        
+        // Add discount applicability
         applicableDiscounts: fee.applicableDiscounts || [],
         canApplyDiscount: fee.canApplyDiscount || false,
+        
+        // Add resident details
+        resident_details: fee.resident_details,
     };
 }
 
 /**
- * Check if resident is eligible for any discounts
+ * Get resident discounts from privileges - DYNAMIC
  */
 export function getResidentDiscounts(resident: Resident): ResidentDiscount[] {
     const discounts: ResidentDiscount[] = [];
     
-    if (resident.is_senior) {
-        discounts.push({
-            type: 'senior',
-            label: 'Senior Citizen',
-            percentage: 20,
-            id_number: (resident as any).senior_id_number,
-            has_id: !!(resident as any).senior_id_number
+    // Use privileges array from the backend
+    if (resident.privileges && Array.isArray(resident.privileges) && resident.privileges.length > 0) {
+        resident.privileges.forEach((rp: any) => {
+            // Skip if not active
+            if (rp.status !== 'active' && rp.status !== 'expiring_soon') return;
+            
+            // Skip if privilege is missing
+            if (!rp.privilege) {
+                console.warn('Resident privilege missing privilege data:', rp);
+                return;
+            }
+            
+            const privilege = rp.privilege;
+            
+            // Skip if privilege code is missing
+            if (!privilege.code) {
+                console.warn('Privilege missing code:', privilege);
+                return;
+            }
+            
+            discounts.push({
+                type: privilege.code.toLowerCase(),
+                label: privilege.name || privilege.code,
+                percentage: rp.discount_percentage || privilege.default_discount_percentage || 0,
+                id_number: rp.id_number,
+                has_id: !!rp.id_number,
+                privilege_code: privilege.code,
+                expires_at: rp.expires_at
+            });
         });
     }
     
-    if (resident.is_pwd) {
-        discounts.push({
-            type: 'pwd',
-            label: 'Person with Disability',
-            percentage: 20,
-            id_number: (resident as any).pwd_id_number,
-            has_id: !!(resident as any).pwd_id_number
-        });
-    }
-    
-    if (resident.is_solo_parent) {
-        discounts.push({
-            type: 'solo_parent',
-            label: 'Solo Parent',
-            percentage: 15,
-            id_number: (resident as any).solo_parent_id_number,
-            has_id: !!(resident as any).solo_parent_id_number
-        });
-    }
-    
-    if (resident.is_indigent) {
-        discounts.push({
-            type: 'indigent',
-            label: 'Indigent',
-            percentage: 25,
-            id_number: (resident as any).indigent_id_number,
-            has_id: !!(resident as any).indigent_id_number
-        });
-    }
-    
-    if (resident.is_veteran) {
-        discounts.push({
-            type: 'veteran',
-            label: 'Veteran',
-            percentage: 100,
-            id_number: (resident as any).veteran_id_number,
-            has_id: !!(resident as any).veteran_id_number
-        });
-    }
-    
-    if (resident.is_government_employee) {
-        discounts.push({
-            type: 'government_employee',
-            label: 'Government Employee',
-            percentage: 10,
-            id_number: undefined,
-            has_id: false
+    // Use discount_eligibility_list if available
+    if (discounts.length === 0 && resident.discount_eligibility_list && Array.isArray(resident.discount_eligibility_list)) {
+        resident.discount_eligibility_list.forEach((discount: any) => {
+            if (!discount || !discount.type) return;
+            
+            const exists = discounts.some(d => d.type === discount.type);
+            if (!exists) {
+                discounts.push({
+                    type: discount.type,
+                    label: discount.label || discount.type,
+                    percentage: discount.percentage || 0,
+                    id_number: discount.id_number,
+                    has_id: !!discount.id_number,
+                    privilege_code: discount.privilege_code
+                });
+            }
         });
     }
     
@@ -268,51 +358,54 @@ export function getResidentDiscounts(resident: Resident): ResidentDiscount[] {
 }
 
 /**
- * Check if discount is allowed for a specific fee
+ * Check if resident has a specific privilege - DYNAMIC
  */
-export function checkIfDiscountAllowed(fee: OutstandingFee, discountType: string): boolean {
-    switch (discountType) {
-        case 'senior':
-            return fee.fee_type_has_senior_discount || false;
-        case 'pwd':
-            return fee.fee_type_has_pwd_discount || false;
-        case 'solo_parent':
-            return fee.fee_type_has_solo_parent_discount || false;
-        case 'indigent':
-            return fee.fee_type_has_indigent_discount || false;
-        case 'veteran':
-            return true;
-        case 'government_employee':
-            return true;
-        default:
-            return false;
-    }
+export function hasPrivilege(resident: Resident, privilegeCode: string): boolean {
+    if (!resident.privileges || !Array.isArray(resident.privileges)) return false;
+    
+    return resident.privileges.some((rp: any) => {
+        if (rp.status !== 'active' && rp.status !== 'expiring_soon') return false;
+        if (!rp.privilege || !rp.privilege.code) return false;
+        return rp.privilege.code.toUpperCase() === privilegeCode.toUpperCase();
+    });
 }
 
 /**
- * Get discount percentage for specific resident and fee type
+ * Get privilege details by code - DYNAMIC
  */
-export function getDiscountPercentageForFeeType(fee: OutstandingFee, discountType: string): number {
-    switch (discountType) {
-        case 'senior':
-            return fee.fee_type_senior_discount_percentage || 20;
-        case 'pwd':
-            return fee.fee_type_pwd_discount_percentage || 20;
-        case 'solo_parent':
-            return fee.fee_type_solo_parent_discount_percentage || 15;
-        case 'indigent':
-            return fee.fee_type_indigent_discount_percentage || 25;
-        case 'veteran':
-            return 100;
-        case 'government_employee':
-            return 10;
-        default:
-            return 0;
+export function getPrivilegeByCode(resident: Resident, privilegeCode: string): any | null {
+    if (!resident.privileges || !Array.isArray(resident.privileges)) return null;
+    
+    for (const rp of resident.privileges) {
+        if (rp.status !== 'active' && rp.status !== 'expiring_soon') continue;
+        if (!rp.privilege || !rp.privilege.code) continue;
+        if (rp.privilege.code.toUpperCase() === privilegeCode.toUpperCase()) {
+            return rp;
+        }
     }
+    
+    return null;
 }
 
 /**
- * 🔴 NEW: Helper function to filter fees by resident
+ * Check if discount is allowed for a specific fee - DYNAMIC
+ */
+export function checkIfDiscountAllowed(fee: OutstandingFee, privilegeCode: string): boolean {
+    const fieldName = `has_${privilegeCode.toLowerCase()}_discount`;
+    return (fee as any)[fieldName] === true;
+}
+
+/**
+ * Get discount percentage for specific resident and fee type - DYNAMIC
+ */
+export function getDiscountPercentageForFeeType(fee: OutstandingFee, privilegeCode: string): number {
+    const fieldName = `${privilegeCode.toLowerCase()}_discount_percentage`;
+    const percentage = (fee as any)[fieldName];
+    return percentage || 0;
+}
+
+/**
+ * Helper function to filter fees by resident
  */
 export function filterFeesByResident(fees: OutstandingFee[], residentId: number | string): OutstandingFee[] {
     return fees.filter(fee => {
@@ -327,7 +420,7 @@ export function filterFeesByResident(fees: OutstandingFee[], residentId: number 
 }
 
 /**
- * 🔴 NEW: Helper function to filter fees by household
+ * Helper function to filter fees by household
  */
 export function filterFeesByHousehold(fees: OutstandingFee[], householdId: number | string): OutstandingFee[] {
     return fees.filter(fee => {
@@ -340,3 +433,170 @@ export function filterFeesByHousehold(fees: OutstandingFee[], householdId: numbe
         return isMatch;
     });
 }
+
+/**
+ * Helper function to filter fees by business
+ */
+export function filterFeesByBusiness(fees: OutstandingFee[], businessId: number | string): OutstandingFee[] {
+    return fees.filter(fee => {
+        const balance = parseAmount(fee.balance);
+        const isMatch = 
+            fee.payer_type === 'business' && 
+            (fee.payer_id == businessId || fee.business_id == businessId) &&
+            balance > 0;
+        
+        return isMatch;
+    });
+}
+
+/**
+ * Calculate total amount from payment items
+ */
+export function calculatePaymentTotal(items: any[]): {
+    subtotal: number;
+    surcharge: number;
+    penalty: number;
+    discount: number;
+    total: number;
+} {
+    return items.reduce((acc, item) => ({
+        subtotal: acc.subtotal + (item.base_amount || 0),
+        surcharge: acc.surcharge + (item.surcharge || 0),
+        penalty: acc.penalty + (item.penalty || 0),
+        discount: acc.discount + (item.discount || 0),
+        total: acc.total + (item.total_amount || 0),
+    }), { subtotal: 0, surcharge: 0, penalty: 0, discount: 0, total: 0 });
+}
+
+/**
+ * Format currency
+ */
+export function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-PH', {
+        style: 'currency',
+        currency: 'PHP',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(amount);
+}
+
+/**
+ * Get discount type label - DYNAMIC
+ */
+export function getDiscountTypeLabel(type: string): string {
+    // Convert from kebab/snake case to title case
+    return type
+        .split(/[_\s-]/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+}
+
+/**
+ * Validate if discount can be applied - DYNAMIC
+ */
+export function canApplyDiscount(
+    privilegeCode: string,
+    resident: Resident,
+    fee: OutstandingFee
+): { allowed: boolean; reason?: string } {
+    // Check if resident has the privilege
+    const hasPriv = hasPrivilege(resident, privilegeCode);
+    
+    if (!hasPriv) {
+        return { allowed: false, reason: `Resident does not have ${privilegeCode} privilege` };
+    }
+    
+    // Check if fee type allows this discount
+    const isAllowed = checkIfDiscountAllowed(fee, privilegeCode);
+    if (!isAllowed) {
+        return { allowed: false, reason: 'This fee type does not allow this discount' };
+    }
+    
+    return { allowed: true };
+}
+
+/**
+ * Get applicable discounts for a fee based on resident privileges - DYNAMIC
+ */
+export function getApplicableDiscountsForFee(resident: Resident, fee: OutstandingFee): Array<{
+    type: string;
+    label: string;
+    percentage: number;
+    id_number?: string;
+    has_id: boolean;
+    privilege_code: string;
+}> {
+    const applicableDiscounts = [];
+    
+    if (!resident.privileges || !Array.isArray(resident.privileges)) return applicableDiscounts;
+    
+    for (const rp of resident.privileges) {
+        if (rp.status !== 'active' && rp.status !== 'expiring_soon') continue;
+        
+        // Skip if privilege is missing
+        if (!rp.privilege || !rp.privilege.code) continue;
+        
+        const privilege = rp.privilege;
+        
+        // Check if this fee type allows this discount
+        const isAllowed = checkIfDiscountAllowed(fee, privilege.code);
+        
+        if (isAllowed) {
+            applicableDiscounts.push({
+                type: privilege.code.toLowerCase(),
+                label: privilege.name || privilege.code,
+                percentage: rp.discount_percentage || privilege.default_discount_percentage || 0,
+                id_number: rp.id_number,
+                has_id: !!rp.id_number,
+                privilege_code: privilege.code
+            });
+        }
+    }
+    
+    return applicableDiscounts;
+}
+
+/**
+ * Get the highest applicable discount
+ */
+export function getHighestDiscount(discounts: Array<{ type: string; percentage: number }>): { type: string; percentage: number } | null {
+    if (discounts.length === 0) return null;
+    
+    return discounts.reduce((highest, current) => 
+        current.percentage > highest.percentage ? current : highest
+    );
+}
+
+/**
+ * Calculate discount amount based on percentage
+ */
+export function calculateDiscountAmount(amount: number, percentage: number): number {
+    return parseFloat((amount * (percentage / 100)).toFixed(2));
+}
+
+// Re-export everything
+export default {
+    generateORNumber,
+    parseAmount,
+    calculateItemTotal,
+    getOutstandingFeeBalance,
+    getAmountPaid,
+    getTotalOriginalAmount,
+    calculateMonthsLate,
+    isValidDate,
+    convertBackendFeeToOutstandingFee,
+    getResidentDiscounts,
+    checkIfDiscountAllowed,
+    getDiscountPercentageForFeeType,
+    getApplicableDiscountsForFee,
+    getDiscountTypeLabel,
+    getHighestDiscount,
+    calculateDiscountAmount,
+    canApplyDiscount,
+    getPrivilegeIcon,
+    getPrivilegeColor,
+    hasPrivilege,
+    getPrivilegeByCode,
+    feeAllowsDiscount,
+    getDiscountPercentage
+};

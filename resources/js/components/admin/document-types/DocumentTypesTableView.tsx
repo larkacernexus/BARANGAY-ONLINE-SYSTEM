@@ -100,7 +100,7 @@ export default function DocumentTypesTableView({
                 <div className="overflow-hidden">
                     <Table className="min-w-full">
                         <TableHeader>
-                            <TableRow className="bg-gray-50 dark:bg-gray-800">
+                            <TableRow className="bg-gray-50 dark:bg-gray-900">
                                 {isBulkMode && (
                                     <TableHead className="w-12 px-4 py-3 text-center">
                                         <div className="flex items-center justify-center">
@@ -159,7 +159,7 @@ export default function DocumentTypesTableView({
                                 <TableHead className="min-w-[100px] px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                                     Status
                                 </TableHead>
-                                <TableHead className="sticky right-0 min-w-[80px] bg-gray-50 px-4 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase dark:bg-gray-800">
+                                <TableHead className="sticky right-0 min-w-[80px] bg-gray-50 px-4 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase dark:bg-gray-900">
                                     Actions
                                 </TableHead>
                             </TableRow>
@@ -177,7 +177,7 @@ export default function DocumentTypesTableView({
                                 return (
                                     <TableRow
                                         key={documentType.id}
-                                        className={`transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/30 ${
+                                        className={`transition-colors hover:bg-gray-50 dark:hover:bg-gray-900/30 ${
                                             isSelected
                                                 ? 'border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-900/10'
                                                 : ''
@@ -318,7 +318,7 @@ export default function DocumentTypesTableView({
                                                 <DropdownMenuTrigger asChild>
                                                     <Button
                                                         variant="ghost"
-                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900"
                                                         onClick={(e) =>
                                                             e.stopPropagation()
                                                         }
@@ -329,140 +329,107 @@ export default function DocumentTypesTableView({
                                                         <MoreVertical className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent
-                                                    align="end"
-                                                    className="w-48"
+                                                  <DropdownMenuContent align="end" className="w-48">
+                                        <DropdownMenuItem asChild className="text-gray-700 dark:text-gray-300 focus:bg-gray-100 dark:focus:bg-gray-800">
+                                            <Link
+                                                href={route(
+                                                    'admin.document-types.show',
+                                                    documentType.id,
+                                                )}
+                                                className="flex cursor-pointer items-center"
+                                            >
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                <span>View Details</span>
+                                            </Link>
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuItem asChild className="text-gray-700 dark:text-gray-300 focus:bg-gray-100 dark:focus:bg-gray-800">
+                                            <Link
+                                                href={route(
+                                                    'admin.document-types.edit',
+                                                    documentType.id,
+                                                )}
+                                                className="flex cursor-pointer items-center"
+                                            >
+                                                <Edit className="mr-2 h-4 w-4" />
+                                                <span>Edit Document Type</span>
+                                            </Link>
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+
+                                        <DropdownMenuItem
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCopyToClipboard(
+                                                    documentType.code || '',
+                                                    'Code',
+                                                );
+                                            }}
+                                            className="flex cursor-pointer items-center text-gray-700 dark:text-gray-300 focus:bg-gray-100 dark:focus:bg-gray-800"
+                                        >
+                                            <Copy className="mr-2 h-4 w-4" />
+                                            <span>Copy Code</span>
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuItem
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCopyToClipboard(
+                                                    documentType.name || '',
+                                                    'Name',
+                                                );
+                                            }}
+                                            className="flex cursor-pointer items-center text-gray-700 dark:text-gray-300 focus:bg-gray-100 dark:focus:bg-gray-800"
+                                        >
+                                            <Copy className="mr-2 h-4 w-4" />
+                                            <span>Copy Name</span>
+                                        </DropdownMenuItem>
+
+                                        {onToggleStatus && (
+                                            <>
+                                                <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                                                <DropdownMenuItem
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onToggleStatus(
+                                                            documentType,
+                                                        );
+                                                    }}
+                                                    className={`flex cursor-pointer items-center ${
+                                                        documentType.is_active
+                                                            ? 'text-amber-600 dark:text-amber-400 focus:bg-amber-50 dark:focus:bg-amber-900/20'
+                                                            : 'text-green-600 dark:text-green-400 focus:bg-green-50 dark:focus:bg-green-900/20'
+                                                    }`}
                                                 >
-                                                    <DropdownMenuItem asChild>
-                                                        <Link
-                                                            href={route(
-                                                                'admin.document-types.show',
-                                                                documentType.id,
-                                                            )}
-                                                            className="flex cursor-pointer items-center"
-                                                        >
-                                                            <Eye className="mr-2 h-4 w-4" />
-                                                            <span>
-                                                                View Details
-                                                            </span>
-                                                        </Link>
-                                                    </DropdownMenuItem>
-
-                                                    <DropdownMenuItem asChild>
-                                                        <Link
-                                                            href={route(
-                                                                'admin.document-types.edit',
-                                                                documentType.id,
-                                                            )}
-                                                            className="flex cursor-pointer items-center"
-                                                        >
-                                                            <Edit className="mr-2 h-4 w-4" />
-                                                            <span>
-                                                                Edit Document
-                                                                Type
-                                                            </span>
-                                                        </Link>
-                                                    </DropdownMenuItem>
-
-                                                    {onDuplicate && (
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                onDuplicate(
-                                                                    documentType,
-                                                                )
-                                                            }
-                                                            className="flex cursor-pointer items-center"
-                                                        >
-                                                            <Copy className="mr-2 h-4 w-4" />
-                                                            <span>
-                                                                Duplicate
-                                                            </span>
-                                                        </DropdownMenuItem>
-                                                    )}
-
-                                                    <DropdownMenuSeparator />
-
-                                                    <DropdownMenuItem
-                                                        onClick={() =>
-                                                            onCopyToClipboard(
-                                                                documentType.code ||
-                                                                    '',
-                                                                'Document Type Code',
-                                                            )
-                                                        }
-                                                        className="flex cursor-pointer items-center"
-                                                    >
-                                                        <Clipboard className="mr-2 h-4 w-4" />
-                                                        <span>Copy Code</span>
-                                                    </DropdownMenuItem>
-
-                                                    <DropdownMenuItem asChild>
-                                                        {/* <Link
-                                                            href={route(
-                                                                'document-requirements.index',
-                                                                {
-                                                                    document_type:
-                                                                        documentType.id,
-                                                                },
-                                                            )}
-                                                            className="flex cursor-pointer items-center"
-                                                        >
-                                                            <FileText className="mr-2 h-4 w-4" />
-                                                            <span>
-                                                                View
-                                                                Requirements
-                                                            </span>
-                                                        </Link> */}
-                                                    </DropdownMenuItem>
-
-                                                    {isBulkMode && (
+                                                    {documentType.is_active ? (
                                                         <>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    onItemSelect(
-                                                                        documentType.id,
-                                                                    )
-                                                                }
-                                                                className="flex cursor-pointer items-center"
-                                                            >
-                                                                {isSelected ? (
-                                                                    <>
-                                                                        <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
-                                                                        <span className="text-green-600">
-                                                                            Deselect
-                                                                        </span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <Square className="mr-2 h-4 w-4" />
-                                                                        <span>
-                                                                            Select
-                                                                            for
-                                                                            Bulk
-                                                                        </span>
-                                                                    </>
-                                                                )}
-                                                            </DropdownMenuItem>
+                                                            <XCircle className="mr-2 h-4 w-4" />
+                                                            <span>Deactivate</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <CheckCircle className="mr-2 h-4 w-4" />
+                                                            <span>Activate</span>
                                                         </>
                                                     )}
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
 
-                                                    <DropdownMenuSeparator />
+                                        <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
 
-                                                    <DropdownMenuItem
-                                                        className="text-red-600 focus:bg-red-50 focus:text-red-700"
-                                                        onClick={() =>
-                                                            onDelete(
-                                                                documentType,
-                                                            )
-                                                        }
-                                                    >
-                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                        <span>
-                                                            Delete Document Type
-                                                        </span>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
+                                        <DropdownMenuItem
+                                            className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-900/20 flex cursor-pointer items-center"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDelete(documentType);
+                                            }}
+                                        >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            <span>Delete Document Type</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
                                     </TableRow>

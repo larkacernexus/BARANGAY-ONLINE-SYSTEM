@@ -85,7 +85,7 @@ export function ResidentMenuContent({ user, Link }: ResidentMenuContentProps) {
             <DropdownMenuItem asChild>
                 <button
                     onClick={handleLogout}
-                    className="flex w-full items-center cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="flex w-full items-center cursor-pointer px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900"
                     data-test="logout-button"
                     type="button"
                 >

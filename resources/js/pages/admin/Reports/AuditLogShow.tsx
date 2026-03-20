@@ -105,7 +105,7 @@ export default function AuditLogShow() {
             >
                 <Head title="Audit Log Not Found" />
 
-                <div className="flex flex-col items-center justify-center min-h-[400px] bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+                <div className="flex flex-col items-center justify-center min-h-[400px] bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
                     <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mb-4">
                         <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
                     </div>
@@ -270,7 +270,7 @@ export default function AuditLogShow() {
                     <div className="flex items-center gap-3">
                         <Link
                             href="/admin/reports/audit-logs"
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                         >
                             <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                         </Link>
@@ -287,14 +287,14 @@ export default function AuditLogShow() {
                     <div className="flex flex-wrap items-center gap-2">
                         <button
                             onClick={exportLog}
-                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                         >
                             <Download className="h-4 w-4" />
                             Export
                         </button>
                         <button
                             onClick={printLog}
-                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                         >
                             <Printer className="h-4 w-4" />
                             Print
@@ -313,7 +313,7 @@ export default function AuditLogShow() {
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Log Overview Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
                                     {getEventIcon(log.event)}
@@ -381,7 +381,7 @@ export default function AuditLogShow() {
                         </div>
 
                         {/* User Information Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                     <UserIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -460,7 +460,7 @@ export default function AuditLogShow() {
                         </div>
 
                         {/* Technical Details Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
                                     <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -486,7 +486,7 @@ export default function AuditLogShow() {
                                         {log.ip_address && (
                                             <button
                                                 onClick={() => copyToClipboard(log.ip_address || '')}
-                                                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded transition-colors"
+                                                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-900 rounded transition-colors"
                                                 title="Copy IP address"
                                             >
                                                 <Copy className="h-4 w-4 text-gray-500" />
@@ -508,7 +508,7 @@ export default function AuditLogShow() {
                         </div>
 
                         {/* Properties Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-6">
                                 <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                                     <FileText className="h-5 w-5 text-purple-600 dark:text-purple-400" />
@@ -551,7 +551,7 @@ export default function AuditLogShow() {
                     <div className="space-y-6">
                         {/* Similar Logs */}
                         {similar_logs && similar_logs.length > 0 && (
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                                         <Activity className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -606,7 +606,7 @@ export default function AuditLogShow() {
 
                         {/* User Timeline */}
                         {log.user && user_timeline && user_timeline.length > 0 && (
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                         <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -655,7 +655,7 @@ export default function AuditLogShow() {
                         )}
 
                         {/* Quick Actions */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                                 Quick Actions
                             </h3>
@@ -663,7 +663,7 @@ export default function AuditLogShow() {
                             <div className="space-y-3">
                                 <button
                                     onClick={() => copyToClipboard(log.id?.toString() || '')}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                                     disabled={!log.id}
                                 >
                                     <Copy className="h-4 w-4" />
@@ -673,7 +673,7 @@ export default function AuditLogShow() {
                                 {log.properties && Object.keys(log.properties).length > 0 && (
                                     <button
                                         onClick={() => copyToClipboard(JSON.stringify(log.properties, null, 2))}
-                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-900 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                                     >
                                         <FileText className="h-4 w-4" />
                                         Copy Properties

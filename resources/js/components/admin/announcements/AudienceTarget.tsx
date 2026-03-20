@@ -186,8 +186,8 @@ const SelectionSection = memo(({
 
     return (
         <div className={cn(
-            "border rounded-lg p-4 mb-4 transition-all",
-            error ? 'border-red-300 bg-red-50 dark:bg-red-950/20' : 'hover:border-gray-300',
+            "border rounded-lg p-4 mb-4 transition-all dark:border-gray-700",
+            error ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800' : 'hover:border-gray-300 dark:hover:border-gray-600',
             disabled && 'opacity-60 pointer-events-none'
         )}>
             {/* Header - Click to expand/collapse */}
@@ -208,30 +208,30 @@ const SelectionSection = memo(({
                 <div className="flex items-center gap-2">
                     <Icon className={cn(
                         "h-5 w-5",
-                        error ? 'text-red-500' : 'text-gray-500'
+                        error ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'
                     )} />
                     <div>
-                        <h4 className="font-medium flex items-center gap-2">
+                        <h4 className="font-medium flex items-center gap-2 dark:text-gray-100">
                             {title}
                             {error && (
-                                <AlertCircle className="h-4 w-4 text-red-500" />
+                                <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
                             )}
                         </h4>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
                             {selectedIds.length} selected
                         </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
                     {selectedIds.length > 0 && (
-                        <Badge variant="secondary" className="mr-2">
+                        <Badge variant="secondary" className="mr-2 dark:bg-gray-700 dark:text-gray-300">
                             {selectedIds.length}
                         </Badge>
                     )}
                     {isExpanded ? (
-                        <ChevronUp className="h-4 w-4 text-gray-500" />
+                        <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                     ) : (
-                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                        <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                     )}
                 </div>
             </div>
@@ -241,12 +241,12 @@ const SelectionSection = memo(({
                 <div id={`${type}-section`} className="mt-4 space-y-4">
                     {/* Search Input */}
                     <div className="relative">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                             placeholder={searchPlaceholder}
                             value={searchTerm}
                             onChange={handleSearchChange}
-                            className="pl-8 pr-8"
+                            className="pl-8 pr-8 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                             onClick={(e) => e.stopPropagation()}
                             disabled={disabled}
                             aria-label={`Search ${title.toLowerCase()}`}
@@ -256,7 +256,7 @@ const SelectionSection = memo(({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="absolute right-1 top-1 h-7 w-7 p-0"
+                                className="absolute right-1 top-1 h-7 w-7 p-0 dark:text-gray-400 dark:hover:text-white"
                                 onClick={handleClearSearch}
                                 disabled={disabled}
                                 aria-label="Clear search"
@@ -268,17 +268,17 @@ const SelectionSection = memo(({
 
                     {/* Selected Items Preview */}
                     {selectedItems.length > 0 && (
-                        <div className="flex flex-wrap gap-1 p-2 bg-gray-50 rounded dark:bg-gray-800">
+                        <div className="flex flex-wrap gap-1 p-2 bg-gray-50 rounded dark:bg-gray-900 border dark:border-gray-700">
                             {selectedItems.slice(0, 5).map((item) => (
                                 <Badge 
                                     key={item.id} 
                                     variant="secondary" 
-                                    className="flex items-center gap-1 pl-2"
+                                    className="flex items-center gap-1 pl-2 dark:bg-gray-700 dark:text-gray-300"
                                 >
                                     {renderItem(item)}
                                     {!disabled && (
                                         <X 
-                                            className="h-3 w-3 cursor-pointer hover:text-red-500 transition-colors" 
+                                            className="h-3 w-3 cursor-pointer hover:text-red-500 dark:hover:text-red-400 transition-colors" 
                                             onClick={(e) => handleRemoveSelected(item.id, e)}
                                             aria-label={`Remove ${item.name || item.household_number || item.business_name || item.first_name}`}
                                         />
@@ -286,7 +286,7 @@ const SelectionSection = memo(({
                                 </Badge>
                             ))}
                             {selectedItems.length > 5 && (
-                                <Badge variant="outline">
+                                <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
                                     +{selectedItems.length - 5} more
                                 </Badge>
                             )}
@@ -301,7 +301,7 @@ const SelectionSection = memo(({
                             size="sm"
                             onClick={handleSelectAll}
                             disabled={disabled || filteredItems.length === 0}
-                            className="text-xs"
+                            className="text-xs dark:text-gray-300 dark:hover:text-white"
                         >
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             Select All ({filteredItems.length})
@@ -312,7 +312,7 @@ const SelectionSection = memo(({
                             size="sm"
                             onClick={handleClearAll}
                             disabled={disabled || selectedIds.length === 0}
-                            className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                            className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
                         >
                             <X className="h-3 w-3 mr-1" />
                             Clear All
@@ -320,7 +320,7 @@ const SelectionSection = memo(({
                     </div>
 
                     {/* Items List */}
-                    <ScrollArea className="h-60 border rounded">
+                    <ScrollArea className="h-60 border rounded dark:border-gray-700">
                         <div className="p-2 space-y-2">
                             {filteredItems.length > 0 ? (
                                 filteredItems.map((item) => {
@@ -330,7 +330,7 @@ const SelectionSection = memo(({
                                             key={item.id} 
                                             className={cn(
                                                 "flex items-start space-x-2 p-2 rounded transition-colors",
-                                                !disabled && "hover:bg-gray-50 cursor-pointer dark:hover:bg-gray-800",
+                                                !disabled && "hover:bg-gray-50 cursor-pointer dark:hover:bg-gray-900",
                                                 isItemSelected && "bg-blue-50 dark:bg-blue-900/20",
                                                 disabled && "opacity-50"
                                             )}
@@ -351,12 +351,12 @@ const SelectionSection = memo(({
                                                 onCheckedChange={() => handleToggle(item.id)}
                                                 onClick={(e) => e.stopPropagation()}
                                                 disabled={disabled}
-                                                className="mt-0.5"
+                                                className="mt-0.5 dark:border-gray-600"
                                                 aria-label={`Select ${item.name || item.household_number || item.business_name || `${item.first_name} ${item.last_name}`}`}
                                             />
                                             <label 
                                                 htmlFor={`${type}-${item.id}`}
-                                                className="text-sm flex-1 cursor-pointer"
+                                                className="text-sm flex-1 cursor-pointer dark:text-gray-300"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 {renderItem(item)}
@@ -366,14 +366,14 @@ const SelectionSection = memo(({
                                 })
                             ) : (
                                 <div className="text-center py-8">
-                                    <Search className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                                    <p className="text-gray-500">No items found</p>
+                                    <Search className="h-8 w-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                                    <p className="text-gray-500 dark:text-gray-400">No items found</p>
                                     {searchTerm && (
                                         <Button
                                             variant="link"
                                             size="sm"
                                             onClick={handleClearSearch}
-                                            className="mt-2"
+                                            className="mt-2 dark:text-blue-400"
                                         >
                                             Clear search
                                         </Button>
@@ -385,7 +385,7 @@ const SelectionSection = memo(({
 
                     {/* Error Message */}
                     {error && (
-                        <p className="text-sm text-red-600 mt-2 flex items-center gap-1">
+                        <p className="text-sm text-red-600 dark:text-red-400 mt-2 flex items-center gap-1">
                             <AlertCircle className="h-4 w-4" />
                             {error}
                         </p>
@@ -428,49 +428,49 @@ export default function AudienceTarget({
             label: 'All Users', 
             icon: Globe, 
             description: 'Send to all registered users',
-            color: 'text-green-600'
+            color: 'text-green-600 dark:text-green-400'
         },
         { 
             value: 'roles', 
             label: 'Specific Roles', 
             icon: Users, 
             description: 'Target users by their role (e.g., Household Head, Staff)',
-            color: 'text-blue-600'
+            color: 'text-blue-600 dark:text-blue-400'
         },
         { 
             value: 'puroks', 
             label: 'Specific Puroks', 
             icon: MapPin, 
             description: 'Target households in specific puroks',
-            color: 'text-purple-600'
+            color: 'text-purple-600 dark:text-purple-400'
         },
         { 
             value: 'households', 
             label: 'Specific Households', 
             icon: Home, 
             description: 'Target specific household accounts',
-            color: 'text-orange-600'
+            color: 'text-orange-600 dark:text-orange-400'
         },
         { 
             value: 'household_members', 
             label: 'All Household Members', 
             icon: Users, 
             description: 'Target all residents in specific households',
-            color: 'text-indigo-600'
+            color: 'text-indigo-600 dark:text-indigo-400'
         },
         { 
             value: 'businesses', 
             label: 'Business Owners', 
             icon: Briefcase, 
             description: 'Target business owners',
-            color: 'text-yellow-600'
+            color: 'text-yellow-600 dark:text-yellow-400'
         },
         { 
             value: 'specific_users', 
             label: 'Specific Users', 
             icon: UserCircle, 
             description: 'Select individual users',
-            color: 'text-pink-600'
+            color: 'text-pink-600 dark:text-pink-400'
         },
     ];
 
@@ -582,20 +582,22 @@ export default function AudienceTarget({
     const selectedAudienceType = audienceTypes.find(t => t.value === value.audience_type);
 
     return (
-        <Card className={cn(disabled && 'opacity-75')}>
+        <Card className={cn('dark:bg-gray-900', disabled && 'opacity-75')}>
             <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                    <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center">
+                        <Users className="h-3 w-3 text-white" />
+                    </div>
                     Audience Targeting
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="dark:text-gray-400">
                     Choose who will see this announcement
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 {/* Audience Type Selection */}
                 <div className="space-y-4">
-                    <Label htmlFor="audience-type" className="text-base font-medium">
+                    <Label htmlFor="audience-type" className="text-base font-medium dark:text-gray-300">
                         Audience Type <span className="text-red-500">*</span>
                     </Label>
                     <div 
@@ -624,21 +626,21 @@ export default function AudienceTarget({
                                     <label
                                         htmlFor={`audience-${type.value}`}
                                         className={cn(
-                                            "flex flex-col p-4 cursor-pointer rounded-lg border-2 transition-all h-full",
+                                            "flex flex-col p-4 cursor-pointer rounded-lg border-2 transition-all h-full dark:border-gray-700",
                                             isSelected 
-                                                ? 'border-primary bg-primary/5 shadow-md' 
-                                                : 'border-muted hover:bg-accent hover:border-gray-300',
+                                                ? 'border-primary bg-primary/5 shadow-md dark:border-blue-700 dark:bg-blue-900/20' 
+                                                : 'border-muted hover:bg-accent hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-900',
                                             disabled && 'pointer-events-none opacity-50'
                                         )}
                                     >
                                         <div className="flex items-center gap-2 mb-2">
                                             <Icon className={cn(
                                                 "h-5 w-5 transition-colors",
-                                                isSelected ? type.color : 'text-gray-500'
+                                                isSelected ? type.color : 'text-gray-500 dark:text-gray-400'
                                             )} />
                                             <span className={cn(
                                                 "font-medium",
-                                                isSelected ? type.color : ''
+                                                isSelected ? type.color : 'dark:text-gray-300'
                                             )}>
                                                 {type.label}
                                             </span>
@@ -655,7 +657,7 @@ export default function AudienceTarget({
                         })}
                     </div>
                     {errors.audience_type && (
-                        <p className="text-sm text-red-600 flex items-center gap-1 mt-2">
+                        <p className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1 mt-2">
                             <AlertCircle className="h-4 w-4" />
                             {errors.audience_type}
                         </p>
@@ -668,9 +670,9 @@ export default function AudienceTarget({
                         <div className="flex items-start gap-3">
                             <div className="flex-shrink-0">
                                 {isCalculating ? (
-                                    <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+                                    <Loader2 className="h-5 w-5 text-blue-500 dark:text-blue-400 animate-spin" />
                                 ) : (
-                                    <Info className="h-5 w-5 text-blue-500" />
+                                    <Info className="h-5 w-5 text-blue-500 dark:text-blue-400" />
                                 )}
                             </div>
                             <div className="flex-1">
@@ -689,7 +691,7 @@ export default function AudienceTarget({
                                     )}
                                 </p>
                                 {estimatedReach === 0 && !isCalculating && (
-                                    <p className="text-xs text-blue-500 mt-1">
+                                    <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">
                                         No users match the current selection criteria
                                     </p>
                                 )}
@@ -710,7 +712,7 @@ export default function AudienceTarget({
                                 items={roles}
                                 searchPlaceholder="Search roles..."
                                 renderItem={(role: Role) => (
-                                    <span className="font-medium">{role.name}</span>
+                                    <span className="font-medium dark:text-gray-300">{role.name}</span>
                                 )}
                                 selectedIds={value.target_roles}
                                 onToggle={(id) => toggleSelection('target_roles', id)}
@@ -734,7 +736,7 @@ export default function AudienceTarget({
                                 items={puroks}
                                 searchPlaceholder="Search puroks..."
                                 renderItem={(purok: Purok) => (
-                                    <span className="font-medium">{purok.name}</span>
+                                    <span className="font-medium dark:text-gray-300">{purok.name}</span>
                                 )}
                                 selectedIds={value.target_puroks}
                                 onToggle={(id) => toggleSelection('target_puroks', id)}
@@ -760,9 +762,9 @@ export default function AudienceTarget({
                                     searchPlaceholder="Search by household number or purok..."
                                     renderItem={(household: Household) => (
                                         <div className="flex items-center gap-1">
-                                            <span className="font-medium">{household.household_number}</span>
+                                            <span className="font-medium dark:text-gray-300">{household.household_number}</span>
                                             {household.purok && (
-                                                <Badge variant="outline" className="ml-2 text-xs">
+                                                <Badge variant="outline" className="ml-2 text-xs dark:border-gray-600 dark:text-gray-300">
                                                     {household.purok.name}
                                                 </Badge>
                                             )}
@@ -800,9 +802,9 @@ export default function AudienceTarget({
                                 searchPlaceholder="Search by business name or owner..."
                                 renderItem={(business: Business) => (
                                     <div>
-                                        <span className="font-medium">{business.business_name}</span>
+                                        <span className="font-medium dark:text-gray-300">{business.business_name}</span>
                                         {business.owner_name && (
-                                            <span className="text-gray-500 text-xs block">
+                                            <span className="text-gray-500 dark:text-gray-400 text-xs block">
                                                 Owner: {business.owner_name}
                                             </span>
                                         )}
@@ -831,15 +833,15 @@ export default function AudienceTarget({
                                 searchPlaceholder="Search by name, email, or role..."
                                 renderItem={(user: User) => (
                                     <div>
-                                        <span className="font-medium">
+                                        <span className="font-medium dark:text-gray-300">
                                             {user.first_name} {user.last_name}
                                         </span>
                                         {user.role && (
-                                            <Badge variant="outline" className="ml-2 text-xs">
+                                            <Badge variant="outline" className="ml-2 text-xs dark:border-gray-600 dark:text-gray-300">
                                                 {user.role.name}
                                             </Badge>
                                         )}
-                                        <span className="text-gray-400 text-xs block">
+                                        <span className="text-gray-400 dark:text-gray-500 text-xs block">
                                             {user.email}
                                         </span>
                                     </div>

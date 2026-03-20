@@ -185,6 +185,12 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class);
     }
 
+
+    public function resident()
+{
+    return $this->belongsTo(Resident::class, 'resident_id');
+}
+
     public function household()
     {
         return $this->belongsTo(Household::class);
@@ -228,6 +234,21 @@ class User extends Authenticatable
         return $this->getAllPermissions()
             ->where('name', $permissionName)
             ->isNotEmpty();
+    }
+
+    /**
+     * Determine if the user has a given permission.
+     * This overrides Laravel's default can() method.
+     */
+    public function can($ability, $arguments = [])
+    {
+        // First check if user is Administrator - should have all permissions
+        if ($this->role && $this->role->name === 'Administrator') {
+            return true;
+        }
+        
+        // Otherwise check specific permission
+        return $this->hasPermission($ability);
     }
 
     public function hasAnyPermission(array $permissionNames): bool

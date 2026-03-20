@@ -169,7 +169,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                                 ? 'from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20' 
                                                                 : 'from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20'
                                                         } ring-2 ring-blue-500/20`
-                                                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                                                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50'
                                                 }`}
                                                 onClick={() => onTypeSelect(type.id)}
                                             >
@@ -178,7 +178,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                         <div className={`p-2.5 rounded-lg flex-shrink-0 mt-0.5 ${
                                                             isSelected 
                                                                 ? (activeTab === 'issues' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-purple-100 dark:bg-purple-900/30')
-                                                                : 'bg-gray-100 dark:bg-gray-800'
+                                                                : 'bg-gray-100 dark:bg-gray-900'
                                                         }`}>
                                                             <Icon className={`h-5 w-5 ${
                                                                 isSelected 
@@ -241,7 +241,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                         );
                                     })}
                                     {pair.filter(type => type && !isOtherType(type)).length < 2 && (
-                                        <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 min-h-[120px] bg-gray-50/50 dark:bg-gray-800/30 flex items-center justify-center">
+                                        <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 min-h-[120px] bg-gray-50/50 dark:bg-gray-900/30 flex items-center justify-center">
                                             <div className="text-center text-gray-400 dark:text-gray-500">
                                                 <div className="text-sm">No more items</div>
                                             </div>
@@ -284,7 +284,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                             <div className={`p-2.5 rounded-lg flex-shrink-0 mt-0.5 ${
                                                                 isSelected 
                                                                     ? 'bg-amber-100 dark:bg-amber-900/30'
-                                                                    : 'bg-gray-100 dark:bg-gray-800'
+                                                                    : 'bg-gray-100 dark:bg-gray-900'
                                                             }`}>
                                                                 <Icon className={`h-5 w-5 ${
                                                                     isSelected 
@@ -345,7 +345,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                             );
                                         })}
                                         {pair.filter(type => type && isOtherType(type)).length < 2 && (
-                                            <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 min-h-[120px] bg-gray-50/50 dark:bg-gray-800/30 flex items-center justify-center">
+                                            <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 min-h-[120px] bg-gray-50/50 dark:bg-gray-900/30 flex items-center justify-center">
                                                 <div className="text-center text-gray-400 dark:text-gray-500">
                                                     <div className="text-sm">No other options</div>
                                                 </div>
@@ -440,17 +440,17 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                         </Button>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-                        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+                        <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
                             <div className="font-medium">Resolution Time</div>
                             <div className="text-gray-600 dark:text-gray-400">{selectedType.resolution_days} days</div>
                         </div>
-                        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+                        <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
                             <div className="font-medium">Evidence</div>
                             <div className={selectedType.requires_evidence ? 'text-red-600' : 'text-green-600'}>
                                 {selectedType.requires_evidence ? 'Required' : 'Optional'}
                             </div>
                         </div>
-                        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded">
+                        <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
                             <div className="font-medium">Anonymous</div>
                             <div className={selectedType.allows_anonymous ? 'text-green-600' : 'text-gray-600'}>
                                 {selectedType.allows_anonymous ? 'Allowed' : 'Not allowed'}

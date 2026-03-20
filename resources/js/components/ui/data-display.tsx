@@ -64,7 +64,7 @@ export const StatsCard = ({
       darkTo: 'dark:to-purple-900/10'
     },
     gray: {
-      bg: 'bg-gray-100 dark:bg-gray-800/30',
+      bg: 'bg-gray-100 dark:bg-gray-900/30',
       icon: 'text-gray-600 dark:text-gray-400',
       gradientFrom: 'from-gray-50',
       gradientTo: 'to-gray-100',
@@ -148,7 +148,7 @@ export const CustomTabs = ({ tabs, activeTab, onTabChange, className = '' }: Cus
               flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap
               ${isActive 
                 ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' 
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900'
               }
               min-w-[70px]
             `}
@@ -183,7 +183,7 @@ interface EmptyStateProps {
 
 export const EmptyState = ({ title, description, icon: Icon, action }: EmptyStateProps) => (
   <div className="text-center py-12">
-    <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+    <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-gray-900 rounded-full flex items-center justify-center mb-4">
       <Icon className="h-8 w-8 text-gray-400" />
     </div>
     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
@@ -239,7 +239,7 @@ export const LoadingOverlay = ({ isLoading, message = 'Loading...' }: LoadingOve
   
   return (
     <div className="fixed inset-0 bg-black/10 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+      <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-lg">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
         <p className="text-sm text-gray-600 dark:text-gray-300">{message}</p>
       </div>

@@ -6,13 +6,22 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Crown, ChevronUp, ChevronDown, Phone, Home, User, Camera, Eye, Edit, QrCode, FileText, Trash2, Clipboard, CheckSquare, Square } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { PhotoViewModal } from './photo-view-modal';
+import { Crown, ChevronUp, ChevronDown, Phone, Home, User, Camera, Eye, Edit, QrCode, FileText, Trash2, Clipboard, CheckSquare, Square, MoreVertical } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { EmptyState } from '@/components/adminui/empty-state';
-import { ActionDropdown, ActionDropdownItem, ActionDropdownSeparator } from '@/components/adminui/action-dropdown';
-import { Resident, FilterState } from '@/types';
+import { Resident } from '@/types';
 import {
     getFullName,
     truncateText,
@@ -27,12 +36,33 @@ import {
 } from '@/admin-utils/residentsUtils';
 import { useState, useEffect } from 'react';
 
+// Define FilterState interface locally to match the one from residentsUtils
+interface FilterState {
+    sort_by: string;
+    sort_order: 'asc' | 'desc';
+    status: string;
+    purok_id: string | number;
+    gender: string;
+    min_age?: number | string;
+    max_age?: number | string;
+    civil_status: string;
+    is_voter: string;
+    is_head: string;
+    privilege_id?: string | number;
+    privilege?: string;
+}
+
+interface HouseholdInfo {
+    id: number;
+    name: string;
+}
+
 interface ResidentsTableViewProps {
     residents: Resident[];
     isBulkMode: boolean;
     selectedResidents: number[];
     isMobile: boolean;
-    filtersState?: FilterState; // Make optional
+    filtersState?: FilterState;
     onItemSelect: (id: number) => void;
     onSort: (column: string) => void;
     hasActiveFilters: boolean;
@@ -42,6 +72,11 @@ interface ResidentsTableViewProps {
     onSelectAllOnPage: () => void;
     isSelectAll: boolean;
 }
+
+// Helper function to get initials from name
+const getInitials = (firstName: string, lastName: string): string => {
+    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+};
 
 export default function ResidentsTableView({
     residents,
@@ -59,7 +94,7 @@ export default function ResidentsTableView({
         civil_status: 'all',
         is_voter: 'all',
         is_head: 'all'
-    }, // Provide default value
+    },
     onItemSelect,
     onSort,
     hasActiveFilters,
@@ -71,6 +106,8 @@ export default function ResidentsTableView({
 }: ResidentsTableViewProps) {
     // Add local state for window width to prevent hydration issues
     const [windowWidth, setWindowWidth] = useState<number>(0);
+    const [photoModalOpen, setPhotoModalOpen] = useState(false);
+    const [selectedResidentForPhoto, setSelectedResidentForPhoto] = useState<Resident | null>(null);
     
     useEffect(() => {
         if (typeof window !== 'undefined') {
@@ -97,6 +134,16 @@ export default function ResidentsTableView({
         });
     };
 
+    const handleViewPhoto = (resident: Resident) => {
+        setSelectedResidentForPhoto(resident);
+        setPhotoModalOpen(true);
+    };
+
+    const handleClosePhotoModal = () => {
+        setPhotoModalOpen(false);
+        setSelectedResidentForPhoto(null);
+    };
+
     const renderTableRow = (resident: Resident) => {
         const fullName = getFullName(resident);
         const nameLength = getTruncationLength('name');
@@ -106,6 +153,10 @@ export default function ResidentsTableView({
         const householdInfo = getHouseholdInfo(resident);
         const isHead = isHeadOfHousehold(resident);
         const isSelected = selectedResidents.includes(resident.id);
+        const initials = getInitials(resident.first_name || '', resident.last_name || '');
+        
+        // Get household details for display
+        const householdNumber = householdInfo?.name || '';
         
         return (
             <TableRow 
@@ -117,7 +168,8 @@ export default function ResidentsTableView({
                     if (isBulkMode && e.target instanceof HTMLElement && 
                         !e.target.closest('a') && 
                         !e.target.closest('button') &&
-                        !e.target.closest('.dropdown-menu-content') &&
+                        !e.target.closest('[role="menuitem"]') &&
+                        !e.target.closest('[data-radix-menu-content]') &&
                         !e.target.closest('input[type="checkbox"]')) {
                         onItemSelect(resident.id);
                     }
@@ -149,24 +201,15 @@ export default function ResidentsTableView({
                         }}
                         title={`Double-click to select all\n${fullName}`}
                     >
-                        <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                            {hasPhoto ? (
-                                <img 
-                                    src={photoUrl} 
-                                    alt={fullName}
-                                    className="h-full w-full object-cover"
-                                    onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                        const parent = e.currentTarget.parentElement;
-                                        if (parent) {
-                                            parent.innerHTML = '<svg class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>';
-                                        }
-                                    }}
-                                />
-                            ) : (
-                                <User className="h-4 w-4 text-gray-600" />
-                            )}
-                        </div>
+                        <Avatar className="h-8 w-8 border border-gray-200 dark:border-gray-700 flex-shrink-0">
+                            <AvatarImage 
+                                src={photoUrl || undefined} 
+                                alt={fullName}
+                            />
+                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-600 dark:to-purple-700 text-white text-xs">
+                                {initials || '?'}
+                            </AvatarFallback>
+                        </Avatar>
                         <div className="min-w-0">
                             <div 
                                 className="font-medium truncate flex items-center gap-1"
@@ -174,7 +217,7 @@ export default function ResidentsTableView({
                             >
                                 {truncateText(fullName, isMobile ? 15 : nameLength)}
                                 {isHead && (
-                                    <Crown className="h-3 w-3 text-amber-600" />
+                                    <Crown className="h-3 w-3 text-amber-600 flex-shrink-0" />
                                 )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
@@ -251,7 +294,11 @@ export default function ResidentsTableView({
                                 {truncateAddress(resident.address, isMobile ? 20 : addressLength)}
                             </div>
                             <div className="text-xs text-gray-500 truncate">
-                                {resident.purok ? resident.purok.name : 'No Purok'}
+                                {typeof resident.purok === 'object' && resident.purok?.name 
+                                    ? resident.purok.name 
+                                    : typeof resident.purok === 'string' 
+                                    ? resident.purok 
+                                    : 'No Purok'}
                             </div>
                         </div>
                     </div>
@@ -263,18 +310,15 @@ export default function ResidentsTableView({
                                 <Link href={`/households/${householdInfo.id}`} className="hover:text-primary hover:underline">
                                     <div 
                                         className="font-medium truncate flex items-center gap-1"
-                                        title={householdInfo.household_number}
+                                        title={householdNumber}
                                     >
-                                        {truncateText(householdInfo.household_number, isMobile ? 12 : 15)}
-                                        {householdInfo.is_head && (
+                                        {truncateText(householdNumber, 15)}
+                                        {isHead && (
                                             <Crown className="h-3 w-3 text-amber-600" />
                                         )}
                                     </div>
-                                    <div 
-                                        className="text-sm text-gray-500 truncate"
-                                        title={`${householdInfo.head_of_family} (${householdInfo.relationship_to_head})`}
-                                    >
-                                        {truncateText(householdInfo.head_of_family, isMobile ? 12 : 15)}
+                                    <div className="text-sm text-gray-500 truncate">
+                                        Head of Household
                                     </div>
                                 </Link>
                             ) : (
@@ -283,7 +327,7 @@ export default function ResidentsTableView({
                         </TableCell>
                         <TableCell className="px-4 py-3">
                             <Badge 
-                                variant={getStatusBadgeVariant(resident.status)}
+                                variant={getStatusBadgeVariant(resident.status) as "default" | "secondary" | "destructive" | "outline"}
                                 className="truncate max-w-full text-xs"
                                 title={getStatusLabel(resident.status)}
                             >
@@ -293,197 +337,242 @@ export default function ResidentsTableView({
                     </>
                 )}
                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
-                    <ActionDropdown>
-                        <ActionDropdownItem
-                            icon={<Eye className="h-4 w-4" />}
-                            href={`/admin/residents/${resident.id}`}
-                        >
-                            View Details
-                        </ActionDropdownItem>
-                        
-                        <ActionDropdownItem
-                            icon={<Edit className="h-4 w-4" />}
-                            href={`/admin/residents/${resident.id}/edit`}
-                        >
-                            Edit Profile
-                        </ActionDropdownItem>
-
-                        {hasPhoto && (
-                            <ActionDropdownItem
-                                icon={<Camera className="h-4 w-4" />}
-                                onClick={() => onViewPhoto(resident)}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button 
+                                variant="ghost" 
+                                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                onClick={(e) => e.stopPropagation()}
                             >
-                                View Photo
-                            </ActionDropdownItem>
-                        )}
-                        
-                        <ActionDropdownSeparator />
-                        
-                        <ActionDropdownItem
-                            icon={<Clipboard className="h-4 w-4" />}
-                            onClick={() => handleCopyToClipboard(fullName, 'Name')}
-                        >
-                            Copy Name
-                        </ActionDropdownItem>
-                        
-                        {resident.contact_number && (
-                            <ActionDropdownItem
-                                icon={<Clipboard className="h-4 w-4" />}
-                                onClick={() => handleCopyToClipboard(resident.contact_number, 'Contact')}
+                                <span className="sr-only">Open menu</span>
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    window.location.href = `/admin/residents/${resident.id}`;
+                                }}
+                                className="flex items-center gap-2 cursor-pointer"
                             >
-                                Copy Contact
-                            </ActionDropdownItem>
-                        )}
-                        
-                        <ActionDropdownItem
-                            icon={<QrCode className="h-4 w-4" />}
-                            href={`/admin/residents/${resident.id}/generate-id`}
-                        >
-                            Generate ID
-                        </ActionDropdownItem>
-                        
-                        <ActionDropdownItem
-                            icon={<FileText className="h-4 w-4" />}
-                            href={`/admin/clearances/create?resident_id=${resident.id}`}
-                        >
-                            Create Clearance
-                        </ActionDropdownItem>
+                                <Eye className="h-4 w-4" />
+                                <span>View Details</span>
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    window.location.href = `/admin/residents/${resident.id}/edit`;
+                                }}
+                                className="flex items-center gap-2 cursor-pointer"
+                            >
+                                <Edit className="h-4 w-4" />
+                                <span>Edit Profile</span>
+                            </DropdownMenuItem>
 
-                        {isBulkMode && (
-                            <>
-                                <ActionDropdownSeparator />
-                                <ActionDropdownItem
-                                    icon={isSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-                                    onClick={() => onItemSelect(resident.id)}
+                            {hasPhoto && (
+                                <DropdownMenuItem 
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleViewPhoto(resident);
+                                    }}
+                                    className="flex items-center gap-2 cursor-pointer"
                                 >
-                                    {isSelected ? 'Deselect' : 'Select for Bulk'}
-                                </ActionDropdownItem>
-                            </>
-                        )}
-                        
-                        <ActionDropdownSeparator />
-                        
-                        {resident.status !== 'deceased' && (
-                            <ActionDropdownItem
-                                icon={<Trash2 className="h-4 w-4" />}
-                                onClick={() => onDelete(resident)}
-                                dangerous
+                                    <Camera className="h-4 w-4" />
+                                    <span>View Photo</span>
+                                </DropdownMenuItem>
+                            )}
+                            
+                            <DropdownMenuSeparator />
+                            
+                            <DropdownMenuItem 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleCopyToClipboard(fullName, 'Name');
+                                }}
+                                className="flex items-center gap-2 cursor-pointer"
                             >
-                                Delete Resident
-                            </ActionDropdownItem>
-                        )}
-                    </ActionDropdown>
+                                <Clipboard className="h-4 w-4" />
+                                <span>Copy Name</span>
+                            </DropdownMenuItem>
+                            
+                            {resident.contact_number && (
+                                <DropdownMenuItem 
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleCopyToClipboard(resident.contact_number, 'Contact');
+                                    }}
+                                    className="flex items-center gap-2 cursor-pointer"
+                                >
+                                    <Clipboard className="h-4 w-4" />
+                                    <span>Copy Contact</span>
+                                </DropdownMenuItem>
+                            )}
+                            
+                           
+                            {isBulkMode && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            onItemSelect(resident.id);
+                                        }}
+                                        className="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        {isSelected ? (
+                                            <>
+                                                <CheckSquare className="h-4 w-4 text-green-600" />
+                                                <span className="text-green-600">Deselect</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Square className="h-4 w-4" />
+                                                <span>Select for Bulk</span>
+                                            </>
+                                        )}
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            
+                            <DropdownMenuSeparator />
+                            
+                            {resident.status !== 'deceased' && (
+                                <DropdownMenuItem 
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        onDelete(resident);
+                                    }}
+                                    className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/30"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    <span>Delete Resident</span>
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </TableCell>
             </TableRow>
         );
     };
 
     // Calculate column span
-    const calculateColumnSpan = () => {
+    const calculateColumnSpan = (): number => {
         let baseCols = isMobile ? 4 : 6;
         if (isBulkMode) baseCols += 1;
         return baseCols + 1; // +1 for actions column
     };
 
     return (
-        <div className="overflow-x-auto">
-            <div className="min-w-full inline-block align-middle">
-                <div className="overflow-hidden">
-                    <Table className="min-w-full">
-                        <TableHeader>
-                            <TableRow className="bg-gray-50 dark:bg-gray-800">
-                                {isBulkMode && (
-                                    <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-center w-10 sm:w-12">
-                                        <div className="flex items-center justify-center">
-                                            <Checkbox
-                                                checked={isSelectAll && residents.length > 0}
-                                                onCheckedChange={onSelectAllOnPage}
-                                                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-4 w-4"
-                                            />
+        <>
+            <div className="overflow-x-auto">
+                <div className="min-w-full inline-block align-middle">
+                    <div className="overflow-hidden">
+                        <Table className="min-w-full">
+                            <TableHeader>
+                                <TableRow className="bg-gray-50 dark:bg-gray-800">
+                                    {isBulkMode && (
+                                        <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-center w-10 sm:w-12">
+                                            <div className="flex items-center justify-center">
+                                                <Checkbox
+                                                    checked={isSelectAll && residents.length > 0}
+                                                    onCheckedChange={onSelectAllOnPage}
+                                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-4 w-4"
+                                                />
+                                            </div>
+                                        </TableHead>
+                                    )}
+                                    <TableHead 
+                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] sm:min-w-[160px] cursor-pointer hover:bg-gray-100"
+                                        onClick={() => onSort('last_name')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Name
+                                            {getSortIcon('last_name')}
                                         </div>
                                     </TableHead>
-                                )}
-                                <TableHead 
-                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] sm:min-w-[160px] cursor-pointer hover:bg-gray-100"
-                                    onClick={() => onSort('last_name')}
-                                >
-                                    <div className="flex items-center gap-1">
-                                        Name
-                                        {getSortIcon('last_name')}
-                                    </div>
-                                </TableHead>
-                                <TableHead 
-                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] sm:min-w-[100px] cursor-pointer hover:bg-gray-100"
-                                    onClick={() => onSort('age')}
-                                >
-                                    <div className="flex items-center gap-1">
-                                        Age/Gender
-                                        {getSortIcon('age')}
-                                    </div>
-                                </TableHead>
-                                <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] sm:min-w-[120px]">
-                                    Contact
-                                </TableHead>
-                                <TableHead 
-                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] sm:min-w-[180px] cursor-pointer hover:bg-gray-100"
-                                    onClick={() => onSort('purok_id')}
-                                >
-                                    <div className="flex items-center gap-1">
-                                        Address/Purok
-                                        {getSortIcon('purok_id')}
-                                    </div>
-                                </TableHead>
-                                {!isMobile && (
-                                    <>
-                                        <TableHead 
-                                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
-                                            onClick={() => onSort('household')}
-                                        >
-                                            <div className="flex items-center gap-1">
-                                                Household
-                                                {getSortIcon('household')}
-                                            </div>
-                                        </TableHead>
-                                        <TableHead 
-                                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
-                                            onClick={() => onSort('status')}
-                                        >
-                                            <div className="flex items-center gap-1">
-                                                Status
-                                                {getSortIcon('status')}
-                                            </div>
-                                        </TableHead>
-                                    </>
-                                )}
-                                <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[60px] sm:min-w-[80px]">
-                                    Actions
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {residents.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={calculateColumnSpan()} className="text-center py-8">
-                                        <EmptyState
-                                            title="No residents found"
-                                            description={hasActiveFilters 
-                                                ? 'Try changing your filters or search criteria.'
-                                                : 'Get started by adding a resident.'}
-                                            icon={<User className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
-                                            hasFilters={hasActiveFilters}
-                                            onClearFilters={onClearFilters}
-                                            onCreateNew={() => window.location.href = '/admin/residents/create'}
-                                            createLabel="Add Resident"
-                                        />
-                                    </TableCell>
+                                    <TableHead 
+                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] sm:min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                        onClick={() => onSort('age')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Age/Gender
+                                            {getSortIcon('age')}
+                                        </div>
+                                    </TableHead>
+                                    <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] sm:min-w-[120px]">
+                                        Contact
+                                    </TableHead>
+                                    <TableHead 
+                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] sm:min-w-[180px] cursor-pointer hover:bg-gray-100"
+                                        onClick={() => onSort('purok_id')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Address/Purok
+                                            {getSortIcon('purok_id')}
+                                        </div>
+                                    </TableHead>
+                                    {!isMobile && (
+                                        <>
+                                            <TableHead 
+                                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
+                                                onClick={() => onSort('household')}
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    Household
+                                                    {getSortIcon('household')}
+                                                </div>
+                                            </TableHead>
+                                            <TableHead 
+                                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                                onClick={() => onSort('status')}
+                                            >
+                                                <div className="flex items-center gap-1">
+                                                    Status
+                                                    {getSortIcon('status')}
+                                                </div>
+                                            </TableHead>
+                                        </>
+                                    )}
+                                    <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[60px] sm:min-w-[80px]">
+                                        Actions
+                                    </TableHead>
                                 </TableRow>
-                            ) : (
-                                residents.map(resident => renderTableRow(resident))
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                {residents.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={calculateColumnSpan()} className="text-center py-8">
+                                            <EmptyState
+                                                title="No residents found"
+                                                description={hasActiveFilters 
+                                                    ? 'Try changing your filters or search criteria.'
+                                                    : 'Get started by adding a resident.'}
+                                                icon={<User className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
+                                                hasFilters={hasActiveFilters}
+                                                onClearFilters={onClearFilters}
+                                                onCreateNew={() => window.location.href = '/admin/residents/create'}
+                                                createLabel="Add Resident"
+                                            />
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    residents.map(resident => renderTableRow(resident))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </div>
             </div>
-        </div>
+
+            {/* Photo Modal */}
+            <PhotoViewModal
+                isOpen={photoModalOpen}
+                onClose={handleClosePhotoModal}
+                resident={selectedResidentForPhoto}
+                photoUrl={selectedResidentForPhoto ? getPhotoUrl(selectedResidentForPhoto.photo_path, selectedResidentForPhoto.photo_url) : null}
+            />
+        </>
     );
 }

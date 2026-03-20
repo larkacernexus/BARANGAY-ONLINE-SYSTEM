@@ -1,9 +1,8 @@
-// resources/js/pages/households/index.tsx
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import {  BulkOperation, SelectionMode } from '@/types';
+import { BulkOperation, SelectionMode } from '@/types';
 import { 
     filterHouseholds, 
     getSelectionStats, 
@@ -15,11 +14,28 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Import reusable components
 import HouseholdsHeader from '@/components/admin/households/HouseholdsHeader';
+import HouseholdsStats from '@/components/admin/households/HouseholdsStats';
 import HouseholdsFilters from '@/components/admin/households/HouseholdsFilters';
 import HouseholdsContent from '@/components/admin/households/HouseholdsContent';
 import HouseholdsDialogs from '@/components/admin/households/HouseholdsDialogs';
 import { Button } from '@/components/ui/button';
 import { KeyRound } from 'lucide-react';
+
+interface HouseholdsProps {
+    households: any[];
+    stats: {
+        total: number;
+        active: number;
+        inactive: number;
+        totalMembers: number;
+        averageMembers: number;
+        purokCount: number;
+        [key: string]: any;
+    };
+    filters: any;
+    puroks: any[];
+    allHouseholds: any[];
+}
 
 export default function Households({ households, stats, filters, puroks, allHouseholds }: HouseholdsProps) {
     const { flash } = usePage().props as any;
@@ -27,7 +43,14 @@ export default function Households({ households, stats, filters, puroks, allHous
     // Initialize state with safe defaults
     const safeFilters = filters || {};
     const safePuroks = puroks || [];
-    const safeStats = stats || {};
+    const safeStats = stats || {
+        total: 0,
+        active: 0,
+        inactive: 0,
+        totalMembers: 0,
+        averageMembers: 0,
+        purokCount: 0
+    };
     
     // Search and filter states
     const [search, setSearch] = useState(safeFilters.search || '');
@@ -184,6 +207,20 @@ export default function Households({ households, stats, filters, puroks, allHous
         );
     }, [allHouseholds, search, filtersState, safePuroks]);
 
+    // Calculate filtered stats for display
+    const filteredStats = useMemo(() => {
+        return {
+            total: filteredHouseholds.length,
+            active: filteredHouseholds.filter(h => h.status === 'active').length,
+            inactive: filteredHouseholds.filter(h => h.status === 'inactive').length,
+            totalMembers: filteredHouseholds.reduce((sum, h) => sum + (h.member_count || 0), 0),
+            averageMembers: filteredHouseholds.length > 0 
+                ? Number((filteredHouseholds.reduce((sum, h) => sum + (h.member_count || 0), 0) / filteredHouseholds.length).toFixed(1))
+                : 0,
+            purokCount: new Set(filteredHouseholds.map(h => h.purok_id)).size
+        };
+    }, [filteredHouseholds]);
+
     // Calculate pagination
     const totalItems = filteredHouseholds.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
@@ -222,8 +259,8 @@ export default function Households({ households, stats, filters, puroks, allHous
 
     const handleSelectAll = () => {
         if (confirm(`This will select ALL ${allHouseholds.length || 0} households. This action may take a moment.`)) {
-            const pageIds = paginatedHouseholds.map(household => household.id);
-            setSelectedHouseholds(pageIds);
+            const allIds = allHouseholds.map(household => household.id);
+            setSelectedHouseholds(allIds);
             setSelectionMode('all');
         }
     };
@@ -267,22 +304,7 @@ export default function Households({ households, stats, filters, puroks, allHous
         try {
             switch (operation) {
                 case 'delete':
-                    if (confirm(`Are you sure you want to delete ${selectedHouseholds.length} selected household(s)?`)) {
-                        await router.post('/admin/households/bulk-action', {
-                            action: 'delete',
-                            household_ids: selectedHouseholds,
-                        }, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                setSelectedHouseholds([]);
-                                setShowBulkDeleteDialog(false);
-                                toast.success('Households deleted successfully');
-                            },
-                            onError: () => {
-                                toast.error('Failed to delete households');
-                            }
-                        });
-                    }
+                    setShowBulkDeleteDialog(true);
                     break;
 
                 case 'activate':
@@ -293,7 +315,7 @@ export default function Households({ households, stats, filters, puroks, allHous
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedHouseholds([]);
-                            toast.success('Households activated successfully');
+                            toast.success(`${selectedHouseholds.length} households activated successfully`);
                         },
                         onError: () => {
                             toast.error('Failed to activate households');
@@ -309,7 +331,7 @@ export default function Households({ households, stats, filters, puroks, allHous
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedHouseholds([]);
-                            toast.success('Households deactivated successfully');
+                            toast.success(`${selectedHouseholds.length} households deactivated successfully`);
                         },
                         onError: () => {
                             toast.error('Failed to deactivate households');
@@ -341,6 +363,89 @@ export default function Households({ households, stats, filters, puroks, allHous
         }
     };
 
+    // Bulk action handlers
+    const handleBulkStatusUpdate = async (status: string) => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/households/bulk-action', {
+                action: 'update_status',
+                household_ids: selectedHouseholds,
+                status: status,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedHouseholds([]);
+                    setShowBulkStatusDialog(false);
+                    setBulkEditValue('');
+                    toast.success(`Status updated to ${status} for ${selectedHouseholds.length} households`);
+                },
+                onError: () => {
+                    toast.error('Failed to update status');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk status update error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkPurokUpdate = async (purokId: number) => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/households/bulk-action', {
+                action: 'update_purok',
+                household_ids: selectedHouseholds,
+                purok_id: purokId,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedHouseholds([]);
+                    setShowBulkPurokDialog(false);
+                    setBulkEditValue('');
+                    toast.success(`Purok updated for ${selectedHouseholds.length} households`);
+                },
+                onError: () => {
+                    toast.error('Failed to update purok');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk purok update error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/households/bulk-action', {
+                action: 'delete',
+                household_ids: selectedHouseholds,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedHouseholds([]);
+                    setShowBulkDeleteDialog(false);
+                    toast.success(`${selectedHouseholds.length} households deleted successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to delete households');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
     // Copy selected data to clipboard
     const handleCopySelectedData = () => {
         if (selectedHouseholdsData.length === 0) {
@@ -351,7 +456,7 @@ export default function Households({ households, stats, filters, puroks, allHous
         const csv = formatForClipboard(selectedHouseholdsData, safePuroks);
         
         navigator.clipboard.writeText(csv).then(() => {
-            toast.success('Data copied to clipboard');
+            toast.success(`${selectedHouseholdsData.length} records copied to clipboard`);
         }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
@@ -374,10 +479,13 @@ export default function Households({ households, stats, filters, puroks, allHous
     };
 
     const handleToggleStatus = (household: any) => {
-        router.post(`/admin/households/${household.id}/toggle-status`, {}, {
+        const newStatus = household.status === 'active' ? 'inactive' : 'active';
+        router.post(`/admin/households/${household.id}/update-status`, {
+            status: newStatus
+        }, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('Household status updated');
+                toast.success(`Household status updated to ${newStatus}`);
             },
             onError: () => {
                 toast.error('Failed to update household status');
@@ -394,11 +502,34 @@ export default function Households({ households, stats, filters, puroks, allHous
     };
 
     const handleSort = (column: string) => {
+        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
+        
         setFiltersState(prev => ({
             ...prev,
             sort_by: column,
-            sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc'
+            sort_order: newOrder
         }));
+        
+        // Trigger server-side sort update
+        const params = {
+            ...filtersState,
+            sort_by: column,
+            sort_order: newOrder,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/households', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearFilters = () => {
@@ -474,8 +605,16 @@ export default function Households({ households, stats, filters, puroks, allHous
                         isMobile={isMobile}
                     />
 
+                    {/* Separate Stats Component */}
+                    <HouseholdsStats 
+                        globalStats={safeStats}
+                        filteredStats={filteredStats}
+                        isLoading={isPerformingBulkAction}
+                    />
+
                     <HouseholdsFilters
-                        stats={safeStats}
+                        globalStats={safeStats}
+                        filteredStats={filteredStats}
                         search={search}
                         setSearch={setSearch}
                         onSearchChange={handleSearchChange}
@@ -492,11 +631,13 @@ export default function Households({ households, stats, filters, puroks, allHous
                         endIndex={endIndex}
                         filteredHouseholds={filteredHouseholds}
                         searchInputRef={searchInputRef}
+                        isLoading={isPerformingBulkAction}
                     />
 
                     <HouseholdsContent
                         households={paginatedHouseholds}
-                        stats={safeStats}
+                        globalStats={safeStats}
+                        filteredStats={filteredStats}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -528,12 +669,14 @@ export default function Households({ households, stats, filters, puroks, allHous
                         onSelectAllFiltered={handleSelectAllFiltered}
                         onSelectAll={handleSelectAll}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                        setShowBulkStatusDialog={setShowBulkStatusDialog}
+                        setShowBulkPurokDialog={setShowBulkPurokDialog}
                         selectionMode={selectionMode}
                     />
 
                     {/* Keyboard Shortcuts Help */}
-                    {isBulkMode && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border">
+                    {isBulkMode && !isMobile && (
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border hidden sm:block">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <KeyRound className="h-4 w-4 text-gray-500" />
@@ -566,6 +709,10 @@ export default function Households({ households, stats, filters, puroks, allHous
                                     <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
                                     <span>Exit/clear</span>
                                 </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+F</kbd>
+                                    <span>Focus search</span>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -584,6 +731,9 @@ export default function Households({ households, stats, filters, puroks, allHous
                 setBulkEditValue={setBulkEditValue}
                 selectedHouseholds={selectedHouseholds}
                 handleBulkOperation={handleBulkOperation}
+                handleBulkStatusUpdate={handleBulkStatusUpdate}
+                handleBulkPurokUpdate={handleBulkPurokUpdate}
+                handleBulkDelete={handleBulkDelete}
                 puroks={safePuroks}
                 selectionStats={selectionStats}
             />

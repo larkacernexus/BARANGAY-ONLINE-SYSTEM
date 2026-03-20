@@ -66,11 +66,11 @@ export const ModernRecordTable = ({
                         const isExpired = isDocumentExpired(doc);
 
                         return (
-                            <TableRow key={doc.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+                            <TableRow key={doc.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                                 <TableCell>
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                            <div className={`p-1.5 rounded ${category?.color ? 'bg-gray-100 dark:bg-gray-800' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                                            <div className={`p-1.5 rounded ${category?.color ? 'bg-gray-100 dark:bg-gray-900' : 'bg-gray-100 dark:bg-gray-900'}`}>
                                                 <DocIconComponent className={`h-4 w-4 ${categoryColor}`} />
                                             </div>
                                             <span className="font-medium text-gray-900 dark:text-white line-clamp-2">

@@ -582,7 +582,7 @@ export default function CommunityReport() {
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mb-1 ${
                                         activeStep === step 
                                             ? 'bg-blue-600 text-white' 
-                                            : 'bg-gray-200 dark:bg-gray-800'
+                                            : 'bg-gray-200 dark:bg-gray-900'
                                     }`}>
                                         {step}
                                     </div>

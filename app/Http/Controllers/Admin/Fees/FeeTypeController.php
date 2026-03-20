@@ -177,7 +177,7 @@ class FeeTypeController extends Controller
             $validated['has_surcharge'] = $validated['has_surcharge'] ?? false;
             $validated['has_penalty'] = $validated['has_penalty'] ?? false;
             
-            // Cast arrays properly
+            // Cast arrays properly - encode to JSON for storage
             if (isset($validated['applicable_puroks'])) {
                 $validated['applicable_puroks'] = json_encode($validated['applicable_puroks']);
             } else {
@@ -237,13 +237,13 @@ class FeeTypeController extends Controller
         
         // Get recent fees with their polymorphic payer relationship
         $recentFees = $feeType->fees()
-            ->with(['payer']) // Use polymorphic 'payer' instead of specific 'resident' and 'household'
+            ->with(['payer'])
             ->latest()
             ->limit(10)
             ->get();
         
         return Inertia::render('admin/Fees/FeeTypes/Show', [
-            'feeType' => $feeType,
+            'feeType' => $feeType, // No manual decoding needed - casts handle it
             'recentFees' => $recentFees,
         ]);
     }
@@ -253,18 +253,8 @@ class FeeTypeController extends Controller
         // Load related data
         $feeType->load(['documentCategory']);
         
-        // Parse JSON fields for the form
-        if ($feeType->applicable_puroks) {
-            $feeType->applicable_puroks = json_decode($feeType->applicable_puroks, true) ?? [];
-        }
-        
-        if ($feeType->requirements) {
-            $feeType->requirements = json_decode($feeType->requirements, true) ?? [];
-        }
-        
-        if ($feeType->computation_formula) {
-            $feeType->computation_formula = json_decode($feeType->computation_formula, true);
-        }
+        // NO MANUAL DECODING NEEDED - the model's $casts property handles it automatically
+        // The values will already be arrays thanks to the casts in the model
         
         // Fetch categories from document_categories table
         $documentCategories = DocumentCategory::where('is_active', true)
@@ -373,7 +363,7 @@ class FeeTypeController extends Controller
             $validated['has_surcharge'] = $validated['has_surcharge'] ?? $feeType->has_surcharge;
             $validated['has_penalty'] = $validated['has_penalty'] ?? $feeType->has_penalty;
 
-            // Cast arrays properly
+            // Cast arrays properly - encode to JSON for storage
             if (isset($validated['applicable_puroks'])) {
                 $validated['applicable_puroks'] = json_encode($validated['applicable_puroks']);
             } else {

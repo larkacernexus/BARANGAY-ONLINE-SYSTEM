@@ -121,7 +121,6 @@ export default function CreateForm() {
     };
 
     const clearForm = () => {
-        // Reset to initial values using type assertion
         reset({
             title: '',
             description: '',
@@ -145,23 +144,19 @@ export default function CreateForm() {
         return data.title.trim() !== '' && data.file !== null;
     };
 
-    // Calculate progress
     const requiredFields = ['title', 'file'];
     const completedRequired = requiredFields.filter(field => {
         if (field === 'file') return data.file !== null;
-        // Type-safe access to data fields
         if (field === 'title') return data.title.trim() !== '';
         return false;
     }).length;
 
     const progressPercentage = Math.round((completedRequired / requiredFields.length) * 100);
 
-    // Handle category change with null instead of empty string
     const handleCategoryChange = (value: string) => {
         setData('category', value);
     };
 
-    // Handle agency change with null instead of empty string
     const handleAgencyChange = (value: string) => {
         setData('issuing_agency', value);
     };
@@ -180,13 +175,13 @@ export default function CreateForm() {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link href="/admin/forms">
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="sm" className="dark:text-gray-300 dark:hover:bg-gray-900">
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to Forms
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-3xl font-bold tracking-tight">Upload New Form</h1>
+                            <h1 className="text-3xl font-bold tracking-tight dark:text-gray-100">Upload New Form</h1>
                             <p className="text-gray-500 dark:text-gray-400">
                                 Add downloadable forms for residents
                             </p>
@@ -196,7 +191,7 @@ export default function CreateForm() {
 
                 {/* Error Messages */}
                 {Object.keys(errors).length > 0 && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
                         <div className="flex items-center gap-2 mb-2">
                             <AlertCircle className="h-5 w-5" />
                             <p className="font-bold">Please fix the following errors:</p>
@@ -213,19 +208,19 @@ export default function CreateForm() {
                     {/* Left Column - Form Details */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Basic Information */}
-                        <Card>
+                        <Card className="dark:bg-gray-900">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
                                     <FileText className="h-5 w-5" />
                                     Form Information
                                 </CardTitle>
-                                <CardDescription>
+                                <CardDescription className="dark:text-gray-400">
                                     Basic details about the form
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="title">
+                                    <Label htmlFor="title" className="dark:text-gray-300">
                                         Form Title <span className="text-red-500">*</span>
                                     </Label>
                                     <Input 
@@ -234,45 +229,47 @@ export default function CreateForm() {
                                         required 
                                         value={data.title}
                                         onChange={(e) => setData('title', e.target.value)}
+                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                     />
-                                    <p className="text-sm text-gray-500">
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
                                         Descriptive title for the form
                                     </p>
                                     {errors.title && (
-                                        <p className="text-sm text-red-600">{errors.title}</p>
+                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.title}</p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="description">Description (Optional)</Label>
+                                    <Label htmlFor="description" className="dark:text-gray-300">Description (Optional)</Label>
                                     <Textarea 
                                         id="description" 
                                         placeholder="Brief description of what this form is for..."
                                         rows={4}
                                         value={data.description}
                                         onChange={(e) => setData('description', e.target.value)}
+                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                     />
-                                    <p className="text-sm text-gray-500">
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
                                         Explain the purpose and usage of this form
                                     </p>
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="category">Category (Optional)</Label>
+                                        <Label htmlFor="category" className="dark:text-gray-300">Category (Optional)</Label>
                                         <Select 
                                             value={data.category || undefined}
                                             onValueChange={handleCategoryChange}
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                                 <SelectValue placeholder="Select category">
                                                     {data.category || "Select category"}
                                                 </SelectValue>
                                             </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="uncategorized">Uncategorized</SelectItem>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                <SelectItem value="uncategorized" className="dark:text-gray-300 dark:focus:bg-gray-700">Uncategorized</SelectItem>
                                                 {CATEGORIES.map((category) => (
-                                                    <SelectItem key={category} value={category}>
+                                                    <SelectItem key={category} value={category} className="dark:text-gray-300 dark:focus:bg-gray-700">
                                                         {category}
                                                     </SelectItem>
                                                 ))}
@@ -281,20 +278,20 @@ export default function CreateForm() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="issuing_agency">Issuing Agency (Optional)</Label>
+                                        <Label htmlFor="issuing_agency" className="dark:text-gray-300">Issuing Agency (Optional)</Label>
                                         <Select 
                                             value={data.issuing_agency || undefined}
                                             onValueChange={handleAgencyChange}
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                                 <SelectValue placeholder="Select agency">
                                                     {data.issuing_agency || "Select agency"}
                                                 </SelectValue>
                                             </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="not_specified">Not specified</SelectItem>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                <SelectItem value="not_specified" className="dark:text-gray-300 dark:focus:bg-gray-700">Not specified</SelectItem>
                                                 {AGENCIES.map((agency) => (
-                                                    <SelectItem key={agency} value={agency}>
+                                                    <SelectItem key={agency} value={agency} className="dark:text-gray-300 dark:focus:bg-gray-700">
                                                         <div className="flex items-center gap-2">
                                                             <Building className="h-4 w-4" />
                                                             {agency}
@@ -309,33 +306,33 @@ export default function CreateForm() {
                         </Card>
 
                         {/* File Upload */}
-                        <Card>
+                        <Card className="dark:bg-gray-900">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
                                     <Upload className="h-5 w-5" />
                                     File Upload
                                 </CardTitle>
-                                <CardDescription>
+                                <CardDescription className="dark:text-gray-400">
                                     Upload the form file (PDF, Word, Excel, or Image)
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="file">
+                                    <Label htmlFor="file" className="dark:text-gray-300">
                                         Form File <span className="text-red-500">*</span>
                                     </Label>
                                     <div className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
                                         data.file 
-                                            ? 'border-green-300 bg-green-50 dark:bg-green-900/10' 
+                                            ? 'border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-900/10' 
                                             : 'border-gray-300 dark:border-gray-700'
                                     }`}>
                                         <div className="flex flex-col items-center justify-center text-center">
-                                            <Upload className="h-12 w-12 text-gray-400 mb-4" />
+                                            <Upload className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
                                             <div className="space-y-2">
-                                                <p className="text-sm font-medium">
+                                                <p className="text-sm font-medium dark:text-gray-300">
                                                     {data.file ? 'File Selected' : 'Upload form file'}
                                                 </p>
-                                                <p className="text-xs text-gray-500">
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                                     PDF, Word, Excel, or Image files up to 10MB
                                                 </p>
                                             </div>
@@ -350,7 +347,7 @@ export default function CreateForm() {
                                             <Button
                                                 type="button"
                                                 variant={data.file ? "outline" : "default"}
-                                                className="mt-4"
+                                                className="mt-4 dark:border-gray-600 dark:text-gray-300"
                                                 onClick={() => document.getElementById('file')?.click()}
                                             >
                                                 {data.file ? 'Change File' : 'Choose File'}
@@ -358,20 +355,20 @@ export default function CreateForm() {
                                         </div>
                                     </div>
                                     {errors.file && (
-                                        <p className="text-sm text-red-600">{errors.file}</p>
+                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.file}</p>
                                     )}
                                 </div>
 
                                 {filePreview && (
-                                    <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
+                                    <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
                                                 <div className="text-2xl">
                                                     {getFileIcon(filePreview.type)}
                                                 </div>
                                                 <div>
-                                                    <p className="font-medium">{filePreview.name}</p>
-                                                    <p className="text-sm text-gray-500">
+                                                    <p className="font-medium dark:text-gray-100">{filePreview.name}</p>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
                                                         {filePreview.size} • {filePreview.type}
                                                     </p>
                                                 </div>
@@ -384,6 +381,7 @@ export default function CreateForm() {
                                                     setData('file', null);
                                                     setFilePreview(null);
                                                 }}
+                                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
                                             >
                                                 Remove
                                             </Button>
@@ -391,7 +389,7 @@ export default function CreateForm() {
                                     </div>
                                 )}
 
-                                <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4">
+                                <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800">
                                     <div className="flex items-start gap-3">
                                         <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                                         <div className="text-sm text-blue-700 dark:text-blue-300">
@@ -412,22 +410,22 @@ export default function CreateForm() {
                     {/* Right Column - Preview & Actions */}
                     <div className="space-y-6">
                         {/* Progress & Actions */}
-                        <Card>
+                        <Card className="dark:bg-gray-900">
                             <CardHeader>
-                                <CardTitle>Upload Progress</CardTitle>
+                                <CardTitle className="dark:text-gray-100">Upload Progress</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
-                                        <span>Required fields</span>
-                                        <span className="font-medium">
+                                        <span className="dark:text-gray-400">Required fields</span>
+                                        <span className="font-medium dark:text-gray-300">
                                             {completedRequired}/{requiredFields.length}
                                         </span>
                                     </div>
-                                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                         <div 
                                             className={`h-full rounded-full transition-all duration-300 ${
-                                                progressPercentage === 100 ? 'bg-green-500' : 'bg-blue-500'
+                                                progressPercentage === 100 ? 'bg-green-500 dark:bg-green-600' : 'bg-blue-500 dark:bg-blue-600'
                                             }`}
                                             style={{ width: `${progressPercentage}%` }}
                                         ></div>
@@ -437,8 +435,8 @@ export default function CreateForm() {
                                 <div className="space-y-3 pt-2">
                                     <div className="flex items-center justify-between">
                                         <div className="space-y-0.5">
-                                            <Label htmlFor="is_active">Active Status</Label>
-                                            <p className="text-sm text-gray-500">
+                                            <Label htmlFor="is_active" className="dark:text-gray-300">Active Status</Label>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
                                                 Visible to residents when active
                                             </p>
                                         </div>
@@ -448,13 +446,14 @@ export default function CreateForm() {
                                             onCheckedChange={(checked) => {
                                                 setData('is_active', checked);
                                             }}
+                                            className="dark:data-[state=checked]:bg-green-600"
                                         />
                                     </div>
 
-                                    <div className="pt-4 border-t">
+                                    <div className="pt-4 border-t dark:border-gray-700">
                                         <Button 
                                             type="submit"
-                                            className="w-full"
+                                            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700"
                                             disabled={processing || !isFormValid()}
                                         >
                                             <Save className="h-4 w-4 mr-2" />
@@ -464,7 +463,7 @@ export default function CreateForm() {
                                         <Button 
                                             type="button"
                                             variant="outline"
-                                            className="w-full mt-2"
+                                            className="w-full mt-2 dark:border-gray-600 dark:text-gray-300"
                                             onClick={clearForm}
                                         >
                                             Clear Form
@@ -475,32 +474,32 @@ export default function CreateForm() {
                         </Card>
 
                         {/* Preview */}
-                        <Card>
+                        <Card className="dark:bg-gray-900">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
                                     <Eye className="h-5 w-5" />
                                     Preview
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="border rounded-lg p-4 bg-white dark:bg-gray-900">
+                                <div className="border rounded-lg p-4 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
                                     <div className="space-y-3">
                                         <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded">
+                                            <div className="p-2 bg-gray-100 dark:bg-gray-900 rounded">
                                                 {filePreview ? getFileIcon(filePreview.type) : '📎'}
                                             </div>
                                             <div>
-                                                <p className="font-medium">
+                                                <p className="font-medium dark:text-gray-100">
                                                     {data.title || 'Form Title'}
                                                 </p>
                                                 <div className="flex flex-wrap gap-2 mt-1">
                                                     {data.category && data.category !== 'uncategorized' && (
-                                                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                                        <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded">
                                                             {data.category}
                                                         </span>
                                                     )}
                                                     {data.issuing_agency && data.issuing_agency !== 'not_specified' && (
-                                                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                                                        <span className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-1 rounded">
                                                             {data.issuing_agency}
                                                         </span>
                                                     )}
@@ -509,19 +508,19 @@ export default function CreateForm() {
                                         </div>
                                         
                                         {data.description && (
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 border-t pt-3">
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 border-t dark:border-gray-700 pt-3">
                                                 {data.description}
                                             </p>
                                         )}
                                         
-                                        <div className="flex items-center justify-between pt-3 border-t">
-                                            <span className="text-xs text-gray-500">
+                                        <div className="flex items-center justify-between pt-3 border-t dark:border-gray-700">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">
                                                 Downloads: 0
                                             </span>
                                             <span className={`text-xs px-2 py-1 rounded ${
                                                 data.is_active 
-                                                    ? 'bg-green-100 text-green-800' 
-                                                    : 'bg-gray-100 text-gray-800'
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
                                             }`}>
                                                 {data.is_active ? 'Active' : 'Inactive'}
                                             </span>
@@ -532,22 +531,22 @@ export default function CreateForm() {
                         </Card>
 
                         {/* Requirements Checklist */}
-                        <Card>
+                        <Card className="dark:bg-gray-900">
                             <CardHeader>
-                                <CardTitle className="text-sm">Requirements Checklist</CardTitle>
+                                <CardTitle className="text-sm dark:text-gray-100">Requirements Checklist</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3 text-sm">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             {data.title ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                                <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
                                             ) : (
-                                                <XCircle className="h-4 w-4 text-gray-300" />
+                                                <XCircle className="h-4 w-4 text-gray-300 dark:text-gray-600" />
                                             )}
-                                            <span>Form Title</span>
+                                            <span className="dark:text-gray-300">Form Title</span>
                                         </div>
-                                        <span className={`font-medium ${data.title ? 'text-green-600' : 'text-gray-400'}`}>
+                                        <span className={`font-medium ${data.title ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}>
                                             {data.title ? '✓' : 'Required'}
                                         </span>
                                     </div>
@@ -555,13 +554,13 @@ export default function CreateForm() {
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             {data.file ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                                <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
                                             ) : (
-                                                <XCircle className="h-4 w-4 text-gray-300" />
+                                                <XCircle className="h-4 w-4 text-gray-300 dark:text-gray-600" />
                                             )}
-                                            <span>File Uploaded</span>
+                                            <span className="dark:text-gray-300">File Uploaded</span>
                                         </div>
-                                        <span className={`font-medium ${data.file ? 'text-green-600' : 'text-red-600'}`}>
+                                        <span className={`font-medium ${data.file ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                             {data.file ? '✓' : 'Required'}
                                         </span>
                                     </div>
@@ -569,30 +568,30 @@ export default function CreateForm() {
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             {data.file && data.file.size <= 10 * 1024 * 1024 ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                                <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
                                             ) : data.file ? (
-                                                <XCircle className="h-4 w-4 text-red-500" />
+                                                <XCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
                                             ) : (
                                                 <div className="h-4 w-4" />
                                             )}
-                                            <span>File size ≤ 10MB</span>
+                                            <span className="dark:text-gray-300">File size ≤ 10MB</span>
                                         </div>
                                         <span className={`font-medium ${
                                             data.file 
-                                                ? (data.file.size <= 10 * 1024 * 1024 ? 'text-green-600' : 'text-red-600')
-                                                : 'text-gray-400'
+                                                ? (data.file.size <= 10 * 1024 * 1024 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')
+                                                : 'text-gray-400 dark:text-gray-500'
                                         }`}>
                                             {data.file ? formatFileSize(data.file.size) : '-'}
                                         </span>
                                     </div>
                                     
-                                    <div className="pt-3 border-t text-xs text-gray-500">
+                                    <div className="pt-3 border-t dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
                                         <p className="font-medium mb-1">Supported file types:</p>
                                         <div className="grid grid-cols-2 gap-1">
-                                            <span className="px-2 py-1 bg-gray-100 rounded">PDF (.pdf)</span>
-                                            <span className="px-2 py-1 bg-gray-100 rounded">Word (.doc/.docx)</span>
-                                            <span className="px-2 py-1 bg-gray-100 rounded">Excel (.xls/.xlsx)</span>
-                                            <span className="px-2 py-1 bg-gray-100 rounded">Images (.jpg/.png)</span>
+                                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">PDF (.pdf)</span>
+                                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">Word (.doc/.docx)</span>
+                                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">Excel (.xls/.xlsx)</span>
+                                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">Images (.jpg/.png)</span>
                                         </div>
                                     </div>
                                 </div>

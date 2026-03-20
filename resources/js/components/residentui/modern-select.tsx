@@ -43,7 +43,7 @@ export const ModernSelect = ({
                 disabled={disabled}
                 className={cn(
                     "flex items-center w-full h-10 px-3 py-2 text-sm",
-                    "bg-white dark:bg-gray-800",
+                    "bg-white dark:bg-gray-900",
                     "border border-gray-200 dark:border-gray-700",
                     "rounded-xl shadow-sm",
                     "hover:border-gray-300 dark:hover:border-gray-600",
@@ -69,7 +69,7 @@ export const ModernSelect = ({
                         className="fixed inset-0 z-40"
                         onClick={() => setIsOpen(false)}
                     />
-                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden">
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden">
                         <div className="max-h-60 overflow-y-auto p-1">
                             <button
                                 onClick={() => {

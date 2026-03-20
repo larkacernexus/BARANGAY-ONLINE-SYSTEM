@@ -23,7 +23,7 @@ export function GridSelectionSummary({
     if (selectedCount === 0) return null;
 
     return (
-        <div className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-3 ${className}`}>
+        <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-3 ${className}`}>
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">

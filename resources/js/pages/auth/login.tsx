@@ -461,7 +461,7 @@ export default function Login({
                                             <Button 
                                                 variant="outline" 
                                                 size="sm" 
-                                                className="text-xs h-7 sm:h-8 border-amber-300 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-gray-800"
+                                                className="text-xs h-7 sm:h-8 border-amber-300 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-gray-900"
                                                 onClick={refreshPage}
                                             >
                                                 <RefreshCw className="w-3 h-3 mr-1" />
@@ -487,7 +487,7 @@ export default function Login({
                                                 <Button 
                                                     variant="outline" 
                                                     size="sm" 
-                                                    className="text-xs h-7 sm:h-8 border-red-300 dark:border-red-800 hover:bg-red-100 dark:hover:bg-gray-800"
+                                                    className="text-xs h-7 sm:h-8 border-red-300 dark:border-red-800 hover:bg-red-100 dark:hover:bg-gray-900"
                                                     onClick={refreshPage}
                                                 >
                                                     <RefreshCw className="w-3 h-3 mr-1" />
@@ -830,7 +830,7 @@ export default function Login({
                     {/* Alerts */}
                     <div className="space-y-3 mb-6">
                         {rateLimitRemaining !== undefined && rateLimitRemaining <= 2 && (
-                            <div className="p-3 bg-amber-50 dark:bg-gray-800 border border-amber-200 dark:border-amber-900 rounded-xl">
+                            <div className="p-3 bg-amber-50 dark:bg-gray-900 border border-amber-200 dark:border-amber-900 rounded-xl">
                                 <div className="flex items-start gap-3">
                                     <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" />
                                     <div className="flex-1">
@@ -849,7 +849,7 @@ export default function Login({
                         )}
 
                         {accountLocked && (
-                            <div className="p-3 bg-red-50 dark:bg-gray-800 border border-red-200 dark:border-red-900 rounded-xl">
+                            <div className="p-3 bg-red-50 dark:bg-gray-900 border border-red-200 dark:border-red-900 rounded-xl">
                                 <div className="flex items-start gap-3">
                                     <Lock className="w-5 h-5 text-red-600 dark:text-red-500 mt-0.5 flex-shrink-0" />
                                     <div className="flex-1">
@@ -877,7 +877,7 @@ export default function Login({
                         )}
 
                         {showSecurityAlert && lastLoginInfo && !accountLocked && (
-                            <div className="p-3 bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded-xl">
+                            <div className="p-3 bg-blue-50 dark:bg-gray-900 border border-blue-200 dark:border-gray-700 rounded-xl">
                                 <div className="flex items-start gap-3">
                                     <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                                     <div className="flex-1">
@@ -925,7 +925,7 @@ export default function Login({
                                         tabIndex={1}
                                         autoComplete="email"
                                         placeholder="you@example.com"
-                                        className="h-12 text-base bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 focus:border-blue-500 focus:ring-blue-500"
+                                        className="h-12 text-base bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 focus:border-blue-500 focus:ring-blue-500"
                                         disabled={accountLocked || processing}
                                     />
                                 </div>
@@ -958,7 +958,7 @@ export default function Login({
                                         tabIndex={2}
                                         autoComplete="current-password"
                                         placeholder="Enter your password"
-                                        className="h-12 text-base bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 focus:border-blue-500 focus:ring-blue-500"
+                                        className="h-12 text-base bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 focus:border-blue-500 focus:ring-blue-500"
                                         disabled={accountLocked || processing}
                                     />
                                     {!accountLocked && (

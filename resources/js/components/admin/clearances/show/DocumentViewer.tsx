@@ -206,7 +206,7 @@ export function DocumentViewer({
                             variant="ghost"
                             size="sm"
                             onClick={handleDownload}
-                            className="text-white hover:bg-gray-800"
+                            className="text-white hover:bg-gray-900"
                         >
                             <DownloadIcon className="h-4 w-4 mr-2" />
                             Download
@@ -215,7 +215,7 @@ export function DocumentViewer({
                             variant="ghost"
                             size="sm"
                             onClick={onClose}
-                            className="text-white hover:bg-gray-800"
+                            className="text-white hover:bg-gray-900"
                         >
                             <X className="h-4 w-4" />
                         </Button>
@@ -230,7 +230,7 @@ export function DocumentViewer({
                             size="sm"
                             onClick={handleZoomOut}
                             disabled={zoom <= 0.5}
-                            className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+                            className="bg-gray-900 border-gray-700 text-white hover:bg-gray-700"
                         >
                             <ZoomOut className="h-4 w-4" />
                         </Button>
@@ -242,7 +242,7 @@ export function DocumentViewer({
                             size="sm"
                             onClick={handleZoomIn}
                             disabled={zoom >= 3}
-                            className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+                            className="bg-gray-900 border-gray-700 text-white hover:bg-gray-700"
                         >
                             <ZoomIn className="h-4 w-4" />
                         </Button>
@@ -251,7 +251,7 @@ export function DocumentViewer({
                             variant="outline"
                             size="sm"
                             onClick={handleRotate}
-                            className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+                            className="bg-gray-900 border-gray-700 text-white hover:bg-gray-700"
                         >
                             <RotateCw className="h-4 w-4" />
                         </Button>
@@ -259,7 +259,7 @@ export function DocumentViewer({
                             variant="outline"
                             size="sm"
                             onClick={handleReset}
-                            className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+                            className="bg-gray-900 border-gray-700 text-white hover:bg-gray-700"
                         >
                             Reset
                         </Button>
@@ -268,7 +268,7 @@ export function DocumentViewer({
                             variant="outline"
                             size="sm"
                             onClick={handleFullscreen}
-                            className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700"
+                            className="bg-gray-900 border-gray-700 text-white hover:bg-gray-700"
                         >
                             <Maximize2 className="h-4 w-4" />
                             {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
@@ -289,7 +289,7 @@ export function DocumentViewer({
                                         value={rejectionNotes}
                                         onChange={(e) => setRejectionNotes(e.target.value)}
                                         placeholder="Enter rejection reason..."
-                                        className="px-3 py-1 text-sm bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                        className="px-3 py-1 text-sm bg-gray-900 border border-gray-700 rounded text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') handleReject();
                                             if (e.key === 'Escape') {
@@ -354,7 +354,7 @@ export function DocumentViewer({
                                 variant="outline"
                                 size="icon"
                                 onClick={onPrev}
-                                className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-gray-800/80 backdrop-blur-sm border-gray-700 text-white hover:bg-gray-700/90 z-10 h-12 w-12 rounded-full"
+                                className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-gray-900/80 backdrop-blur-sm border-gray-700 text-white hover:bg-gray-700/90 z-10 h-12 w-12 rounded-full"
                             >
                                 <ChevronLeft className="h-6 w-6" />
                             </Button>
@@ -364,7 +364,7 @@ export function DocumentViewer({
                                 variant="outline"
                                 size="icon"
                                 onClick={onNext}
-                                className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-gray-800/80 backdrop-blur-sm border-gray-700 text-white hover:bg-gray-700/90 z-10 h-12 w-12 rounded-full"
+                                className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-gray-900/80 backdrop-blur-sm border-gray-700 text-white hover:bg-gray-700/90 z-10 h-12 w-12 rounded-full"
                             >
                                 <ChevronRight className="h-6 w-6" />
                             </Button>
@@ -437,7 +437,7 @@ export function DocumentViewer({
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center p-8 bg-gray-800 rounded-lg max-w-md mx-auto">
+                            <div className="text-center p-8 bg-gray-900 rounded-lg max-w-md mx-auto">
                                 <File className="h-16 w-16 mx-auto text-gray-400 mb-4" />
                                 <h4 className="text-lg font-semibold text-white mb-2">Unsupported File Type</h4>
                                 <p className="text-gray-300 mb-6">

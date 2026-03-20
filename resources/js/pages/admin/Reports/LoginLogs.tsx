@@ -452,27 +452,7 @@ export default function LoginLogs() {
         return params;
     };
 
-    // Debounced search function
-    const debouncedSearch = useMemo(
-        () => debounce(() => {
-            const params = buildFilterParams();
-            router.get('/admin/reports/login-logs', params, { // CHANGED HERE
-                preserveScroll: true,
-                preserveState: true,
-                onStart: () => setIsLoading(true),
-                onFinish: () => setIsLoading(false),
-            });
-        }, 500),
-        [search, status, browser, deviceType, userId, dateFrom, dateTo, perPage]
-    );
-
-    // Update search with debounce
-    useEffect(() => {
-        if (search !== undefined) {
-            debouncedSearch();
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch]);
+   
 
     // Handle filter changes
     const handleStatusChange = (value: string) => {
@@ -677,7 +657,7 @@ export default function LoginLogs() {
                     </div>
                     
                     <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg p-1">
+                        <div className="flex items-center gap-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg p-1">
                             <button
                                 onClick={() => setViewMode('list')}
                                 className={`px-3 py-1 rounded text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
@@ -694,7 +674,7 @@ export default function LoginLogs() {
                         
                         <button
                             onClick={() => setShowFilters(!showFilters)}
-                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900"
                         >
                             <Filter className="h-4 w-4" />
                             {showFilters ? 'Hide Filters' : 'Show Filters'}
@@ -703,7 +683,7 @@ export default function LoginLogs() {
                         <button
                             onClick={handleRefresh}
                             disabled={isLoading}
-                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900 disabled:opacity-50"
                         >
                             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                             Refresh
@@ -722,7 +702,7 @@ export default function LoginLogs() {
 
                 {/* Stats Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Logins</p>
@@ -740,7 +720,7 @@ export default function LoginLogs() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Successful</p>
@@ -758,7 +738,7 @@ export default function LoginLogs() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Sessions</p>
@@ -776,7 +756,7 @@ export default function LoginLogs() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Today's Logins</p>
@@ -796,7 +776,7 @@ export default function LoginLogs() {
                 </div>
 
                 {/* Status Tabs */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div className="px-6 pt-6">
                         <div className="flex items-center gap-2 mb-4">
                             <FolderTree className="h-5 w-5 text-gray-500" />
@@ -836,7 +816,7 @@ export default function LoginLogs() {
                                         placeholder={`Search login activities, users, IP addresses...`}
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                     />
                                     {search && (
                                         <button
@@ -863,7 +843,7 @@ export default function LoginLogs() {
                                             <select
                                                 value={status}
                                                 onChange={(e) => handleStatusChange(e.target.value)}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                             >
                                                 <option value="">All Status</option>
                                                 <option value="success">Successful</option>
@@ -880,7 +860,7 @@ export default function LoginLogs() {
                                         <select
                                             value={browser}
                                             onChange={(e) => handleBrowserChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         >
                                             <option value="">All Browsers</option>
                                             {browsers?.map((browser) => (
@@ -899,7 +879,7 @@ export default function LoginLogs() {
                                         <select
                                             value={deviceType}
                                             onChange={(e) => handleDeviceTypeChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         >
                                             <option value="">All Devices</option>
                                             {devices?.map((device) => (
@@ -918,7 +898,7 @@ export default function LoginLogs() {
                                         <select
                                             value={userId}
                                             onChange={(e) => handleUserIdChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         >
                                             <option value="">All Users</option>
                                             {users?.map((user) => (
@@ -937,7 +917,7 @@ export default function LoginLogs() {
                                         <select
                                             value={perPage.toString()}
                                             onChange={(e) => handlePerPageChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         >
                                             <option value="10">10 per page</option>
                                             <option value="25">25 per page</option>
@@ -957,7 +937,7 @@ export default function LoginLogs() {
                                             type="date"
                                             value={dateFrom}
                                             onChange={(e) => handleDateFromChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         />
                                     </div>
                                     <div>
@@ -968,7 +948,7 @@ export default function LoginLogs() {
                                             type="date"
                                             value={dateTo}
                                             onChange={(e) => handleDateToChange(e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                         />
                                     </div>
                                 </div>
@@ -1060,7 +1040,7 @@ export default function LoginLogs() {
 
                         {/* Login Logs Table/Grid */}
                         {viewMode === 'list' ? (
-                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                                 {isLoading ? (
                                     <div className="h-64 flex items-center justify-center">
                                         <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
@@ -1274,7 +1254,7 @@ export default function LoginLogs() {
                                                                             User Information
                                                                         </h4>
                                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                                            <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
+                                                                            <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded">
                                                                                 <UserIcon className="h-4 w-4 text-gray-500" />
                                                                                 <div>
                                                                                     <div className="text-xs text-gray-500">Name</div>
@@ -1283,7 +1263,7 @@ export default function LoginLogs() {
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                            <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
+                                                                            <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded">
                                                                                 <Globe className="h-4 w-4 text-gray-500" />
                                                                                 <div>
                                                                                     <div className="text-xs text-gray-500">Email</div>
@@ -1293,7 +1273,7 @@ export default function LoginLogs() {
                                                                                 </div>
                                                                             </div>
                                                                             {log.user.username && (
-                                                                                <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
+                                                                                <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded">
                                                                                     <UserIcon className="h-4 w-4 text-gray-500" />
                                                                                     <div>
                                                                                         <div className="text-xs text-gray-500">Username</div>
@@ -1319,7 +1299,7 @@ export default function LoginLogs() {
                                                                     )}
                                                                     <Link
                                                                         href={`/admin/reports/login-logs/${log.id}`} // CHANGED HERE
-                                                                        className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+                                                                        className="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-gray-600 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 rounded"
                                                                     >
                                                                         <Eye className="h-3 w-3" />
                                                                         View Full Details
@@ -1380,7 +1360,7 @@ export default function LoginLogs() {
                                                             link.active
                                                                 ? 'bg-primary-600 text-white'
                                                                 : link.url
-                                                                ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                                                ? 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                                                                 : 'bg-gray-50 dark:bg-gray-900 text-gray-400 dark:text-gray-600 cursor-not-allowed'
                                                         }`}
                                                         dangerouslySetInnerHTML={{ __html: link.label }}
@@ -1397,7 +1377,7 @@ export default function LoginLogs() {
                                 {logs.data.map((log) => (
                                     <div 
                                         key={log.id} 
-                                        className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow"
+                                        className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow"
                                     >
                                         <div className="flex items-start gap-3">
                                             <div className={`p-2 rounded-lg ${getStatusClass(log.is_successful)}`}>
@@ -1506,7 +1486,7 @@ export default function LoginLogs() {
                     {/* Sidebar with Analytics */}
                     <div className="space-y-6">
                         {/* Recent Logins */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
                                     <Clock className="h-5 w-5 text-primary-600 dark:text-primary-400" />
@@ -1560,7 +1540,7 @@ export default function LoginLogs() {
                         </div>
 
                         {/* Browser Distribution */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                     <Globe className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -1607,7 +1587,7 @@ export default function LoginLogs() {
                         </div>
 
                         {/* Device Distribution */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
                                     <Computer className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -1644,7 +1624,7 @@ export default function LoginLogs() {
                         </div>
 
                         {/* Top Active Users */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                                     <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />

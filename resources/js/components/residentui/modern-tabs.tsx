@@ -14,7 +14,7 @@ interface ModernTabsProps {
 export function ModernTabs({ tabs, activeTab, onTabChange, getTabCount, className }: ModernTabsProps) {
     return (
         <div className={cn(
-            "flex items-center gap-1 overflow-x-auto scrollbar-hide p-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700",
+            "flex items-center gap-1 overflow-x-auto scrollbar-hide p-1 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700",
             className
         )}>
             {tabs.map((tab) => {
@@ -30,7 +30,7 @@ export function ModernTabs({ tabs, activeTab, onTabChange, getTabCount, classNam
                             "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 whitespace-nowrap flex-1",
                             isActive 
                                 ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg" 
-                                : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900"
                         )}
                     >
                         <Icon className={cn(
@@ -46,7 +46,7 @@ export function ModernTabs({ tabs, activeTab, onTabChange, getTabCount, classNam
                                     "ml-auto px-1.5 py-0.5 text-[10px] font-medium",
                                     isActive 
                                         ? "bg-white/20 text-white border-0" 
-                                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-0"
+                                        : "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-0"
                                 )}
                             >
                                 {count}

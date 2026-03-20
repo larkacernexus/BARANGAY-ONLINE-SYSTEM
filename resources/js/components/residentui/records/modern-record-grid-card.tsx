@@ -49,7 +49,7 @@ export const ModernRecordGridCard = ({
                 <div className="flex items-center gap-3 flex-1">
                     <div className={cn(
                         "p-2 rounded-full flex-shrink-0",
-                        category?.color ? BG_COLOR_MAP[category.color] : 'bg-gray-100 dark:bg-gray-800'
+                        category?.color ? BG_COLOR_MAP[category.color] : 'bg-gray-100 dark:bg-gray-900'
                     )}>
                         <DocIconComponent className={cn("h-5 w-5", categoryColor)} />
                     </div>

@@ -1,4 +1,5 @@
-// app/pages/admin/document-types/create.tsx
+// pages/admin/document-types/create.tsx
+
 import { router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -38,7 +39,8 @@ import {
     Folder,
     HelpCircle,
     Copy,
-    Sparkles
+    Sparkles,
+    Hash
 } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { Badge } from '@/components/ui/badge';
@@ -305,28 +307,29 @@ export default function DocumentTypeCreate() {
         <AppLayout
             title="Create Document Type"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Document Types', href: '/document-types' },
-                { title: 'Create', href: '/document-types/create' }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Document Types', href: '/admin/document-types' },
+                { title: 'Create', href: '/admin/document-types/create' }
             ]}
         >
             <TooltipProvider>
                 <div className="space-y-6">
                     {/* Header */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-2">
                             <Button
-                                variant="ghost"
-                                size="icon"
+                                variant="outline"
+                                size="sm"
                                 onClick={handleCancel}
                                 type="button"
-                                className="h-8 w-8"
+                                className="dark:border-gray-600 dark:text-gray-300"
                             >
-                                <ArrowLeft className="h-4 w-4" />
+                                <ArrowLeft className="h-4 w-4 mr-2" />
+                                Back
                             </Button>
                             <div>
-                                <h1 className="text-2xl font-bold tracking-tight">Create Document Type</h1>
-                                <p className="text-sm text-muted-foreground">
+                                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">Create Document Type</h1>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
                                     Add a new document type to the system
                                 </p>
                             </div>
@@ -339,6 +342,7 @@ export default function DocumentTypeCreate() {
                                 onClick={handleCancel}
                                 disabled={isSubmitting}
                                 type="button"
+                                className="dark:border-gray-600 dark:text-gray-300"
                             >
                                 <X className="h-4 w-4 mr-2" />
                                 Cancel
@@ -347,7 +351,7 @@ export default function DocumentTypeCreate() {
                                 onClick={handleSubmit}
                                 size="sm"
                                 disabled={isSubmitting}
-                                className="gap-2"
+                                className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700"
                                 type="button"
                             >
                                 {isSubmitting ? (
@@ -364,43 +368,70 @@ export default function DocumentTypeCreate() {
 
                     {/* Template Selection */}
                     {commonTypes.length > 0 && (
-                        <Alert>
-                            <Sparkles className="h-4 w-4" />
-                            <AlertTitle>Quick start with templates</AlertTitle>
-                            <AlertDescription>
-                                Choose from common document type templates to get started quickly.
-                            </AlertDescription>
-                            <div className="flex flex-wrap gap-2 mt-4">
-                                {commonTypes.map((type) => (
-                                    <Button
-                                        key={type.code}
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => loadCommonType(type.code)}
-                                        className="gap-2"
-                                        type="button"
-                                    >
-                                        <Copy className="h-3 w-3" />
-                                        {type.name}
-                                    </Button>
-                                ))}
-                            </div>
-                        </Alert>
+                        <Card className="border-l-4 border-l-blue-500 dark:bg-gray-900">
+                            <CardContent className="p-4">
+                                <div className="flex items-start gap-3">
+                                    <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                                    <div className="flex-1">
+                                        <h3 className="font-medium text-blue-800 dark:text-blue-300">Quick start with templates</h3>
+                                        <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                                            Choose from common document type templates to get started quickly.
+                                        </p>
+                                        <div className="flex flex-wrap gap-2 mt-3">
+                                            {commonTypes.map((type) => (
+                                                <Button
+                                                    key={type.code}
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => loadCommonType(type.code)}
+                                                    className="gap-2 dark:border-gray-600 dark:text-gray-300"
+                                                    type="button"
+                                                >
+                                                    <Copy className="h-3 w-3" />
+                                                    {type.name}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     )}
 
-                    {/* Main Form - REMOVED the form tag entirely */}
+                    {/* Error Alert */}
+                    {Object.keys(errors).length > 0 && (
+                        <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
+                            <CardContent className="p-4">
+                                <div className="flex items-start gap-3">
+                                    <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
+                                    <div>
+                                        <p className="font-medium text-red-800 dark:text-red-300">Please fix the following errors:</p>
+                                        <ul className="list-disc list-inside mt-2 space-y-1">
+                                            {Object.entries(errors).map(([field, message]) => (
+                                                <li key={field} className="text-sm text-red-600 dark:text-red-400">
+                                                    <span className="font-medium capitalize">{field.replace('_', ' ')}:</span> {message}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Main Form */}
                     <div className="space-y-4">
                         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                            <TabsList className="grid w-full grid-cols-3 lg:w-auto">
-                                <TabsTrigger value="basic" className="gap-2">
+                            <TabsList className="grid w-full grid-cols-3 lg:w-auto ">
+                                <TabsTrigger value="basic" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white ">
                                     <FileText className="h-4 w-4" />
                                     <span className="hidden sm:inline">Basic Information</span>
                                 </TabsTrigger>
-                                <TabsTrigger value="specs" className="gap-2">
+                                <TabsTrigger value="specs" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white">
                                     <HardDrive className="h-4 w-4" />
                                     <span className="hidden sm:inline">File Specifications</span>
                                 </TabsTrigger>
-                                <TabsTrigger value="settings" className="gap-2">
+                                <TabsTrigger value="settings" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white ">
                                     <ListOrdered className="h-4 w-4" />
                                     <span className="hidden sm:inline">Settings</span>
                                 </TabsTrigger>
@@ -408,10 +439,10 @@ export default function DocumentTypeCreate() {
 
                             {/* Basic Information Tab */}
                             <TabsContent value="basic" className="space-y-4">
-                                <Card>
+                                <Card className="dark:bg-gray-900">
                                     <CardHeader>
-                                        <CardTitle>Basic Information</CardTitle>
-                                        <CardDescription>
+                                        <CardTitle className="dark:text-gray-100">Basic Information</CardTitle>
+                                        <CardDescription className="dark:text-gray-400">
                                             Enter the basic details for this document type
                                         </CardDescription>
                                     </CardHeader>
@@ -419,27 +450,30 @@ export default function DocumentTypeCreate() {
                                         {/* Code and Name */}
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label htmlFor="code" className="flex items-center gap-1">
+                                                <Label htmlFor="code" className="flex items-center gap-1 dark:text-gray-300">
                                                     Code
                                                     <Tooltip>
                                                         <TooltipTrigger type="button">
-                                                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                                            <HelpCircle className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                         </TooltipTrigger>
-                                                        <TooltipContent>
+                                                        <TooltipContent className="dark:bg-gray-900 dark:text-gray-300">
                                                             <p>Unique identifier (uppercase letters, numbers, underscores)</p>
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </Label>
                                                 <div className="flex gap-2">
-                                                    <Input
-                                                        id="code"
-                                                        name="code"
-                                                        value={formData.code}
-                                                        onChange={handleInputChange}
-                                                        placeholder="e.g., BARANGAY_CLEARANCE"
-                                                        className={errors.code ? 'border-destructive' : ''}
-                                                        disabled={isSubmitting}
-                                                    />
+                                                    <div className="relative flex-1">
+                                                        <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                                        <Input
+                                                            id="code"
+                                                            name="code"
+                                                            value={formData.code}
+                                                            onChange={handleInputChange}
+                                                            placeholder="e.g., BARANGAY_CLEARANCE"
+                                                            className={`pl-10 ${errors.code ? 'border-destructive' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300`}
+                                                            disabled={isSubmitting}
+                                                        />
+                                                    </div>
                                                     <Button
                                                         type="button"
                                                         variant="outline"
@@ -447,35 +481,36 @@ export default function DocumentTypeCreate() {
                                                         onClick={generateCode}
                                                         disabled={!formData.name || isSubmitting}
                                                         title="Generate from name"
+                                                        className="dark:border-gray-600 dark:text-gray-300"
                                                     >
                                                         <Sparkles className="h-4 w-4" />
                                                     </Button>
                                                 </div>
                                                 {errors.code && (
-                                                    <p className="text-sm text-destructive">{errors.code}</p>
+                                                    <p className="text-sm text-red-600 dark:text-red-400">{errors.code}</p>
                                                 )}
                                             </div>
 
                                             <div className="space-y-2">
-                                                <Label htmlFor="name">Name</Label>
+                                                <Label htmlFor="name" className="dark:text-gray-300">Name</Label>
                                                 <Input
                                                     id="name"
                                                     name="name"
                                                     value={formData.name}
                                                     onChange={handleInputChange}
                                                     placeholder="e.g., Barangay Clearance"
-                                                    className={errors.name ? 'border-destructive' : ''}
+                                                    className={`${errors.name ? 'border-destructive' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300`}
                                                     disabled={isSubmitting}
                                                 />
                                                 {errors.name && (
-                                                    <p className="text-sm text-destructive">{errors.name}</p>
+                                                    <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                                                 )}
                                             </div>
                                         </div>
 
                                         {/* Description */}
                                         <div className="space-y-2">
-                                            <Label htmlFor="description">Description</Label>
+                                            <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
                                             <Textarea
                                                 id="description"
                                                 name="description"
@@ -483,24 +518,25 @@ export default function DocumentTypeCreate() {
                                                 onChange={handleInputChange}
                                                 placeholder="Enter a description for this document type"
                                                 rows={4}
+                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                                 disabled={isSubmitting}
                                             />
                                         </div>
 
                                         {/* Category */}
                                         <div className="space-y-2">
-                                            <Label htmlFor="category">Category</Label>
+                                            <Label htmlFor="category" className="dark:text-gray-300">Category</Label>
                                             <Select
                                                 value={formData.document_category_id}
                                                 onValueChange={(value) => handleSelectChange('document_category_id', value)}
                                                 disabled={isSubmitting}
                                             >
-                                                <SelectTrigger className={errors.document_category_id ? 'border-destructive' : ''}>
+                                                <SelectTrigger className={`${errors.document_category_id ? 'border-destructive' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300`}>
                                                     <SelectValue placeholder="Select a category" />
                                                 </SelectTrigger>
-                                                <SelectContent>
+                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                     {categories.map((category) => (
-                                                        <SelectItem key={category.id} value={category.id.toString()}>
+                                                        <SelectItem key={category.id} value={category.id.toString()} className="dark:text-gray-300 dark:focus:bg-gray-700">
                                                             <div className="flex items-center gap-2">
                                                                 <Folder className="h-4 w-4" />
                                                                 {category.name}
@@ -510,7 +546,7 @@ export default function DocumentTypeCreate() {
                                                 </SelectContent>
                                             </Select>
                                             {errors.document_category_id && (
-                                                <p className="text-sm text-destructive">{errors.document_category_id}</p>
+                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.document_category_id}</p>
                                             )}
                                         </div>
                                     </CardContent>
@@ -519,10 +555,10 @@ export default function DocumentTypeCreate() {
 
                             {/* File Specifications Tab */}
                             <TabsContent value="specs" className="space-y-4">
-                                <Card>
+                                <Card className="dark:bg-gray-900">
                                     <CardHeader>
-                                        <CardTitle>File Specifications</CardTitle>
-                                        <CardDescription>
+                                        <CardTitle className="dark:text-gray-100">File Specifications</CardTitle>
+                                        <CardDescription className="dark:text-gray-400">
                                             Configure accepted file formats and size limits
                                         </CardDescription>
                                     </CardHeader>
@@ -530,13 +566,14 @@ export default function DocumentTypeCreate() {
                                         {/* Accepted Formats */}
                                         <div className="space-y-4">
                                             <div className="flex items-center justify-between">
-                                                <Label>Accepted File Formats</Label>
+                                                <Label className="dark:text-gray-300">Accepted File Formats</Label>
                                                 <Button
                                                     type="button"
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() => setShowCustomFormatInput(true)}
                                                     disabled={showCustomFormatInput || isSubmitting}
+                                                    className="dark:border-gray-600 dark:text-gray-300"
                                                 >
                                                     <Plus className="h-4 w-4 mr-2" />
                                                     Add Custom Format
@@ -553,7 +590,11 @@ export default function DocumentTypeCreate() {
                                                         size="sm"
                                                         onClick={() => toggleFormat(format)}
                                                         disabled={isSubmitting}
-                                                        className="justify-start"
+                                                        className={`justify-start ${
+                                                            selectedFormats.includes(format)
+                                                                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white dark:from-blue-700 dark:to-indigo-700'
+                                                                : 'dark:border-gray-600 dark:text-gray-300'
+                                                        }`}
                                                     >
                                                         <FileCode className="h-4 w-4 mr-2" />
                                                         {label}
@@ -571,7 +612,7 @@ export default function DocumentTypeCreate() {
                                                         value={customFormat}
                                                         onChange={(e) => setCustomFormat(e.target.value)}
                                                         placeholder="Enter format (e.g., psd, ai)"
-                                                        className="flex-1"
+                                                        className="flex-1 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                                         disabled={isSubmitting}
                                                     />
                                                     <Button
@@ -580,6 +621,7 @@ export default function DocumentTypeCreate() {
                                                         size="sm"
                                                         onClick={addCustomFormat}
                                                         disabled={!customFormat.trim() || isSubmitting}
+                                                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700"
                                                     >
                                                         Add
                                                     </Button>
@@ -592,6 +634,7 @@ export default function DocumentTypeCreate() {
                                                             setCustomFormat('');
                                                         }}
                                                         disabled={isSubmitting}
+                                                        className="dark:text-gray-400 dark:hover:text-white"
                                                     >
                                                         <X className="h-4 w-4" />
                                                     </Button>
@@ -601,15 +644,15 @@ export default function DocumentTypeCreate() {
                                             {/* Selected Formats */}
                                             {selectedFormats.length > 0 && (
                                                 <div className="space-y-2">
-                                                    <Label>Selected Formats</Label>
+                                                    <Label className="dark:text-gray-300">Selected Formats</Label>
                                                     <div className="flex flex-wrap gap-2">
                                                         {selectedFormats.map((format) => (
-                                                            <Badge key={format} variant="secondary" className="gap-1">
+                                                            <Badge key={format} variant="secondary" className="gap-1 dark:bg-gray-700 dark:text-gray-300">
                                                                 {format.toUpperCase()}
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => removeFormat(format)}
-                                                                    className="ml-1 hover:text-destructive"
+                                                                    className="ml-1 hover:text-red-600 dark:hover:text-red-400"
                                                                     disabled={isSubmitting}
                                                                 >
                                                                     <X className="h-3 w-3" />
@@ -621,11 +664,11 @@ export default function DocumentTypeCreate() {
                                             )}
                                         </div>
 
-                                        <Separator />
+                                        <Separator className="dark:bg-gray-700" />
 
                                         {/* Max File Size */}
                                         <div className="space-y-4">
-                                            <Label>Maximum File Size</Label>
+                                            <Label className="dark:text-gray-300">Maximum File Size</Label>
                                             <div className="flex gap-2">
                                                 <div className="flex-1">
                                                     <Input
@@ -634,7 +677,7 @@ export default function DocumentTypeCreate() {
                                                         max={fileSizeUnit === 'MB' ? '10' : '10240'}
                                                         value={fileSizeValue}
                                                         onChange={(e) => handleFileSizeChange(parseInt(e.target.value) || 0)}
-                                                        className={errors.max_file_size ? 'border-destructive' : ''}
+                                                        className={`${errors.max_file_size ? 'border-destructive' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300`}
                                                         disabled={isSubmitting}
                                                     />
                                                 </div>
@@ -643,19 +686,19 @@ export default function DocumentTypeCreate() {
                                                     onValueChange={(value: 'KB' | 'MB') => setFileSizeUnit(value)}
                                                     disabled={isSubmitting}
                                                 >
-                                                    <SelectTrigger className="w-24">
+                                                    <SelectTrigger className="w-24 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                                         <SelectValue />
                                                     </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="KB">KB</SelectItem>
-                                                        <SelectItem value="MB">MB</SelectItem>
+                                                    <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                        <SelectItem value="KB" className="dark:text-gray-300 dark:focus:bg-gray-700">KB</SelectItem>
+                                                        <SelectItem value="MB" className="dark:text-gray-300 dark:focus:bg-gray-700">MB</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
                                             {errors.max_file_size && (
-                                                <p className="text-sm text-destructive">{errors.max_file_size}</p>
+                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.max_file_size}</p>
                                             )}
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">
                                                 Maximum file size: 10MB (10240 KB)
                                             </p>
                                         </div>
@@ -665,17 +708,17 @@ export default function DocumentTypeCreate() {
 
                             {/* Settings Tab */}
                             <TabsContent value="settings" className="space-y-4">
-                                <Card>
+                                <Card className="dark:bg-gray-900">
                                     <CardHeader>
-                                        <CardTitle>Document Type Settings</CardTitle>
-                                        <CardDescription>
+                                        <CardTitle className="dark:text-gray-100">Document Type Settings</CardTitle>
+                                        <CardDescription className="dark:text-gray-400">
                                             Configure behavior and display settings
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent className="space-y-6">
                                         {/* Sort Order */}
                                         <div className="space-y-2">
-                                            <Label htmlFor="sort_order">Sort Order</Label>
+                                            <Label htmlFor="sort_order" className="dark:text-gray-300">Sort Order</Label>
                                             <Input
                                                 id="sort_order"
                                                 name="sort_order"
@@ -683,25 +726,25 @@ export default function DocumentTypeCreate() {
                                                 min="0"
                                                 value={formData.sort_order}
                                                 onChange={handleInputChange}
-                                                className={errors.sort_order ? 'border-destructive' : ''}
+                                                className={`${errors.sort_order ? 'border-destructive' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300`}
                                                 disabled={isSubmitting}
                                             />
                                             {errors.sort_order && (
-                                                <p className="text-sm text-destructive">{errors.sort_order}</p>
+                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.sort_order}</p>
                                             )}
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">
                                                 Lower numbers appear first in lists
                                             </p>
                                         </div>
 
-                                        <Separator />
+                                        <Separator className="dark:bg-gray-700" />
 
                                         {/* Toggle Switches */}
                                         <div className="space-y-4">
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                                 <div className="space-y-0.5">
-                                                    <Label>Required Document</Label>
-                                                    <p className="text-sm text-muted-foreground">
+                                                    <Label className="dark:text-gray-300">Required Document</Label>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
                                                         Mark this document as required for all clearance types
                                                     </p>
                                                 </div>
@@ -709,13 +752,14 @@ export default function DocumentTypeCreate() {
                                                     checked={formData.is_required}
                                                     onCheckedChange={(checked) => handleSwitchChange('is_required', checked)}
                                                     disabled={isSubmitting}
+                                                    className="dark:data-[state=checked]:bg-green-600"
                                                 />
                                             </div>
 
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                                 <div className="space-y-0.5">
-                                                    <Label>Active Status</Label>
-                                                    <p className="text-sm text-muted-foreground">
+                                                    <Label className="dark:text-gray-300">Active Status</Label>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
                                                         Enable this document type for use
                                                     </p>
                                                 </div>
@@ -723,6 +767,7 @@ export default function DocumentTypeCreate() {
                                                     checked={formData.is_active}
                                                     onCheckedChange={(checked) => handleSwitchChange('is_active', checked)}
                                                     disabled={isSubmitting}
+                                                    className="dark:data-[state=checked]:bg-green-600"
                                                 />
                                             </div>
                                         </div>
@@ -730,21 +775,21 @@ export default function DocumentTypeCreate() {
                                 </Card>
 
                                 {/* Help Card */}
-                                <Card>
+                                <Card className="dark:bg-gray-900">
                                     <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
+                                        <CardTitle className="flex items-center gap-2 dark:text-gray-100">
                                             <HelpCircle className="h-4 w-4" />
                                             Need help?
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="space-y-2 text-sm">
-                                            <p><strong>Code:</strong> Unique identifier used in the system. Use uppercase letters, numbers, and underscores.</p>
-                                            <p><strong>Name:</strong> Display name for the document type.</p>
-                                            <p><strong>Category:</strong> Group this document type under a category.</p>
-                                            <p><strong>Accepted Formats:</strong> Select which file formats are allowed for upload.</p>
-                                            <p><strong>Max File Size:</strong> Maximum file size allowed for upload.</p>
-                                            <p><strong>Sort Order:</strong> Controls the display order in lists.</p>
+                                        <div className="space-y-2 text-sm dark:text-gray-400">
+                                            <p><strong className="dark:text-gray-300">Code:</strong> Unique identifier used in the system. Use uppercase letters, numbers, and underscores.</p>
+                                            <p><strong className="dark:text-gray-300">Name:</strong> Display name for the document type.</p>
+                                            <p><strong className="dark:text-gray-300">Category:</strong> Group this document type under a category.</p>
+                                            <p><strong className="dark:text-gray-300">Accepted Formats:</strong> Select which file formats are allowed for upload.</p>
+                                            <p><strong className="dark:text-gray-300">Max File Size:</strong> Maximum file size allowed for upload.</p>
+                                            <p><strong className="dark:text-gray-300">Sort Order:</strong> Controls the display order in lists.</p>
                                         </div>
                                     </CardContent>
                                 </Card>

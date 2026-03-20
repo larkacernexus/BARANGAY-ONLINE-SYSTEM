@@ -231,7 +231,7 @@ function ThreeDotsMenu({
             {open && (
                 <div 
                     ref={menuRef}
-                    className={`fixed md:absolute z-[9999] w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 ${getMenuPositionClasses()}`}
+                    className={`fixed md:absolute z-[9999] w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 ${getMenuPositionClasses()}`}
                     role="menu"
                     aria-orientation="vertical"
                     style={{
@@ -256,7 +256,7 @@ function ThreeDotsMenu({
                                 ? 'opacity-50 cursor-not-allowed text-gray-400 dark:text-gray-500' 
                                 : item.destructive
                                     ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                         }`;
 
                         if ('href' in item) {
@@ -328,12 +328,12 @@ export default function RolesGridView({
         if (isSystemRole) {
             return {
                 text: 'System',
-                className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+                className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
             };
         }
         return {
             text: 'Custom',
-            className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+            className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
         };
     };
 
@@ -369,7 +369,7 @@ export default function RolesGridView({
             description={hasActiveFilters 
                 ? 'Try changing your filters or search criteria.'
                 : 'Get started by creating a role.'}
-            icon={<Shield className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
+            icon={<Shield className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
             hasFilters={hasActiveFilters}
             onClearFilters={onClearFilters}
             onCreateNew={() => window.location.href = '/admin/roles/create'}
@@ -395,8 +395,10 @@ export default function RolesGridView({
                 return (
                     <Card 
                         key={role.id}
-                        className={`transition-all hover:shadow-md relative group ${
-                            isSelected ? 'border-blue-500 border-2 bg-blue-50 dark:bg-blue-900/10' : ''
+                        className={`transition-all hover:shadow-md relative group bg-white dark:bg-gray-950 border ${
+                            isSelected 
+                                ? 'border-blue-500 border-2 bg-blue-50 dark:bg-blue-900/20' 
+                                : 'border-gray-200 dark:border-gray-700'
                         }`}
                         role="article"
                         aria-label={`Role: ${role.name}`}
@@ -421,8 +423,8 @@ export default function RolesGridView({
                                 <div className="flex items-center gap-2">
                                     <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                                         role.is_system_role 
-                                            ? 'bg-purple-100 dark:bg-purple-900' 
-                                            : 'bg-green-100 dark:bg-green-900'
+                                            ? 'bg-purple-100 dark:bg-purple-900/30' 
+                                            : 'bg-green-100 dark:bg-green-900/30'
                                     }`}>
                                         <Shield className={`h-5 w-5 ${
                                             role.is_system_role 
@@ -431,7 +433,7 @@ export default function RolesGridView({
                                         }`} />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-medium truncate" title={role.name}>
+                                        <div className="font-medium text-gray-900 dark:text-gray-100 truncate" title={role.name}>
                                             {truncateText(role.name, nameLength)}
                                         </div>
                                         <div 
@@ -450,7 +452,7 @@ export default function RolesGridView({
                                             onCheckedChange={() => onItemSelect(role.id)}
                                             onClick={(e) => e.stopPropagation()}
                                             onKeyDown={(e) => e.stopPropagation()}
-                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-gray-300 dark:border-gray-600"
                                             aria-label={`Select role ${role.name}`}
                                         />
                                     )}

@@ -1,3 +1,4 @@
+// resources/js/pages/admin/puroks/index.tsx
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
@@ -16,26 +17,40 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Import AdminUI components
 import PuroksHeader from '@/components/admin/puroks/PuroksHeader';
+import PuroksStats from '@/components/admin/puroks/PuroksStats';
 import PuroksFilters from '@/components/admin/puroks/PuroksFilters';
 import PuroksContent from '@/components/admin/puroks/PuroksContent';
 import PuroksDialogs from '@/components/admin/puroks/PuroksDialogs';
 import { Button } from '@/components/ui/button';
 import { KeyRound } from 'lucide-react';
 
-
+interface PaginationData {
+    data: Purok[];
+    total: number;
+    per_page: number;
+    current_page: number;
+    last_page: number;
+    from: number;
+    to: number;
+}
 
 interface PuroksPageProps {
     puroks: PaginationData;
     filters: PurokFilters;
-    stats: PurokStats[];
+    stats: {
+        total: number;
+        active: number;
+        totalHouseholds: number;
+        totalResidents: number;
+    };
 }
 
-const defaultStats: PurokStats[] = [
-    { label: 'Total Puroks', value: '0' },
-    { label: 'Active Puroks', value: '0' },
-    { label: 'Total Households', value: '0' },
-    { label: 'Total Residents', value: '0' }
-];
+const defaultStats = {
+    total: 0,
+    active: 0,
+    totalHouseholds: 0,
+    totalResidents: 0
+};
 
 export default function PuroksIndex({ 
     puroks, 
@@ -105,38 +120,7 @@ export default function PuroksIndex({
         }
     }, [flash]);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/admin/puroks', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== filters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, filters.search]);
+    
 
     // Filter puroks
     const filteredPuroks = useMemo(() => {
@@ -146,6 +130,16 @@ export default function PuroksIndex({
             filters: filtersState
         });
     }, [puroks.data, search, filtersState]);
+
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        return {
+            total: filteredPuroks.length,
+            active: filteredPuroks.filter(p => p.status === 'active').length,
+            totalHouseholds: filteredPuroks.reduce((sum, p) => sum + (p.total_households || 0), 0),
+            totalResidents: filteredPuroks.reduce((sum, p) => sum + (p.total_residents || 0), 0)
+        };
+    }, [filteredPuroks]);
 
     // Pagination
     const totalItems = filteredPuroks.length;
@@ -238,8 +232,8 @@ export default function PuroksIndex({
 
     const handleSelectAll = () => {
         if (confirm(`This will select ALL ${puroks.total || 0} puroks. This action may take a moment.`)) {
-            const pageIds = paginatedPuroks.map(purok => purok.id);
-            setSelectedPuroks(pageIds);
+            const allIds = puroks.data.map(p => p.id);
+            setSelectedPuroks(allIds);
             setSelectionMode('all');
         }
     };
@@ -283,46 +277,11 @@ export default function PuroksIndex({
         try {
             switch (operation) {
                 case 'delete':
-                    if (confirm(`Are you sure you want to delete ${selectedPuroks.length} selected purok(s)?`)) {
-                        await router.post('/admin/puroks/bulk-action', {
-                            action: 'delete',
-                            purok_ids: selectedPuroks,
-                        }, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                setSelectedPuroks([]);
-                                setShowBulkDeleteDialog(false);
-                                toast.success('Puroks deleted successfully');
-                            },
-                            onError: () => {
-                                toast.error('Failed to delete puroks');
-                            }
-                        });
-                    }
+                    setShowBulkDeleteDialog(true);
                     break;
 
                 case 'update_status':
-                    if (!bulkEditValue) {
-                        toast.error('Please select a status');
-                        return;
-                    }
-                    
-                    await router.post('/admin/puroks/bulk-action', {
-                        action: 'update_status',
-                        purok_ids: selectedPuroks,
-                        status: bulkEditValue
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setSelectedPuroks([]);
-                            setBulkEditValue('');
-                            setShowBulkStatusDialog(false);
-                            toast.success('Purok status updated successfully');
-                        },
-                        onError: () => {
-                            toast.error('Failed to update purok status');
-                        }
-                    });
+                    setShowBulkStatusDialog(true);
                     break;
 
                 case 'export':
@@ -364,7 +323,8 @@ export default function PuroksIndex({
                     document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
                     
-                    toast.success('Export completed successfully');
+                    toast.success(`${selectedPuroks.length} puroks exported successfully`);
+                    setSelectedPuroks([]);
                     break;
 
                 case 'print':
@@ -373,6 +333,7 @@ export default function PuroksIndex({
                         window.open(`/admin/puroks/${id}/print`, '_blank');
                     });
                     toast.success(`${selectedPuroks.length} purok(s) opened for printing`);
+                    setSelectedPuroks([]);
                     break;
 
                 case 'generate_report':
@@ -380,6 +341,7 @@ export default function PuroksIndex({
                     const idsParam = selectedPuroks.join(',');
                     window.open(`/admin/puroks/report?ids=${idsParam}`, '_blank');
                     toast.success(`Generating report for ${selectedPuroks.length} purok(s)`);
+                    setSelectedPuroks([]);
                     break;
 
                 case 'send_message':
@@ -396,34 +358,11 @@ export default function PuroksIndex({
                     } else {
                         toast.error('No contact numbers available for selected purok leaders');
                     }
+                    setSelectedPuroks([]);
                     break;
 
                 case 'copy_data':
-                    // Copy selected data to clipboard
-                    if (selectedPuroksData.length === 0) {
-                        toast.error('No data to copy');
-                        return;
-                    }
-                    
-                    const data = selectedPuroksData.map(purok => ({
-                        'Name': purok.name || 'N/A',
-                        'Leader': purok.leader_name || 'N/A',
-                        'Contact': purok.leader_contact || 'N/A',
-                        'Households': purok.total_households,
-                        'Residents': purok.total_residents,
-                        'Status': purok.status,
-                    }));
-                    
-                    const csvData = [
-                        Object.keys(data[0]).join(','),
-                        ...data.map(row => Object.values(row).join(','))
-                    ].join('\n');
-                    
-                    navigator.clipboard.writeText(csvData).then(() => {
-                        toast.success('Data copied to clipboard');
-                    }).catch(() => {
-                        toast.error('Failed to copy to clipboard');
-                    });
+                    handleCopySelectedData();
                     break;
 
                 default:
@@ -433,6 +372,65 @@ export default function PuroksIndex({
         } catch (error) {
             console.error('Bulk operation error:', error);
             toast.error('An error occurred during the bulk operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkStatusUpdate = async () => {
+        if (!bulkEditValue) {
+            toast.error('Please select a status');
+            return;
+        }
+        
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/puroks/bulk-action', {
+                action: 'update_status',
+                purok_ids: selectedPuroks,
+                status: bulkEditValue
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedPuroks([]);
+                    setBulkEditValue('');
+                    setShowBulkStatusDialog(false);
+                    toast.success(`${selectedPuroks.length} purok statuses updated successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to update purok status');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk status update error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/puroks/bulk-action', {
+                action: 'delete',
+                purok_ids: selectedPuroks,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedPuroks([]);
+                    setShowBulkDeleteDialog(false);
+                    toast.success(`${selectedPuroks.length} puroks deleted successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to delete puroks');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            toast.error('An error occurred during the operation.');
         } finally {
             setIsPerformingBulkAction(false);
         }
@@ -469,11 +467,34 @@ export default function PuroksIndex({
     };
 
     const handleSort = (column: string) => {
+        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
+        
         setFiltersState(prev => ({
             ...prev,
             sort_by: column as any,
-            sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc'
+            sort_order: newOrder
         }));
+        
+        // Trigger server-side sort update
+        const params = {
+            ...filtersState,
+            sort_by: column,
+            sort_order: newOrder,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/puroks', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearFilters = () => {
@@ -483,6 +504,18 @@ export default function PuroksIndex({
             sort_by: 'name',
             sort_order: 'asc'
         });
+        
+        // Trigger server-side filter clear
+        router.get('/admin/puroks', {
+            search: '',
+            status: 'all',
+            sort_by: 'name',
+            sort_order: 'asc'
+        }, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const handleClearSelection = () => {
@@ -491,17 +524,59 @@ export default function PuroksIndex({
     };
 
     const handleCopySelectedData = () => {
-        handleBulkOperation('copy_data');
+        if (selectedPuroksData.length === 0) {
+            toast.error('No data to copy');
+            return;
+        }
+        
+        const data = selectedPuroksData.map(purok => ({
+            'Name': purok.name || 'N/A',
+            'Leader': purok.leader_name || 'N/A',
+            'Contact': purok.leader_contact || 'N/A',
+            'Households': purok.total_households,
+            'Residents': purok.total_residents,
+            'Status': purok.status,
+        }));
+        
+        const csvData = [
+            Object.keys(data[0]).join(','),
+            ...data.map(row => Object.values(row).join(','))
+        ].join('\n');
+        
+        navigator.clipboard.writeText(csvData).then(() => {
+            toast.success(`${selectedPuroksData.length} records copied to clipboard`);
+        }).catch(() => {
+            toast.error('Failed to copy to clipboard');
+        });
     };
 
     const updateFilter = (key: keyof PurokFilters, value: string) => {
         setFiltersState(prev => ({ ...prev, [key]: value }));
+        
+        // Trigger server-side filter update
+        const params = {
+            ...filtersState,
+            [key]: value,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/puroks', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
     };
 
     const hasActiveFilters = 
         search || 
-        filtersState.status !== 'all' ||
-        filtersState.sort_by !== 'name';
+        filtersState.status !== 'all';
 
     return (
         <AppLayout
@@ -520,8 +595,15 @@ export default function PuroksIndex({
                         onUpdateStatistics={handleUpdateStatistics}
                     />
 
+                    {/* Separate Stats Component */}
+                    <PuroksStats 
+                        globalStats={stats}
+                        filteredStats={filteredStats}
+                        isLoading={isPerformingBulkAction}
+                    />
+
                     <PuroksFilters
-                        stats={stats}
+                        // Remove stats prop
                         search={search}
                         setSearch={setSearch}
                         filtersState={filtersState}
@@ -535,11 +617,12 @@ export default function PuroksIndex({
                         startIndex={startIndex}
                         endIndex={endIndex}
                         searchInputRef={searchInputRef}
+                        isLoading={isPerformingBulkAction}
                     />
 
                     <PuroksContent
                         puroks={paginatedPuroks}
-                        stats={stats}
+                        // Remove stats prop
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -573,7 +656,7 @@ export default function PuroksIndex({
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <KeyRound className="h-4 w-4 text-gray-500" />
@@ -606,6 +689,10 @@ export default function PuroksIndex({
                                     <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
                                     <span>Exit/clear</span>
                                 </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+F</kbd>
+                                    <span>Focus search</span>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -619,7 +706,8 @@ export default function PuroksIndex({
                 setShowBulkStatusDialog={setShowBulkStatusDialog}
                 isPerformingBulkAction={isPerformingBulkAction}
                 selectedPuroks={selectedPuroks}
-                handleBulkOperation={handleBulkOperation}
+                handleBulkOperation={handleBulkDelete}
+                handleBulkStatusUpdate={handleBulkStatusUpdate}
                 selectionStats={selectionStats}
                 bulkEditValue={bulkEditValue}
                 setBulkEditValue={setBulkEditValue}

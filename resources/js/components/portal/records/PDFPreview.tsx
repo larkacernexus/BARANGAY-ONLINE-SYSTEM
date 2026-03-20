@@ -133,7 +133,7 @@ export function PDFPreview({ file, zoomLevel }: PDFPreviewProps) {
         title={`PDF - ${file.name}`}
       >
         <div className="w-full h-full bg-gray-900 p-1">
-          <div className="border border-gray-700 rounded-lg overflow-hidden h-full bg-gray-800">
+          <div className="border border-gray-700 rounded-lg overflow-hidden h-full bg-gray-900">
             <iframe
               src={pdfUrl}
               className="w-full h-full border-0"

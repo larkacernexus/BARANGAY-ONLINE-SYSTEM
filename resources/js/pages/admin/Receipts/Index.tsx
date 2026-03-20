@@ -2,12 +2,20 @@
 
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Receipt, Search, Filter, Download, Printer, Eye, Plus, FileText, X, Calendar } from 'lucide-react';
-import { useState, useRef } from 'react';
+import { Receipt, Search, Filter, Download, Printer, Eye, Plus, FileText, X, Calendar, CreditCard, User, MapPin, Tag, Clock, CheckCircle, XCircle, AlertCircle, MoreVertical, Copy, Ban, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import PrintableReceipt from '@/components/admin/receipts/PrintableReceipt';
 import { route } from 'ziggy-js';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { GridLayout } from '@/components/adminui/grid-layout';
+import { EmptyState } from '@/components/adminui/empty-state';
+import { ActionDropdown, ActionDropdownItem, ActionDropdownSeparator } from '@/components/adminui/action-dropdown';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
+// Keep the same interface definitions
 interface Receipt {
     id: number;
     receipt_number: string;
@@ -119,6 +127,383 @@ interface Props {
     };
 }
 
+// Helper function to get status badge configuration
+const getStatusConfig = (status: string, isVoided: boolean) => {
+    if (isVoided) {
+        return {
+            variant: 'destructive' as const,
+            className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
+            icon: <Ban className="h-3 w-3 mr-1" />,
+            label: 'Voided'
+        };
+    }
+    
+    switch (status.toLowerCase()) {
+        case 'paid':
+        case 'completed':
+            return {
+                variant: 'default' as const,
+                className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
+                icon: <CheckCircle className="h-3 w-3 mr-1" />,
+                label: 'Paid'
+            };
+        case 'pending':
+            return {
+                variant: 'secondary' as const,
+                className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
+                icon: <Clock className="h-3 w-3 mr-1" />,
+                label: 'Pending'
+            };
+        case 'failed':
+            return {
+                variant: 'destructive' as const,
+                className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
+                icon: <XCircle className="h-3 w-3 mr-1" />,
+                label: 'Failed'
+            };
+        default:
+            return {
+                variant: 'outline' as const,
+                className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700',
+                icon: <AlertCircle className="h-3 w-3 mr-1" />,
+                label: status
+            };
+    }
+};
+
+// Helper function to get payment method icon
+const getPaymentMethodIcon = (method: string) => {
+    switch (method.toLowerCase()) {
+        case 'cash':
+            return <CreditCard className="h-4 w-4 text-green-600 dark:text-green-400" />;
+        case 'card':
+        case 'credit_card':
+            return <CreditCard className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+        case 'bank_transfer':
+        case 'bank':
+            return <CreditCard className="h-4 w-4 text-purple-600 dark:text-purple-400" />;
+        case 'check':
+            return <CreditCard className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
+        default:
+            return <CreditCard className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+    }
+};
+
+// Receipt Card Component
+function ReceiptCard({ 
+    receipt, 
+    isSelected,
+    isBulkMode,
+    onSelect,
+    onView,
+    onPrint,
+    onVoid,
+    truncationLength = 25
+}: { 
+    receipt: Receipt;
+    isSelected: boolean;
+    isBulkMode: boolean;
+    onSelect: (id: number) => void;
+    onView: (id: number) => void;
+    onPrint: (receipt: Receipt) => void;
+    onVoid: (id: number, number: string) => void;
+    truncationLength?: number;
+}) {
+    const [expanded, setExpanded] = useState(false);
+    const statusConfig = getStatusConfig(receipt.status, receipt.is_voided);
+    
+    const truncateText = (text: string, maxLength: number) => {
+        if (!text) return '';
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    };
+
+    return (
+        <Card 
+            className={`overflow-hidden transition-all hover:shadow-md bg-white dark:bg-gray-950 border ${
+                isSelected 
+                    ? 'border-blue-500 border-2 bg-blue-50 dark:bg-blue-900/20' 
+                    : 'border-gray-200 dark:border-gray-700'
+            } ${expanded ? 'shadow-lg' : ''}`}
+            onClick={(e) => {
+                if (isBulkMode && e.target instanceof HTMLElement && 
+                    !e.target.closest('a') && 
+                    !e.target.closest('button') &&
+                    !e.target.closest('.dropdown-menu-content')) {
+                    onSelect(receipt.id);
+                }
+            }}
+        >
+            <CardContent className="p-4">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            receipt.is_voided 
+                                ? 'bg-red-100 dark:bg-red-900/30' 
+                                : 'bg-blue-100 dark:bg-blue-900/30'
+                        }`}>
+                            {receipt.is_voided ? (
+                                <Ban className="h-5 w-5 text-red-600 dark:text-red-400" />
+                            ) : (
+                                <Receipt className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                {truncateText(receipt.receipt_number, truncationLength)}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                OR: {receipt.or_number || '—'} • {receipt.receipt_type_label}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                        {isBulkMode && (
+                            <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => onSelect(receipt.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-gray-300 dark:border-gray-600"
+                            />
+                        )}
+                        <ActionDropdown>
+                            <ActionDropdownItem
+                                icon={<Eye className="h-4 w-4" />}
+                                onClick={() => onView(receipt.id)}
+                            >
+                                View Details
+                            </ActionDropdownItem>
+                            
+                            <ActionDropdownItem
+                                icon={<Printer className="h-4 w-4" />}
+                                onClick={() => onPrint(receipt)}
+                            >
+                                Print Receipt
+                            </ActionDropdownItem>
+                            
+                            <ActionDropdownSeparator />
+                            
+                            <ActionDropdownItem
+                                icon={<Copy className="h-4 w-4" />}
+                                onClick={() => navigator.clipboard.writeText(receipt.receipt_number)}
+                            >
+                                Copy Receipt #
+                            </ActionDropdownItem>
+                            
+                            <ActionDropdownItem
+                                icon={<Copy className="h-4 w-4" />}
+                                onClick={() => navigator.clipboard.writeText(receipt.or_number || '')}
+                            >
+                                Copy OR #
+                            </ActionDropdownItem>
+                            
+                            {!receipt.is_voided && (
+                                <>
+                                    <ActionDropdownSeparator />
+                                    <ActionDropdownItem
+                                        icon={<Ban className="h-4 w-4" />}
+                                        onClick={() => onVoid(receipt.id, receipt.receipt_number)}
+                                        dangerous
+                                    >
+                                        Void Receipt
+                                    </ActionDropdownItem>
+                                </>
+                            )}
+                        </ActionDropdown>
+                    </div>
+                </div>
+
+                {/* Status Badge and Basic Info */}
+                <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                    <Badge 
+                        variant={statusConfig.variant}
+                        className={`text-xs px-2 py-0.5 ${statusConfig.className}`}
+                    >
+                        {statusConfig.icon}
+                        {statusConfig.label}
+                    </Badge>
+                    
+                    {receipt.printed_count > 0 && (
+                        <Badge variant="outline" className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-800">
+                            <Printer className="h-3 w-3 mr-1" />
+                            {receipt.printed_count} print(s)
+                        </Badge>
+                    )}
+                </div>
+
+                {/* Main Content */}
+                <div className="space-y-2">
+                    {/* Payer Info */}
+                    <div className="flex items-center gap-2 text-sm">
+                        <User className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                        <span className="font-medium text-gray-900 dark:text-white truncate">
+                            {receipt.payer_name}
+                        </span>
+                    </div>
+
+                    {/* Amount */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm">
+                            <Tag className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                            <span className="text-gray-600 dark:text-gray-400">Total Amount:</span>
+                        </div>
+                        <div className="font-bold text-lg text-gray-900 dark:text-white">
+                            {receipt.formatted_total}
+                        </div>
+                    </div>
+
+                    {/* Paid Amount */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm">
+                            <CreditCard className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                            <span className="text-gray-600 dark:text-gray-400">Paid:</span>
+                        </div>
+                        <div className="font-medium text-green-600 dark:text-green-400">
+                            {receipt.formatted_amount_paid}
+                        </div>
+                    </div>
+
+                    {/* Payment Method & Date */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div className="flex items-center gap-1">
+                            {getPaymentMethodIcon(receipt.payment_method)}
+                            <span className="text-xs text-gray-700 dark:text-gray-300">
+                                {receipt.payment_method_label}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1 justify-end">
+                            <Calendar className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                            <span className="text-xs text-gray-700 dark:text-gray-300">
+                                {receipt.formatted_issued_date}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Reference Number */}
+                    {receipt.reference_number && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            Ref: {receipt.reference_number}
+                        </div>
+                    )}
+
+                    {/* Issued By */}
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                        Issued by: {receipt.issued_by}
+                    </div>
+
+                    {/* Fee Breakdown - Expandable */}
+                    {receipt.fee_breakdown && receipt.fee_breakdown.length > 0 && (
+                        <div className="pt-2">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpanded(!expanded);
+                                }}
+                                className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                                {expanded ? 'Hide' : 'Show'} Fee Breakdown
+                                {expanded ? (
+                                    <ChevronUp className="h-3 w-3" />
+                                ) : (
+                                    <ChevronDown className="h-3 w-3" />
+                                )}
+                            </button>
+                            
+                            {expanded && (
+                                <div className="mt-2 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
+                                    {receipt.fee_breakdown.map((fee, index) => (
+                                        <div key={index} className="flex items-center justify-between text-xs">
+                                            <span className="text-gray-600 dark:text-gray-400">
+                                                {fee.fee_name}
+                                            </span>
+                                            <span className="font-medium text-gray-900 dark:text-white">
+                                                ₱{fee.total_amount.toLocaleString()}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Void Reason */}
+                    {receipt.is_voided && receipt.void_reason && (
+                        <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-md">
+                            <p className="text-xs text-red-700 dark:text-red-400">
+                                <span className="font-medium">Void Reason:</span> {receipt.void_reason}
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Quick Action Buttons */}
+                <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-1">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onView(receipt.id);
+                                }}
+                            >
+                                <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p className="text-xs">View Details</p>
+                        </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-950"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onPrint(receipt);
+                                }}
+                            >
+                                <Printer className="h-3.5 w-3.5" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p className="text-xs">Print Receipt</p>
+                        </TooltipContent>
+                    </Tooltip>
+
+                    {receipt.payer_address && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigator.clipboard.writeText(receipt.payer_address || '');
+                                    }}
+                                >
+                                    <MapPin className="h-3.5 w-3.5" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p className="text-xs">Copy Address</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function ReceiptsIndex({ 
     receipts, 
     filters: initialFilters, 
@@ -134,11 +519,13 @@ export default function ReceiptsIndex({
     const [dateTo, setDateTo] = useState(initialFilters.date_to || '');
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
+    const [isBulkMode, setIsBulkMode] = useState(false);
+    const [selectedReceipts, setSelectedReceipts] = useState<number[]>([]);
     
     const printRef = useRef<HTMLDivElement>(null);
 
     const handlePrint = useReactToPrint({
-        contentRef: printRef, // Use contentRef instead of content
+        contentRef: printRef,
         documentTitle: `receipt-${selectedReceipt?.receipt_number || 'document'}`,
         onAfterPrint: () => {
             setSelectedReceipt(null);
@@ -146,7 +533,7 @@ export default function ReceiptsIndex({
     });
 
     // Apply filters
-    const applyFilters = () => {
+    const applyFilters = useCallback(() => {
         router.get(route('receipts.index'), {
             search: search || undefined,
             status: statusFilter || undefined,
@@ -158,7 +545,7 @@ export default function ReceiptsIndex({
             preserveState: true,
             preserveScroll: true,
         });
-    };
+    }, [search, statusFilter, methodFilter, typeFilter, dateFrom, dateTo]);
 
     // Handle search submit
     const handleSearch = (e: React.FormEvent) => {
@@ -167,7 +554,7 @@ export default function ReceiptsIndex({
     };
 
     // Clear filters
-    const clearFilters = () => {
+    const clearFilters = useCallback(() => {
         setSearch('');
         setStatusFilter('');
         setMethodFilter('');
@@ -179,24 +566,23 @@ export default function ReceiptsIndex({
             preserveState: true,
             preserveScroll: true,
         });
-    };
+    }, []);
 
     // View receipt
-    const viewReceipt = (id: number) => {
+    const viewReceipt = useCallback((id: number) => {
         router.get(route('receipts.show', id));
-    };
+    }, []);
 
     // Print receipt
-    const printReceipt = (receipt: Receipt) => {
+    const printReceipt = useCallback((receipt: Receipt) => {
         setSelectedReceipt(receipt);
-        // Small delay to ensure the printable component is rendered
         setTimeout(() => {
             handlePrint();
         }, 100);
-    };
+    }, [handlePrint]);
 
     // Void receipt
-    const voidReceipt = (id: number, receiptNumber: string) => {
+    const voidReceipt = useCallback((id: number, receiptNumber: string) => {
         const reason = prompt(`Enter reason for voiding receipt #${receiptNumber}:`);
         if (reason && reason.trim().length >= 10) {
             router.post(route('receipts.void', id), {
@@ -210,22 +596,48 @@ export default function ReceiptsIndex({
         } else if (reason) {
             alert('Void reason must be at least 10 characters long.');
         }
-    };
+    }, []);
 
     // Generate receipt from clearance
-    const generateFromClearance = (clearanceId: number) => {
+    const generateFromClearance = useCallback((clearanceId: number) => {
         router.post(route('receipts.generate-from-clearance', clearanceId), {
             receipt_type: 'clearance'
         }, {
             preserveScroll: true,
         });
-    };
+    }, []);
+
+    // Handle item select in bulk mode
+    const handleItemSelect = useCallback((id: number) => {
+        setSelectedReceipts(prev => 
+            prev.includes(id) 
+                ? prev.filter(item => item !== id)
+                : [...prev, id]
+        );
+    }, []);
+
+    // Handle select all
+    const handleSelectAll = useCallback(() => {
+        if (selectedReceipts.length === receipts.data.length) {
+            setSelectedReceipts([]);
+        } else {
+            setSelectedReceipts(receipts.data.map(r => r.id));
+        }
+    }, [receipts.data, selectedReceipts.length]);
+
+    // Handle clear selection
+    const handleClearSelection = useCallback(() => {
+        setSelectedReceipts([]);
+        setIsBulkMode(false);
+    }, []);
 
     // Check if filters are active
-    const hasActiveFilters = !!(search || statusFilter || methodFilter || typeFilter || dateFrom || dateTo);
+    const hasActiveFilters = useMemo(() => 
+        !!(search || statusFilter || methodFilter || typeFilter || dateFrom || dateTo),
+    [search, statusFilter, methodFilter, typeFilter, dateFrom, dateTo]);
 
     // Handle page change
-    const handlePageChange = (page: number) => {
+    const handlePageChange = useCallback((page: number) => {
         router.get(route('receipts.index'), {
             ...initialFilters,
             page
@@ -233,10 +645,10 @@ export default function ReceiptsIndex({
             preserveState: true,
             preserveScroll: true,
         });
-    };
+    }, [initialFilters]);
 
     // Handle per page change
-    const handlePerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handlePerPageChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
         router.get(route('receipts.index'), {
             ...initialFilters,
             per_page: e.target.value,
@@ -245,13 +657,28 @@ export default function ReceiptsIndex({
             preserveState: true,
             preserveScroll: true,
         });
-    };
+    }, [initialFilters]);
+
+    // Empty state component
+    const emptyState = useMemo(() => (
+        <EmptyState
+            title="No receipts found"
+            description={hasActiveFilters 
+                ? 'Try changing your filters or search criteria.'
+                : 'Generate your first receipt by creating a payment or clearance.'}
+            icon={<Receipt className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
+            hasFilters={hasActiveFilters}
+            onClearFilters={clearFilters}
+            onCreateNew={() => router.get(route('receipts.create'))}
+            createLabel="Generate Receipt"
+        />
+    ), [hasActiveFilters, clearFilters]);
 
     return (
         <AppLayout>
             <Head title="Receipts Management" />
 
-            {/* Hidden Print Preview - Only render when a receipt is selected */}
+            {/* Hidden Print Preview */}
             {selectedReceipt && (
                 <div className="fixed top-0 left-0 w-0 h-0 overflow-hidden opacity-0 pointer-events-none">
                     <PrintableReceipt 
@@ -274,19 +701,61 @@ export default function ReceiptsIndex({
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <Link
-                            href={route('receipts.create')}
-                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
-                        >
-                            <Plus className="h-5 w-5" />
-                            Generate Receipt
-                        </Link>
+                        {isBulkMode ? (
+                            <>
+                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                    {selectedReceipts.length} selected
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleClearSelection}
+                                >
+                                    Cancel
+                                </Button>
+                                {selectedReceipts.length === receipts.data.length && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleSelectAll}
+                                    >
+                                        Deselect All
+                                    </Button>
+                                )}
+                                {selectedReceipts.length !== receipts.data.length && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleSelectAll}
+                                    >
+                                        Select All
+                                    </Button>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsBulkMode(true)}
+                                >
+                                    Bulk Select
+                                </Button>
+                                <Link
+                                    href={route('receipts.create')}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
+                                >
+                                    <Plus className="h-5 w-5" />
+                                    Generate Receipt
+                                </Link>
+                            </>
+                        )}
                     </div>
                 </div>
 
                 {/* Stats Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                 <Receipt className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -303,7 +772,7 @@ export default function ReceiptsIndex({
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                                 <FileText className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -320,7 +789,7 @@ export default function ReceiptsIndex({
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                                 <Printer className="h-6 w-6 text-amber-600 dark:text-amber-400" />
@@ -337,10 +806,10 @@ export default function ReceiptsIndex({
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                                <Receipt className="h-6 w-6 text-red-600 dark:text-red-400" />
+                                <Ban className="h-6 w-6 text-red-600 dark:text-red-400" />
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Voided</p>
@@ -373,7 +842,7 @@ export default function ReceiptsIndex({
                                 </p>
                                 <div className="mt-3 space-y-2">
                                     {pendingClearances.map((clearance) => (
-                                        <div key={clearance.id} className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg">
+                                        <div key={clearance.id} className="flex items-center justify-between bg-white dark:bg-gray-900 p-3 rounded-lg">
                                             <div>
                                                 <p className="font-medium text-gray-900 dark:text-white">
                                                     {clearance.resident_name}
@@ -402,7 +871,7 @@ export default function ReceiptsIndex({
                 )}
 
                 {/* Filters Card */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <form onSubmit={handleSearch}>
                         <div className="flex flex-col gap-4">
                             {/* Basic Search */}
@@ -563,208 +1032,85 @@ export default function ReceiptsIndex({
                     </form>
                 </div>
 
-                {/* Receipts Table */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-gray-50 dark:bg-gray-900/50">
-                                <tr>
-                                    <th className="py-3 px-6 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                                        Receipt Details
-                                    </th>
-                                    <th className="py-3 px-6 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                                        Payer Information
-                                    </th>
-                                    <th className="py-3 px-6 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                                        Amount
-                                    </th>
-                                    <th className="py-3 px-6 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                                        Payment Method
-                                    </th>
-                                    <th className="py-3 px-6 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                                        Date & Status
-                                    </th>
-                                    <th className="py-3 px-6 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {receipts.data.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="py-12 text-center text-gray-500 dark:text-gray-400">
-                                            <Receipt className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                                            <p className="text-lg font-medium">No receipts found</p>
-                                            <p className="text-sm mt-1">Try adjusting your search or filters</p>
-                                            {hasActiveFilters && (
-                                                <button
-                                                    onClick={clearFilters}
-                                                    className="mt-4 px-4 py-2 text-sm text-primary-600 hover:text-primary-700 font-medium"
-                                                >
-                                                    Clear all filters
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    receipts.data.map((receipt) => (
-                                        <tr key={receipt.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
-                                            <td className="py-4 px-6">
-                                                <div className="space-y-1">
-                                                    <div className="font-semibold text-gray-900 dark:text-white">
-                                                        {receipt.receipt_number}
-                                                    </div>
-                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                        OR: {receipt.or_number || '—'}
-                                                    </div>
-                                                    <div className="text-xs text-gray-400 dark:text-gray-500">
-                                                        Type: {receipt.receipt_type_label}
-                                                    </div>
-                                                    <div className="text-xs text-gray-400 dark:text-gray-500">
-                                                        Printed: {receipt.printed_count} time(s)
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-6">
-                                                <div className="font-medium text-gray-900 dark:text-white">
-                                                    {receipt.payer_name}
-                                                </div>
-                                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                    Issued by: {receipt.issued_by}
-                                                </div>
-                                                {receipt.payer_address && (
-                                                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                                        {receipt.payer_address}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="py-4 px-6">
-                                                <div className="font-bold text-lg text-gray-900 dark:text-white">
-                                                    {receipt.formatted_total}
-                                                </div>
-                                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                    Paid: {receipt.formatted_amount_paid}
-                                                </div>
-                                                {receipt.change_due > 0 && (
-                                                    <div className="text-xs text-green-600 dark:text-green-400">
-                                                        Change: {receipt.formatted_change}
-                                                    </div>
-                                                )}
-                                                {receipt.discount > 0 && (
-                                                    <div className="text-xs text-blue-600 dark:text-blue-400">
-                                                        Discount: {receipt.formatted_discount}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="py-4 px-6">
-                                                <div className="font-medium text-gray-900 dark:text-white">
-                                                    {receipt.payment_method_label}
-                                                </div>
-                                                {receipt.reference_number && (
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                        Ref: {receipt.reference_number}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="py-4 px-6">
-                                                <div className="space-y-2">
-                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                                                        {receipt.formatted_issued_date}
-                                                    </div>
-                                                    <div dangerouslySetInnerHTML={{ __html: receipt.status_badge }} />
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-6">
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => viewReceipt(receipt.id)}
-                                                        title="View Receipt"
-                                                        className="p-2 text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                                                    >
-                                                        <Eye className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => printReceipt(receipt)}
-                                                        title="Print Receipt"
-                                                        className="p-2 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                                                    >
-                                                        <Printer className="h-4 w-4" />
-                                                    </button>
-                                                    {!receipt.is_voided && (
-                                                        <button
-                                                            onClick={() => voidReceipt(receipt.id, receipt.receipt_number)}
-                                                            title="Void Receipt"
-                                                            className="p-2 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors text-sm font-medium"
-                                                        >
-                                                            Void
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                {/* Grid View */}
+                <GridLayout
+                    isEmpty={receipts.data.length === 0}
+                    emptyState={emptyState}
+                    gridCols={{ base: 1, sm: 2, lg: 3, xl: 4 }}
+                    gap={{ base: '3', sm: '4' }}
+                    padding="p-4"
+                >
+                    {receipts.data.map((receipt) => (
+                        <ReceiptCard
+                            key={receipt.id}
+                            receipt={receipt}
+                            isSelected={selectedReceipts.includes(receipt.id)}
+                            isBulkMode={isBulkMode}
+                            onSelect={handleItemSelect}
+                            onView={viewReceipt}
+                            onPrint={printReceipt}
+                            onVoid={voidReceipt}
+                            truncationLength={window.innerWidth < 640 ? 15 : 25}
+                        />
+                    ))}
+                </GridLayout>
 
-                    {/* Pagination */}
-                    {receipts.last_page > 1 && (
-                        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                                Showing {receipts.from} to {receipts.to} of {receipts.total} results
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => handlePageChange(receipts.current_page - 1)}
-                                    disabled={receipts.current_page === 1}
-                                    className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Previous
-                                </button>
-                                
-                                {Array.from({ length: Math.min(5, receipts.last_page) }, (_, i) => {
-                                    let pageNum;
-                                    if (receipts.last_page <= 5) {
-                                        pageNum = i + 1;
-                                    } else if (receipts.current_page <= 3) {
-                                        pageNum = i + 1;
-                                    } else if (receipts.current_page >= receipts.last_page - 2) {
-                                        pageNum = receipts.last_page - 4 + i;
-                                    } else {
-                                        pageNum = receipts.current_page - 2 + i;
-                                    }
-                                    
-                                    return (
-                                        <button
-                                            key={pageNum}
-                                            onClick={() => handlePageChange(pageNum)}
-                                            className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                                receipts.current_page === pageNum
-                                                    ? 'bg-primary-600 text-white'
-                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                                            }`}
-                                        >
-                                            {pageNum}
-                                        </button>
-                                    );
-                                })}
-                                
-                                <button
-                                    onClick={() => handlePageChange(receipts.current_page + 1)}
-                                    disabled={receipts.current_page === receipts.last_page}
-                                    className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Next
-                                </button>
-                            </div>
+                {/* Pagination */}
+                {receipts.last_page > 1 && (
+                    <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Showing {receipts.from} to {receipts.to} of {receipts.total} results
                         </div>
-                    )}
-                </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => handlePageChange(receipts.current_page - 1)}
+                                disabled={receipts.current_page === 1}
+                                className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Previous
+                            </button>
+                            
+                            {Array.from({ length: Math.min(5, receipts.last_page) }, (_, i) => {
+                                let pageNum;
+                                if (receipts.last_page <= 5) {
+                                    pageNum = i + 1;
+                                } else if (receipts.current_page <= 3) {
+                                    pageNum = i + 1;
+                                } else if (receipts.current_page >= receipts.last_page - 2) {
+                                    pageNum = receipts.last_page - 4 + i;
+                                } else {
+                                    pageNum = receipts.current_page - 2 + i;
+                                }
+                                
+                                return (
+                                    <button
+                                        key={pageNum}
+                                        onClick={() => handlePageChange(pageNum)}
+                                        className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                            receipts.current_page === pageNum
+                                                ? 'bg-primary-600 text-white'
+                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900'
+                                        }`}
+                                    >
+                                        {pageNum}
+                                    </button>
+                                );
+                            })}
+                            
+                            <button
+                                onClick={() => handlePageChange(receipts.current_page + 1)}
+                                disabled={receipts.current_page === receipts.last_page}
+                                className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Payment Method Breakdown */}
                 {stats.by_method && stats.by_method.length > 0 && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                             Payment Method Breakdown
                         </h2>
@@ -790,7 +1136,7 @@ export default function ReceiptsIndex({
 
                 {/* Receipt Type Breakdown */}
                 {stats.by_type && stats.by_type.length > 0 && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                             Receipt Type Breakdown
                         </h2>
@@ -812,7 +1158,7 @@ export default function ReceiptsIndex({
                 )}
 
                 {/* Quick Actions */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                         Quick Actions
                     </h2>

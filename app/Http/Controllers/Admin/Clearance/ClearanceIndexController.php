@@ -5,13 +5,13 @@ namespace App\Http\Controllers\Admin\Clearance;
 use App\Http\Controllers\Controller;
 use App\Models\ClearanceRequest;
 use App\Models\ClearanceType;
+use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
 
 class ClearanceIndexController extends Controller
 {
-    public function __invoke(Request $request)
+    public function index(Request $request)
     {
         $query = ClearanceRequest::query()
             ->with(['resident', 'household', 'business', 'clearanceType', 'issuingOfficer', 'payment'])
@@ -27,12 +27,10 @@ class ClearanceIndexController extends Controller
                       $q->where(DB::raw("CONCAT(first_name, ' ', COALESCE(middle_name, ''), ' ', last_name)"), 'like', "%{$search}%");
                   })
                   ->orWhereHas('household', function ($q) use ($search) {
-                      $q->where('household_number', 'like', "%{$search}%")
-                        ->orWhere('head_name', 'like', "%{$search}%");
+                      $q->where('household_number', 'like', "%{$search}%");
                   })
                   ->orWhereHas('business', function ($q) use ($search) {
-                      $q->where('business_name', 'like', "%{$search}%")
-                        ->orWhere('owner_name', 'like', "%{$search}%");
+                      $q->where('business_name', 'like', "%{$search}%");
                   });
             });
         }
@@ -53,33 +51,21 @@ class ClearanceIndexController extends Controller
         }
 
         // Get paginated results
-        $clearances = $query->paginate(20)->through(function ($clearance) {
-            return $this->formatClearance($clearance);
-        });
+        $clearances = $query->paginate(20)->through(fn($clearance) => $this->formatClearance($clearance));
 
         // Get stats
         $stats = $this->getStats();
 
         // Get clearance types
-        $clearanceTypes = $this->getClearanceTypes();
+        $clearanceTypes = ClearanceType::active()
+            ->withCount('clearanceRequests')
+            ->orderBy('name')
+            ->get()
+            ->map(fn($type) => $this->formatClearanceType($type));
 
-        // Status options for filter
-        $statusOptions = [
-            ['value' => 'pending', 'label' => 'Pending Review'],
-            ['value' => 'pending_payment', 'label' => 'Pending Payment'],
-            ['value' => 'processing', 'label' => 'Under Processing'],
-            ['value' => 'approved', 'label' => 'Approved'],
-            ['value' => 'issued', 'label' => 'Issued'],
-            ['value' => 'rejected', 'label' => 'Rejected'],
-            ['value' => 'cancelled', 'label' => 'Cancelled'],
-            ['value' => 'expired', 'label' => 'Expired'],
-        ];
-
-        $paymentStatusOptions = [
-            ['value' => 'unpaid', 'label' => 'Unpaid'],
-            ['value' => 'partially_paid', 'label' => 'Partially Paid'],
-            ['value' => 'paid', 'label' => 'Paid'],
-        ];
+        // Status options
+        $statusOptions = $this->getStatusOptions();
+        $paymentStatusOptions = $this->getPaymentStatusOptions();
 
         return Inertia::render('admin/Clearances/Index', [
             'clearances' => $clearances,
@@ -91,31 +77,50 @@ class ClearanceIndexController extends Controller
         ]);
     }
 
-    protected function formatClearance($clearance)
+    private function formatClearance($clearance)
     {
+        $payerData = [
+            'payer_type' => $clearance->payer_type,
+            'payer_id' => $clearance->payer_id,
+            'payer_name' => $clearance->payer_name,
+            'payer_display' => $clearance->payer_display,
+        ];
+
+        $residentData = $clearance->resident ? [
+            'id' => $clearance->resident->id,
+            'full_name' => $clearance->resident->full_name,
+            'address' => $clearance->resident->address,
+            'contact_number' => $clearance->resident->contact_number,
+            'purok' => $clearance->resident->purok,
+        ] : null;
+
+        $householdData = $clearance->household ? [
+            'id' => $clearance->household->id,
+            'household_number' => $clearance->household->household_number,
+            'head_name' => $clearance->household->head_name,
+            'address' => $clearance->household->address,
+            'purok' => $clearance->household->purok,
+        ] : null;
+
+        $businessData = $clearance->business ? [
+            'id' => $clearance->business->id,
+            'business_name' => $clearance->business->business_name,
+            'owner_name' => $clearance->business->owner_name,
+            'address' => $clearance->business->address,
+        ] : null;
+
         return array_merge(
             $clearance->toArray(),
+            $payerData,
             [
-                'payer_type' => $clearance->payer_type,
-                'payer_id' => $clearance->payer_id,
-                'payer_display' => $clearance->payer_display,
-                'resident' => $clearance->resident ? [
-                    'id' => $clearance->resident->id,
-                    'full_name' => $clearance->resident->full_name,
-                    'contact_number' => $clearance->resident->contact_number,
-                ] : null,
-                'household' => $clearance->household ? [
-                    'id' => $clearance->household->id,
-                    'household_number' => $clearance->household->household_number,
-                    'head_name' => $clearance->household->head_name,
-                ] : null,
-                'business' => $clearance->business ? [
-                    'id' => $clearance->business->id,
-                    'business_name' => $clearance->business->business_name,
-                ] : null,
+                'resident' => $residentData,
+                'household' => $householdData,
+                'business' => $businessData,
                 'clearance_type' => $clearance->clearanceType ? [
                     'id' => $clearance->clearanceType->id,
                     'name' => $clearance->clearanceType->name,
+                    'code' => $clearance->clearanceType->code,
+                    'fee' => (float) $clearance->clearanceType->fee,
                 ] : null,
                 'payment' => $clearance->payment ? [
                     'id' => $clearance->payment->id,
@@ -125,13 +130,32 @@ class ClearanceIndexController extends Controller
                 'status_display' => $clearance->status_display,
                 'payment_status_display' => $clearance->payment_status_display,
                 'formatted_fee' => $clearance->formatted_fee,
-                'is_fully_paid' => $clearance->is_fully_paid,
+                'is_valid' => $clearance->is_valid,
+                'days_remaining' => $clearance->days_remaining,
                 'created_at' => $clearance->created_at->toDateTimeString(),
+                'issue_date' => $clearance->issue_date?->toDateString(),
+                'valid_until' => $clearance->valid_until?->toDateString(),
             ]
         );
     }
 
-    protected function getStats()
+    private function formatClearanceType($type)
+    {
+        return [
+            'id' => $type->id,
+            'name' => $type->name,
+            'code' => $type->code,
+            'fee' => (float) $type->fee,
+            'formatted_fee' => $type->formatted_fee,
+            'processing_days' => $type->processing_days,
+            'validity_days' => $type->validity_days,
+            'is_active' => (bool) $type->is_active,
+            'requires_payment' => (bool) $type->requires_payment,
+            'total_requests' => $type->clearance_requests_count,
+        ];
+    }
+
+    private function getStats()
     {
         return [
             'total' => ClearanceRequest::count(),
@@ -157,21 +181,26 @@ class ClearanceIndexController extends Controller
         ];
     }
 
-    protected function getClearanceTypes()
+    private function getStatusOptions()
     {
-        return ClearanceType::active()
-            ->withCount(['clearanceRequests'])
-            ->orderBy('name')
-            ->get()
-            ->map(function ($type) {
-                return [
-                    'id' => $type->id,
-                    'name' => $type->name,
-                    'code' => $type->code,
-                    'fee' => (float) $type->fee,
-                    'formatted_fee' => $type->formatted_fee,
-                    'requires_payment' => (bool) $type->requires_payment,
-                ];
-            });
+        return [
+            ['value' => 'pending', 'label' => 'Pending Review'],
+            ['value' => 'pending_payment', 'label' => 'Pending Payment'],
+            ['value' => 'processing', 'label' => 'Under Processing'],
+            ['value' => 'approved', 'label' => 'Approved'],
+            ['value' => 'issued', 'label' => 'Issued'],
+            ['value' => 'rejected', 'label' => 'Rejected'],
+            ['value' => 'cancelled', 'label' => 'Cancelled'],
+            ['value' => 'expired', 'label' => 'Expired'],
+        ];
+    }
+
+    private function getPaymentStatusOptions()
+    {
+        return [
+            ['value' => 'unpaid', 'label' => 'Unpaid'],
+            ['value' => 'partially_paid', 'label' => 'Partially Paid'],
+            ['value' => 'paid', 'label' => 'Paid'],
+        ];
     }
 }

@@ -43,7 +43,7 @@ export const BG_COLOR_MAP: Record<string, string> = {
     'purple': 'bg-purple-50 dark:bg-purple-900/20',
     'pink': 'bg-pink-50 dark:bg-pink-900/20',
     'indigo': 'bg-indigo-50 dark:bg-indigo-900/20',
-    'gray': 'bg-gray-50 dark:bg-gray-800'
+    'gray': 'bg-gray-50 dark:bg-gray-900'
 };
 
 // File type configurations

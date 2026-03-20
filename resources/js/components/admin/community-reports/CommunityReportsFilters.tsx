@@ -154,17 +154,17 @@ export default function CommunityReportsFilters({
 }: CommunityReportsFiltersProps) {
     
     return (
-        <Card className="overflow-hidden border shadow-sm">
+        <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             <CardContent className="pt-6">
                 <div className="flex flex-col space-y-4">
                     {/* Search Bar */}
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
                             <Input
                                 ref={searchInputRef}
                                 placeholder="Search reports by ID, title, description, location, resident name, or contact... (Ctrl+F)"
-                                className="pl-10"
+                                className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                             />
@@ -172,7 +172,7 @@ export default function CommunityReportsFilters({
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                                     onClick={() => setSearch('')}
                                 >
                                     <X className="h-3 w-3" />
@@ -183,7 +183,7 @@ export default function CommunityReportsFilters({
                             <Button 
                                 variant="outline" 
                                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                                className="h-9"
+                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                             >
                                 <Filter className="h-4 w-4 mr-2" />
                                 <span className="hidden sm:inline">
@@ -195,7 +195,7 @@ export default function CommunityReportsFilters({
                             </Button>
                             <Button 
                                 variant="outline"
-                                className="h-9"
+                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 onClick={handleExport}
                             >
                                 <Download className="h-4 w-4 mr-2" />
@@ -206,7 +206,7 @@ export default function CommunityReportsFilters({
 
                     {/* Active Filters Info and Clear Button */}
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
                             Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} reports
                             {search && ` matching "${search}"`}
                         </div>
@@ -217,32 +217,32 @@ export default function CommunityReportsFilters({
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleClearFilters}
-                                    className="text-red-600 hover:text-red-700 h-8"
+                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8 hover:bg-red-50 dark:hover:bg-red-950/50"
                                 >
                                     <FilterX className="h-3.5 w-3.5 mr-1" />
                                     Clear Filters
                                 </Button>
                             )}
                             {isBulkMode && (
-                                <div className="flex items-center gap-2" ref={selectionRef}>
+                                <div className="flex items-center gap-2 relative" ref={selectionRef}>
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setShowSelectionOptions(!showSelectionOptions)}
-                                        className="h-8"
+                                        className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                     >
                                         <Layers className="h-3.5 w-3.5 mr-1" />
                                         Select
                                     </Button>
                                     {showSelectionOptions && (
-                                        <div className="absolute right-0 top-full mt-1 z-50 w-48 bg-white dark:bg-gray-800 border rounded-md shadow-lg">
+                                        <div className="absolute right-0 top-full mt-1 z-50 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
                                             <div className="p-2">
                                                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-1">
                                                     SELECTION OPTIONS
                                                 </div>
                                                 <Button
                                                     variant="ghost"
-                                                    className="w-full justify-start h-8 text-sm"
+                                                    className="w-full justify-start h-8 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                                     onClick={handleSelectAllOnPage}
                                                 >
                                                     <Rows className="h-3.5 w-3.5 mr-2" />
@@ -250,7 +250,7 @@ export default function CommunityReportsFilters({
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
-                                                    className="w-full justify-start h-8 text-sm"
+                                                    className="w-full justify-start h-8 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                                     onClick={handleSelectAllFiltered}
                                                 >
                                                     <Filter className="h-3.5 w-3.5 mr-2" />
@@ -258,16 +258,16 @@ export default function CommunityReportsFilters({
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
-                                                    className="w-full justify-start h-8 text-sm"
+                                                    className="w-full justify-start h-8 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                                     onClick={handleSelectAll}
                                                 >
                                                     <Hash className="h-3.5 w-3.5 mr-2" />
                                                     All ({totalItems})
                                                 </Button>
-                                                <div className="border-t my-1"></div>
+                                                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                                                 <Button
                                                     variant="ghost"
-                                                    className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700"
+                                                    className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50"
                                                     onClick={() => {}}
                                                 >
                                                     <RotateCcw className="h-3.5 w-3.5 mr-2" />
@@ -284,9 +284,9 @@ export default function CommunityReportsFilters({
                     {/* Basic Filters */}
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                         <div className="space-y-1">
-                            <Label className="text-xs text-gray-500">Status</Label>
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Status</Label>
                             <select
-                                className="w-full border rounded px-2 py-1.5 text-sm"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
                             >
@@ -300,9 +300,9 @@ export default function CommunityReportsFilters({
                         </div>
                         
                         <div className="space-y-1">
-                            <Label className="text-xs text-gray-500">Priority</Label>
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Priority</Label>
                             <select
-                                className="w-full border rounded px-2 py-1.5 text-sm"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={priorityFilter}
                                 onChange={(e) => setPriorityFilter(e.target.value)}
                             >
@@ -316,9 +316,9 @@ export default function CommunityReportsFilters({
                         </div>
 
                         <div className="space-y-1">
-                            <Label className="text-xs text-gray-500">Urgency</Label>
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Urgency</Label>
                             <select
-                                className="w-full border rounded px-2 py-1.5 text-sm"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={urgencyFilter}
                                 onChange={(e) => setUrgencyFilter(e.target.value)}
                             >
@@ -332,9 +332,9 @@ export default function CommunityReportsFilters({
                         </div>
 
                         <div className="space-y-1">
-                            <Label className="text-xs text-gray-500">Report Type</Label>
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Report Type</Label>
                             <select
-                                className="w-full border rounded px-2 py-1.5 text-sm"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={reportTypeFilter}
                                 onChange={(e) => setReportTypeFilter(e.target.value)}
                             >
@@ -348,9 +348,9 @@ export default function CommunityReportsFilters({
                         </div>
 
                         <div className="space-y-1">
-                            <Label className="text-xs text-gray-500">Assigned To</Label>
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Assigned To</Label>
                             <select
-                                className="w-full border rounded px-2 py-1.5 text-sm"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={assignedFilter}
                                 onChange={(e) => setAssignedFilter(e.target.value)}
                             >
@@ -365,10 +365,10 @@ export default function CommunityReportsFilters({
                         </div>
 
                         <div className="space-y-1">
-                            <Label className="text-xs text-gray-500">Sort By</Label>
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Sort By</Label>
                             <div className="flex gap-1">
                                 <select
-                                    className="flex-1 border rounded px-2 py-1.5 text-sm"
+                                    className="flex-1 border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                     value={sortBy}
                                     onChange={(e) => setSortBy(e.target.value)}
                                 >
@@ -385,7 +385,7 @@ export default function CommunityReportsFilters({
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="h-9 w-9 p-0"
+                                    className="h-9 w-9 p-0 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                     onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                                 >
                                     {sortOrder === 'asc' ? '↑' : '↓'}
@@ -396,41 +396,42 @@ export default function CommunityReportsFilters({
 
                     {/* Advanced Filters */}
                     {showAdvancedFilters && (
-                        <div className="border-t pt-4 space-y-4">
-                            <h3 className="text-sm font-medium text-gray-900">Advanced Filters</h3>
+                        <div className="border-t pt-4 space-y-4 border-gray-200 dark:border-gray-800">
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Advanced Filters</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {/* Date Range */}
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700">Incident Date Range</Label>
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Incident Date Range</Label>
                                     <div className="grid grid-cols-2 gap-2">
                                         <Input
                                             placeholder="From Date"
                                             type="date"
                                             value={fromDateFilter}
                                             onChange={(e) => setFromDateFilter(e.target.value)}
-                                            className="text-sm"
+                                            className="text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                         />
                                         <Input
                                             placeholder="To Date"
                                             type="date"
                                             value={toDateFilter}
                                             onChange={(e) => setToDateFilter(e.target.value)}
-                                            className="text-sm"
+                                            className="text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                         />
                                     </div>
                                 </div>
 
                                 {/* Additional Filters */}
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700">Special Flags</Label>
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Special Flags</Label>
                                     <div className="space-y-2">
                                         <div className="flex items-center space-x-2">
                                             <Checkbox
                                                 id="has-evidences"
                                                 checked={hasEvidencesFilter}
                                                 onCheckedChange={(checked) => setHasEvidencesFilter(checked as boolean)}
+                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-primary-600 dark:data-[state=checked]:bg-primary-500"
                                             />
-                                            <Label htmlFor="has-evidences" className="text-sm">
+                                            <Label htmlFor="has-evidences" className="text-sm text-gray-700 dark:text-gray-300">
                                                 Has Evidence/Photos
                                             </Label>
                                         </div>
@@ -439,8 +440,9 @@ export default function CommunityReportsFilters({
                                                 id="safety-concern"
                                                 checked={safetyConcernFilter}
                                                 onCheckedChange={(checked) => setSafetyConcernFilter(checked as boolean)}
+                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-primary-600 dark:data-[state=checked]:bg-primary-500"
                                             />
-                                            <Label htmlFor="safety-concern" className="text-sm">
+                                            <Label htmlFor="safety-concern" className="text-sm text-gray-700 dark:text-gray-300">
                                                 Safety Concern
                                             </Label>
                                         </div>
@@ -449,8 +451,9 @@ export default function CommunityReportsFilters({
                                                 id="environmental-impact"
                                                 checked={environmentalFilter}
                                                 onCheckedChange={(checked) => setEnvironmentalFilter(checked as boolean)}
+                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-primary-600 dark:data-[state=checked]:bg-primary-500"
                                             />
-                                            <Label htmlFor="environmental-impact" className="text-sm">
+                                            <Label htmlFor="environmental-impact" className="text-sm text-gray-700 dark:text-gray-300">
                                                 Environmental Impact
                                             </Label>
                                         </div>
@@ -459,8 +462,9 @@ export default function CommunityReportsFilters({
                                                 id="recurring-issue"
                                                 checked={recurringFilter}
                                                 onCheckedChange={(checked) => setRecurringFilter(checked as boolean)}
+                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-primary-600 dark:data-[state=checked]:bg-primary-500"
                                             />
-                                            <Label htmlFor="recurring-issue" className="text-sm">
+                                            <Label htmlFor="recurring-issue" className="text-sm text-gray-700 dark:text-gray-300">
                                                 Recurring Issue
                                             </Label>
                                         </div>
@@ -469,8 +473,9 @@ export default function CommunityReportsFilters({
                                                 id="anonymous"
                                                 checked={anonymousFilter}
                                                 onCheckedChange={(checked) => setAnonymousFilter(checked as boolean)}
+                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-primary-600 dark:data-[state=checked]:bg-primary-500"
                                             />
-                                            <Label htmlFor="anonymous" className="text-sm">
+                                            <Label htmlFor="anonymous" className="text-sm text-gray-700 dark:text-gray-300">
                                                 Anonymous Only
                                             </Label>
                                         </div>
@@ -479,10 +484,10 @@ export default function CommunityReportsFilters({
 
                                 {/* Impact and Category */}
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700">Impact & Category</Label>
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Impact & Category</Label>
                                     <div className="grid grid-cols-2 gap-2">
                                         <select
-                                            className="w-full border rounded px-2 py-1.5 text-sm"
+                                            className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                             value={impactFilter}
                                             onChange={(e) => setImpactFilter(e.target.value)}
                                         >
@@ -493,7 +498,7 @@ export default function CommunityReportsFilters({
                                             <option value="severe">Severe</option>
                                         </select>
                                         <select
-                                            className="w-full border rounded px-2 py-1.5 text-sm"
+                                            className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                             value={categoryFilter}
                                             onChange={(e) => setCategoryFilter(e.target.value)}
                                         >
@@ -507,7 +512,7 @@ export default function CommunityReportsFilters({
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
                                         <select
-                                            className="w-full border rounded px-2 py-1.5 text-sm"
+                                            className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                             value={affectedPeopleFilter}
                                             onChange={(e) => setAffectedPeopleFilter(e.target.value)}
                                         >
@@ -519,7 +524,7 @@ export default function CommunityReportsFilters({
                                             <option value="multiple">Multiple Groups</option>
                                         </select>
                                         <select
-                                            className="w-full border rounded px-2 py-1.5 text-sm"
+                                            className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                             value={purokFilter}
                                             onChange={(e) => setPurokFilter(e.target.value)}
                                         >

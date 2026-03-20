@@ -102,6 +102,7 @@ class ClearanceRequest extends Model
         'payer_type_label',
         'payment_status_display',
         'is_fully_paid',
+        // DYNAMIC: Will be populated via relationship
     ];
     
     // ========== ACTIVITY LOG CONFIGURATION ==========
@@ -197,7 +198,7 @@ class ClearanceRequest extends Model
         );
     }
     
-        /**
+    /**
      * Get the receipts for this clearance request (polymorphic)
      */
     public function receipts()
@@ -421,7 +422,7 @@ class ClearanceRequest extends Model
             return 'Household ' . $household->household_number;
         }
         
-        // Try to access members relationship if it exists (without causing error if it doesn't)
+        // Try to access members relationship if it exists
         if (method_exists($household, 'members')) {
             try {
                 $headMember = $household->members()
@@ -433,11 +434,10 @@ class ClearanceRequest extends Model
                     return ($headMember->resident->full_name ?? 'Unknown') . ' (Household)';
                 }
             } catch (\Exception $e) {
-                // Silently fall back to other methods
+                // Silently fall back
             }
         }
         
-        // Ultimate fallback
         return 'Household #' . $household->id;
     }
 
@@ -450,12 +450,10 @@ class ClearanceRequest extends Model
             return null;
         }
         
-        // Check if household has a head_name attribute directly
         if (isset($household->head_name) && !empty($household->head_name)) {
             return $household->head_name;
         }
         
-        // Try to access members relationship if it exists
         if (method_exists($household, 'members')) {
             try {
                 $headMember = $household->members()
@@ -503,12 +501,10 @@ class ClearanceRequest extends Model
             return null;
         }
         
-        // Check if household has a contact_number directly
         if (isset($household->contact_number) && !empty($household->contact_number)) {
             return $household->contact_number;
         }
         
-        // Try to get from head member
         if (method_exists($household, 'members')) {
             try {
                 $headMember = $household->members()
@@ -528,7 +524,27 @@ class ClearanceRequest extends Model
     }
 
     /**
-     * Get detailed payer display information.
+     * Get resident's privileges if payer is a resident
+     */
+    private function getResidentPrivileges($resident): array
+    {
+        if (!$resident || !$resident->relationLoaded('residentPrivileges')) {
+            return [];
+        }
+
+        return $resident->residentPrivileges
+            ->filter(fn($rp) => $rp->isActive())
+            ->map(fn($rp) => [
+                'code' => $rp->privilege->code,
+                'name' => $rp->privilege->name,
+                'id_number' => $rp->id_number,
+            ])
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * Get detailed payer display information - DYNAMIC with privileges
      */
     public function getPayerDisplayAttribute()
     {
@@ -543,30 +559,67 @@ class ClearanceRequest extends Model
             'purok' => $this->payer_purok,
         ];
         
-        // Add type-specific details
+        // Add type-specific details with DYNAMIC privileges
         if ($this->payer_type === 'resident' && $this->resident) {
+            // Load privileges if not already loaded
+            if (!$this->resident->relationLoaded('residentPrivileges')) {
+                $this->resident->load('residentPrivileges.privilege');
+            }
+            
+            $privileges = $this->getResidentPrivileges($this->resident);
+            
             $display['details'] = [
                 'age' => $this->resident->age ?? null,
                 'gender' => $this->resident->gender ?? null,
                 'civil_status' => $this->resident->civil_status ?? null,
-                'is_senior' => $this->resident->is_senior ?? false,
-                'is_pwd' => $this->resident->is_pwd ?? false,
+                'privileges' => $privileges,
+                'privileges_count' => count($privileges),
+                'has_privileges' => count($privileges) > 0,
             ];
         } elseif ($this->payer_type === 'household' && $this->household) {
-            // Get head member info safely
             $headName = $this->getHouseholdHeadNameSafe($this->household);
+            
+            // Try to get head resident's privileges
+            $headPrivileges = [];
+            if (method_exists($this->household, 'members')) {
+                try {
+                    $headMember = $this->household->members()
+                        ->where('is_head', true)
+                        ->with('resident.residentPrivileges.privilege')
+                        ->first();
+                        
+                    if ($headMember && $headMember->resident) {
+                        $headPrivileges = $this->getResidentPrivileges($headMember->resident);
+                    }
+                } catch (\Exception $e) {
+                    // Silently fail
+                }
+            }
             
             $display['details'] = [
                 'household_number' => $this->household->household_number ?? null,
                 'head_name' => $headName ?? 'Unknown',
                 'member_count' => $this->getHouseholdMemberCountSafe($this->household),
+                'head_privileges' => $headPrivileges,
+                'head_has_privileges' => count($headPrivileges) > 0,
             ];
         } elseif ($this->payer_type === 'business' && $this->business) {
+            // Try to get owner's privileges
+            $ownerPrivileges = [];
+            if ($this->business->owner_id) {
+                $owner = Resident::with(['residentPrivileges.privilege'])->find($this->business->owner_id);
+                if ($owner) {
+                    $ownerPrivileges = $this->getResidentPrivileges($owner);
+                }
+            }
+            
             $display['details'] = [
                 'business_type' => $this->business->business_type_label ?? $this->business->business_type ?? null,
                 'owner_name' => $this->business->owner_name ?? null,
                 'permit_number' => $this->business->mayors_permit_number ?? null,
                 'employee_count' => $this->business->employee_count ?? null,
+                'owner_privileges' => $ownerPrivileges,
+                'owner_has_privileges' => count($ownerPrivileges) > 0,
             ];
         }
         
@@ -656,7 +709,6 @@ class ClearanceRequest extends Model
         
         $processingDays = $this->clearanceType->processing_days ?? 3;
         
-        // Adjust for urgency
         if ($this->urgency === 'rush') {
             $processingDays = ceil($processingDays * 0.5);
         } elseif ($this->urgency === 'express') {
@@ -851,17 +903,15 @@ class ClearanceRequest extends Model
         $this->payment_date = $payment->payment_date;
         $this->or_number = $payment->or_number;
         
-        // Update payment status
         if ($this->balance <= 0) {
             $this->payment_status = 'paid';
-            $this->status = 'approved'; // Ready for issuance
+            $this->status = 'approved';
         } elseif ($this->amount_paid > 0) {
             $this->payment_status = 'partially_paid';
         } else {
             $this->payment_status = 'unpaid';
         }
         
-        // Update additional fields if provided
         if (isset($data['issue_date'])) {
             $this->issue_date = $data['issue_date'];
         }
@@ -872,7 +922,6 @@ class ClearanceRequest extends Model
         
         $this->save();
         
-        // Log payment activity
         activity()
             ->performedOn($this)
             ->causedBy(auth()->user())
@@ -892,7 +941,7 @@ class ClearanceRequest extends Model
     }
 
     /**
-     * Mark as paid without creating a payment (for testing or manual override)
+     * Mark as paid without creating a payment
      */
     public function markAsPaid(float $amount = null, array $data = []): self
     {
@@ -1097,18 +1146,15 @@ class ClearanceRequest extends Model
                 $model->reference_number = self::generateReferenceNumber();
             }
             
-            // Initialize payment tracking fields
             $model->payment_status = $model->payment_status ?? 'unpaid';
             $model->amount_paid = $model->amount_paid ?? 0;
             $model->balance = $model->fee_amount ?? 0;
             
-            // Set contact info from payer if not provided
             if (!$model->contact_name && $model->payer) {
                 if ($model->payer_type === 'resident') {
                     $model->contact_name = $model->payer->full_name ?? null;
                     $model->contact_number = $model->payer->contact_number ?? null;
                 } elseif ($model->payer_type === 'household') {
-                    // Safely get head member info
                     if (method_exists($model->payer, 'members')) {
                         try {
                             $headMember = $model->payer->members()
@@ -1120,7 +1166,6 @@ class ClearanceRequest extends Model
                                 $model->contact_number = $headMember->resident->contact_number ?? null;
                             }
                         } catch (\Exception $e) {
-                            // Fall back to household data
                             $model->contact_name = $model->payer->head_name ?? 'Household Member';
                         }
                     } else {
@@ -1136,7 +1181,6 @@ class ClearanceRequest extends Model
             }
         });
         
-        // Auto-update payment status when fee_amount changes
         static::updating(function ($model) {
             if ($model->isDirty('fee_amount') && $model->amount_paid > 0) {
                 $model->balance = max(0, $model->fee_amount - $model->amount_paid);
@@ -1149,7 +1193,6 @@ class ClearanceRequest extends Model
             }
         });
         
-        // Auto-mark as expired when validity passes
         static::saving(function ($model) {
             if ($model->status === 'issued' && $model->valid_until && $model->valid_until->isPast()) {
                 $model->status = 'expired';

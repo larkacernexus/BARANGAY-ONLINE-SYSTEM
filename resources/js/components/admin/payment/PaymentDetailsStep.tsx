@@ -34,11 +34,6 @@ import {
     Hash,
     IdCard,
     Shield,
-    Heart,
-    HeartHandshake,
-    Baby,
-    HandHeart,
-    Calendar,
     Award,
     Briefcase,
     UsersRound,
@@ -55,7 +50,7 @@ import {
 } from 'lucide-react';
 import { PaymentItem, PaymentFormData, DiscountRule } from './paymentCreate/types';
 
-// ========== IMPORT FROM UTILS (only what's available) ==========
+// ========== IMPORT FROM UTILS ==========
 import { 
     generateORNumber
 } from '@/components/admin/payment/paymentCreate/utils';
@@ -73,6 +68,147 @@ function formatPercentage(percent: number | undefined | null): string {
     return `${percent.toFixed(1)}%`;
 }
 
+// ========== DYNAMIC PRIVILEGE HELPER FUNCTIONS ==========
+
+/**
+ * Get privilege icon based on code
+ */
+function getPrivilegeIcon(code: string): string {
+    const firstChar = (code?.[0] || 'A').toUpperCase();
+    
+    const iconMap: Record<string, string> = {
+        'S': '👴',
+        'P': '♿',
+        'I': '🏠',
+        'F': '🌾',
+        'O': '✈️',
+        '4': '📦',
+        'U': '💼',
+        'A': '🎫',
+        'B': '🎫',
+        'C': '🎫',
+        'D': '🎫',
+        'E': '🎫',
+    };
+    
+    return iconMap[firstChar] || '🎫';
+}
+
+/**
+ * Get privilege color for badge
+ */
+function getPrivilegeColor(code: string): string {
+    const firstChar = (code?.[0] || 'A').toUpperCase().charCodeAt(0);
+    const colorIndex = firstChar % 8;
+    
+    const colors = [
+        'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+        'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+        'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+        'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+        'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+        'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800',
+        'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800',
+        'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+    ];
+    
+    return colors[colorIndex] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
+}
+
+/**
+ * Get resident's active privileges
+ */
+function getActivePrivileges(resident: any): any[] {
+    if (!resident || !resident.privileges || !Array.isArray(resident.privileges)) {
+        return [];
+    }
+    
+    return resident.privileges.filter((p: any) => 
+        p.status === 'active' || p.status === 'expiring_soon'
+    );
+}
+
+/**
+ * Get resident's privilege badges
+ */
+function getPrivilegeBadges(resident: any): Array<{ code: string; name: string; icon: string; color: string; id_number?: string }> {
+    if (!resident) return [];
+    
+    const activePrivileges = getActivePrivileges(resident);
+    
+    return activePrivileges.map((p: any) => ({
+        code: p.code,
+        name: p.name || p.code,
+        icon: getPrivilegeIcon(p.code),
+        color: getPrivilegeColor(p.code),
+        id_number: p.id_number
+    }));
+}
+
+/**
+ * Check if fee type allows discount for a specific privilege
+ */
+function feeTypeAllowsPrivilege(feeType: any, privilegeCode: string): boolean {
+    if (!feeType) return false;
+    
+    // Check for has_{code}_discount field
+    const hasField = `has_${privilegeCode.toLowerCase()}_discount`;
+    const hasDiscount = feeType[hasField] === true;
+    
+    if (hasDiscount) return true;
+    
+    // Check for backward compatibility with specific fields
+    const legacyMap: Record<string, string[]> = {
+        'senior': ['has_senior_discount', 'senior_discount_percentage'],
+        'pwd': ['has_pwd_discount', 'pwd_discount_percentage'],
+        'solo_parent': ['has_solo_parent_discount', 'solo_parent_discount_percentage'],
+        'indigent': ['has_indigent_discount', 'indigent_discount_percentage'],
+    };
+    
+    const legacyType = Object.entries(legacyMap).find(([key]) => 
+        privilegeCode.toLowerCase().includes(key)
+    );
+    
+    if (legacyType && feeType[legacyType[1][0]] === true) {
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Get discount percentage for a specific privilege from fee type
+ */
+function getDiscountPercentage(feeType: any, privilegeCode: string, defaultPercentage: number = 0): number {
+    if (!feeType) return defaultPercentage;
+    
+    // Check for {code}_discount_percentage field
+    const percentageField = `${privilegeCode.toLowerCase()}_discount_percentage`;
+    const percentage = feeType[percentageField];
+    
+    if (percentage && !isNaN(percentage)) {
+        return percentage;
+    }
+    
+    // Check for backward compatibility
+    const legacyMap: Record<string, string[]> = {
+        'senior': ['senior_discount_percentage'],
+        'pwd': ['pwd_discount_percentage'],
+        'solo_parent': ['solo_parent_discount_percentage'],
+        'indigent': ['indigent_discount_percentage'],
+    };
+    
+    const legacyType = Object.entries(legacyMap).find(([key]) => 
+        privilegeCode.toLowerCase().includes(key)
+    );
+    
+    if (legacyType && feeType[legacyType[1][0]]) {
+        return feeType[legacyType[1][0]];
+    }
+    
+    return defaultPercentage;
+}
+
 // ========== INTERFACE DEFINITIONS ==========
 interface ClearanceType {
     id: string | number;
@@ -86,15 +222,8 @@ interface ClearanceType {
     requires_payment: boolean;
     requires_approval: boolean;
     is_online_only: boolean;
-    has_senior_discount?: boolean;
-    senior_discount_percentage?: number;
-    has_pwd_discount?: boolean;
-    pwd_discount_percentage?: number;
-    has_solo_parent_discount?: boolean;
-    solo_parent_discount_percentage?: number;
-    has_indigent_discount?: boolean;
-    indigent_discount_percentage?: number;
     is_discountable?: boolean;
+    [key: string]: any; // Dynamic discount fields
 }
 
 interface FeeType {
@@ -104,20 +233,7 @@ interface FeeType {
     base_amount: number | string;
     category: string;
     is_discountable?: boolean;
-    has_senior_discount?: boolean;
-    senior_discount_percentage?: number;
-    has_pwd_discount?: boolean;
-    pwd_discount_percentage?: number;
-    has_solo_parent_discount?: boolean;
-    solo_parent_discount_percentage?: number;
-    has_indigent_discount?: boolean;
-    indigent_discount_percentage?: number;
-    has_surcharge?: boolean;
-    surcharge_rate?: number;
-    surcharge_fixed?: number;
-    has_penalty?: boolean;
-    penalty_rate?: number;
-    penalty_fixed?: number;
+    [key: string]: any; // Dynamic discount fields
 }
 
 interface DiscountEligibility {
@@ -126,6 +242,7 @@ interface DiscountEligibility {
     percentage: number;
     id_number?: string;
     has_id?: boolean;
+    privilege_code?: string;
 }
 
 interface HouseholdInfo {
@@ -193,22 +310,22 @@ interface ResidentDetails {
     civil_status?: string;
     occupation?: string;
     is_voter?: boolean;
-    is_senior?: boolean;
-    is_pwd?: boolean;
-    is_solo_parent?: boolean;
-    is_indigent?: boolean;
-    senior_id_number?: string;
-    pwd_id_number?: string;
-    solo_parent_id_number?: string;
-    indigent_id_number?: string;
     household_id?: string | number;
     household_number?: string;
     purok?: string;
     purok_id?: string | number;
     is_household_head?: boolean;
     household_info?: HouseholdInfo | null;
+    
+    // DYNAMIC: Privilege data
+    privileges?: any[];
+    privileges_count?: number;
+    has_privileges?: boolean;
     discount_eligibility_list?: DiscountEligibility[];
     has_special_classification?: boolean;
+    
+    // DYNAMIC: Individual privilege flags will be added
+    [key: string]: any;
 }
 
 interface PaymentDetailsStepProps {
@@ -232,6 +349,7 @@ interface PaymentDetailsStepProps {
     selectedBusiness?: BusinessInfo | null;
     payerSource?: 'residents' | 'households' | 'businesses' | 'clearance' | 'fees' | 'other';
     feeTypes?: FeeType[];
+    allPrivileges?: any[]; // All privileges from database
 }
 
 export function PaymentDetailsStep({
@@ -254,7 +372,8 @@ export function PaymentDetailsStep({
     selectedHousehold = null,
     selectedBusiness = null,
     payerSource = 'residents',
-    feeTypes = []
+    feeTypes = [],
+    allPrivileges = []
 }: PaymentDetailsStepProps) {
     
     // ========== DEBUG LOGGING ==========
@@ -266,7 +385,8 @@ export function PaymentDetailsStep({
         amount_paid: data.amount_paid,
         total_amount: data.total_amount,
         payer_type: data.payer_type,
-        payer_name: data.payer_name
+        payer_name: data.payer_name,
+        itemsCount: paymentItems.length
     });
 
     // ========== STATE DECLARATIONS ==========
@@ -280,63 +400,53 @@ export function PaymentDetailsStep({
         data.amount_paid ? data.amount_paid.toString() : ''
     );
     
-    // ========== 🔥 FIX: SYNC AMOUNT TENDERED WITH DATA ==========
+    // ========== GET RESIDENT'S PRIVILEGES ==========
+    const residentPrivileges = useMemo(() => {
+        if (!selectedResident) return [];
+        return getPrivilegeBadges(selectedResident);
+    }, [selectedResident]);
+    
+    // ========== SYNC AMOUNT TENDERED WITH DATA ==========
     useEffect(() => {
-        // When data.amount_paid changes from outside (like from discount application),
-        // update the local amountTendered state
         if (data.amount_paid !== undefined && data.amount_paid !== null) {
             const amountValue = typeof data.amount_paid === 'number' 
                 ? data.amount_paid.toString() 
                 : data.amount_paid;
             
-            // Only update if different to avoid loops
             if (amountTendered !== amountValue) {
                 setAmountTendered(amountValue);
                 console.log('💰 Syncing amountTendered with data.amount_paid:', amountValue);
             }
         }
-    }, [data.amount_paid]); // This dependency is key - runs whenever amount_paid changes
+    }, [data.amount_paid]);
     
     // ========== CORRECTED CALCULATIONS ==========
-    // Original amount BEFORE discount (subtotal + surcharge + penalty)
     const originalTotal = (data.subtotal || 0) + (data.surcharge || 0) + (data.penalty || 0);
-    
-    // Discount amount
     const discountAmount = data.discount || 0;
-    
-    // Calculate discount percentage for display (with safe division)
     const discountPercentage = originalTotal > 0 ? (discountAmount / originalTotal) * 100 : 0;
-    
-    // Amount due AFTER discount (what the payer SHOULD pay)
     const amountDue = originalTotal - discountAmount;
-    
-    // Amount actually paid (cash received)
     const amountPaid = data.amount_paid || 0;
     
-    // Calculate if payment is correct
     const isExactAmount = Math.abs(amountPaid - amountDue) < 0.01;
     const isOverpaid = amountPaid > amountDue + 0.01;
     const isUnderpaid = amountPaid < amountDue - 0.01 && amountPaid > 0;
     const isUnpaid = amountPaid <= 0;
     
-    // Calculate balance/change
     const balance = Math.max(0, amountDue - amountPaid);
     const change = Math.max(0, amountPaid - amountDue);
     
-    // Payment status
     const paymentStatus = isUnpaid ? 'unpaid' : 
                          (isUnderpaid ? 'partial' : 
                          (isExactAmount ? 'paid' : 
                          (isOverpaid ? 'overpaid' : 'unknown')));
     
-    // Log for debugging
     console.log('💰 CORRECTED CALCULATIONS:', {
-        originalTotal: originalTotal,
+        originalTotal,
         discount: discountAmount,
-        discountPercentage: discountPercentage,
-        amountDue: amountDue,
-        amountPaid: amountPaid,
-        amountTendered: amountTendered,
+        discountPercentage,
+        amountDue,
+        amountPaid,
+        amountTendered,
         isExactAmount,
         isOverpaid,
         isUnderpaid,
@@ -345,23 +455,22 @@ export function PaymentDetailsStep({
         paymentStatus
     });
 
-    const isClearanceFeePayment = paymentItems.some(item => 
-        item.metadata?.is_clearance_fee || item.category === 'clearance'
-    );
+    // ========== FIXED: Get ALL clearance items and filter fees ==========
+    const clearanceItems = useMemo(() => {
+        return paymentItems.filter(item => 
+            item.metadata?.is_clearance_fee === true || item.category === 'clearance'
+        );
+    }, [paymentItems]);
 
-    const isFeePayment = payerSource === 'fees' || paymentItems.some(item => 
-        item.metadata?.is_outstanding_fee === true && !item.metadata?.is_clearance_fee
-    );
+    const feeItems = useMemo(() => {
+        return paymentItems.filter(item => 
+            !(item.metadata?.is_clearance_fee === true || item.category === 'clearance')
+        );
+    }, [paymentItems]);
 
+    const isClearanceFeePayment = clearanceItems.length > 0;
+    const isFeePayment = payerSource === 'fees' || feeItems.length > 0;
     const isBusinessPayment = data.payer_type === 'business' || payerSource === 'businesses';
-
-    const clearanceItem = paymentItems.find(item => 
-        item.metadata?.is_clearance_fee || item.category === 'clearance'
-    );
-
-    const feeItems = paymentItems.filter(item => 
-        !(item.metadata?.is_clearance_fee || item.category === 'clearance')
-    );
 
     const selectedDiscountRule = discountRules.find(rule => rule.code === selectedDiscountCode);
 
@@ -395,15 +504,8 @@ export function PaymentDetailsStep({
                         (selectedBusiness?.purok) || 
                         '';
 
-    // ========== DISCOUNT ELIGIBILITY CHECKING ==========
+    // ========== DYNAMIC DISCOUNT ELIGIBILITY CHECKING ==========
     
-    const DISCOUNT_PRIORITY: Record<string, number> = {
-        'senior': 1,
-        'pwd': 2,
-        'indigent': 3,
-        'solo_parent': 4
-    };
-
     const isFeeTypeDiscountable = useCallback((feeTypeId?: string | number): boolean => {
         if (!feeTypeId) return false;
         const feeType = feeTypes.find(ft => ft.id == feeTypeId);
@@ -412,181 +514,126 @@ export function PaymentDetailsStep({
 
     const isResidentEligibleForDiscount = useCallback((
         resident: ResidentDetails | null,
-        discountType: string,
+        privilegeCode: string,
         feeTypeId?: string | number
     ): { eligible: boolean; percentage: number; id_number?: string } => {
         if (!resident) return { eligible: false, percentage: 0 };
         
-        const feeType = feeTypeId ? feeTypes.find(ft => ft.id == feeTypeId) : null;
+        // Check if resident has the privilege
+        const hasPrivilege = resident.privileges?.some((p: any) => 
+            p.code?.toUpperCase() === privilegeCode?.toUpperCase() &&
+            (p.status === 'active' || p.status === 'expiring_soon')
+        );
         
-        switch (discountType) {
-            case 'senior':
-                if (!resident.is_senior) return { eligible: false, percentage: 0 };
-                if (feeType && !feeType.has_senior_discount) return { eligible: false, percentage: 0 };
-                return {
-                    eligible: true,
-                    percentage: feeType?.senior_discount_percentage || 20,
-                    id_number: resident.senior_id_number
-                };
-                
-            case 'pwd':
-                if (!resident.is_pwd) return { eligible: false, percentage: 0 };
-                if (feeType && !feeType.has_pwd_discount) return { eligible: false, percentage: 0 };
-                return {
-                    eligible: true,
-                    percentage: feeType?.pwd_discount_percentage || 20,
-                    id_number: resident.pwd_id_number
-                };
-                
-            case 'solo_parent':
-                if (!resident.is_solo_parent) return { eligible: false, percentage: 0 };
-                if (feeType && !feeType.has_solo_parent_discount) return { eligible: false, percentage: 0 };
-                return {
-                    eligible: true,
-                    percentage: feeType?.solo_parent_discount_percentage || 10,
-                    id_number: resident.solo_parent_id_number
-                };
-                
-            case 'indigent':
-                if (!resident.is_indigent) return { eligible: false, percentage: 0 };
-                if (feeType && !feeType.has_indigent_discount) return { eligible: false, percentage: 0 };
-                return {
-                    eligible: true,
-                    percentage: feeType?.indigent_discount_percentage || 25,
-                    id_number: resident.indigent_id_number
-                };
-                
-            default:
-                return { eligible: false, percentage: 0 };
+        if (!hasPrivilege) return { eligible: false, percentage: 0 };
+        
+        // Check if fee type allows this discount
+        const feeType = feeTypeId ? feeTypes.find(ft => ft.id == feeTypeId) : null;
+        if (!feeTypeAllowsPrivilege(feeType, privilegeCode)) {
+            return { eligible: false, percentage: 0 };
         }
+        
+        // Get discount percentage
+        const percentage = getDiscountPercentage(feeType, privilegeCode);
+        
+        // Get ID number from privilege
+        const residentPriv = resident.privileges?.find((p: any) => 
+            p.code?.toUpperCase() === privilegeCode?.toUpperCase()
+        );
+        
+        return {
+            eligible: true,
+            percentage,
+            id_number: residentPriv?.id_number
+        };
     }, [feeTypes]);
 
     const getBestDiscountForFee = useCallback((feeItem: PaymentItem): DiscountEligibility | null => {
-        if (!selectedResident) return null;
+        if (!selectedResident || !selectedResident.privileges) return null;
         
         const feeTypeId = feeItem.fee_type_id;
         const availableDiscounts: DiscountEligibility[] = [];
         
-        const discountTypes = ['senior', 'pwd', 'solo_parent', 'indigent'];
-        
-        for (const type of discountTypes) {
-            const eligibility = isResidentEligibleForDiscount(selectedResident, type, feeTypeId);
+        // Check each privilege the resident has
+        for (const priv of selectedResident.privileges) {
+            if (priv.status !== 'active' && priv.status !== 'expiring_soon') continue;
+            
+            const eligibility = isResidentEligibleForDiscount(selectedResident, priv.code, feeTypeId);
             if (eligibility.eligible) {
                 availableDiscounts.push({
-                    type,
-                    label: type === 'senior' ? 'Senior Citizen' :
-                           type === 'pwd' ? 'Person with Disability' :
-                           type === 'solo_parent' ? 'Solo Parent' : 'Indigent',
+                    type: priv.code.toLowerCase(),
+                    label: priv.name || priv.code,
                     percentage: eligibility.percentage,
                     id_number: eligibility.id_number,
-                    has_id: !!eligibility.id_number
+                    has_id: !!eligibility.id_number,
+                    privilege_code: priv.code
                 });
             }
         }
         
         if (availableDiscounts.length === 0) return null;
         
-        availableDiscounts.sort((a, b) => 
-            (DISCOUNT_PRIORITY[a.type] || 999) - (DISCOUNT_PRIORITY[b.type] || 999)
-        );
+        // Sort by percentage (highest first)
+        availableDiscounts.sort((a, b) => b.percentage - a.percentage);
         
         return availableDiscounts[0];
     }, [selectedResident, isResidentEligibleForDiscount]);
 
     const getAllPossibleDiscounts = useMemo(() => {
-        if (!selectedResident) return [];
+        if (!selectedResident || !selectedResident.privileges) return [];
         
-        const discountSet = new Set<string>();
-        const discounts: DiscountEligibility[] = [];
+        const discountMap = new Map<string, DiscountEligibility>();
         
         feeItems.forEach(item => {
             const bestDiscount = getBestDiscountForFee(item);
-            if (bestDiscount && !discountSet.has(bestDiscount.type)) {
-                discountSet.add(bestDiscount.type);
-                discounts.push(bestDiscount);
+            if (bestDiscount && !discountMap.has(bestDiscount.type)) {
+                discountMap.set(bestDiscount.type, bestDiscount);
             }
         });
         
-        // Check clearance-specific discounts from the clearance item metadata
-        if (clearanceItem && clearanceItem.metadata) {
-            const clearanceDiscounts = [];
-            
-            if (selectedResident.is_senior && clearanceItem.metadata.has_senior_discount) {
-                clearanceDiscounts.push({
-                    type: 'senior',
-                    label: 'Senior Citizen',
-                    percentage: clearanceItem.metadata.senior_discount_percentage || 20,
-                    id_number: selectedResident.senior_id_number,
-                    has_id: !!selectedResident.senior_id_number
-                });
-            }
-            
-            if (selectedResident.is_pwd && clearanceItem.metadata.has_pwd_discount) {
-                clearanceDiscounts.push({
-                    type: 'pwd',
-                    label: 'Person with Disability',
-                    percentage: clearanceItem.metadata.pwd_discount_percentage || 20,
-                    id_number: selectedResident.pwd_id_number,
-                    has_id: !!selectedResident.pwd_id_number
-                });
-            }
-            
-            if (selectedResident.is_solo_parent && clearanceItem.metadata.has_solo_parent_discount) {
-                clearanceDiscounts.push({
-                    type: 'solo_parent',
-                    label: 'Solo Parent',
-                    percentage: clearanceItem.metadata.solo_parent_discount_percentage || 10,
-                    id_number: selectedResident.solo_parent_id_number,
-                    has_id: !!selectedResident.solo_parent_id_number
-                });
-            }
-            
-            if (selectedResident.is_indigent && clearanceItem.metadata.has_indigent_discount) {
-                clearanceDiscounts.push({
-                    type: 'indigent',
-                    label: 'Indigent',
-                    percentage: clearanceItem.metadata.indigent_discount_percentage || 25,
-                    id_number: selectedResident.indigent_id_number,
-                    has_id: !!selectedResident.indigent_id_number
-                });
-            }
-            
-            if (clearanceDiscounts.length > 0) {
-                clearanceDiscounts.sort((a, b) => 
-                    (DISCOUNT_PRIORITY[a.type] || 999) - (DISCOUNT_PRIORITY[b.type] || 999)
-                );
-                const bestClearanceDiscount = clearanceDiscounts[0];
-                if (!discountSet.has(bestClearanceDiscount.type)) {
-                    discountSet.add(bestClearanceDiscount.type);
-                    discounts.push(bestClearanceDiscount);
+        // Check clearance-specific discounts
+        clearanceItems.forEach(item => {
+            if (item.metadata) {
+                for (const priv of selectedResident.privileges) {
+                    if (priv.status !== 'active' && priv.status !== 'expiring_soon') continue;
+                    
+                    const hasDiscount = item.metadata[`has_${priv.code.toLowerCase()}_discount`];
+                    
+                    if (hasDiscount && !discountMap.has(priv.code.toLowerCase())) {
+                        discountMap.set(priv.code.toLowerCase(), {
+                            type: priv.code.toLowerCase(),
+                            label: priv.name || priv.code,
+                            percentage: item.metadata[`${priv.code.toLowerCase()}_discount_percentage`] || 0,
+                            id_number: priv.id_number,
+                            has_id: !!priv.id_number,
+                            privilege_code: priv.code
+                        });
+                    }
                 }
             }
-        }
+        });
         
-        discounts.sort((a, b) => 
-            (DISCOUNT_PRIORITY[a.type] || 999) - (DISCOUNT_PRIORITY[b.type] || 999)
-        );
+        const discounts = Array.from(discountMap.values());
+        
+        // Sort by percentage (highest first)
+        discounts.sort((a, b) => b.percentage - a.percentage);
         
         return discounts;
-    }, [selectedResident, feeItems, clearanceItem, getBestDiscountForFee]);
+    }, [selectedResident, feeItems, clearanceItems, getBestDiscountForFee]);
 
     const isDiscountRuleApplicable = useCallback((rule: DiscountRule): boolean => {
         if (!selectedResident) return true;
         
-        const ruleTypeMap: Record<string, string> = {
-            'SENIOR': 'senior',
-            'SENIOR_CITIZEN': 'senior',
-            'PWD': 'pwd',
-            'SOLO_PARENT': 'solo_parent',
-            'INDIGENT': 'indigent'
-        };
+        // Check if discount rule maps to a privilege the resident has
+        const privilegeCode = rule.privilege_code || rule.code;
         
-        const residentType = ruleTypeMap[rule.code];
-        if (!residentType) return true;
+        const hasPrivilege = selectedResident.privileges?.some((p: any) => 
+            p.code?.toUpperCase() === privilegeCode?.toUpperCase() &&
+            (p.status === 'active' || p.status === 'expiring_soon')
+        );
         
-        const eligibility = isResidentEligibleForDiscount(selectedResident, residentType);
-        return eligibility.eligible;
-    }, [selectedResident, isResidentEligibleForDiscount]);
+        return hasPrivilege === true;
+    }, [selectedResident]);
 
     const filteredDiscountRules = useMemo(() => {
         return discountRules.filter(rule => isDiscountRuleApplicable(rule));
@@ -640,7 +687,6 @@ export function PaymentDetailsStep({
         }
     }, []);
 
-    // Auto-set amount paid to amount due if not set
     useEffect(() => {
         if (!data.amount_paid && amountDue > 0) {
             const dueValue = amountDue.toFixed(2);
@@ -831,7 +877,6 @@ export function PaymentDetailsStep({
             }
         }
         
-        // Show warning if amount paid doesn't match amount due
         if (!isExactAmount && amountPaid > 0) {
             const message = isOverpaid 
                 ? `You are overpaying by ${formatCurrency(change)}. Change of ${formatCurrency(change)} will be given. Continue?`
@@ -884,7 +929,7 @@ export function PaymentDetailsStep({
                 badge: 'Combined Payment',
                 color: 'bg-gradient-to-r from-purple-600 to-blue-600',
                 icon: <Receipt className="h-3 w-3 mr-1" />,
-                description: 'Clearance + Fees'
+                description: `Clearance (${clearanceItems.length}) + Fees (${feeItems.length})`
             };
         }
         if (isClearanceFeePayment) {
@@ -892,7 +937,7 @@ export function PaymentDetailsStep({
                 badge: 'Clearance Payment',
                 color: 'bg-purple-600',
                 icon: <FileBadge className="h-3 w-3 mr-1" />,
-                description: 'Clearance Certificate'
+                description: `${clearanceItems.length} Clearance Item${clearanceItems.length !== 1 ? 's' : ''}`
             };
         }
         if (isFeePayment) {
@@ -900,7 +945,7 @@ export function PaymentDetailsStep({
                 badge: 'Fee Payment',
                 color: 'bg-blue-600',
                 icon: <Receipt className="h-3 w-3 mr-1" />,
-                description: 'Barangay Fees'
+                description: `${feeItems.length} Fee Item${feeItems.length !== 1 ? 's' : ''}`
             };
         }
         return null;
@@ -913,31 +958,31 @@ export function PaymentDetailsStep({
             case 'paid':
                 return {
                     label: 'PAID',
-                    color: 'bg-green-100 text-green-800 border-green-200',
+                    color: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
                     icon: <CheckCircle2 className="h-3 w-3 mr-1" />
                 };
             case 'partial':
                 return {
                     label: 'PARTIAL',
-                    color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                    color: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
                     icon: <AlertTriangle className="h-3 w-3 mr-1" />
                 };
             case 'unpaid':
                 return {
                     label: 'UNPAID',
-                    color: 'bg-gray-100 text-gray-800 border-gray-200',
+                    color: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700',
                     icon: <XCircle className="h-3 w-3 mr-1" />
                 };
             case 'overpaid':
                 return {
                     label: 'OVERPAID',
-                    color: 'bg-blue-100 text-blue-800 border-blue-200',
+                    color: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
                     icon: <TrendingUp className="h-3 w-3 mr-1" />
                 };
             default:
                 return {
                     label: 'UNPAID',
-                    color: 'bg-gray-100 text-gray-800 border-gray-200',
+                    color: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700',
                     icon: <XCircle className="h-3 w-3 mr-1" />
                 };
         }
@@ -946,82 +991,28 @@ export function PaymentDetailsStep({
     const statusBadge = getPaymentStatusBadge();
 
     // ========== RENDER FUNCTIONS ==========
-    const renderResidentClassifications = () => {
-        if (!selectedResident) return null;
-
-        const classifications = [];
-
-        if (selectedResident.is_voter) {
-            classifications.push({
-                icon: <Award className="h-3 w-3" />,
-                label: 'Registered Voter',
-                color: 'bg-blue-100 text-blue-800 border-blue-200',
-                idNumber: null,
-                tooltip: 'Registered Voter'
-            });
-        }
-
-        if (selectedResident.is_senior) {
-            classifications.push({
-                icon: <Heart className="h-3 w-3" />,
-                label: 'Senior Citizen',
-                color: 'bg-green-100 text-green-800 border-green-200',
-                idNumber: selectedResident.senior_id_number,
-                tooltip: 'Senior Citizen Discount Eligible'
-            });
-        }
-
-        if (selectedResident.is_pwd) {
-            classifications.push({
-                icon: <HeartHandshake className="h-3 w-3" />,
-                label: 'PWD',
-                color: 'bg-purple-100 text-purple-800 border-purple-200',
-                idNumber: selectedResident.pwd_id_number,
-                tooltip: 'Person with Disability'
-            });
-        }
-
-        if (selectedResident.is_solo_parent) {
-            classifications.push({
-                icon: <Baby className="h-3 w-3" />,
-                label: 'Solo Parent',
-                color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-                idNumber: selectedResident.solo_parent_id_number,
-                tooltip: 'Solo Parent'
-            });
-        }
-
-        if (selectedResident.is_indigent) {
-            classifications.push({
-                icon: <HandHeart className="h-3 w-3" />,
-                label: 'Indigent',
-                color: 'bg-orange-100 text-orange-800 border-orange-200',
-                idNumber: selectedResident.indigent_id_number,
-                tooltip: 'Indigent Family'
-            });
-        }
-
-        if (classifications.length === 0) return null;
+    const renderResidentPrivileges = () => {
+        if (!selectedResident || residentPrivileges.length === 0) return null;
 
         return (
-            <div className="mt-4 pt-3 border-t border-gray-100">
-                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <Award className="h-3 w-3" />
-                    Special Classifications
+                    Privileges
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    {classifications.map((item, index) => (
+                    {residentPrivileges.map((item, index) => (
                         <Badge 
                             key={index} 
                             variant="outline" 
                             className={`${item.color} flex items-center gap-1 px-2 py-1 cursor-help`}
-                            title={item.idNumber ? `ID: ${item.idNumber}` : item.tooltip}
+                            title={item.id_number ? `ID: ${item.id_number}` : item.name}
                         >
-                            {item.icon}
-                            <span className="text-xs">{item.label}</span>
-                            {item.idNumber && (
+                            <span>{item.icon}</span>
+                            <span className="text-xs">{item.name}</span>
+                            {item.id_number && (
                                 <span className="text-[10px] ml-1 opacity-75 font-mono">
-                                    #{item.idNumber.split('-').pop()}
+                                    #{item.id_number.split('-').pop()}
                                 </span>
                             )}
                         </Badge>
@@ -1044,13 +1035,13 @@ export function PaymentDetailsStep({
             if (hasDiscountableFees) {
                 return (
                     <div className="mt-3">
-                        <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+                        <div className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                             <Percent className="h-3 w-3" />
                             Discount Eligibility
                         </div>
-                        <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                            <p className="text-xs text-gray-600 flex items-center gap-1">
-                                <XCircle className="h-3 w-3 text-gray-400" />
+                        <div className="p-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-md">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                                <XCircle className="h-3 w-3 text-gray-400 dark:text-gray-500" />
                                 Some fees are discountable, but you're not eligible for any discounts.
                             </p>
                         </div>
@@ -1063,38 +1054,35 @@ export function PaymentDetailsStep({
 
         return (
             <div className="mt-3">
-                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <Percent className="h-3 w-3" />
                     Available Discounts
                 </div>
                 <div className="space-y-2">
                     {possibleDiscounts.map((eligibility, index) => {
-                        const iconMap: Record<string, JSX.Element> = {
-                            senior: <Heart className="h-3 w-3 text-green-600" />,
-                            pwd: <HeartHandshake className="h-3 w-3 text-purple-600" />,
-                            solo_parent: <Baby className="h-3 w-3 text-yellow-600" />,
-                            indigent: <HandHeart className="h-3 w-3 text-orange-600" />
-                        };
-                        
                         return (
                             <div 
                                 key={index} 
                                 className={`flex items-center justify-between p-2 rounded-md border ${
-                                    index === 0 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200 opacity-75'
+                                    index === 0 
+                                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                                        : 'bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 opacity-75'
                                 }`}
                             >
                                 <div className="flex items-center gap-2">
-                                    {iconMap[eligibility.type as keyof typeof iconMap]}
-                                    <span className="text-xs font-medium">{eligibility.label}</span>
+                                    <span className="text-xs">{getPrivilegeIcon(eligibility.privilege_code || '')}</span>
+                                    <span className="text-xs font-medium dark:text-gray-200">{eligibility.label}</span>
                                     <Badge variant="secondary" className={`text-[10px] ${
-                                        index === 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                        index === 0 
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                                     }`}>
                                         {formatPercentage(eligibility.percentage)}
                                     </Badge>
                                 </div>
                                 {eligibility.has_id && eligibility.id_number && (
-                                    <span className="text-[10px] text-gray-500 font-mono flex items-center gap-1">
-                                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono flex items-center gap-1">
+                                        <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
                                         ID: {eligibility.id_number}
                                     </span>
                                 )}
@@ -1103,15 +1091,15 @@ export function PaymentDetailsStep({
                     })}
                     
                     {possibleDiscounts.length > 1 && (
-                        <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md mt-2">
-                            <p className="text-xs text-yellow-800 flex items-center gap-1">
+                        <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md mt-2">
+                            <p className="text-xs text-yellow-800 dark:text-yellow-400 flex items-center gap-1">
                                 <AlertTriangle className="h-3 w-3" />
                                 Note: Only one discount can be applied. The highest priority discount will be used.
                             </p>
                         </div>
                     )}
                     
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Select a discount from the dropdown below to apply
                     </p>
                 </div>
@@ -1125,20 +1113,20 @@ export function PaymentDetailsStep({
         const household = selectedResident.household_info;
 
         return (
-            <div className="mt-4 pt-3 border-t border-gray-100">
-                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <Home className="h-3 w-3" />
                     Household Information
                 </div>
                 <div className="space-y-2">
                     {household.household_number && (
-                        <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                        <Badge variant="outline" className="bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
                             <Hash className="h-3 w-3 mr-1" />
                             {household.household_number}
                         </Badge>
                     )}
                     {household.purok && (
-                        <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                        <Badge variant="outline" className="bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
                             <MapPinHouse className="h-3 w-3 mr-1" />
                             {household.purok}
                         </Badge>
@@ -1146,14 +1134,14 @@ export function PaymentDetailsStep({
 
                     {household.head_of_household && (
                         <div className="flex items-center gap-2 text-xs">
-                            <User className="h-3 w-3 text-gray-400" />
-                            <span className="text-gray-600">Head:</span>
-                            <span className="font-medium text-gray-900">{household.head_of_household.name}</span>
+                            <User className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                            <span className="text-gray-600 dark:text-gray-400">Head:</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-200">{household.head_of_household.name}</span>
                         </div>
                     )}
 
                     {household.member_count && (
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                             <UsersRound className="h-3 w-3" />
                             <span>{household.member_count} family members</span>
                         </div>
@@ -1167,14 +1155,14 @@ export function PaymentDetailsStep({
         if (!selectedBusiness) return null;
 
         return (
-            <div className="mt-4 pt-3 border-t border-gray-100">
-                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <Briefcase className="h-3 w-3" />
                     Business Details
                 </div>
                 <div className="space-y-2">
                     {selectedBusiness.business_type && (
-                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                        <Badge variant="outline" className="bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800">
                             <Building className="h-3 w-3 mr-1" />
                             {selectedBusiness.business_type_label || selectedBusiness.business_type}
                         </Badge>
@@ -1182,21 +1170,21 @@ export function PaymentDetailsStep({
                     
                     {selectedBusiness.owner_name && (
                         <div className="flex items-center gap-2 text-xs">
-                            <User className="h-3 w-3 text-gray-400" />
-                            <span className="text-gray-600">Owner:</span>
-                            <span className="font-medium text-gray-900">{selectedBusiness.owner_name}</span>
+                            <User className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                            <span className="text-gray-600 dark:text-gray-400">Owner:</span>
+                            <span className="font-medium text-gray-900 dark:text-gray-200">{selectedBusiness.owner_name}</span>
                         </div>
                     )}
 
                     {selectedBusiness.permit_expiry_date && (
                         <div className="flex items-center gap-2 text-xs">
-                            <Calendar className="h-3 w-3 text-gray-400" />
-                            <span className="text-gray-600">Permit Expiry:</span>
-                            <span className={`font-medium ${selectedBusiness.is_permit_valid ? 'text-green-600' : 'text-yellow-600'}`}>
+                            <Calendar className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                            <span className="text-gray-600 dark:text-gray-400">Permit Expiry:</span>
+                            <span className={`font-medium ${selectedBusiness.is_permit_valid ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
                                 {new Date(selectedBusiness.permit_expiry_date).toLocaleDateString()}
                             </span>
                             {!selectedBusiness.is_permit_valid && (
-                                <Badge variant="outline" className="text-[10px] bg-yellow-100 text-yellow-800">
+                                <Badge variant="outline" className="text-[10px] bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400">
                                     Expiring Soon
                                 </Badge>
                             )}
@@ -1205,25 +1193,25 @@ export function PaymentDetailsStep({
 
                     {selectedBusiness.employee_count && (
                         <div className="flex items-center gap-2 text-xs">
-                            <Users className="h-3 w-3 text-gray-400" />
-                            <span className="text-gray-600">Employees:</span>
-                            <span className="font-medium">{selectedBusiness.employee_count}</span>
+                            <Users className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                            <span className="text-gray-600 dark:text-gray-400">Employees:</span>
+                            <span className="font-medium dark:text-gray-200">{selectedBusiness.employee_count}</span>
                         </div>
                     )}
 
                     {selectedBusiness.capital_amount && (
                         <div className="flex items-center gap-2 text-xs">
-                            <DollarSign className="h-3 w-3 text-gray-400" />
-                            <span className="text-gray-600">Capital:</span>
-                            <span className="font-medium">{selectedBusiness.formatted_capital || formatCurrency(selectedBusiness.capital_amount)}</span>
+                            <DollarSign className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                            <span className="text-gray-600 dark:text-gray-400">Capital:</span>
+                            <span className="font-medium dark:text-gray-200">{selectedBusiness.formatted_capital || formatCurrency(selectedBusiness.capital_amount)}</span>
                         </div>
                     )}
 
                     {selectedBusiness.monthly_gross && (
                         <div className="flex items-center gap-2 text-xs">
-                            <TrendingUp className="h-3 w-3 text-gray-400" />
-                            <span className="text-gray-600">Monthly Gross:</span>
-                            <span className="font-medium">{selectedBusiness.formatted_monthly_gross || formatCurrency(selectedBusiness.monthly_gross)}</span>
+                            <TrendingUp className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                            <span className="text-gray-600 dark:text-gray-400">Monthly Gross:</span>
+                            <span className="font-medium dark:text-gray-200">{selectedBusiness.formatted_monthly_gross || formatCurrency(selectedBusiness.monthly_gross)}</span>
                         </div>
                     )}
                 </div>
@@ -1235,11 +1223,11 @@ export function PaymentDetailsStep({
         if (feeItems.length === 0) return null;
 
         return (
-            <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
-                <div className="flex items-center gap-2 text-blue-700 font-medium mb-2">
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-medium mb-2">
                     <Receipt className="h-4 w-4" />
-                    <span className="text-sm">Fee Items</span>
-                    <Badge className="ml-2 bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                    <span className="text-sm">Fee Items ({feeItems.length})</span>
+                    <Badge className="ml-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800 text-xs">
                         {feeItems.length} item(s)
                     </Badge>
                 </div>
@@ -1249,29 +1237,29 @@ export function PaymentDetailsStep({
                         const bestDiscount = getBestDiscountForFee(item);
                         
                         return (
-                            <div key={item.id} className="p-2 bg-white rounded border border-blue-100">
+                            <div key={item.id} className="p-2 bg-white dark:bg-gray-900 rounded border border-blue-100 dark:border-blue-900">
                                 <div className="flex justify-between items-start">
                                     <div className="flex-1">
-                                        <div className="font-medium text-sm flex items-center gap-2">
+                                        <div className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
                                             {item.fee_name}
                                             {isDiscountable && (
-                                                <Badge variant="outline" className="text-[10px] bg-yellow-50 text-yellow-700 border-yellow-200">
+                                                <Badge variant="outline" className="text-[10px] bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">
                                                     <Tag className="h-2 w-2 mr-1" />
                                                     Discountable
                                                 </Badge>
                                             )}
                                         </div>
-                                        <div className="text-xs text-gray-500">{item.fee_code}</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">{item.fee_code}</div>
                                         
                                         {bestDiscount && (
                                             <div className="mt-1">
-                                                <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700">
+                                                <Badge variant="outline" className="text-[10px] bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400">
                                                     Eligible: {bestDiscount.label} ({formatPercentage(bestDiscount.percentage)})
                                                 </Badge>
                                             </div>
                                         )}
                                     </div>
-                                    <div className="font-medium text-sm">
+                                    <div className="font-medium text-sm dark:text-gray-200">
                                         {formatCurrency(item.total_amount)}
                                     </div>
                                 </div>
@@ -1289,18 +1277,18 @@ export function PaymentDetailsStep({
             {/* Left Column - Payment Information */}
             <div className="lg:col-span-2 space-y-6">
                 {/* Payment Information Card */}
-                <Card>
+                <Card className="dark:bg-gray-900">
                     <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <div className="p-2 bg-primary/10 rounded-lg">
-                                    <Receipt className="h-5 w-5 text-primary" />
+                                <div className="p-2 bg-primary/10 dark:bg-blue-900/30 rounded-lg">
+                                    <Receipt className="h-5 w-5 text-primary dark:text-blue-400" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-xl font-semibold">
+                                    <CardTitle className="text-xl font-semibold dark:text-gray-100">
                                         Payment Details
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="dark:text-gray-400">
                                         Complete the payment information
                                     </CardDescription>
                                 </div>
@@ -1312,20 +1300,20 @@ export function PaymentDetailsStep({
                                         {paymentEmphasis.badge}
                                     </Badge>
                                 )}
-                                <Badge variant="outline">Step 3 of 3</Badge>
+                                <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">Step 3 of 3</Badge>
                             </div>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         {/* Receipt Details */}
                         <div className="space-y-3">
-                            <h3 className="font-medium flex items-center gap-2">
+                            <h3 className="font-medium flex items-center gap-2 dark:text-gray-200">
                                 <FileDigit className="h-4 w-4" />
                                 Receipt Information
                             </h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-xs">OR Number</Label>
+                                    <Label className="text-xs dark:text-gray-300">OR Number</Label>
                                     <div className="relative">
                                         <Input
                                             value={data.or_number || ''}
@@ -1339,14 +1327,14 @@ export function PaymentDetailsStep({
                                                 }
                                                 setAutoGeneratedOR(false);
                                             }}
-                                            className="font-mono text-sm pr-20"
+                                            className="font-mono text-sm pr-20 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                             placeholder="BAR-YYYYMMDD-XXX"
                                         />
                                         <Button
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            className="absolute right-1 top-1 h-7 text-xs"
+                                            className="absolute right-1 top-1 h-7 text-xs dark:text-gray-400 dark:hover:text-white"
                                             onClick={handleRegenerateOR}
                                         >
                                             <RefreshCw className="h-3 w-3 mr-1" />
@@ -1355,7 +1343,7 @@ export function PaymentDetailsStep({
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs">Payment Date</Label>
+                                    <Label className="text-xs dark:text-gray-300">Payment Date</Label>
                                     <Input
                                         type="date"
                                         value={data.payment_date || new Date().toISOString().split('T')[0]}
@@ -1368,57 +1356,59 @@ export function PaymentDetailsStep({
                                                 }
                                             }
                                         }}
+                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-xs">Period Covered</Label>
+                                <Label className="text-xs dark:text-gray-300">Period Covered</Label>
                                 <Input
                                     placeholder="e.g., January 2024, Q1 2024"
                                     value={data.period_covered || ''}
                                     onChange={(e) => handlePeriodCoveredChange(e.target.value)}
+                                    className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                 />
                             </div>
                         </div>
 
-                        <Separator />
+                        <Separator className="dark:bg-gray-700" />
 
                         {/* Amount Paid Section */}
                         <div className="space-y-3">
-                            <h3 className="font-medium flex items-center gap-2">
+                            <h3 className="font-medium flex items-center gap-2 dark:text-gray-200">
                                 <Wallet className="h-4 w-4" />
                                 Payment Amount
                             </h3>
                             
                             <div className="space-y-4">
                                 {/* Summary of charges */}
-                                <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
+                                <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg space-y-1 text-sm border border-gray-200 dark:border-gray-700">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-600">Subtotal:</span>
-                                        <span>{formatCurrency(data.subtotal || 0)}</span>
+                                        <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+                                        <span className="dark:text-gray-300">{formatCurrency(data.subtotal || 0)}</span>
                                     </div>
                                     {data.surcharge > 0 && (
-                                        <div className="flex justify-between text-amber-700">
+                                        <div className="flex justify-between text-amber-700 dark:text-amber-400">
                                             <span>Surcharge:</span>
                                             <span>+{formatCurrency(data.surcharge)}</span>
                                         </div>
                                     )}
                                     {data.penalty > 0 && (
-                                        <div className="flex justify-between text-red-700">
+                                        <div className="flex justify-between text-red-700 dark:text-red-400">
                                             <span>Penalty:</span>
                                             <span>+{formatCurrency(data.penalty)}</span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between font-medium pt-1 border-t border-gray-200 mt-1">
-                                        <span>Original Amount:</span>
-                                        <span>{formatCurrency(originalTotal)}</span>
+                                    <div className="flex justify-between font-medium pt-1 border-t border-gray-200 dark:border-gray-700 mt-1">
+                                        <span className="dark:text-gray-300">Original Amount:</span>
+                                        <span className="dark:text-gray-200">{formatCurrency(originalTotal)}</span>
                                     </div>
                                     {discountAmount > 0 && (
-                                        <div className="flex justify-between text-green-700">
+                                        <div className="flex justify-between text-green-700 dark:text-green-400">
                                             <div className="flex items-center gap-1">
                                                 <span>Discount:</span>
                                                 {selectedDiscountRule && (
-                                                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                                    <Badge variant="secondary" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
                                                         {selectedDiscountRule.percentage ? formatPercentage(selectedDiscountRule.percentage) : 
                                                          selectedDiscountRule.formatted_value || 'Fixed'}
                                                     </Badge>
@@ -1427,7 +1417,7 @@ export function PaymentDetailsStep({
                                             <span>-{formatCurrency(discountAmount)}</span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between font-bold text-primary pt-1 border-t border-gray-200 mt-1">
+                                    <div className="flex justify-between font-bold text-primary dark:text-blue-400 pt-1 border-t border-gray-200 dark:border-gray-700 mt-1">
                                         <span>Amount Due:</span>
                                         <span>{formatCurrency(amountDue)}</span>
                                     </div>
@@ -1435,20 +1425,20 @@ export function PaymentDetailsStep({
 
                                 {/* Amount Tendered Input */}
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-medium">Amount Tendered (Cash Received)</Label>
+                                    <Label className="text-sm font-medium dark:text-gray-300">Amount Tendered (Cash Received)</Label>
                                     <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₱</span>
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">₱</span>
                                         <Input
                                             type="text"
                                             value={amountTendered}
                                             onChange={handleAmountTenderedChange}
-                                            className={`pl-8 text-lg font-medium ${
-                                                !isExactAmount && amountPaid > 0 ? 'border-yellow-500' : ''
+                                            className={`pl-8 text-lg font-medium dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 ${
+                                                !isExactAmount && amountPaid > 0 ? 'border-yellow-500 dark:border-yellow-600' : ''
                                             }`}
                                             placeholder="0.00"
                                         />
                                     </div>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
                                         Enter the cash amount received from the payer
                                     </p>
                                 </div>
@@ -1460,7 +1450,7 @@ export function PaymentDetailsStep({
                                         variant="default"
                                         size="sm"
                                         onClick={handleExactAmount}
-                                        className="text-xs bg-green-600 hover:bg-green-700 text-white"
+                                        className="text-xs bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800"
                                     >
                                         <CheckCircle2 className="h-3 w-3 mr-1" />
                                         Pay Exact Amount ({formatCurrency(amountDue)})
@@ -1470,7 +1460,7 @@ export function PaymentDetailsStep({
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handleQuickAmount(Math.ceil(amountDue / 100) * 100)}
-                                        className="text-xs"
+                                        className="text-xs dark:border-gray-600 dark:text-gray-300"
                                     >
                                         Round Up
                                     </Button>
@@ -1479,7 +1469,7 @@ export function PaymentDetailsStep({
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handleQuickAmount(amountDue + 100)}
-                                        className="text-xs"
+                                        className="text-xs dark:border-gray-600 dark:text-gray-300"
                                     >
                                         +₱100
                                     </Button>
@@ -1488,39 +1478,39 @@ export function PaymentDetailsStep({
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handleQuickAmount(amountDue + 500)}
-                                        className="text-xs"
+                                        className="text-xs dark:border-gray-600 dark:text-gray-300"
                                     >
                                         +₱500
                                     </Button>
                                 </div>
 
                                 {/* Payment Summary */}
-                                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg space-y-2 border border-gray-200 dark:border-gray-700">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">Amount Due:</span>
-                                        <span className="font-medium">{formatCurrency(amountDue)}</span>
+                                        <span className="text-gray-600 dark:text-gray-400">Amount Due:</span>
+                                        <span className="font-medium dark:text-gray-300">{formatCurrency(amountDue)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">Amount Tendered:</span>
-                                        <span className="font-medium text-blue-600">{formatCurrency(amountPaid)}</span>
+                                        <span className="text-gray-600 dark:text-gray-400">Amount Tendered:</span>
+                                        <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(amountPaid)}</span>
                                     </div>
                                     
-                                    <Separator />
+                                    <Separator className="dark:bg-gray-700" />
                                     
                                     {isOverpaid ? (
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium text-blue-700">Change Due:</span>
-                                            <span className="text-lg font-bold text-blue-700">{formatCurrency(change)}</span>
+                                            <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Change Due:</span>
+                                            <span className="text-lg font-bold text-blue-700 dark:text-blue-400">{formatCurrency(change)}</span>
                                         </div>
                                     ) : isUnderpaid ? (
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium text-yellow-700">Remaining Balance:</span>
-                                            <span className="text-lg font-bold text-yellow-700">{formatCurrency(balance)}</span>
+                                            <span className="text-sm font-medium text-yellow-700 dark:text-yellow-400">Remaining Balance:</span>
+                                            <span className="text-lg font-bold text-yellow-700 dark:text-yellow-400">{formatCurrency(balance)}</span>
                                         </div>
                                     ) : isExactAmount ? (
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium text-green-700">Payment Status:</span>
-                                            <span className="text-lg font-bold text-green-700">PAID</span>
+                                            <span className="text-sm font-medium text-green-700 dark:text-green-400">Payment Status:</span>
+                                            <span className="text-lg font-bold text-green-700 dark:text-green-400">PAID</span>
                                         </div>
                                     ) : null}
 
@@ -1537,11 +1527,11 @@ export function PaymentDetailsStep({
                                 {!isExactAmount && amountPaid > 0 && (
                                     <div className={`p-3 rounded-md ${
                                         isOverpaid 
-                                            ? 'bg-blue-50 border border-blue-200' 
-                                            : 'bg-yellow-50 border border-yellow-200'
+                                            ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
+                                            : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
                                     }`}>
                                         <p className={`text-sm flex items-center gap-2 ${
-                                            isOverpaid ? 'text-blue-800' : 'text-yellow-800'
+                                            isOverpaid ? 'text-blue-800 dark:text-blue-400' : 'text-yellow-800 dark:text-yellow-400'
                                         }`}>
                                             {isOverpaid ? (
                                                 <>
@@ -1560,27 +1550,27 @@ export function PaymentDetailsStep({
                             </div>
                         </div>
 
-                        <Separator />
+                        <Separator className="dark:bg-gray-700" />
 
                         {/* Purpose of Payment */}
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <h3 className="font-medium flex items-center gap-2">
+                                <h3 className="font-medium flex items-center gap-2 dark:text-gray-200">
                                     <FileText className="h-4 w-4" />
                                     Purpose of Payment
                                 </h3>
-                                <Badge variant="outline" className="text-xs">Required</Badge>
+                                <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">Required</Badge>
                             </div>
                             
                             <Textarea
                                 placeholder="Enter the purpose of payment..."
                                 value={data.purpose || ''}
                                 onChange={(e) => handlePurposeChange(e.target.value)}
-                                className={`min-h-[80px] ${purposeError ? 'border-red-300' : ''}`}
+                                className={`min-h-[80px] dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 ${purposeError ? 'border-red-300 dark:border-red-700' : ''}`}
                             />
                             
                             {purposeError && (
-                                <p className="text-xs text-red-600 flex items-center gap-1">
+                                <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
                                     <AlertCircle className="h-3 w-3" />
                                     {purposeError}
                                 </p>
@@ -1591,7 +1581,7 @@ export function PaymentDetailsStep({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="w-full border-dashed text-xs"
+                                    className="w-full border-dashed text-xs dark:border-gray-600 dark:text-gray-300"
                                     onClick={() => {
                                         const purpose = generatePurpose();
                                         handlePurposeChange(purpose);
@@ -1604,23 +1594,23 @@ export function PaymentDetailsStep({
                             )}
                         </div>
 
-                        <Separator />
+                        <Separator className="dark:bg-gray-700" />
 
                         {/* Payment Method */}
                         <div className="space-y-3">
-                            <h3 className="font-medium flex items-center gap-2">
+                            <h3 className="font-medium flex items-center gap-2 dark:text-gray-200">
                                 <CreditCard className="h-4 w-4" />
                                 Payment Method
                             </h3>
                             
                             <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { id: 'cash', icon: Banknote, name: 'Cash', desc: 'Cash payment' },
-                                    { id: 'gcash', icon: Smartphone, name: 'GCash', desc: 'Mobile payment' },
-                                    { id: 'maya', icon: Smartphone, name: 'Maya', desc: 'Mobile payment' },
-                                    { id: 'bank', icon: Building, name: 'Bank Transfer', desc: 'Bank transfer' },
-                                    { id: 'check', icon: FileText, name: 'Check', desc: 'Check payment' },
-                                    { id: 'online', icon: Globe, name: 'Online', desc: 'Online payment' },
+                                    { id: 'cash', icon: Banknote, name: 'Cash', desc: 'Cash payment', color: 'text-green-600 dark:text-green-400' },
+                                    { id: 'gcash', icon: Smartphone, name: 'GCash', desc: 'Mobile payment', color: 'text-blue-600 dark:text-blue-400' },
+                                    { id: 'maya', icon: Smartphone, name: 'Maya', desc: 'Mobile payment', color: 'text-purple-600 dark:text-purple-400' },
+                                    { id: 'bank', icon: Building, name: 'Bank Transfer', desc: 'Bank transfer', color: 'text-orange-600 dark:text-orange-400' },
+                                    { id: 'check', icon: FileText, name: 'Check', desc: 'Check payment', color: 'text-indigo-600 dark:text-indigo-400' },
+                                    { id: 'online', icon: Globe, name: 'Online', desc: 'Online payment', color: 'text-cyan-600 dark:text-cyan-400' },
                                 ].map((method) => {
                                     const Icon = method.icon;
                                     const isSelected = data.payment_method === method.id;
@@ -1630,15 +1620,15 @@ export function PaymentDetailsStep({
                                             onClick={() => handlePaymentMethodChange(method.id)}
                                             className={`border rounded-lg p-3 cursor-pointer transition-all ${
                                                 isSelected
-                                                    ? 'ring-2 ring-primary border-primary bg-primary/5'
-                                                    : 'hover:border-gray-300'
+                                                    ? 'ring-2 ring-primary border-primary bg-primary/5 dark:ring-blue-600 dark:border-blue-600 dark:bg-blue-900/20'
+                                                    : 'hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
                                             }`}
                                         >
                                             <div className="flex items-center gap-2">
-                                                <Icon className={`h-4 w-4 ${method.id === 'cash' ? 'text-green-600' : 'text-blue-600'}`} />
-                                                <span className="font-medium text-sm">{method.name}</span>
+                                                <Icon className={`h-4 w-4 ${method.color}`} />
+                                                <span className="font-medium text-sm dark:text-gray-200">{method.name}</span>
                                             </div>
-                                            <p className="text-xs text-gray-500 mt-1">{method.desc}</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{method.desc}</p>
                                         </div>
                                     );
                                 })}
@@ -1646,7 +1636,7 @@ export function PaymentDetailsStep({
 
                             {data.payment_method !== 'cash' && (
                                 <div className="space-y-2">
-                                    <Label className="text-xs">Reference Number</Label>
+                                    <Label className="text-xs dark:text-gray-300">Reference Number</Label>
                                     <Input
                                         placeholder="Enter transaction reference"
                                         value={data.reference_number || ''}
@@ -1659,6 +1649,7 @@ export function PaymentDetailsStep({
                                                 }
                                             }
                                         }}
+                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                     />
                                 </div>
                             )}
@@ -1666,7 +1657,7 @@ export function PaymentDetailsStep({
 
                         {/* Remarks - Optional */}
                         <div className="space-y-2">
-                            <Label className="text-xs">Remarks (Optional)</Label>
+                            <Label className="text-xs dark:text-gray-300">Remarks (Optional)</Label>
                             <Textarea
                                 placeholder="Additional notes..."
                                 rows={2}
@@ -1680,6 +1671,7 @@ export function PaymentDetailsStep({
                                         }
                                     }
                                 }}
+                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                             />
                         </div>
 
@@ -1688,7 +1680,7 @@ export function PaymentDetailsStep({
                             <Button 
                                 type="submit" 
                                 disabled={processing} 
-                                className="flex-1"
+                                className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700"
                                 size="lg"
                                 onClick={handleFormSubmit}
                             >
@@ -1706,6 +1698,7 @@ export function PaymentDetailsStep({
                                 variant="outline"
                                 onClick={() => setStep(2)}
                                 size="lg"
+                                className="dark:border-gray-600 dark:text-gray-300"
                             >
                                 Back
                             </Button>
@@ -1717,14 +1710,14 @@ export function PaymentDetailsStep({
             {/* Right Column - Summary Only */}
             <div className="space-y-6">
                 {/* Payer Summary */}
-                <Card>
+                <Card className="dark:bg-gray-900">
                     <CardHeader className="pb-3">
                         <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-blue-100 rounded">
-                                <PayerIcon className="h-4 w-4 text-blue-700" />
+                            <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded">
+                                <PayerIcon className="h-4 w-4 text-blue-700 dark:text-blue-400" />
                             </div>
-                            <CardTitle className="text-base">Payer</CardTitle>
-                            <Badge variant="outline" className="ml-auto text-xs">
+                            <CardTitle className="text-base dark:text-gray-100">Payer</CardTitle>
+                            <Badge variant="outline" className="ml-auto text-xs dark:border-gray-600 dark:text-gray-300">
                                 {getPayerTypeLabel()}
                             </Badge>
                         </div>
@@ -1732,38 +1725,38 @@ export function PaymentDetailsStep({
                     <CardContent className="pt-0">
                         <div className="space-y-3">
                             <div>
-                                <p className="font-medium text-gray-900">{displayPayerName}</p>
+                                <p className="font-medium text-gray-900 dark:text-gray-100">{displayPayerName}</p>
                                 {selectedResident?.suffix && (
-                                    <span className="text-xs text-gray-500 ml-1">{selectedResident.suffix}</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">{selectedResident.suffix}</span>
                                 )}
                             </div>
                             
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <Phone className="h-4 w-4 text-gray-400" />
+                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                <Phone className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                 <span>{displayContactNumber}</span>
                             </div>
                             
                             {selectedResident?.email && (
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <Briefcase className="h-4 w-4 text-gray-400" />
+                                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                    <Briefcase className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                     <span className="text-xs">{selectedResident.email}</span>
                                 </div>
                             )}
                             
-                            <div className="flex items-start gap-2 text-sm text-gray-600">
-                                <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                            <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                <MapPin className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                                 <span>{displayAddress}</span>
                             </div>
                             
                             <div className="flex flex-wrap gap-2 mt-2">
                                 {displayPurok && (
-                                    <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                                    <Badge variant="outline" className="bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
                                         <MapPinHouse className="h-3 w-3 mr-1" />
                                         {displayPurok}
                                     </Badge>
                                 )}
                                 {displayHouseholdNumber && (
-                                    <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+                                    <Badge variant="outline" className="bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
                                         <Hash className="h-3 w-3 mr-1" />
                                         {displayHouseholdNumber}
                                     </Badge>
@@ -1773,27 +1766,27 @@ export function PaymentDetailsStep({
                             {/* Render appropriate info based on payer type */}
                             {data.payer_type === 'resident' && selectedResident && (
                                 <>
-                                    {renderResidentClassifications()}
+                                    {renderResidentPrivileges()}
                                     {renderHouseholdInfo()}
                                     {renderDiscountEligibilities()}
                                 </>
                             )}
                             
                             {data.payer_type === 'household' && selectedHousehold && (
-                                <div className="mt-3 pt-2 border-t border-gray-100">
-                                    <div className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-2">
+                                <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                    <div className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         <Home className="h-3 w-3" />
                                         Household Details
                                     </div>
                                     <div className="space-y-1 text-xs">
                                         <div className="flex justify-between">
-                                            <span className="text-gray-500">Number:</span>
-                                            <span className="font-medium">{selectedHousehold.household_number}</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Number:</span>
+                                            <span className="font-medium dark:text-gray-200">{selectedHousehold.household_number}</span>
                                         </div>
                                         {selectedHousehold.member_count && (
                                             <div className="flex justify-between">
-                                                <span className="text-gray-500">Members:</span>
-                                                <span className="font-medium">{selectedHousehold.member_count}</span>
+                                                <span className="text-gray-500 dark:text-gray-400">Members:</span>
+                                                <span className="font-medium dark:text-gray-200">{selectedHousehold.member_count}</span>
                                             </div>
                                         )}
                                     </div>
@@ -1806,16 +1799,16 @@ export function PaymentDetailsStep({
                 </Card>
 
                 {/* Payment Summary */}
-                <Card>
+                <Card className="dark:bg-gray-900">
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <div className="p-1.5 bg-blue-100 rounded">
-                                    <Calculator className="h-4 w-4 text-blue-700" />
+                                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded">
+                                    <Calculator className="h-4 w-4 text-blue-700 dark:text-blue-400" />
                                 </div>
-                                <CardTitle className="text-base">Summary</CardTitle>
+                                <CardTitle className="text-base dark:text-gray-100">Summary</CardTitle>
                             </div>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">
                                 {paymentItems.length} item{paymentItems.length !== 1 ? 's' : ''}
                             </Badge>
                         </div>
@@ -1831,32 +1824,48 @@ export function PaymentDetailsStep({
                             </div>
                         )}
 
-                        {/* Updated to show clearance details from payment items */}
-                        {isClearanceFeePayment && clearanceItem && (
-                            <div className="bg-purple-50 p-3 rounded-md border border-purple-200">
-                                <div className="flex items-center gap-2 text-purple-700 font-medium mb-2">
+                        {/* FIXED: Show ALL clearance details from payment items */}
+                        {clearanceItems.length > 0 && (
+                            <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-md border border-purple-200 dark:border-purple-800">
+                                <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400 font-medium mb-2">
                                     <FileBadge className="h-4 w-4" />
-                                    <span className="text-sm">Clearance Details</span>
+                                    <span className="text-sm">Clearance Details ({clearanceItems.length})</span>
                                 </div>
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-600">Type:</span>
-                                    <span className="font-medium text-purple-700">
-                                        {clearanceItem.metadata?.clearance_type_name || 'Clearance'}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm mt-1">
-                                    <span className="text-gray-600">Fee:</span>
-                                    <span className="font-medium text-purple-700">{formatCurrency(clearanceItem.total_amount)}</span>
+                                <div className="space-y-3">
+                                    {clearanceItems.map((item, index) => (
+                                        <div key={item.id} className={`${index > 0 ? 'pt-2 border-t border-purple-200 dark:border-purple-800' : ''}`}>
+                                            <div className="flex justify-between items-center text-sm">
+                                                <div>
+                                                    <span className="font-medium text-purple-700 dark:text-purple-400">
+                                                        {item.metadata?.clearance_type_name || item.fee_name}
+                                                    </span>
+                                                    {item.metadata?.reference_number && (
+                                                        <Badge variant="outline" className="ml-2 text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
+                                                            #{item.metadata.reference_number}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <span className="font-medium text-purple-700 dark:text-purple-400">
+                                                    {formatCurrency(item.total_amount)}
+                                                </span>
+                                            </div>
+                                            {item.metadata?.purpose && (
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                                    {item.metadata.purpose}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
                                 {data.validity_date && (
-                                    <div className="flex justify-between items-center text-sm mt-1">
-                                        <span className="text-gray-600">Valid Until:</span>
-                                        <span className="text-xs text-gray-700">{new Date(data.validity_date).toLocaleDateString()}</span>
+                                    <div className="flex justify-between items-center text-sm mt-2 pt-2 border-t border-purple-200 dark:border-purple-800">
+                                        <span className="text-gray-600 dark:text-gray-400">Valid Until:</span>
+                                        <span className="text-xs text-gray-700 dark:text-gray-300">{new Date(data.validity_date).toLocaleDateString()}</span>
                                     </div>
                                 )}
                                 {/* Clearance status */}
                                 {data.is_cleared && (
-                                    <div className="mt-2 flex items-center gap-1 text-xs text-green-600">
+                                    <div className="mt-2 flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
                                         <CheckCircle2 className="h-3 w-3" />
                                         Ready to issue
                                     </div>
@@ -1874,22 +1883,22 @@ export function PaymentDetailsStep({
                                     return (
                                         <div key={item.id} className="flex justify-between items-start text-sm">
                                             <div className="flex-1">
-                                                <div className="font-medium flex items-center gap-1">
+                                                <div className="font-medium flex items-center gap-1 dark:text-gray-200">
                                                     {item.fee_name}
                                                     {isClearance && (
-                                                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                                        <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800">
                                                             Clearance
                                                         </Badge>
                                                     )}
                                                     {isBusiness && (
-                                                        <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                                                        <Badge variant="outline" className="text-xs bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800">
                                                             Business
                                                         </Badge>
                                                     )}
                                                 </div>
-                                                <div className="text-xs text-gray-500">{item.fee_code}</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">{item.fee_code}</div>
                                             </div>
-                                            <div className="font-medium">
+                                            <div className="font-medium dark:text-gray-200">
                                                 {formatCurrency(item.total_amount)}
                                             </div>
                                         </div>
@@ -1898,36 +1907,36 @@ export function PaymentDetailsStep({
                             </div>
                         )}
 
-                        <Separator />
+                        <Separator className="dark:bg-gray-700" />
 
                         {/* Totals */}
                         <div className="space-y-1.5">
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Subtotal</span>
-                                <span>{formatCurrency(data.subtotal || 0)}</span>
+                                <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
+                                <span className="dark:text-gray-300">{formatCurrency(data.subtotal || 0)}</span>
                             </div>
                             {data.surcharge > 0 && (
-                                <div className="flex justify-between text-sm text-amber-700">
+                                <div className="flex justify-between text-sm text-amber-700 dark:text-amber-400">
                                     <span>Surcharge</span>
                                     <span>+{formatCurrency(data.surcharge)}</span>
                                 </div>
                             )}
                             {data.penalty > 0 && (
-                                <div className="flex justify-between text-sm text-red-700">
+                                <div className="flex justify-between text-sm text-red-700 dark:text-red-400">
                                     <span>Penalty</span>
                                     <span>+{formatCurrency(data.penalty)}</span>
                                 </div>
                             )}
-                            <div className="flex justify-between text-sm font-medium pt-1 border-t border-gray-200">
-                                <span>Original Amount</span>
-                                <span>{formatCurrency(originalTotal)}</span>
+                            <div className="flex justify-between text-sm font-medium pt-1 border-t border-gray-200 dark:border-gray-700">
+                                <span className="dark:text-gray-300">Original Amount</span>
+                                <span className="dark:text-gray-200">{formatCurrency(originalTotal)}</span>
                             </div>
                             {discountAmount > 0 && (
-                                <div className="flex justify-between text-sm text-green-700">
+                                <div className="flex justify-between text-sm text-green-700 dark:text-green-400">
                                     <div className="flex items-center gap-1">
                                         <span>Discount</span>
                                         {selectedDiscountRule && (
-                                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                            <Badge variant="secondary" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
                                                 {selectedDiscountRule.percentage ? formatPercentage(selectedDiscountRule.percentage) : 
                                                  selectedDiscountRule.formatted_value || 'Fixed'}
                                             </Badge>
@@ -1938,32 +1947,32 @@ export function PaymentDetailsStep({
                             )}
                         </div>
 
-                        <Separator />
+                        <Separator className="dark:bg-gray-700" />
 
                         {/* Payment Status Summary */}
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">
-                                <span className="font-semibold text-gray-900">Amount Due</span>
-                                <span className="text-xl font-bold text-primary">
+                                <span className="font-semibold text-gray-900 dark:text-gray-100">Amount Due</span>
+                                <span className="text-xl font-bold text-primary dark:text-blue-400">
                                     {formatCurrency(amountDue)}
                                 </span>
                             </div>
                             
                             <div className="flex justify-between items-center text-sm">
-                                <span className="text-gray-600">Amount Paid:</span>
-                                <span className="font-medium text-blue-600">{formatCurrency(amountPaid)}</span>
+                                <span className="text-gray-600 dark:text-gray-400">Amount Paid:</span>
+                                <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(amountPaid)}</span>
                             </div>
                             
                             {isUnderpaid && (
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-600">Balance:</span>
-                                    <span className="font-medium text-yellow-600">{formatCurrency(balance)}</span>
+                                    <span className="text-gray-600 dark:text-gray-400">Balance:</span>
+                                    <span className="font-medium text-yellow-600 dark:text-yellow-400">{formatCurrency(balance)}</span>
                                 </div>
                             )}
                             {isOverpaid && (
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-600">Change:</span>
-                                    <span className="font-medium text-blue-600">{formatCurrency(change)}</span>
+                                    <span className="text-gray-600 dark:text-gray-400">Change:</span>
+                                    <span className="font-medium text-blue-600 dark:text-blue-400">{formatCurrency(change)}</span>
                                 </div>
                             )}
                             
@@ -1977,34 +1986,41 @@ export function PaymentDetailsStep({
 
                         {/* Discount Selection */}
                         <div className="pt-2 space-y-2">
+                            <Label className="text-xs dark:text-gray-300">Apply Discount</Label>
                             <Select
                                 value={selectedDiscountCode || 'no_discount'}
                                 onValueChange={handleDiscountSelect}
                             >
-                                <SelectTrigger className="h-8 text-xs">
+                                <SelectTrigger className="w-full dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                     <SelectValue placeholder="No discount" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                     <SelectItem value="no_discount">No Discount</SelectItem>
-                                    {filteredDiscountRules.map((rule) => (
-                                        <SelectItem key={rule.id} value={rule.code}>
-                                            <div className="flex items-center gap-2">
-                                                <span>{rule.name}</span>
-                                                <Badge variant="outline" className="text-xs">
-                                                    {rule.percentage ? formatPercentage(rule.percentage) : 
-                                                     rule.formatted_value || 'Fixed amount'}
-                                                </Badge>
-                                                {rule.requires_verification && (
-                                                    <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
-                                                        <IdCard className="h-3 w-3 mr-1" />
-                                                        Requires ID
+                                    {filteredDiscountRules.map((rule) => {
+                                        const privilegeCode = rule.privilege_code || rule.code;
+                                        const icon = getPrivilegeIcon(privilegeCode);
+                                        
+                                        return (
+                                            <SelectItem key={rule.id} value={rule.code} className="dark:text-gray-300 dark:focus:bg-gray-700">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs">{icon}</span>
+                                                    <span>{rule.name}</span>
+                                                    <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">
+                                                        {rule.percentage ? formatPercentage(rule.percentage) : 
+                                                         rule.formatted_value || 'Fixed amount'}
                                                     </Badge>
-                                                )}
-                                            </div>
-                                        </SelectItem>
-                                    ))}
+                                                    {rule.requires_verification && (
+                                                        <Badge variant="outline" className="text-xs bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">
+                                                            <IdCard className="h-3 w-3 mr-1" />
+                                                            Requires ID
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </SelectItem>
+                                        );
+                                    })}
                                     {filteredDiscountRules.length === 0 && discountRules.length > 0 && (
-                                        <SelectItem value="no_discount" disabled>
+                                        <SelectItem value="no_discount" disabled className="dark:text-gray-500">
                                             No applicable discounts for this resident
                                         </SelectItem>
                                     )}
@@ -2012,8 +2028,8 @@ export function PaymentDetailsStep({
                             </Select>
                             
                             {selectedDiscountRule?.requires_verification && data.verification_id_number && (
-                                <div className="p-2 bg-green-50 border border-green-200 rounded-md">
-                                    <p className="text-xs text-green-800 flex items-center gap-1">
+                                <div className="p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                                    <p className="text-xs text-green-800 dark:text-green-400 flex items-center gap-1">
                                         <Shield className="h-3 w-3" />
                                         Verified with ID: {data.verification_id_number}
                                     </p>
@@ -2021,8 +2037,8 @@ export function PaymentDetailsStep({
                             )}
                             
                             {selectedDiscountRule?.minimum_purchase_amount && originalTotal < selectedDiscountRule.minimum_purchase_amount && (
-                                <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                                    <p className="text-xs text-yellow-800 flex items-center gap-1">
+                                <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                                    <p className="text-xs text-yellow-800 dark:text-yellow-400 flex items-center gap-1">
                                         <AlertCircle className="h-3 w-3" />
                                         Minimum purchase of {formatCurrency(selectedDiscountRule.minimum_purchase_amount)} required
                                     </p>
@@ -2032,13 +2048,13 @@ export function PaymentDetailsStep({
                             {getDiscountWarningMessage && (
                                 <div className={`p-2 ${
                                     getDiscountWarningMessage.type === 'warning' 
-                                        ? 'bg-yellow-50 border-yellow-200' 
-                                        : 'bg-blue-50 border-blue-200'
+                                        ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800' 
+                                        : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
                                 } border rounded-md mt-2`}>
                                     <p className={`text-xs flex items-center gap-1 ${
                                         getDiscountWarningMessage.type === 'warning'
-                                            ? 'text-yellow-800'
-                                            : 'text-blue-800'
+                                            ? 'text-yellow-800 dark:text-yellow-400'
+                                            : 'text-blue-800 dark:text-blue-400'
                                     }`}>
                                         {getDiscountWarningMessage.type === 'warning' ? (
                                             <AlertTriangle className="h-3 w-3" />

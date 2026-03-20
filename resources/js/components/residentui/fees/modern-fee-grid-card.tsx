@@ -146,7 +146,7 @@ export const ModernFeeGridCard = ({
                     </div>
 
                     {/* Amount Section */}
-                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 mb-3">
+                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 mb-3">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs text-gray-500 dark:text-gray-400">Total Amount</span>
                             <span className="text-lg font-bold text-gray-900 dark:text-white">

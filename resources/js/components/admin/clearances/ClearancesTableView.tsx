@@ -322,7 +322,7 @@ export default function ClearancesTableView({
         <div className="overflow-x-auto">
             <Table>
                 <TableHeader>
-                    <TableRow className="bg-gray-50 dark:bg-gray-800">
+                    <TableRow className="bg-gray-50 dark:bg-gray-900">
                         {isBulkMode && (
                             <TableHead className="w-12 px-4">
                                 <div className="flex items-center">
@@ -522,7 +522,7 @@ export default function ClearancesTableView({
                                                             e.stopPropagation();
                                                             handlePaymentClick(clearance);
                                                         }}
-                                                        className="flex items-center w-full px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md cursor-pointer"
+                                                        className="flex items-center w-full px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900 rounded-md cursor-pointer"
                                                     >
                                                         <CreditCard className="mr-2 h-4 w-4 text-green-600" />
                                                         <span className="text-green-600 font-medium">Record Payment</span>

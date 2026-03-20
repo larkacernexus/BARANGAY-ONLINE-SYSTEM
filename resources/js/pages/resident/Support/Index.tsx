@@ -180,18 +180,18 @@ export default function SupportPage({
       case 'open': return 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400';
       case 'in_progress': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/50 dark:text-yellow-400';
       case 'resolved': return 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-400';
-      case 'closed': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
+      case 'closed': return 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-400';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-400';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch(priority) {
-      case 'low': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
+      case 'low': return 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-400';
       case 'medium': return 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400';
       case 'high': return 'bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-400';
       case 'urgent': return 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-400';
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-400';
     }
   };
 
@@ -236,7 +236,7 @@ export default function SupportPage({
         {/* Quick Contact Cards - COMPACT ON MOBILE */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3 px-4 sm:px-0">
           {/* Email Card - Compact */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 p-2 sm:p-3 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white dark:bg-gray-900 rounded-lg border dark:border-gray-700 p-2 sm:p-3 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex flex-col items-center text-center">
               <div className="p-1.5 sm:p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full mb-1 sm:mb-2">
                 <MailIcon className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
@@ -250,7 +250,7 @@ export default function SupportPage({
           </div>
 
           {/* Phone Card - Compact */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 p-2 sm:p-3 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white dark:bg-gray-900 rounded-lg border dark:border-gray-700 p-2 sm:p-3 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex flex-col items-center text-center">
               <div className="p-1.5 sm:p-2 bg-green-100 dark:bg-green-900/30 rounded-full mb-1 sm:mb-2">
                 <PhoneIcon className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 dark:text-green-400" />
@@ -266,7 +266,7 @@ export default function SupportPage({
           </div>
 
           {/* Visit Us Card - Compact */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 p-2 sm:p-3 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white dark:bg-gray-900 rounded-lg border dark:border-gray-700 p-2 sm:p-3 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex flex-col items-center text-center">
               <div className="p-1.5 sm:p-2 bg-purple-100 dark:bg-purple-900/30 rounded-full mb-1 sm:mb-2">
                 <BuildingIcon className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400" />
@@ -304,7 +304,7 @@ export default function SupportPage({
 
           {/* FAQ Tab */}
           <TabsContent value="faq" className="space-y-4">
-            <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <Card className="dark:bg-gray-900 dark:border-gray-700">
               <CardHeader className="p-3 sm:p-6">
                 <CardTitle className="text-base sm:text-lg dark:text-white">Frequently Asked Questions</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">Find answers to common questions</CardDescription>
@@ -318,11 +318,11 @@ export default function SupportPage({
                       placeholder="Search FAQs..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-7 sm:pl-9 h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-800 dark:border-gray-700"
+                      className="pl-7 sm:pl-9 h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-900 dark:border-gray-700"
                     />
                   </div>
                   <Select value={faqCategory} onValueChange={setFaqCategory}>
-                    <SelectTrigger className="w-full sm:w-[180px] h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-800 dark:border-gray-700">
+                    <SelectTrigger className="w-full sm:w-[180px] h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-900 dark:border-gray-700">
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
@@ -377,7 +377,7 @@ export default function SupportPage({
 
           {/* Contact Support Tab */}
           <TabsContent value="contact">
-            <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <Card className="dark:bg-gray-900 dark:border-gray-700">
               <CardHeader className="p-3 sm:p-6">
                 <CardTitle className="text-base sm:text-lg dark:text-white">Submit a Support Ticket</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">Fill out the form below and we'll get back to you as soon as possible</CardDescription>
@@ -393,7 +393,7 @@ export default function SupportPage({
                         value={formData.name}
                         onChange={handleInputChange}
                         required
-                        className="h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-800 dark:border-gray-700"
+                        className="h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-900 dark:border-gray-700"
                       />
                     </div>
                     <div className="space-y-1 sm:space-y-2">
@@ -405,7 +405,7 @@ export default function SupportPage({
                         value={formData.email}
                         onChange={handleInputChange}
                         required
-                        className="h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-800 dark:border-gray-700"
+                        className="h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-900 dark:border-gray-700"
                       />
                     </div>
                   </div>
@@ -418,7 +418,7 @@ export default function SupportPage({
                       value={formData.subject}
                       onChange={handleInputChange}
                       required
-                      className="h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-800 dark:border-gray-700"
+                      className="h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-900 dark:border-gray-700"
                     />
                   </div>
 
@@ -429,7 +429,7 @@ export default function SupportPage({
                         value={formData.category} 
                         onValueChange={(value) => handleSelectChange('category', value)}
                       >
-                        <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-800 dark:border-gray-700">
+                        <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-900 dark:border-gray-700">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
@@ -445,7 +445,7 @@ export default function SupportPage({
                         value={formData.priority} 
                         onValueChange={(value) => handleSelectChange('priority', value)}
                       >
-                        <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-800 dark:border-gray-700">
+                        <SelectTrigger className="h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-900 dark:border-gray-700">
                           <SelectValue placeholder="Select priority" />
                         </SelectTrigger>
                         <SelectContent>
@@ -467,7 +467,7 @@ export default function SupportPage({
                       value={formData.message}
                       onChange={handleInputChange}
                       required
-                      className="text-xs sm:text-sm dark:bg-gray-800 dark:border-gray-700"
+                      className="text-xs sm:text-sm dark:bg-gray-900 dark:border-gray-700"
                     />
                   </div>
 
@@ -478,7 +478,7 @@ export default function SupportPage({
                         id="attachment"
                         type="file"
                         onChange={handleFileChange}
-                        className="flex-1 h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-800 dark:border-gray-700 file:mr-2 file:py-1 file:px-2 file:text-xs"
+                        className="flex-1 h-8 sm:h-10 text-xs sm:text-sm dark:bg-gray-900 dark:border-gray-700 file:mr-2 file:py-1 file:px-2 file:text-xs"
                       />
                       {formData.attachment && (
                         <Button
@@ -521,7 +521,7 @@ export default function SupportPage({
 
           {/* My Tickets Tab */}
           <TabsContent value="tickets">
-            <Card className="dark:bg-gray-800 dark:border-gray-700">
+            <Card className="dark:bg-gray-900 dark:border-gray-700">
               <CardHeader className="p-3 sm:p-6">
                 <CardTitle className="text-base sm:text-lg dark:text-white">My Support Tickets</CardTitle>
                 <CardDescription className="text-xs sm:text-sm">View and track your support requests</CardDescription>
@@ -592,7 +592,7 @@ export default function SupportPage({
         <div className="px-4 sm:px-0">
           <h2 className="text-sm sm:text-lg font-semibold mb-2 sm:mb-3 dark:text-white">Helpful Resources</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-            <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-md transition-shadow">
+            <Card className="dark:bg-gray-900 dark:border-gray-700 hover:shadow-md transition-shadow">
               <CardContent className="p-2 sm:p-4">
                 <Link href="/portal/guides" className="flex items-center gap-2 sm:gap-3">
                   <div className="p-1.5 sm:p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
@@ -609,7 +609,7 @@ export default function SupportPage({
               </CardContent>
             </Card>
 
-            <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-md transition-shadow">
+            <Card className="dark:bg-gray-900 dark:border-gray-700 hover:shadow-md transition-shadow">
               <CardContent className="p-2 sm:p-4">
                 <Link href="/portal/video-tutorials" className="flex items-center gap-2 sm:gap-3">
                   <div className="p-1.5 sm:p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
@@ -626,7 +626,7 @@ export default function SupportPage({
               </CardContent>
             </Card>
 
-            <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-md transition-shadow">
+            <Card className="dark:bg-gray-900 dark:border-gray-700 hover:shadow-md transition-shadow">
               <CardContent className="p-2 sm:p-4">
                 <Link href="/portal/announcements" className="flex items-center gap-2 sm:gap-3">
                   <div className="p-1.5 sm:p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">

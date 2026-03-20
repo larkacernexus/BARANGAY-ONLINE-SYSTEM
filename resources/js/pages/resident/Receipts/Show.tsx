@@ -106,7 +106,7 @@ export default function Show({ receipt }: Props) {
                     <div className="flex items-center gap-4">
                         <Link
                             href={route('portal.receipts.index')}
-                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg transition-colors"
                         >
                             <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                         </Link>
@@ -129,7 +129,7 @@ export default function Show({ receipt }: Props) {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={handlePrint}
-                            className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
                         >
                             <Printer className="h-4 w-4" />
                             Print
@@ -149,7 +149,7 @@ export default function Show({ receipt }: Props) {
                     {/* Left Column - Receipt Details */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Receipt Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Receipt Details
@@ -227,7 +227,7 @@ export default function Show({ receipt }: Props) {
                         </div>
 
                         {/* Items Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Items ({receipt.items_count})
@@ -263,7 +263,7 @@ export default function Show({ receipt }: Props) {
                     {/* Right Column - Summary */}
                     <div className="space-y-6">
                         {/* Payer Info */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Payer Information
@@ -294,7 +294,7 @@ export default function Show({ receipt }: Props) {
                         </div>
 
                         {/* Payment Summary */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Payment Summary
@@ -341,7 +341,7 @@ export default function Show({ receipt }: Props) {
                         </div>
 
                         {/* Actions */}
-                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     Actions
@@ -351,7 +351,7 @@ export default function Show({ receipt }: Props) {
                                 <div className="space-y-3">
                                     <button
                                         onClick={handlePrint}
-                                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                                     >
                                         <div className="flex items-center gap-3">
                                             <Printer className="h-5 w-5 text-gray-500" />
@@ -361,7 +361,7 @@ export default function Show({ receipt }: Props) {
                                     </button>
                                     <button
                                         onClick={handleDownload}
-                                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                                     >
                                         <div className="flex items-center gap-3">
                                             <Download className="h-5 w-5 text-gray-500" />
@@ -371,7 +371,7 @@ export default function Show({ receipt }: Props) {
                                     </button>
                                     <Link
                                         href={route('portal.receipts.index')}
-                                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                                     >
                                         <div className="flex items-center gap-3">
                                             <Receipt className="h-5 w-5 text-gray-500" />

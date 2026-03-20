@@ -14,12 +14,27 @@ use App\Models\ClearanceRequest;
 use App\Models\Form;
 use App\Models\Announcement;
 use App\Models\Payment;
+use App\Models\Privilege;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Cache;
 
 class SearchController extends Controller
 {
+    protected $allPrivileges;
+
+    public function __construct()
+    {
+        // Cache all privileges for performance
+        $this->allPrivileges = Cache::remember('all_privileges', 3600, function () {
+            return Privilege::where('is_active', true)
+                ->get(['id', 'name', 'code', 'description'])
+                ->keyBy('code')
+                ->toArray();
+        });
+    }
+
     public function index(Request $request)
     {
         $query = $request->get('q');
@@ -34,7 +49,10 @@ class SearchController extends Controller
             $quickResults = $this->performQuickSearch($query);
             
             // Return JSON response for quick search
-            return response()->json(['quickResults' => $quickResults]);
+            return response()->json([
+                'quickResults' => $quickResults,
+                'allPrivileges' => $this->allPrivileges
+            ]);
         }
 
         // Regular search (full page)
@@ -42,7 +60,8 @@ class SearchController extends Controller
             return Inertia::render('admin/Search/Index', [
                 'query' => $query ?? '',
                 'results' => [],
-                'recentSearches' => $this->getRecentSearches($request)
+                'recentSearches' => $this->getRecentSearches($request),
+                'allPrivileges' => $this->allPrivileges
             ]);
         }
 
@@ -54,7 +73,8 @@ class SearchController extends Controller
         return Inertia::render('admin/Search/Index', [
             'query' => $query,
             'results' => $results,
-            'recentSearches' => $this->getRecentSearches($request)
+            'recentSearches' => $this->getRecentSearches($request),
+            'allPrivileges' => $this->allPrivileges
         ]);
     }
 
@@ -64,7 +84,7 @@ class SearchController extends Controller
         $results = [];
 
         // Quick search - top 3 from most important tables
-        $residents = Resident::with('purok')
+        $residents = Resident::with(['purok', 'residentPrivileges.privilege'])
             ->where('first_name', 'like', $searchTerm)
             ->orWhere('last_name', 'like', $searchTerm)
             ->orWhere('middle_name', 'like', $searchTerm)
@@ -77,17 +97,22 @@ class SearchController extends Controller
                     $url = route('admin.residents.show', $r->id);
                 }
 
+                // Get active privileges
+                $privileges = $this->getResidentPrivileges($r);
+
                 return [
                     'id' => $r->id,
                     'type' => 'resident',
                     'text' => $r->full_name ?? $r->first_name . ' ' . $r->last_name,
                     'subtext' => $r->purok?->name ?? 'No purok',
                     'url' => $url,
-                    'icon' => 'User'
+                    'icon' => 'User',
+                    'privileges' => $privileges,
+                    'has_privileges' => count($privileges) > 0,
                 ];
             })->toArray();
 
-        $households = Household::with('purok')
+        $households = Household::with(['purok', 'householdMembers.resident.residentPrivileges.privilege'])
             ->where('household_number', 'like', $searchTerm)
             ->orWhere('head_of_family', 'like', $searchTerm)
             ->orWhere('address', 'like', $searchTerm)
@@ -99,17 +124,25 @@ class SearchController extends Controller
                     $url = route('admin.households.show', $h->id);
                 }
 
+                // Check if head has privileges
+                $headHasPrivileges = false;
+                $headMember = $h->householdMembers->where('is_head', true)->first();
+                if ($headMember && $headMember->resident) {
+                    $headHasPrivileges = $this->hasAnyPrivilege($headMember->resident);
+                }
+
                 return [
                     'id' => $h->id,
                     'type' => 'household',
                     'text' => 'Household ' . ($h->household_number ?? '#' . $h->id),
                     'subtext' => $h->address ?? 'No address',
                     'url' => $url,
-                    'icon' => 'Home'
+                    'icon' => 'Home',
+                    'has_privileges' => $headHasPrivileges,
                 ];
             })->toArray();
 
-        $businesses = Business::with('purok')
+        $businesses = Business::with(['purok', 'owner.residentPrivileges.privilege'])
             ->where('business_name', 'like', $searchTerm)
             ->orWhere('owner_name', 'like', $searchTerm)
             ->limit(2)
@@ -120,13 +153,20 @@ class SearchController extends Controller
                     $url = route('admin.businesses.show', $b->id);
                 }
 
+                // Check if owner has privileges
+                $ownerHasPrivileges = false;
+                if ($b->owner) {
+                    $ownerHasPrivileges = $this->hasAnyPrivilege($b->owner);
+                }
+
                 return [
                     'id' => $b->id,
                     'type' => 'business',
                     'text' => $b->business_name ?? 'Unnamed Business',
                     'subtext' => $b->business_type ?? 'Business',
                     'url' => $url,
-                    'icon' => 'Briefcase'
+                    'icon' => 'Briefcase',
+                    'has_privileges' => $ownerHasPrivileges,
                 ];
             })->toArray();
 
@@ -145,7 +185,7 @@ class SearchController extends Controller
                     'text' => $p->name,
                     'subtext' => 'Purok',
                     'url' => $url,
-                    'icon' => 'MapPin'
+                    'icon' => 'MapPin',
                 ];
             })->toArray();
 
@@ -169,12 +209,12 @@ class SearchController extends Controller
                     'text' => $user->first_name . ' ' . $user->last_name ?? $user->username ?? 'User',
                     'subtext' => $user->email ?? 'No email',
                     'url' => $url,
-                    'icon' => 'UserCircle'
+                    'icon' => 'UserCircle',
                 ];
             })->toArray();
 
         // Search Officials for quick results
-        $officials = Official::with('resident')
+        $officials = Official::with('resident.residentPrivileges.privilege')
             ->whereHas('resident', function ($q) use ($searchTerm) {
                 $q->where('first_name', 'like', $searchTerm)
                   ->orWhere('last_name', 'like', $searchTerm);
@@ -187,13 +227,16 @@ class SearchController extends Controller
                     $url = route('admin.officials.show', $official->id);
                 }
 
+                $hasPrivileges = $official->resident && $this->hasAnyPrivilege($official->resident);
+
                 return [
                     'id' => $official->id,
                     'type' => 'official',
                     'text' => $official->resident?->full_name ?? 'Unknown',
                     'subtext' => $official->position ?? 'Official',
                     'url' => $url,
-                    'icon' => 'BadgeCheck'
+                    'icon' => 'BadgeCheck',
+                    'has_privileges' => $hasPrivileges,
                 ];
             })->toArray();
 
@@ -205,7 +248,7 @@ class SearchController extends Controller
         $searchTerm = '%' . $query . '%';
         $results = [];
 
-        // 1. Search Residents (most important)
+        // 1. Search Residents (most important) with privileges
         $results = array_merge($results, $this->searchResidents($searchTerm, $query));
 
         // 2. Search Households
@@ -269,19 +312,70 @@ class SearchController extends Controller
         return $results;
     }
 
+    /**
+     * Get resident's active privileges
+     */
+    protected function getResidentPrivileges($resident)
+    {
+        if (!$resident || !$resident->residentPrivileges) {
+            return [];
+        }
+
+        return $resident->residentPrivileges
+            ->filter(function ($rp) {
+                return $rp->isActive();
+            })
+            ->map(function ($rp) {
+                $privilege = $rp->privilege;
+                return [
+                    'id' => $rp->id,
+                    'privilege_id' => $privilege->id,
+                    'code' => $privilege->code,
+                    'name' => $privilege->name,
+                    'id_number' => $rp->id_number,
+                ];
+            })
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * Check if resident has any active privileges
+     */
+    protected function hasAnyPrivilege($resident)
+    {
+        if (!$resident || !$resident->residentPrivileges) {
+            return false;
+        }
+
+        return $resident->residentPrivileges
+            ->filter(function ($rp) {
+                return $rp->isActive();
+            })
+            ->isNotEmpty();
+    }
+
+    /**
+     * Get privilege tags for display
+     */
+    protected function getPrivilegeTags($privileges)
+    {
+        $tags = [];
+        foreach ($privileges as $priv) {
+            $tags[] = $priv['name'];
+        }
+        return $tags;
+    }
+
     protected function searchResidents($searchTerm, $rawQuery)
     {
-        $residents = Resident::with(['purok', 'household'])
+        $residents = Resident::with(['purok', 'household', 'residentPrivileges.privilege'])
             ->where('first_name', 'like', $searchTerm)
             ->orWhere('last_name', 'like', $searchTerm)
             ->orWhere('middle_name', 'like', $searchTerm)
             ->orWhere('email', 'like', $searchTerm)
             ->orWhere('contact_number', 'like', $searchTerm)
             ->orWhere('resident_id', 'like', $searchTerm)
-            ->orWhere('senior_id_number', 'like', $searchTerm)
-            ->orWhere('pwd_id_number', 'like', $searchTerm)
-            ->orWhere('solo_parent_id_number', 'like', $searchTerm)
-            ->orWhere('indigent_id_number', 'like', $searchTerm)
             ->orWhere('address', 'like', $searchTerm)
             ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$searchTerm])
             ->orWhereRaw("CONCAT(first_name, ' ', middle_name, ' ', last_name) LIKE ?", [$searchTerm])
@@ -297,13 +391,16 @@ class SearchController extends Controller
                     $relevance += 20;
                 }
 
-                // Get discount tags
-                $tags = [];
-                if ($resident->is_senior) $tags[] = 'Senior';
-                if ($resident->is_pwd) $tags[] = 'PWD';
-                if ($resident->is_solo_parent) $tags[] = 'Solo Parent';
-                if ($resident->is_indigent) $tags[] = 'Indigent';
-                if ($resident->is_voter) $tags[] = 'Voter';
+                // Get privileges
+                $privileges = $this->getResidentPrivileges($resident);
+                
+                // Create tags from privileges
+                $tags = $this->getPrivilegeTags($privileges);
+                
+                // Add voter tag if applicable
+                if ($resident->is_voter) {
+                    $tags[] = 'Voter';
+                }
 
                 // Check if route exists
                 $url = '#';
@@ -326,6 +423,8 @@ class SearchController extends Controller
                         'age' => $resident->age,
                         'gender' => $resident->gender,
                         'civil_status' => $resident->civil_status,
+                        'privileges' => $privileges,
+                        'privileges_count' => count($privileges),
                     ]
                 ];
             })
@@ -336,7 +435,7 @@ class SearchController extends Controller
 
     protected function searchHouseholds($searchTerm)
     {
-        $households = Household::with(['purok'])
+        $households = Household::with(['purok', 'householdMembers.resident.residentPrivileges.privilege'])
             ->where('household_number', 'like', $searchTerm)
             ->orWhere('contact_number', 'like', $searchTerm)
             ->orWhere('email', 'like', $searchTerm)
@@ -348,6 +447,13 @@ class SearchController extends Controller
                 $url = '#';
                 if (Route::has('admin.households.show')) {
                     $url = route('admin.households.show', $household->id);
+                }
+
+                // Get head member's privileges
+                $headPrivileges = [];
+                $headMember = $household->householdMembers->where('is_head', true)->first();
+                if ($headMember && $headMember->resident) {
+                    $headPrivileges = $this->getResidentPrivileges($headMember->resident);
                 }
 
                 return [
@@ -364,10 +470,13 @@ class SearchController extends Controller
                         $household->ownership_status,
                         $household->electricity ? 'With Electricity' : null,
                         $household->internet ? 'With Internet' : null,
+                        count($headPrivileges) > 0 ? 'Head has privileges' : null,
                     ]),
                     'meta' => [
                         'member_count' => $household->member_count,
                         'income_range' => $household->income_range,
+                        'head_privileges' => $headPrivileges,
+                        'head_privileges_count' => count($headPrivileges),
                     ]
                 ];
             })
@@ -415,7 +524,7 @@ class SearchController extends Controller
 
     protected function searchBusinesses($searchTerm)
     {
-        $businesses = Business::with(['purok', 'owner'])
+        $businesses = Business::with(['purok', 'owner.residentPrivileges.privilege'])
             ->where('business_name', 'like', $searchTerm)
             ->orWhere('business_type', 'like', $searchTerm)
             ->orWhere('owner_name', 'like', $searchTerm)
@@ -432,6 +541,12 @@ class SearchController extends Controller
                     $url = route('admin.businesses.show', $business->id);
                 }
 
+                // Get owner's privileges
+                $ownerPrivileges = [];
+                if ($business->owner) {
+                    $ownerPrivileges = $this->getResidentPrivileges($business->owner);
+                }
+
                 return [
                     'id' => $business->id,
                     'type' => 'business',
@@ -445,6 +560,8 @@ class SearchController extends Controller
                     'meta' => [
                         'employees' => $business->employee_count,
                         'capital' => $business->capital_amount ? '₱' . number_format($business->capital_amount, 2) : null,
+                        'owner_privileges' => $ownerPrivileges,
+                        'owner_privileges_count' => count($ownerPrivileges),
                     ]
                 ];
             })
@@ -455,7 +572,7 @@ class SearchController extends Controller
 
     protected function searchOfficials($searchTerm)
     {
-        $officials = Official::with(['resident', 'position'])
+        $officials = Official::with(['resident.residentPrivileges.privilege', 'position'])
             ->whereHas('resident', function ($q) use ($searchTerm) {
                 $q->where('first_name', 'like', $searchTerm)
                   ->orWhere('last_name', 'like', $searchTerm)
@@ -476,6 +593,9 @@ class SearchController extends Controller
                     $url = route('admin.officials.show', $official->id);
                 }
                 
+                // Get resident's privileges
+                $privileges = $official->resident ? $this->getResidentPrivileges($official->resident) : [];
+                
                 return [
                     'id' => $official->id,
                     'type' => 'official',
@@ -486,6 +606,10 @@ class SearchController extends Controller
                     'icon' => 'BadgeCheck',
                     'badge' => 'Official',
                     'tags' => array_filter([$official->status, $termYears]),
+                    'meta' => [
+                        'privileges' => $privileges,
+                        'privileges_count' => count($privileges),
+                    ]
                 ];
             })
             ->toArray();
@@ -563,7 +687,7 @@ class SearchController extends Controller
 
     protected function searchClearanceRequests($searchTerm)
     {
-        $clearances = ClearanceRequest::with(['resident', 'clearanceType'])
+        $clearances = ClearanceRequest::with(['resident.residentPrivileges.privilege', 'clearanceType'])
             ->where('reference_number', 'like', $searchTerm)
             ->orWhere('clearance_number', 'like', $searchTerm)
             ->orWhere('purpose', 'like', $searchTerm)
@@ -581,6 +705,9 @@ class SearchController extends Controller
                     $url = route('admin.clearance-requests.show', $clearance->id);
                 }
 
+                // Get resident's privileges
+                $privileges = $clearance->resident ? $this->getResidentPrivileges($clearance->resident) : [];
+
                 return [
                     'id' => $clearance->id,
                     'type' => 'clearance',
@@ -594,6 +721,8 @@ class SearchController extends Controller
                     'meta' => [
                         'amount' => $clearance->fee_amount ? '₱' . number_format($clearance->fee_amount, 2) : null,
                         'payment_status' => $clearance->payment_status,
+                        'privileges' => $privileges,
+                        'privileges_count' => count($privileges),
                     ]
                 ];
             })
@@ -675,7 +804,7 @@ class SearchController extends Controller
 
     protected function searchPayments($searchTerm)
     {
-        $payments = Payment::query()
+        $payments = Payment::with(['resident.residentPrivileges.privilege', 'household'])
             ->where('or_number', 'like', $searchTerm)
             ->orWhere('payer_name', 'like', $searchTerm)
             ->orWhere('reference_number', 'like', $searchTerm)
@@ -698,6 +827,12 @@ class SearchController extends Controller
                     }
                 }
 
+                // Get resident's privileges if applicable
+                $privileges = [];
+                if ($payment->resident) {
+                    $privileges = $this->getResidentPrivileges($payment->resident);
+                }
+
                 return [
                     'id' => $payment->id,
                     'type' => 'payment',
@@ -711,6 +846,8 @@ class SearchController extends Controller
                     'meta' => [
                         'date' => $payment->payment_date ? date('M d, Y', strtotime($payment->payment_date)) : null,
                         'recorded_by' => $recordedByName,
+                        'privileges' => $privileges,
+                        'privileges_count' => count($privileges),
                     ]
                 ];
             })

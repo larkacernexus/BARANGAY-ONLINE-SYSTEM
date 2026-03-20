@@ -38,7 +38,7 @@ export function SelectAllFloat({
                     <TooltipTrigger asChild>
                         <Button
                             onClick={onSelectAll}
-                            className="h-10 px-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-lg hover:shadow-xl rounded-full flex items-center gap-2 transition-all duration-200"
+                            className="h-10 px-4 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 shadow-lg hover:shadow-xl rounded-full flex items-center gap-2 transition-all duration-200"
                         >
                             {isSelectAll ? (
                                 <CheckSquare className="h-4 w-4 text-green-600" />

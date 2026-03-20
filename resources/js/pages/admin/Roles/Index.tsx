@@ -67,39 +67,7 @@ export default function Roles() {
         return normalizeStats(propsStats, roles.data);
     }, [propsStats, roles.data]);
 
-    // Debounced search
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value
-            };
-            
-            // Clean up empty values
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (!params[k] || params[k] === 'all') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/admin/roles', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 500),
-        [filtersState]
-    );
-
-    // Handle search change
-    useEffect(() => {
-        if (search !== initialFilters.search) {
-            debouncedSearch(search);
-        }
-        return () => debouncedSearch.cancel();
-    }, [search, debouncedSearch, initialFilters.search]);
-
+    
     // Handle window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -559,7 +527,7 @@ export default function Roles() {
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border hidden sm:block">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border hidden sm:block">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Key className="h-4 w-4 text-gray-500" />

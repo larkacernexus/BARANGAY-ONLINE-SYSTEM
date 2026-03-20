@@ -143,7 +143,7 @@ export default function FeesTableView({
         if (onEdit) {
             onEdit(fee);
         } else {
-            router.get(route('fees.edit', fee.id));
+            router.get(route('admin.fees.edit', fee.id));
         }
     };
 
@@ -161,7 +161,7 @@ export default function FeesTableView({
                 <div className="overflow-hidden">
                     <Table className="min-w-full">
                         <TableHeader>
-                            <TableRow className="bg-gray-50 dark:bg-gray-800">
+                            <TableRow className="bg-gray-50 dark:bg-gray-900">
                                 {isBulkMode && (
                                     <TableHead className="px-4 py-3 text-center w-12">
                                         <div className="flex items-center justify-center">
@@ -219,7 +219,7 @@ export default function FeesTableView({
                                         {getSortIcon('status', filtersState)}
                                     </div>
                                 </TableHead>
-                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[80px]">
+                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[80px]">
                                     Actions
                                 </TableHead>
                             </TableRow>
@@ -233,7 +233,7 @@ export default function FeesTableView({
                                 return (
                                     <TableRow 
                                         key={fee.id} 
-                                        className={`hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${
+                                        className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors ${
                                             isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
                                         } ${isFeeOverdue ? 'bg-red-50/30 dark:bg-red-900/10' : ''}`}
                                         onClick={(e) => {
@@ -278,7 +278,7 @@ export default function FeesTableView({
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                                                <div className="p-2 bg-gray-100 dark:bg-gray-900 rounded-lg">
                                                     {getPayerIcon(fee.payer_type)}
                                                 </div>
                                                 <div>

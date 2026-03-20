@@ -49,6 +49,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { route } from 'ziggy-js';
+import { toast } from '@/hooks/use-toast';
 
 interface RolePermissionShowProps {
     role_permission: {
@@ -80,7 +82,7 @@ interface RolePermissionShowProps {
             id: number;
             name: string;
             email: string;
-            avatar?: string;
+            avatar?: string | null;
             role?: string;
         };
         notes?: string;
@@ -93,29 +95,55 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
     const [isRevoking, setIsRevoking] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
 
+    // Add null check for role_permission
+    if (!role_permission) {
+        return (
+            <AdminLayout title="Permission Assignment">
+                <div className="flex items-center justify-center min-h-screen dark:bg-gray-900">
+                    <Alert className="w-96 dark:bg-gray-900 dark:border-gray-700">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Error</AlertTitle>
+                        <AlertDescription>Permission assignment data not found.</AlertDescription>
+                    </Alert>
+                </div>
+            </AdminLayout>
+        );
+    }
+
     const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
+        if (!dateString) return 'N/A';
+        try {
+            return new Date(dateString).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        } catch {
+            return 'Invalid date';
+        }
     };
 
     const formatTimeAgo = (dateString: string) => {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-        
-        if (diffInSeconds < 60) return 'just now';
-        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
-        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-        if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
-        return formatDate(dateString);
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+            
+            if (diffInSeconds < 60) return 'just now';
+            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+            if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+            return formatDate(dateString);
+        } catch {
+            return 'Invalid date';
+        }
     };
 
     const handleCopyToClipboard = async (text: string, label: string) => {
+        if (!text) return;
         try {
             await navigator.clipboard.writeText(text);
             setCopySuccess(`${label} copied to clipboard!`);
@@ -134,7 +162,7 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
         router.delete(route('role-permissions.destroy', role_permission.id), {
             preserveScroll: true,
             onSuccess: () => {
-                router.visit(route('role-permissions.index'));
+                router.visit(route('admin.role-permissions.index'));
             },
             onError: () => {
                 setIsRevoking(false);
@@ -149,7 +177,7 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
             permission: role_permission.permission,
             granter: role_permission.granter,
             granted_at: role_permission.granted_at,
-            notes: role_permission.notes,
+            notes: role_permission.notes || null,
         };
         
         const jsonString = JSON.stringify(data, null, 2);
@@ -165,6 +193,7 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
     };
 
     const getInitials = (name: string) => {
+        if (!name) return '??';
         return name
             .split(' ')
             .map(part => part[0])
@@ -173,38 +202,65 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
             .slice(0, 2);
     };
 
+    // Safe access helpers
+    const granter = role_permission.granter || {
+        id: 0,
+        name: 'Unknown',
+        email: '',
+        avatar: null,
+        role: 'Unknown'
+    };
+
+    const role = role_permission.role || {
+        id: 0,
+        name: 'Unknown',
+        is_system_role: false,
+        created_at: '',
+        updated_at: ''
+    };
+
+    const permission = role_permission.permission || {
+        id: 0,
+        name: 'unknown',
+        display_name: 'Unknown',
+        module: 'unknown',
+        is_active: false,
+        created_at: '',
+        updated_at: ''
+    };
+
     return (
         <AdminLayout
             title={`Permission Assignment #${role_permission.id}`}
             breadcrumbs={[
-                { title: 'Dashboard', href: route('dashboard') },
-                { title: 'Role Permissions', href: route('role-permissions.index') },
-                { title: `Assignment #${role_permission.id}`, href: route('role-permissions.show', role_permission.id) }
+                { title: 'Dashboard', href: route('admin.dashboard') },
+                { title: 'Role Permissions', href: route('admin.role-permissions.index') },
+                { title: `Assignment #${role_permission.id}`, href: route('admin.role-permissions.show', role_permission.id) }
             ]}
         >
             <Head title={`Permission Assignment #${role_permission.id}`} />
 
-            {/* Success Alert */}
-            {copySuccess && (
-                <Alert className="mb-6 bg-green-50 text-green-800 border-green-200">
-                    <Check className="h-4 w-4" />
-                    <AlertTitle>Success!</AlertTitle>
-                    <AlertDescription>{copySuccess}</AlertDescription>
-                </Alert>
-            )}
+            <div className="space-y-6 dark:bg-gray-900 min-h-screen p-6">
+                {/* Success Alert */}
+                {copySuccess && (
+                    <Alert className="mb-6 bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800">
+                        <Check className="h-4 w-4" />
+                        <AlertTitle className="dark:text-green-300">Success!</AlertTitle>
+                        <AlertDescription className="dark:text-green-400">{copySuccess}</AlertDescription>
+                    </Alert>
+                )}
 
-            <div className="space-y-6">
                 {/* Header with Actions */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <Link href={route('role-permissions.index')}>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <ArrowLeft className="h-4 w-4" />
+                        <Link href={route('admin.role-permissions.index')}>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 dark:hover:bg-gray-700">
+                                <ArrowLeft className="h-4 w-4 dark:text-gray-300" />
                                 <span className="sr-only">Back</span>
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-white">
                                 Permission Assignment
                             </h1>
                             <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base mt-1">
@@ -220,29 +276,32 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                         variant="outline" 
                                         size="sm"
                                         onClick={() => handleCopyToClipboard(
-                                            `${role_permission.role.name} - ${role_permission.permission.display_name}`,
+                                            `${role.name} - ${permission.display_name}`,
                                             'Assignment details'
                                         )}
+                                        className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                     >
                                         <Copy className="h-4 w-4" />
                                         <span className="hidden sm:inline ml-2">Copy Details</span>
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Copy assignment details</TooltipContent>
+                                <TooltipContent className="dark:bg-gray-700 dark:text-white dark:border-gray-600">
+                                    Copy assignment details
+                                </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm">
+                                <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
                                     <MoreVertical className="h-4 w-4" />
                                     <span className="hidden sm:inline ml-2">More</span>
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
                                 <DropdownMenuItem 
                                     onClick={() => window.print()}
-                                    className="flex items-center cursor-pointer"
+                                    className="flex items-center cursor-pointer dark:text-white dark:focus:bg-gray-700"
                                 >
                                     <Printer className="mr-2 h-4 w-4" />
                                     <span>Print Details</span>
@@ -250,7 +309,7 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
 
                                 <DropdownMenuItem 
                                     onClick={handleExportDetails}
-                                    className="flex items-center cursor-pointer"
+                                    className="flex items-center cursor-pointer dark:text-white dark:focus:bg-gray-700"
                                 >
                                     <Download className="mr-2 h-4 w-4" />
                                     <span>Export as JSON</span>
@@ -261,16 +320,16 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                         const url = window.location.href;
                                         handleCopyToClipboard(url, 'Assignment URL');
                                     }}
-                                    className="flex items-center cursor-pointer"
+                                    className="flex items-center cursor-pointer dark:text-white dark:focus:bg-gray-700"
                                 >
                                     <Copy className="mr-2 h-4 w-4" />
                                     <span>Copy Link</span>
                                 </DropdownMenuItem>
 
-                                <DropdownMenuSeparator />
+                                <DropdownMenuSeparator className="dark:bg-gray-700" />
 
                                 <DropdownMenuItem 
-                                    className="flex items-center cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50"
+                                    className="flex items-center cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50 dark:text-red-400 dark:focus:bg-red-900/20"
                                     onClick={handleRevoke}
                                 >
                                     <Trash2 className="mr-2 h-4 w-4" />
@@ -283,72 +342,72 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
 
                 {/* Main Content Tabs */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                    <TabsList className="grid grid-cols-4 w-full max-w-md">
-                        <TabsTrigger value="overview">Overview</TabsTrigger>
-                        <TabsTrigger value="role">Role Details</TabsTrigger>
-                        <TabsTrigger value="permission">Permission Details</TabsTrigger>
-                        <TabsTrigger value="audit">Audit Trail</TabsTrigger>
+                    <TabsList className="grid grid-cols-4 w-full max-w-md dark:bg-gray-900">
+                        <TabsTrigger value="overview" className="dark:data-[state=active]:bg-gray-900 dark:text-gray-400 dark:data-[state=active]:text-white">Overview</TabsTrigger>
+                        <TabsTrigger value="role" className="dark:data-[state=active]:bg-gray-900 dark:text-gray-400 dark:data-[state=active]:text-white">Role Details</TabsTrigger>
+                        <TabsTrigger value="permission" className="dark:data-[state=active]:bg-gray-900 dark:text-gray-400 dark:data-[state=active]:text-white">Permission Details</TabsTrigger>
+                        <TabsTrigger value="audit" className="dark:data-[state=active]:bg-gray-900 dark:text-gray-400 dark:data-[state=active]:text-white">Audit Trail</TabsTrigger>
                     </TabsList>
 
                     {/* Overview Tab */}
                     <TabsContent value="overview" className="space-y-6">
                         <div className="grid gap-6 md:grid-cols-2">
                             {/* Assignment Details Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Key className="h-5 w-5" />
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
+                                        <Key className="h-5 w-5 dark:text-gray-300" />
                                         Assignment Details
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="dark:text-gray-400">
                                         Information about this permission assignment
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <div className="text-sm font-medium text-gray-500">Assignment ID</div>
+                                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Assignment ID</div>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <div className="font-mono text-sm">{role_permission.id}</div>
+                                                <div className="font-mono text-sm dark:text-white">{role_permission.id}</div>
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="h-6 w-6 p-0"
+                                                    className="h-6 w-6 p-0 dark:hover:bg-gray-700"
                                                     onClick={() => handleCopyToClipboard(role_permission.id.toString(), 'Assignment ID')}
                                                 >
-                                                    <Copy className="h-3 w-3" />
+                                                    <Copy className="h-3 w-3 dark:text-gray-400" />
                                                 </Button>
                                             </div>
                                         </div>
                                         <div>
-                                            <div className="text-sm font-medium text-gray-500">Granted</div>
+                                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Granted</div>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <Calendar className="h-4 w-4 text-gray-400" />
-                                                <span className="text-sm">{formatTimeAgo(role_permission.granted_at)}</span>
+                                                <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                                <span className="text-sm dark:text-white">{formatTimeAgo(role_permission.granted_at)}</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     {role_permission.notes && (
                                         <div>
-                                            <div className="text-sm font-medium text-gray-500">Notes</div>
-                                            <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-md min-h-[60px]">
-                                                <p className="text-sm">{role_permission.notes}</p>
+                                            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Notes</div>
+                                            <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900/50 dark:border-gray-700 rounded-md min-h-[60px]">
+                                                <p className="text-sm dark:text-gray-300">{role_permission.notes}</p>
                                             </div>
                                         </div>
                                     )}
 
                                     <div className="pt-2">
-                                        <div className="text-sm font-medium text-gray-500 mb-2">Quick Links</div>
+                                        <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Quick Links</div>
                                         <div className="grid grid-cols-2 gap-2">
-                                            <Link href={route('roles.show', role_permission.role.id)}>
-                                                <Button variant="outline" className="w-full justify-start h-10">
+                                            <Link href={route('admin.roles.show', role.id)}>
+                                                <Button variant="outline" className="w-full justify-start h-10 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
                                                     <Shield className="h-4 w-4 mr-2" />
                                                     View Role
                                                 </Button>
                                             </Link>
-                                            <Link href={route('roles.permissions', role_permission.role.id)}>
-                                                <Button variant="outline" className="w-full justify-start h-10">
+                                            <Link href={route('admin.roles.permissions', role.id)}>
+                                                <Button variant="outline" className="w-full justify-start h-10 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
                                                     <Settings className="h-4 w-4 mr-2" />
                                                     Role Permissions
                                                 </Button>
@@ -359,32 +418,32 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                             </Card>
 
                             {/* Granter Information Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <User className="h-5 w-5" />
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
+                                        <User className="h-5 w-5 dark:text-gray-300" />
                                         Granted By
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="dark:text-gray-400">
                                         User who assigned this permission
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
-                                        <Avatar className="h-12 w-12">
-                                            {role_permission.granter.avatar ? (
-                                                <AvatarImage src={role_permission.granter.avatar} alt={role_permission.granter.name} />
-                                            ) : null}
-                                            <AvatarFallback>
-                                                {getInitials(role_permission.granter.name)}
+                                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 dark:border-gray-700 rounded-md">
+                                        <Avatar className="h-12 w-12 dark:border-gray-700">
+                                            {granter.avatar && (
+                                                <AvatarImage src={granter.avatar} alt={granter.name} />
+                                            )}
+                                            <AvatarFallback className="dark:bg-gray-700 dark:text-white">
+                                                {getInitials(granter.name)}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1">
-                                            <div className="font-medium">{role_permission.granter.name}</div>
-                                            <div className="text-sm text-gray-500">{role_permission.granter.email}</div>
-                                            {role_permission.granter.role && (
-                                                <Badge variant="outline" className="mt-1 text-xs">
-                                                    {role_permission.granter.role}
+                                            <div className="font-medium dark:text-white">{granter.name}</div>
+                                            <div className="text-sm text-gray-500 dark:text-gray-400">{granter.email || 'No email'}</div>
+                                            {granter.role && (
+                                                <Badge variant="outline" className="mt-1 text-xs dark:border-gray-600 dark:text-gray-300">
+                                                    {granter.role}
                                                 </Badge>
                                             )}
                                         </div>
@@ -393,18 +452,21 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                     <div className="space-y-2">
                                         <Button
                                             variant="outline"
-                                            className="w-full justify-start"
-                                            onClick={() => handleCopyToClipboard(role_permission.granter.email, 'Granter email')}
+                                            className="w-full justify-start dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                                            onClick={() => granter.email && handleCopyToClipboard(granter.email, 'Granter email')}
+                                            disabled={!granter.email}
                                         >
                                             <Mail className="h-4 w-4 mr-2" />
                                             Copy Email
                                         </Button>
                                         <Button
                                             variant="outline"
-                                            className="w-full justify-start"
+                                            className="w-full justify-start dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                             onClick={() => {
-                                                // This would link to user profile if implemented
-                                                toast.info('User profile view not implemented');
+                                                toast({
+                                                    title: "Info",
+                                                    description: "User profile view not implemented",
+                                                });
                                             }}
                                         >
                                             <Eye className="h-4 w-4 mr-2" />
@@ -415,55 +477,55 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                             </Card>
 
                             {/* Summary Card */}
-                            <Card className="md:col-span-2">
+                            <Card className="md:col-span-2 dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <FileText className="h-5 w-5" />
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
+                                        <FileText className="h-5 w-5 dark:text-gray-300" />
                                         Summary
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-4">
-                                            <div className="flex items-center gap-3 p-3 border rounded-lg">
-                                                <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                                                    <Shield className="h-5 w-5 text-purple-600" />
+                                            <div className="flex items-center gap-3 p-3 border rounded-lg dark:border-gray-700">
+                                                <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center">
+                                                    <Shield className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <div className="font-medium">Role</div>
-                                                    <div className="text-lg font-semibold">{role_permission.role.name}</div>
-                                                    <div className="text-sm text-gray-500">
-                                                        {role_permission.role.is_system_role ? 'System Role' : 'Custom Role'}
-                                                        {role_permission.role.users_count && ` • ${role_permission.role.users_count} users`}
+                                                    <div className="font-medium dark:text-white">Role</div>
+                                                    <div className="text-lg font-semibold dark:text-white">{role.name}</div>
+                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                        {role.is_system_role ? 'System Role' : 'Custom Role'}
+                                                        {role.users_count && ` • ${role.users_count} users`}
                                                     </div>
                                                 </div>
                                             </div>
-                                            {role_permission.role.description && (
-                                                <div className="text-sm text-gray-600 p-2 bg-gray-50 rounded">
-                                                    {role_permission.role.description}
+                                            {role.description && (
+                                                <div className="text-sm text-gray-600 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-900/50 rounded">
+                                                    {role.description}
                                                 </div>
                                             )}
                                         </div>
 
                                         <div className="space-y-4">
-                                            <div className="flex items-center gap-3 p-3 border rounded-lg">
-                                                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                                                    <Key className="h-5 w-5 text-green-600" />
+                                            <div className="flex items-center gap-3 p-3 border rounded-lg dark:border-gray-700">
+                                                <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                                                    <Key className="h-5 w-5 text-green-600 dark:text-green-400" />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <div className="font-medium">Permission</div>
-                                                    <div className="text-lg font-semibold">{role_permission.permission.display_name}</div>
-                                                    <div className="text-sm text-gray-500">
-                                                        <code>{role_permission.permission.name}</code>
-                                                        <Badge variant="outline" className="ml-2">
-                                                            {role_permission.permission.module}
+                                                    <div className="font-medium dark:text-white">Permission</div>
+                                                    <div className="text-lg font-semibold dark:text-white">{permission.display_name}</div>
+                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                        <code className="dark:text-gray-400">{permission.name}</code>
+                                                        <Badge variant="outline" className="ml-2 dark:border-gray-600 dark:text-gray-300">
+                                                            {permission.module}
                                                         </Badge>
                                                     </div>
                                                 </div>
                                             </div>
-                                            {role_permission.permission.description && (
-                                                <div className="text-sm text-gray-600 p-2 bg-gray-50 rounded">
-                                                    {role_permission.permission.description}
+                                            {permission.description && (
+                                                <div className="text-sm text-gray-600 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-900/50 rounded">
+                                                    {permission.description}
                                                 </div>
                                             )}
                                         </div>
@@ -475,13 +537,13 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
 
                     {/* Role Details Tab */}
                     <TabsContent value="role">
-                        <Card>
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Shield className="h-5 w-5" />
+                                <CardTitle className="flex items-center gap-2 dark:text-white">
+                                    <Shield className="h-5 w-5 dark:text-gray-300" />
                                     Role Information
                                 </CardTitle>
-                                <CardDescription>
+                                <CardDescription className="dark:text-gray-400">
                                     Complete details about the role in this assignment
                                 </CardDescription>
                             </CardHeader>
@@ -490,28 +552,28 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-4">
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Role Name</div>
-                                                <div className="text-lg font-semibold mt-1">{role_permission.role.name}</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Role Name</div>
+                                                <div className="text-lg font-semibold mt-1 dark:text-white">{role.name}</div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Role Type</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Role Type</div>
                                                 <div className="mt-1">
                                                     <Badge 
-                                                        variant={role_permission.role.is_system_role ? "default" : "outline"}
-                                                        className={role_permission.role.is_system_role 
-                                                            ? "bg-purple-100 text-purple-800"
-                                                            : "bg-green-100 text-green-800"
+                                                        variant={role.is_system_role ? "default" : "outline"}
+                                                        className={role.is_system_role 
+                                                            ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800"
+                                                            : "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800"
                                                         }
                                                     >
-                                                        {role_permission.role.is_system_role ? 'System Role' : 'Custom Role'}
+                                                        {role.is_system_role ? 'System Role' : 'Custom Role'}
                                                     </Badge>
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Description</div>
-                                                <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
-                                                    {role_permission.role.description || (
-                                                        <span className="text-gray-400 italic">No description provided</span>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</div>
+                                                <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-md">
+                                                    {role.description || (
+                                                        <span className="text-gray-400 dark:text-gray-600 italic">No description provided</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -519,45 +581,45 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
 
                                         <div className="space-y-4">
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Role ID</div>
-                                                <div className="font-mono text-sm mt-1">{role_permission.role.id}</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Role ID</div>
+                                                <div className="font-mono text-sm mt-1 dark:text-white">{role.id}</div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Created</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</div>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <Calendar className="h-4 w-4 text-gray-400" />
-                                                    <span className="text-sm">{formatDate(role_permission.role.created_at)}</span>
+                                                    <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                                    <span className="text-sm dark:text-white">{formatDate(role.created_at)}</span>
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Last Updated</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Updated</div>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <Clock className="h-4 w-4 text-gray-400" />
-                                                    <span className="text-sm">{formatTimeAgo(role_permission.role.updated_at)}</span>
+                                                    <Clock className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                                    <span className="text-sm dark:text-white">{formatTimeAgo(role.updated_at)}</span>
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Users Count</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Users Count</div>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <Users className="h-4 w-4 text-gray-400" />
-                                                    <span className="text-lg font-semibold">{role_permission.role.users_count || 0}</span>
-                                                    <span className="text-sm text-gray-500">users assigned</span>
+                                                    <Users className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                                    <span className="text-lg font-semibold dark:text-white">{role.users_count || 0}</span>
+                                                    <span className="text-sm text-gray-500 dark:text-gray-400">users assigned</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <Separator />
+                                    <Separator className="dark:bg-gray-700" />
 
                                     <div className="flex gap-3">
-                                        <Link href={route('roles.show', role_permission.role.id)}>
-                                            <Button>
+                                        <Link href={route('admin.roles.show', role.id)}>
+                                            <Button className="dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600">
                                                 <Eye className="h-4 w-4 mr-2" />
                                                 View Full Role Details
                                             </Button>
                                         </Link>
-                                        <Link href={route('roles.permissions', role_permission.role.id)}>
-                                            <Button variant="outline">
+                                        <Link href={route('admin.roles.permissions', role.id)}>
+                                            <Button variant="outline" className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
                                                 <Settings className="h-4 w-4 mr-2" />
                                                 Manage Role Permissions
                                             </Button>
@@ -570,13 +632,13 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
 
                     {/* Permission Details Tab */}
                     <TabsContent value="permission">
-                        <Card>
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Key className="h-5 w-5" />
+                                <CardTitle className="flex items-center gap-2 dark:text-white">
+                                    <Key className="h-5 w-5 dark:text-gray-300" />
                                     Permission Information
                                 </CardTitle>
-                                <CardDescription>
+                                <CardDescription className="dark:text-gray-400">
                                     Complete details about the permission in this assignment
                                 </CardDescription>
                             </CardHeader>
@@ -585,20 +647,20 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-4">
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Display Name</div>
-                                                <div className="text-lg font-semibold mt-1">{role_permission.permission.display_name}</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Display Name</div>
+                                                <div className="text-lg font-semibold mt-1 dark:text-white">{permission.display_name}</div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Technical Name</div>
-                                                <div className="font-mono text-sm mt-1 p-2 bg-gray-50 rounded">
-                                                    {role_permission.permission.name}
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Technical Name</div>
+                                                <div className="font-mono text-sm mt-1 p-2 bg-gray-50 dark:bg-gray-900/50 dark:text-gray-300 rounded">
+                                                    {permission.name}
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Description</div>
-                                                <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
-                                                    {role_permission.permission.description || (
-                                                        <span className="text-gray-400 italic">No description provided</span>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</div>
+                                                <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-md">
+                                                    {permission.description || (
+                                                        <span className="text-gray-400 dark:text-gray-600 italic">No description provided</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -606,54 +668,55 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
 
                                         <div className="space-y-4">
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Module</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Module</div>
                                                 <div className="mt-1">
-                                                    <Badge variant="outline" className="text-lg">
-                                                        {role_permission.permission.module}
+                                                    <Badge variant="outline" className="text-lg dark:border-gray-600 dark:text-gray-300">
+                                                        {permission.module}
                                                     </Badge>
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Permission ID</div>
-                                                <div className="font-mono text-sm mt-1">{role_permission.permission.id}</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Permission ID</div>
+                                                <div className="font-mono text-sm mt-1 dark:text-white">{permission.id}</div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Status</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</div>
                                                 <div className="mt-1">
                                                     <Badge 
-                                                        variant={role_permission.permission.is_active ? "default" : "outline"}
-                                                        className={role_permission.permission.is_active 
-                                                            ? "bg-green-100 text-green-800"
-                                                            : "bg-gray-100 text-gray-800"
+                                                        variant={permission.is_active ? "default" : "outline"}
+                                                        className={permission.is_active 
+                                                            ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800"
+                                                            : "bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300 dark:border-gray-700"
                                                         }
                                                     >
-                                                        {role_permission.permission.is_active ? 'Active' : 'Inactive'}
+                                                        {permission.is_active ? 'Active' : 'Inactive'}
                                                     </Badge>
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Created</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</div>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <Calendar className="h-4 w-4 text-gray-400" />
-                                                    <span className="text-sm">{formatDate(role_permission.permission.created_at)}</span>
+                                                    <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                                    <span className="text-sm dark:text-white">{formatDate(permission.created_at)}</span>
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-500">Last Updated</div>
+                                                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Updated</div>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <Clock className="h-4 w-4 text-gray-400" />
-                                                    <span className="text-sm">{formatTimeAgo(role_permission.permission.updated_at)}</span>
+                                                    <Clock className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                                    <span className="text-sm dark:text-white">{formatTimeAgo(permission.updated_at)}</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <Separator />
+                                    <Separator className="dark:bg-gray-700" />
 
                                     <div className="flex gap-3">
                                         <Button
                                             variant="outline"
-                                            onClick={() => handleCopyToClipboard(role_permission.permission.name, 'Permission name')}
+                                            onClick={() => handleCopyToClipboard(permission.name, 'Permission name')}
+                                            className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                         >
                                             <Copy className="h-4 w-4 mr-2" />
                                             Copy Permission Name
@@ -661,8 +724,9 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                         <Button
                                             variant="outline"
                                             onClick={() => {
-                                                router.get(route('permissions.show', role_permission.permission.id));
+                                                router.get(route('permissions.show', permission.id));
                                             }}
+                                            className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                         >
                                             <Eye className="h-4 w-4 mr-2" />
                                             View Permission Details
@@ -675,79 +739,79 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
 
                     {/* Audit Trail Tab */}
                     <TabsContent value="audit">
-                        <Card>
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <FileText className="h-5 w-5" />
+                                <CardTitle className="flex items-center gap-2 dark:text-white">
+                                    <FileText className="h-5 w-5 dark:text-gray-300" />
                                     Audit Trail
                                 </CardTitle>
-                                <CardDescription>
+                                <CardDescription className="dark:text-gray-400">
                                     History and activity log for this permission assignment
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-6">
                                     <div className="space-y-4">
-                                        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 dark:border-gray-700 rounded-lg">
                                             <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                                                <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
                                                     <Key className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                                                 </div>
                                                 <div>
-                                                    <div className="font-medium">Permission Assigned</div>
-                                                    <div className="text-sm text-gray-500">
+                                                    <div className="font-medium dark:text-white">Permission Assigned</div>
+                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
                                                         Grant event recorded in system
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-sm font-medium">{formatDate(role_permission.granted_at)}</div>
-                                                <div className="text-xs text-gray-500">{formatTimeAgo(role_permission.granted_at)}</div>
+                                                <div className="text-sm font-medium dark:text-white">{formatDate(role_permission.granted_at)}</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">{formatTimeAgo(role_permission.granted_at)}</div>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <Card>
+                                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                                 <CardHeader className="pb-2">
-                                                    <CardTitle className="text-sm">Grant Details</CardTitle>
+                                                    <CardTitle className="text-sm dark:text-white">Grant Details</CardTitle>
                                                 </CardHeader>
                                                 <CardContent>
                                                     <div className="space-y-2">
                                                         <div className="flex justify-between">
-                                                            <span className="text-sm text-gray-500">Granted By:</span>
-                                                            <span className="font-medium">{role_permission.granter.name}</span>
+                                                            <span className="text-sm text-gray-500 dark:text-gray-400">Granted By:</span>
+                                                            <span className="font-medium dark:text-white">{granter.name}</span>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span className="text-sm text-gray-500">Grant Method:</span>
-                                                            <Badge variant="outline" className="text-xs">
+                                                            <span className="text-sm text-gray-500 dark:text-gray-400">Grant Method:</span>
+                                                            <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">
                                                                 Manual Assignment
                                                             </Badge>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span className="text-sm text-gray-500">Granter Role:</span>
-                                                            <span className="text-sm">{role_permission.granter.role || 'N/A'}</span>
+                                                            <span className="text-sm text-gray-500 dark:text-gray-400">Granter Role:</span>
+                                                            <span className="text-sm dark:text-white">{granter.role || 'N/A'}</span>
                                                         </div>
                                                     </div>
                                                 </CardContent>
                                             </Card>
 
-                                            <Card>
+                                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                                 <CardHeader className="pb-2">
-                                                    <CardTitle className="text-sm">System Information</CardTitle>
+                                                    <CardTitle className="text-sm dark:text-white">System Information</CardTitle>
                                                 </CardHeader>
                                                 <CardContent>
                                                     <div className="space-y-2">
                                                         <div className="flex justify-between">
-                                                            <span className="text-sm text-gray-500">Assignment ID:</span>
-                                                            <code className="text-xs">{role_permission.id}</code>
+                                                            <span className="text-sm text-gray-500 dark:text-gray-400">Assignment ID:</span>
+                                                            <code className="text-xs dark:text-gray-300">{role_permission.id}</code>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span className="text-sm text-gray-500">Created Timestamp:</span>
-                                                            <span className="text-xs text-gray-500">{role_permission.granted_at}</span>
+                                                            <span className="text-sm text-gray-500 dark:text-gray-400">Created Timestamp:</span>
+                                                            <span className="text-xs text-gray-500 dark:text-gray-400">{role_permission.granted_at}</span>
                                                         </div>
                                                         <div className="flex justify-between">
-                                                            <span className="text-sm text-gray-500">Status:</span>
-                                                            <Badge variant="default" className="bg-green-100 text-green-800">
+                                                            <span className="text-sm text-gray-500 dark:text-gray-400">Status:</span>
+                                                            <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800">
                                                                 Active
                                                             </Badge>
                                                         </div>
@@ -757,23 +821,23 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                         </div>
 
                                         {role_permission.notes && (
-                                            <Card>
+                                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                                 <CardHeader className="pb-2">
-                                                    <CardTitle className="text-sm">Assignment Notes</CardTitle>
+                                                    <CardTitle className="text-sm dark:text-white">Assignment Notes</CardTitle>
                                                 </CardHeader>
                                                 <CardContent>
-                                                    <div className="p-3 bg-gray-50 rounded">
-                                                        <p className="text-sm whitespace-pre-wrap">{role_permission.notes}</p>
+                                                    <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded">
+                                                        <p className="text-sm whitespace-pre-wrap dark:text-gray-300">{role_permission.notes}</p>
                                                     </div>
                                                 </CardContent>
                                             </Card>
                                         )}
                                     </div>
 
-                                    <Separator />
+                                    <Separator className="dark:bg-gray-700" />
 
                                     <div className="text-center">
-                                        <Button variant="outline" onClick={() => window.print()}>
+                                        <Button variant="outline" onClick={() => window.print()} className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">
                                             <Printer className="h-4 w-4 mr-2" />
                                             Print Audit Trail
                                         </Button>
@@ -785,13 +849,13 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                 </Tabs>
 
                 {/* Danger Zone */}
-                <Card className="border-red-200 dark:border-red-800">
+                <Card className="border-red-200 dark:border-red-800 dark:bg-gray-900">
                     <CardHeader>
-                        <CardTitle className="text-red-600 flex items-center gap-2">
+                        <CardTitle className="text-red-600 dark:text-red-400 flex items-center gap-2">
                             <AlertTriangle className="h-5 w-5" />
                             Danger Zone
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="dark:text-gray-400">
                             Irreversible actions for this permission assignment
                         </CardDescription>
                     </CardHeader>
@@ -809,6 +873,7 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                 variant="destructive"
                                 onClick={handleRevoke}
                                 disabled={isRevoking}
+                                className="dark:bg-red-900 dark:text-red-100 dark:hover:bg-red-800"
                             >
                                 {isRevoking ? (
                                     <>
@@ -829,30 +894,32 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
 
             {/* Revoke Permission Dialog */}
             <AlertDialog open={showRevokeDialog} onOpenChange={setShowRevokeDialog}>
-                <AlertDialogContent>
+                <AlertDialogContent className="dark:bg-gray-900 dark:border-gray-700">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Revoke Permission</AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogTitle className="dark:text-white">Revoke Permission</AlertDialogTitle>
+                        <AlertDialogDescription className="dark:text-gray-400">
                             Are you sure you want to revoke this permission assignment?
                             <br /><br />
-                            <strong>{role_permission.role.name}</strong> will lose the permission:
+                            <strong className="dark:text-white">{role.name}</strong> will lose the permission:
                             <br />
-                            <code className="text-sm bg-gray-100 px-2 py-1 rounded mt-2 inline-block">
-                                {role_permission.permission.name}
+                            <code className="text-sm bg-gray-100 dark:bg-gray-900 dark:text-gray-300 px-2 py-1 rounded mt-2 inline-block">
+                                {permission.name}
                             </code>
                             <br />
-                            <span className="text-sm text-gray-600">
-                                ({role_permission.permission.display_name})
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                                ({permission.display_name})
                             </span>
                             <br /><br />
                             This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isRevoking}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isRevoking} className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:bg-gray-900">
+                            Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={confirmRevoke}
-                            className="bg-red-600 hover:bg-red-700 text-white"
+                            className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-900 dark:hover:bg-red-800"
                             disabled={isRevoking}
                         >
                             {isRevoking ? (

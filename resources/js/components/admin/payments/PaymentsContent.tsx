@@ -38,7 +38,7 @@ import { SelectAllFloat } from '@/components/adminui/select-all-float';
 import { GridSelectionSummary } from '@/components/adminui/grid-selection-summary';
 import PaymentsTableView from './PaymentsTableView';
 import PaymentsGridView from './PaymentsGridView';
-import PaymentsBulkActions from './PaymentsBulkActions'; // ADDED
+import PaymentsBulkActions from './PaymentsBulkActions';
 import { Payment, Filters, SelectionStats } from '@/types/payments.types';
 
 interface PaymentMethod {
@@ -191,7 +191,7 @@ export default function PaymentsContent({
 
     return (
         <>
-            {/* Enhanced Bulk Actions Bar - ADDED ABOVE THE MAIN CARD */}
+            {/* Enhanced Bulk Actions Bar */}
             {isBulkMode && selectedPayments.length > 0 && (
                 <PaymentsBulkActions
                     selectedPayments={selectedPayments}
@@ -226,13 +226,13 @@ export default function PaymentsContent({
                 />
             )}
 
-            {/* Payments List/Grid View */}
-            <Card className="overflow-hidden border border-gray-200 dark:border-gray-700">
-                <CardHeader className="flex flex-row items-center justify-between pb-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-800/50">
+            {/* Payments List/Grid View with dark mode */}
+            <Card className="overflow-hidden border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
-                            <Receipt className="h-5 w-5 text-gray-500" />
-                            <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">
+                            <Receipt className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                            <CardTitle className="text-base sm:text-lg md:text-xl font-semibold dark:text-gray-100">
                                 Payment Transactions
                                 {selectedPayments.length > 0 && isBulkMode && (
                                     <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
@@ -257,9 +257,9 @@ export default function PaymentsContent({
                                     id="select-all-grid"
                                     checked={isSelectAll}
                                     onCheckedChange={onSelectAllOnPage}
-                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
                                 />
-                                <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap">
+                                <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
                                     {isSelectAll ? 'Deselect Page' : 'Select Page'}
                                 </Label>
                             </div>
@@ -275,16 +275,16 @@ export default function PaymentsContent({
                                                 id="bulk-mode"
                                                 checked={isBulkMode}
                                                 onCheckedChange={handleBulkModeToggle}
-                                                className="data-[state=checked]:bg-blue-600 h-5 w-9"
+                                                className="data-[state=checked]:bg-blue-600 h-5 w-9 dark:data-[state=checked]:bg-blue-600"
                                             />
-                                            <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap">
+                                            <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
                                                 Bulk Mode
                                             </Label>
                                         </div>
                                     </TooltipTrigger>
-                                    <TooltipContent>
+                                    <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                         <p>Toggle bulk selection mode</p>
-                                        <p className="text-xs text-gray-500">Ctrl+Shift+B • Ctrl+A to select</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Ctrl+Shift+B • Ctrl+A to select</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </div>
@@ -296,11 +296,11 @@ export default function PaymentsContent({
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                    {/* Empty State */}
+                <CardContent className="p-0 dark:bg-gray-900">
+                    {/* Empty State with dark mode */}
                     {payments.length === 0 ? (
                         <EmptyState
-                            icon={<Receipt className="h-12 w-12 text-gray-400" />}
+                            icon={<Receipt className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
                             title="No payments found"
                             description={hasActiveFilters 
                                 ? "No payments match your current filters. Try adjusting your search or filters."
@@ -309,7 +309,7 @@ export default function PaymentsContent({
                                 label: "Clear Filters",
                                 onClick: onClearFilters
                             } : undefined}
-                            className="py-12 sm:py-16"
+                            className="py-12 sm:py-16 dark:bg-gray-900"
                         />
                     ) : (
                         <>
@@ -355,7 +355,7 @@ export default function PaymentsContent({
                                 />
                             )}
 
-                            {/* Grid Selection Summary */}
+                            {/* Grid Selection Summary with dark mode */}
                             {viewMode === 'grid' && isBulkMode && selectedPayments.length > 0 && (
                                 <GridSelectionSummary
                                     selectedCount={selectedPayments.length}
@@ -363,16 +363,16 @@ export default function PaymentsContent({
                                     isSelectAll={isSelectAll}
                                     onSelectAll={onSelectAllOnPage}
                                     onClearSelection={onClearSelection}
-                                    className="mt-4 mx-4"
+                                    className="mt-4 mx-4 dark:text-gray-300"
                                     extraInfo={
-                                        <div className="text-xs text-gray-500 mt-1">
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                             Total amount: {formatCurrency(selectionStats.totalAmount)}
                                         </div>
                                     }
                                 />
                             )}
 
-                            {/* Pagination */}
+                            {/* Pagination with dark mode */}
                             {totalPages > 1 && (
                                 <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
                                     <Pagination

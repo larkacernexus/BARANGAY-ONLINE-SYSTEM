@@ -12,10 +12,30 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Link, router } from '@inertiajs/react';
-import { Shield, Phone, MoreVertical, Eye, Edit, User, Copy, Printer, Trash2, CheckSquare, Square, ChevronUp, ChevronDown } from 'lucide-react';
+import { 
+    Shield, 
+    Phone, 
+    MoreVertical, 
+    Eye, 
+    Edit, 
+    User, 
+    Copy, 
+    Printer, 
+    Trash2, 
+    CheckSquare, 
+    Square, 
+    ChevronUp, 
+    ChevronDown,
+    CheckCircle,
+    Clock,
+    AlertCircle,
+    RefreshCw,
+    PowerOff
+} from 'lucide-react';
 import { Official } from '@/types/officials';
 import { FilterState } from '@/admin-utils/officialsUtils';
 import { truncateText, getTruncationLength, getStatusBadgeVariant, formatDate, getPositionBadgeVariant } from '@/admin-utils/officialsUtils';
+import { toast } from 'sonner';
 
 interface OfficialsTableViewProps {
     officials: Official[];
@@ -58,13 +78,91 @@ export default function OfficialsTableView({
         return filtersState.sort_order === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
     };
 
+    // Handle status change
+    const handleStatusChange = (official: Official, newStatus: 'active' | 'inactive' | 'former') => {
+        const statusLabels = {
+            active: 'Active',
+            inactive: 'Inactive',
+            former: 'Former'
+        };
+
+        // Prepare update data
+        const updateData: any = {
+            resident_id: official.resident_id,
+            position_id: official.position_id,
+            committee_id: official.committee_id,
+            term_start: official.term_start,
+            term_end: official.term_end,
+            status: newStatus,
+            order: official.order,
+            responsibilities: official.responsibilities || '',
+            contact_number: official.contact_number || '',
+            email: official.email || '',
+            achievements: official.achievements || '',
+            is_regular: official.is_regular,
+            user_id: official.user_id,
+            use_resident_photo: false
+        };
+
+        // If changing to former, validate term_end
+        if (newStatus === 'former' && new Date(official.term_start) > new Date(official.term_end)) {
+            toast.error('Term end must be after term start');
+            return;
+        }
+
+        router.put(`/admin/officials/${official.id}`, updateData, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(`Official status changed to ${statusLabels[newStatus]}`);
+            },
+            onError: (errors) => {
+                console.error('Status change error:', errors);
+                toast.error('Failed to change official status');
+            }
+        });
+    };
+
+    // Handle term end (make former) - USING DEDICATED ENDPOINT
+    const handleEndTerm = (official: Official) => {
+        if (confirm(`Are you sure you want to end ${official.resident?.full_name || 'this official'}'s term?`)) {
+            
+            router.post(`/admin/officials/${official.id}/end-term`, {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Term ended successfully. Official marked as former.');
+                },
+                onError: (errors: any) => {
+                    console.error('End term error:', errors);
+                    toast.error(errors.error || 'Failed to end term');
+                }
+            });
+        }
+    };
+
+    // Handle reactivate - USING DEDICATED ENDPOINT
+    const handleReactivate = (official: Official) => {
+        if (confirm(`Reactivate ${official.resident?.full_name || 'this official'}?`)) {
+            
+            router.post(`/admin/officials/${official.id}/reactivate`, {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Official reactivated successfully');
+                },
+                onError: (errors: any) => {
+                    console.error('Reactivate error:', errors);
+                    toast.error(errors.error || 'Failed to reactivate official');
+                }
+            });
+        }
+    };
+
     return (
         <div className="overflow-x-auto">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <Table className="min-w-full">
                         <TableHeader>
-                            <TableRow className="bg-gray-50 dark:bg-gray-800">
+                            <TableRow className="bg-gray-50 dark:bg-gray-900">
                                 {isBulkMode && (
                                     <TableHead className="px-4 py-3 text-center w-12">
                                         <div className="flex items-center justify-center">
@@ -121,7 +219,7 @@ export default function OfficialsTableView({
                                         {getSortIcon('status')}
                                     </div>
                                 </TableHead>
-                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[80px]">
+                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[80px]">
                                     Actions
                                 </TableHead>
                             </TableRow>
@@ -175,7 +273,7 @@ export default function OfficialsTableView({
                                     return (
                                         <TableRow 
                                             key={official.id} 
-                                            className={`hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${
+                                            className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors ${
                                                 isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
                                             }`}
                                             onClick={(e) => {
@@ -202,7 +300,7 @@ export default function OfficialsTableView({
                                             )}
                                             <TableCell className="px-4 py-3 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                                    <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-900 flex items-center justify-center overflow-hidden flex-shrink-0">
                                                         {official.photo_url || resident?.photo_url ? (
                                                             <img 
                                                                 src={official.photo_url || resident?.photo_url} 
@@ -279,14 +377,15 @@ export default function OfficialsTableView({
                                                     <DropdownMenuTrigger asChild>
                                                         <Button 
                                                             variant="ghost" 
-                                                            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900"
                                                             onClick={(e) => e.stopPropagation()}
                                                         >
                                                             <span className="sr-only">Open menu</span>
                                                             <MoreVertical className="h-4 w-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-48">
+                                                    <DropdownMenuContent align="end" className="w-56">
+                                                        {/* Quick Actions */}
                                                         <DropdownMenuItem asChild>
                                                             <Link href={`/admin/officials/${official.id}`} className="flex items-center cursor-pointer">
                                                                 <Eye className="mr-2 h-4 w-4" />
@@ -302,7 +401,7 @@ export default function OfficialsTableView({
                                                         </DropdownMenuItem>
                                                         
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/residents/${resident?.id}`} className="flex items-center cursor-pointer">
+                                                            <Link href={`/admin/residents/${resident?.id}`} className="flex items-center cursor-pointer">
                                                                 <User className="mr-2 h-4 w-4" />
                                                                 <span>View Resident</span>
                                                             </Link>
@@ -310,6 +409,67 @@ export default function OfficialsTableView({
                                                         
                                                         <DropdownMenuSeparator />
                                                         
+                                                        {/* Status Management Section */}
+                                                        <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
+                                                            Change Status
+                                                        </div>
+                                                        
+                                                        {official.status !== 'active' && (
+                                                            <DropdownMenuItem 
+                                                                onClick={() => handleStatusChange(official, 'active')}
+                                                                className="flex items-center cursor-pointer text-green-600 focus:text-green-700"
+                                                            >
+                                                                <CheckCircle className="mr-2 h-4 w-4" />
+                                                                <span>Set as Active</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        
+                                                        {official.status !== 'inactive' && (
+                                                            <DropdownMenuItem 
+                                                                onClick={() => handleStatusChange(official, 'inactive')}
+                                                                className="flex items-center cursor-pointer text-yellow-600 focus:text-yellow-700"
+                                                            >
+                                                                <Clock className="mr-2 h-4 w-4" />
+                                                                <span>Set as Inactive</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        
+                                                        {official.status !== 'former' && (
+                                                            <DropdownMenuItem 
+                                                                onClick={() => handleStatusChange(official, 'former')}
+                                                                className="flex items-center cursor-pointer text-gray-600 focus:text-gray-700"
+                                                            >
+                                                                <AlertCircle className="mr-2 h-4 w-4" />
+                                                                <span>Set as Former</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        
+                                                        <DropdownMenuSeparator />
+                                                        
+                                                        {/* Term Management */}
+                                                        {official.status === 'active' && (
+                                                            <DropdownMenuItem 
+                                                                onClick={() => handleEndTerm(official)}
+                                                                className="flex items-center cursor-pointer text-orange-600 focus:text-orange-700"
+                                                            >
+                                                                <PowerOff className="mr-2 h-4 w-4" />
+                                                                <span>End Term (Make Former)</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        
+                                                        {official.status === 'former' && (
+                                                            <DropdownMenuItem 
+                                                                onClick={() => handleReactivate(official)}
+                                                                className="flex items-center cursor-pointer text-blue-600 focus:text-blue-700"
+                                                            >
+                                                                <RefreshCw className="mr-2 h-4 w-4" />
+                                                                <span>Reactivate</span>
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        
+                                                        <DropdownMenuSeparator />
+                                                        
+                                                        {/* Copy Options */}
                                                         <DropdownMenuItem 
                                                             onClick={() => onCopyToClipboard(resident?.full_name || '', 'Official Name')}
                                                             className="flex items-center cursor-pointer"

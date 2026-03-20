@@ -1,12 +1,41 @@
 // app/Pages/Admin/Payments/types.ts
 
-// Define Discount Rule types
+// ==================== DYNAMIC PRIVILEGE TYPES ====================
+
+export interface Privilege {
+    id: number;
+    name: string;
+    code: string;
+    description?: string;
+    default_discount_percentage?: number;
+    requires_id_number?: boolean;
+    requires_verification?: boolean;
+    validity_years?: number;
+    is_active: boolean;
+}
+
+export interface ResidentPrivilege {
+    id: number;
+    resident_id: number;
+    privilege_id: number;
+    privilege?: Privilege;
+    id_number?: string;
+    verified_at?: string | null;
+    expires_at?: string | null;
+    remarks?: string;
+    discount_percentage?: number;
+    status: 'pending' | 'active' | 'expired' | 'expiring_soon';
+    is_active: boolean;
+}
+
+// ==================== UPDATED DISCOUNT RULE TYPES ====================
+
 export interface DiscountRule {
     id: number;
     code: string;
     name: string;
     description: string | null;
-    discount_type: string; // SENIOR, PWD, SOLO_PARENT, INDIGENT, VETERAN, etc.
+    discount_type: string; // Dynamic - can be any privilege code
     value_type: 'percentage' | 'fixed';
     discount_value: number;
     maximum_discount_amount: number | null;
@@ -14,7 +43,7 @@ export interface DiscountRule {
     priority: number;
     requires_verification: boolean;
     verification_document: string | null;
-    applicable_to: string | null; // resident, household, business, all
+    applicable_to: string | null;
     stackable: boolean;
     exclusive_with: string[] | null;
     effective_date: string | null;
@@ -23,15 +52,25 @@ export interface DiscountRule {
     status: string;
     type_label: string;
     is_expired: boolean;
+    // Link to privilege
+    privilege_id?: number;
+    privilege?: Privilege;
+    privilege_code?: string;
 }
 
+// ==================== UPDATED RESIDENT DISCOUNT TYPES ====================
+
 export interface ResidentDiscount {
-    type: 'senior' | 'pwd' | 'solo_parent' | 'indigent' | 'veteran' | 'government_employee';
+    type: string; // Dynamic - any privilege code
     label: string;
     percentage: number;
     id_number?: string;
     has_id: boolean;
+    privilege_code?: string;
+    expires_at?: string;
 }
+
+// ==================== UPDATED FEE TYPE TYPES ====================
 
 export interface FeeType {
     id: string | number;
@@ -41,14 +80,7 @@ export interface FeeType {
     base_amount: number | string;
     category: string;
     frequency: string;
-    has_senior_discount: boolean;
-    senior_discount_percentage?: number;
-    has_pwd_discount: boolean;
-    pwd_discount_percentage?: number;
-    has_solo_parent_discount: boolean;
-    solo_parent_discount_percentage?: number;
-    has_indigent_discount: boolean;
-    indigent_discount_percentage?: number;
+    is_discountable: boolean;
     has_surcharge: boolean;
     surcharge_rate?: number;
     surcharge_fixed?: number;
@@ -56,18 +88,24 @@ export interface FeeType {
     penalty_rate?: number;
     penalty_fixed?: number;
     validity_days?: number;
+    // DYNAMIC: All discount fields will be added dynamically
+    // e.g., has_SENIOR_discount, SENIOR_discount_percentage, etc.
+    [key: string]: any;
 }
+
+// ==================== UPDATED BACKEND FEE TYPES ====================
 
 export interface BackendFee {
     id: string | number;
     fee_type_id: string | number;
     fee_code: string;
-    payer_type: 'resident' | 'household' | 'business';
+    payer_type: 'resident' | 'household' | 'business' | 'App\\Models\\Resident' | 'App\\Models\\Household' | 'App\\Models\\Business';
     resident_id: string | number | null;
     household_id: string | number | null;
-    business_id: string | number | null; // ADDED
+    business_id: string | number | null;
     business_name: string | null;
     payer_name: string;
+    payer_id?: string | number;
     contact_number: string | null;
     address: string | null;
     purok: string | null;
@@ -89,6 +127,29 @@ export interface BackendFee {
     purpose: string | null;
     fee_type_name?: string;
     fee_type_category?: string;
+    
+    // DYNAMIC: Discount applicability
+    applicableDiscounts?: Array<{
+        type: string;
+        label: string;
+        percentage: number;
+        applicablePercentage: number;
+        has_id: boolean;
+        id_number?: string;
+        privilege_code?: string;
+    }>;
+    canApplyDiscount?: boolean;
+    
+    // DYNAMIC: Resident details with privileges
+    resident_details?: {
+        privileges?: Array<{
+            code: string;
+            name: string;
+            id_number?: string;
+        }>;
+        [key: string]: any; 
+    };
+    
     // Business specific fields
     business_type?: string;
     business_type_label?: string;
@@ -100,8 +161,12 @@ export interface BackendFee {
     monthly_gross?: number;
     formatted_capital?: string;
     formatted_monthly_gross?: string;
+    
+    // DYNAMIC: All discount fields will be added dynamically
     [key: string]: any;
 }
+
+// ==================== UPDATED OUTSTANDING FEE TYPES ====================
 
 export interface OutstandingFee {
     id: string | number;
@@ -111,6 +176,9 @@ export interface OutstandingFee {
     payer_name: string;
     payer_type: 'resident' | 'household' | 'business';
     payer_id?: string | number;
+    resident_id?: string | number;
+    household_id?: string | number;
+    business_id?: string | number;
     due_date: string;
     base_amount: string | number;
     surcharge_amount: string | number;
@@ -127,13 +195,15 @@ export interface OutstandingFee {
     period_start?: string;
     period_end?: string;
     category?: string;
+    
     // Business specific fields
     business_name?: string;
     business_type?: string;
     contact_number?: string;
     address?: string;
     purok?: string;
-    // Discount related fields
+    
+    // DYNAMIC: Discount fields
     applicableDiscounts?: Array<{
         type: string;
         label: string;
@@ -141,18 +211,15 @@ export interface OutstandingFee {
         applicablePercentage: number;
         has_id: boolean;
         id_number?: string;
+        privilege_code?: string;
     }>;
     canApplyDiscount?: boolean;
-    // Fee type discount settings from backend
-    fee_type_has_senior_discount?: boolean;
-    fee_type_senior_discount_percentage?: number;
-    fee_type_has_pwd_discount?: boolean;
-    fee_type_pwd_discount_percentage?: number;
-    fee_type_has_solo_parent_discount?: boolean;
-    fee_type_solo_parent_discount_percentage?: number;
-    fee_type_has_indigent_discount?: boolean;
-    fee_type_indigent_discount_percentage?: number;
+    
+    // DYNAMIC: All discount flags will be added dynamically
+    [key: string]: any;
 }
+
+// ==================== UPDATED CLEARANCE TYPE TYPES ====================
 
 export interface ClearanceType {
     id: string | number;
@@ -166,18 +233,16 @@ export interface ClearanceType {
     requires_payment: boolean;
     requires_approval: boolean;
     is_online_only: boolean;
+    is_discountable?: boolean;
     eligibility_criteria?: string;
     purpose_options?: string[];
-    // Discount eligibility for clearance types
-    has_senior_discount?: boolean;
-    senior_discount_percentage?: number;
-    has_pwd_discount?: boolean;
-    pwd_discount_percentage?: number;
-    has_solo_parent_discount?: boolean;
-    solo_parent_discount_percentage?: number;
-    has_indigent_discount?: boolean;
-    indigent_discount_percentage?: number;
+    requirements?: string[];
+    
+    // DYNAMIC: All discount fields will be added dynamically
+    [key: string]: any;
 }
+
+// ==================== UPDATED CLEARANCE REQUEST TYPES ====================
 
 export interface ClearanceRequest {
     id: string | number;
@@ -188,55 +253,127 @@ export interface ClearanceRequest {
     specific_purpose?: string;
     fee_amount: number | string;
     status: string;
+    status_display?: string;
     clearance_type?: ClearanceType;
     resident?: Resident;
     can_be_paid?: boolean;
     already_paid?: boolean;
+    
+    // DYNAMIC: Discount fields
+    applicableDiscounts?: Array<{
+        type: string;
+        label: string;
+        percentage: number;
+        applicablePercentage: number;
+        has_id: boolean;
+        id_number?: string;
+        privilege_code?: string;
+    }>;
+    canApplyDiscount?: boolean;
 }
+
+// ==================== UPDATED RESIDENT TYPES ====================
 
 export interface Resident {
     id: string | number;
     name: string;
+    first_name?: string;
+    last_name?: string;
+    middle_name?: string;
+    suffix?: string;
     contact_number?: string;
+    email?: string;
     address?: string;
+    birth_date?: string;
+    age?: number;
+    gender?: string;
+    civil_status?: string;
+    occupation?: string;
     household_number?: string;
     purok?: string;
-    outstanding_fees?: OutstandingFee[];
+    purok_id?: string | number;
     household_id?: string | number;
+    household_info?: any;
+    outstanding_fees?: OutstandingFee[];
     has_outstanding_fees?: boolean;
     outstanding_fee_count?: number;
     total_outstanding_balance?: string;
+    is_voter?: boolean;
+    
+    // DYNAMIC: Privilege data
+    privileges?: ResidentPrivilege[];
+    privileges_count?: number;
+    active_privileges_count?: number;
+    has_privileges?: boolean;
     discount_eligibility_list?: ResidentDiscount[];
     has_special_classification?: boolean;
-    is_senior?: boolean;
-    is_pwd?: boolean;
-    is_solo_parent?: boolean;
-    is_indigent?: boolean;
-    is_veteran?: boolean;
-    is_government_employee?: boolean;
+    
     // Business ownership
     businesses?: Business[];
     is_business_owner?: boolean;
+    is_household_head?: boolean;
+    
+    // DYNAMIC: Individual privilege flags will be added dynamically
+    [key: string]: any;
 }
+
+// ==================== UPDATED HOUSEHOLD TYPES ====================
 
 export interface Household {
     id: string | number;
-    head_name: string;
-    contact_number?: string;
-    address: string;
     household_number: string;
+    head_name: string;
+    head_id?: string | number;
+    contact_number?: string;
+    email?: string;
+    address: string;
+    full_address?: string;
     purok?: string;
+    purok_id?: string | number;
+    member_count?: number;
     outstanding_fees?: OutstandingFee[];
     has_outstanding_fees?: boolean;
     outstanding_fee_count?: number;
     total_outstanding_balance?: string;
-    // Household members
-    members?: any[];
-    member_count?: number;
+    
+    // DYNAMIC: Household members with privileges
+    members?: HouseholdMember[];
     head_of_household?: any;
+    family_composition?: {
+        total_members: number;
+        adults: number;
+        minors: number;
+        [key: string]: any; // Dynamic composition fields like seniors, pwd, etc.
+    };
+    
+    has_user_account?: boolean;
+    user_account?: any;
+    
+    // DYNAMIC: Head resident's privileges
+    head_privileges?: Array<{
+        code: string;
+        name: string;
+        id_number?: string;
+    }>;
+    has_discount_eligible_head?: boolean;
 }
 
-// ADDED: Business interface
+export interface HouseholdMember {
+    id: string | number;
+    resident_id: string | number;
+    name: string;
+    contact_number?: string;
+    relationship_to_head: string;
+    is_head: boolean;
+    age?: number;
+    gender?: string;
+    
+    // DYNAMIC: Privilege flags will be added dynamically
+    [key: string]: any;
+}
+
+// ==================== UPDATED BUSINESS TYPES ====================
+
 export interface Business {
     id: string | number;
     business_name: string;
@@ -260,14 +397,26 @@ export interface Business {
     monthly_gross?: number;
     formatted_capital?: string;
     formatted_monthly_gross?: string;
+    
     // Outstanding fees
     outstanding_fees?: OutstandingFee[];
     has_outstanding_fees?: boolean;
     outstanding_fee_count?: number;
     total_outstanding_balance?: string;
+    
     // Owner details
     owner?: Resident;
+    
+    // DYNAMIC: Owner's privileges
+    owner_privileges?: Array<{
+        code: string;
+        name: string;
+        id_number?: string;
+    }>;
+    owner_has_privileges?: boolean;
 }
+
+// ==================== UPDATED PAYMENT ITEM TYPES ====================
 
 export interface PaymentItem {
     id: number;
@@ -283,20 +432,22 @@ export interface PaymentItem {
     category: string;
     period_covered: string;
     months_late: number;
+    fee_type_id?: string | number;
     metadata?: {
         is_clearance_fee?: boolean;
         clearance_request_id?: string | number;
         clearance_type_id?: string | number;
         clearance_type_code?: string;
+        clearance_type_name?: string;
         is_outstanding_fee?: boolean;
         original_fee_id?: string | number;
         payer_type?: string;
         payer_id?: string | number;
-        // Business specific metadata
+        resident_id?: string | number;
+        household_id?: string | number;
         is_business_fee?: boolean;
         business_id?: string | number;
         business_name?: string;
-        // Original fee data for reference
         original_fee_data?: {
             base_amount: number;
             surcharge_amount: number;
@@ -307,18 +458,29 @@ export interface PaymentItem {
             total_amount?: number;
         };
         appliedDiscount?: {
-            rule_id?: number; // ID of the applied discount rule
-            code?: string; // Discount rule code
-            type?: string; // Discount type for backward compatibility
-            percentage?: number; // Applied percentage
-            amount: number; // Discount amount
+            rule_id?: number;
+            code?: string;
+            type?: string;
+            percentage?: number;
+            amount: number;
             residentId?: string | number;
             residentName?: string;
-            verification_id?: string; // ID number used for verification
-            verified_at?: string; // Timestamp of verification
+            verification_id?: string;
+            verified_at?: string;
+            privilege_code?: string;
+            id_number?: string;
         };
+        resident_privileges?: Array<{
+            privilege_code: string;
+            id_number?: string;
+            discount_percentage?: number;
+        }>;
+        // DYNAMIC: Discount flags
+        [key: string]: any;
     };
 }
+
+// ==================== UPDATED PAYMENT FORM DATA ====================
 
 export interface PaymentFormData {
     payer_type: string;
@@ -338,9 +500,9 @@ export interface PaymentFormData {
     surcharge: number;
     penalty: number;
     discount: number;
-    discount_code: string; // Changed from discount_type - stores the discount rule code
-    discount_id?: number; // ID of the applied discount rule
-    discount_type: string; // Kept for backward compatibility
+    discount_code: string;
+    discount_id?: number;
+    discount_type: string;
     total_amount: number;
     purpose: string;
     remarks: string;
@@ -351,11 +513,22 @@ export interface PaymentFormData {
     validity_date: string;
     collection_type: 'manual' | 'system';
     clearance_request_id?: string | number;
-    // Verification fields for discounts that require it
     verification_id_number?: string;
     verification_remarks?: string;
     amount_paid?: number;
+    resident_id?: string | number;
+    resident_name?: string;
+    
+    // DYNAMIC: Applied discounts tracking
+    applied_discounts?: Array<{
+        privilege_code: string;
+        discount_percentage: number;
+        discount_amount: number;
+        id_number?: string;
+    }>;
 }
+
+// ==================== UPDATED PRE-FILLED FEE DATA ====================
 
 export interface PreFilledFeeData {
     fee_id?: number;
@@ -375,10 +548,11 @@ export interface PreFilledFeeData {
     clearance_type_id?: string | number;
     clearance_type?: string;
     clearance_code?: string;
-    // Business specific
     business_name?: string;
     business_id?: string | number;
 }
+
+// ==================== UPDATED SELECTED FEE DETAILS ====================
 
 export interface SelectedFeeDetails {
     id: string | number;
@@ -403,81 +577,99 @@ export interface SelectedFeeDetails {
     due_date: string;
     purpose: string;
     remarks: string;
-    // Business specific
     business_name?: string;
     business_type?: string;
-    // New discount fields
+    
+    // DYNAMIC: Discount fields
     applicable_discounts?: Array<{
         type: string;
         label: string;
         percentage: number;
         id_number?: string;
         has_id: boolean;
+        privilege_code?: string;
     }>;
     discount_eligibility_text?: string;
+    
     resident_discount_info?: {
         id: string | number;
         name: string;
-        is_senior: boolean;
-        is_pwd: boolean;
-        is_solo_parent: boolean;
-        is_indigent: boolean;
         has_special_classification: boolean;
         discount_eligibility_list: ResidentDiscount[];
+        privileges?: Array<{
+            code: string;
+            name: string;
+            id_number?: string;
+            discount_percentage?: number;
+        }>;
+        // DYNAMIC: Individual privilege flags
+        [key: string]: any;
     };
-    // Fee type discount settings
-    fee_type_has_senior_discount?: boolean;
-    fee_type_senior_discount_percentage?: number;
-    fee_type_has_pwd_discount?: boolean;
-    fee_type_pwd_discount_percentage?: number;
-    fee_type_has_solo_parent_discount?: boolean;
-    fee_type_solo_parent_discount_percentage?: number;
-    fee_type_has_indigent_discount?: boolean;
-    fee_type_indigent_discount_percentage?: number;
-    // Household info
+    
     household_info?: any;
     is_household_head?: boolean;
+    
+    // DYNAMIC: All discount flags will be added dynamically
+    [key: string]: any;
 }
+
+// ==================== UPDATED PAGE PROPS ====================
 
 export interface PageProps {
     residents: Resident[];
     households: Household[];
-    businesses?: Business[]; // ADDED
+    businesses?: Business[];
     fees: BackendFee[];
     feeTypes?: FeeType[];
-    discountRules?: DiscountRule[]; // Added: Full discount rule data
-    discountTypes?: Record<string, string>; // For dropdown display (kept for compatibility)
-    discountCodeToIdMap?: Record<string, number>; // Added: Map discount codes to IDs
+    discountRules?: DiscountRule[];
+    discountTypes?: Record<string, string>;
+    discountCodeToIdMap?: Record<string, number>;
+    privileges?: Privilege[];
+    allPrivileges?: Privilege[];
     pre_filled_data?: PreFilledFeeData;
     clearance_request?: ClearanceRequest | null;
     clearance_fee_type?: any;
     clearanceTypes?: Record<string, string>;
     clearanceTypesDetails?: ClearanceType[];
     clearance_requests?: ClearanceRequest[];
-    // New properties for discount eligibility
     selected_fee_details?: SelectedFeeDetails | null;
     selected_fee_type_id?: string | number;
-    // Summary counts
     payer_counts?: {
         residents: number;
         households: number;
         businesses: number;
         total: number;
     };
+    hasClearanceTypes?: boolean;
+    isCombinedPayment?: boolean;
+    isClearanceMode?: boolean;
+    isBusinessMode?: boolean;
+    isFeePayment?: boolean;
+    payerClearanceRequests?: ClearanceRequest[];
+    
 }
 
-// Utility type for discount application
+// ==================== UTILITY TYPES ====================
+
 export interface DiscountApplication {
     rule: DiscountRule;
     amount: number;
     verification_id?: string;
     verified_at?: string;
+    privilege_code?: string;
+    privilege_id?: number;
+    id_number?: string;
 }
 
-// Type for discount calculation result
 export interface DiscountCalculationResult {
     discountAmount: number;
     appliedRule?: DiscountRule;
+    appliedDiscounts?: Array<{
+        privilege_code: string;
+        discount_percentage: number;
+        discount_amount: number;
+        id_number?: string;
+    }>;
     items: PaymentItem[];
     subtotal: number;
     surcharge: number;
@@ -485,7 +677,6 @@ export interface DiscountCalculationResult {
     total: number;
 }
 
-// ADDED: Business payment summary interface
 export interface BusinessPaymentSummary {
     business_id: string | number;
     business_name: string;
@@ -499,7 +690,6 @@ export interface BusinessPaymentSummary {
     fee_count: number;
 }
 
-// ADDED: Payment method details interface
 export interface PaymentMethodDetails {
     id: string;
     name: string;

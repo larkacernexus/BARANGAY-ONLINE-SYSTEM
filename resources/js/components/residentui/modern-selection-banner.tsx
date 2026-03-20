@@ -27,7 +27,7 @@ export const ModernSelectionBanner = ({
         <div className="mb-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 animate-slide-down">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <Badge variant="secondary" className="gap-1 bg-white dark:bg-gray-800">
+                    <Badge variant="secondary" className="gap-1 bg-white dark:bg-gray-900">
                         <Square className="h-3 w-3" />
                         Selection Mode
                     </Badge>
@@ -40,7 +40,7 @@ export const ModernSelectionBanner = ({
                         variant="outline"
                         size="sm"
                         onClick={allSelected ? onDeselectAll : onSelectAll}
-                        className="flex-1 sm:flex-none bg-white dark:bg-gray-800"
+                        className="flex-1 sm:flex-none bg-white dark:bg-gray-900"
                     >
                         {allSelected ? 'Deselect All' : 'Select All'}
                     </Button>

@@ -9,6 +9,7 @@ use App\Models\Resident;
 use App\Models\HouseholdMember;
 use App\Models\Household;
 use App\Models\User;
+use App\Models\Privilege;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -31,6 +32,9 @@ class ResidentFeeController extends Controller
             return $this->renderEmptyFeePage($request, 'No resident profile found.');
         }
         
+        // Get ALL active privileges for reference
+        $allPrivileges = $this->getAllPrivileges();
+        
         // Get ALL resident IDs that belong to this household
         $householdResidentIds = $this->getAllHouseholdResidentIds($currentResident);
         
@@ -41,11 +45,11 @@ class ResidentFeeController extends Controller
         $query = $this->buildFeeQuery($householdResidentIds, $householdId, $request);
         
         // Get filter data with caching
-        $filterData = Cache::remember("resident_fee_filters_{$currentResident->id}", 300, function () use ($householdResidentIds, $householdId, $currentResident) {
+        $filterData = Cache::remember("resident_fee_filters_{$currentResident->id}", 300, function () use ($householdResidentIds, $householdId, $currentResident, $allPrivileges) {
             return [
                 'years' => $this->getAvailableYears($householdResidentIds, $householdId),
                 'fee_types' => $this->getAvailableFeeTypes($householdResidentIds, $householdId, $currentResident),
-                'residents' => $this->getHouseholdResidents($householdResidentIds),
+                'residents' => $this->getHouseholdResidents($householdResidentIds, $allPrivileges),
             ];
         });
         
@@ -53,22 +57,22 @@ class ResidentFeeController extends Controller
         $fees = $query->paginate(15)->withQueryString();
         
         // Format fees manually
-        $formattedFees = $fees->getCollection()->map(function ($fee) {
+        $formattedFees = $fees->getCollection()->map(function ($fee) use ($allPrivileges) {
             // Make sure we load the feeType with its documentCategory
             if ($fee->feeType && !$fee->feeType->relationLoaded('documentCategory')) {
                 $fee->feeType->load('documentCategory');
             }
-            return $this->formatFeeForFrontend($fee);
+            return $this->formatFeeForFrontend($fee, $allPrivileges);
         });
         
         // Replace the collection with formatted data
         $fees->setCollection($formattedFees);
         
         // Calculate stats for the entire household
-        $stats = $this->calculateHouseholdFeeStats($householdResidentIds, $householdId);
+        $stats = $this->calculateHouseholdFeeStats($householdResidentIds, $householdId, $allPrivileges);
         
         // Get household members list for reference
-        $householdMembers = $this->getHouseholdMembersList($householdResidentIds);
+        $householdMembers = $this->getHouseholdMembersList($householdResidentIds, $allPrivileges);
         
         return Inertia::render('resident/Fees/Index', [
             'fees' => $fees,
@@ -86,6 +90,7 @@ class ResidentFeeController extends Controller
                 'currentResidentName' => $currentResident->full_name,
                 'householdSize' => count($householdResidentIds),
             ],
+            'allPrivileges' => $allPrivileges, // Send all privileges to frontend
         ]);
     }
 
@@ -100,6 +105,9 @@ class ResidentFeeController extends Controller
         if (!$currentResident) {
             abort(403, 'No resident profile found.');
         }
+        
+        // Get ALL active privileges for reference
+        $allPrivileges = $this->getAllPrivileges();
         
         // Get all household resident IDs for authorization
         $householdResidentIds = $this->getAllHouseholdResidentIds($currentResident);
@@ -119,23 +127,46 @@ class ResidentFeeController extends Controller
             }
         ]);
         
-        $formattedFee = $this->formatFeeForFrontend($fee);
+        $formattedFee = $this->formatFeeForFrontend($fee, $allPrivileges);
         $paymentHistory = $this->getPaymentHistory($fee);
         
         // Determine which household member this fee belongs to
-        $payerInfo = $this->getPayerInfo($fee);
+        $payerInfo = $this->getPayerInfo($fee, $allPrivileges);
         
         return Inertia::render('resident/Fees/Show', [
             'fee' => $formattedFee,
             'paymentHistory' => $paymentHistory,
             'canPayOnline' => $this->canPayOnline($fee),
             'payerInfo' => $payerInfo,
+            'allPrivileges' => $allPrivileges,
         ]);
     }
 
     /**
      * Helper Methods
      */
+
+    /**
+     * Get all active privileges from database - DYNAMIC
+     */
+    private function getAllPrivileges(): array
+    {
+        return Cache::remember('all_active_privileges', 3600, function () {
+            return Privilege::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'description', 'default_discount_percentage'])
+                ->map(function ($privilege) {
+                    return [
+                        'id' => $privilege->id,
+                        'name' => $privilege->name,
+                        'code' => $privilege->code,
+                        'description' => $privilege->description,
+                        'default_discount_percentage' => $privilege->default_discount_percentage,
+                    ];
+                })
+                ->toArray();
+        });
+    }
 
     /**
      * Get the current active resident for the authenticated user
@@ -147,7 +178,7 @@ class ResidentFeeController extends Controller
         return Cache::remember($cacheKey, 300, function () use ($user) {
             // First try to get the resident from current_resident_id
             if ($user->current_resident_id) {
-                $resident = Resident::with('household')->find($user->current_resident_id);
+                $resident = Resident::with(['household', 'residentPrivileges.privilege'])->find($user->current_resident_id);
                 if ($resident) {
                     return $resident;
                 }
@@ -158,7 +189,7 @@ class ResidentFeeController extends Controller
                 // Find household head through household members
                 $householdMember = HouseholdMember::where('household_id', $user->household_id)
                     ->where('is_head', true)
-                    ->with('resident')
+                    ->with(['resident.residentPrivileges.privilege'])
                     ->first();
                     
                 if ($householdMember && $householdMember->resident) {
@@ -166,7 +197,8 @@ class ResidentFeeController extends Controller
                 }
                 
                 // If no head found, get the first resident in the household
-                $firstResident = Resident::where('household_id', $user->household_id)
+                $firstResident = Resident::with(['residentPrivileges.privilege'])
+                    ->where('household_id', $user->household_id)
                     ->first();
                     
                 if ($firstResident) {
@@ -230,14 +262,14 @@ class ResidentFeeController extends Controller
             ->where(function ($query) use ($residentIds, $householdId) {
                 // Include fees where payer is any resident in the household
                 $query->where(function ($q) use ($residentIds) {
-                    $q->where('payer_type', 'App\\Models\\Resident') // FIXED: Use full model class name
+                    $q->where('payer_type', 'App\\Models\\Resident')
                       ->whereIn('payer_id', $residentIds);
                 });
                 
                 // Include fees where payer is the household itself
                 if ($householdId) {
                     $query->orWhere(function ($q) use ($householdId) {
-                        $q->where('payer_type', 'App\\Models\\Household') // FIXED: Use full model class name
+                        $q->where('payer_type', 'App\\Models\\Household')
                           ->where('payer_id', $householdId);
                     });
                 }
@@ -273,21 +305,17 @@ class ResidentFeeController extends Controller
                     });
             });
         }
-     // Status filter
-if ($request->filled('status') && $request->status !== 'all') {
-
-    if ($request->status === 'overdue') {
-
-        $query->where('balance', '>', 0)
-              ->whereDate('due_date', '<', now())
-              ->whereNotIn('status', ['paid', 'cancelled']);
-
-    } else {
-
-        $query->where('status', $request->status);
-
-    }
-}
+        
+        // Status filter
+        if ($request->filled('status') && $request->status !== 'all') {
+            if ($request->status === 'overdue') {
+                $query->where('balance', '>', 0)
+                      ->whereDate('due_date', '<', now())
+                      ->whereNotIn('status', ['paid', 'cancelled']);
+            } else {
+                $query->where('status', $request->status);
+            }
+        }
         
         // Fee type filter
         if ($request->filled('fee_type') && $request->fee_type !== 'all') {
@@ -306,7 +334,7 @@ if ($request->filled('status') && $request->status !== 'all') {
             // Only apply filter if the selected resident is part of the household
             if (in_array($residentId, $residentIds)) {
                 $query->where(function ($q) use ($residentId) {
-                    $q->where('payer_type', 'App\\Models\\Resident') // FIXED: Use full model class name
+                    $q->where('payer_type', 'App\\Models\\Resident')
                       ->where('payer_id', $residentId);
                 });
             }
@@ -334,13 +362,13 @@ if ($request->filled('status') && $request->status !== 'all') {
         return Fee::query()
             ->where(function ($query) use ($residentIds, $householdId) {
                 $query->where(function ($q) use ($residentIds) {
-                    $q->where('payer_type', 'App\\Models\\Resident') // FIXED: Use full model class name
+                    $q->where('payer_type', 'App\\Models\\Resident')
                       ->whereIn('payer_id', $residentIds);
                 });
                 
                 if ($householdId) {
                     $query->orWhere(function ($q) use ($householdId) {
-                        $q->where('payer_type', 'App\\Models\\Household') // FIXED: Use full model class name
+                        $q->where('payer_type', 'App\\Models\\Household')
                           ->where('payer_id', $householdId);
                     });
                 }
@@ -394,48 +422,98 @@ if ($request->filled('status') && $request->status !== 'all') {
     }
 
     /**
-     * Get all residents in the household for filtering
+     * Get all residents in the household for filtering - WITH PRIVILEGES
      */
-    private function getHouseholdResidents(array $residentIds): array
+    private function getHouseholdResidents(array $residentIds, array $allPrivileges): array
     {
         return Resident::query()
             ->whereIn('id', $residentIds)
+            ->with(['residentPrivileges.privilege'])
             ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name', 'middle_name', 'suffix'])
-            ->map(function ($resident) {
-                return [
+            ->get()
+            ->map(function ($resident) use ($allPrivileges) {
+                // Get active privileges
+                $activePrivileges = $resident->residentPrivileges
+                    ->filter(function ($rp) {
+                        return $rp->isActive();
+                    })
+                    ->map(function ($rp) {
+                        return [
+                            'code' => $rp->privilege->code,
+                            'name' => $rp->privilege->name,
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+
+                // DYNAMIC privilege flags
+                $privilegeFlags = [];
+                foreach ($activePrivileges as $priv) {
+                    $code = strtolower($priv['code']);
+                    $privilegeFlags["is_{$code}"] = true;
+                }
+
+                return array_merge([
                     'id' => $resident->id,
                     'first_name' => $resident->first_name,
                     'last_name' => $resident->last_name,
                     'middle_name' => $resident->middle_name,
                     'suffix' => $resident->suffix,
                     'full_name' => $resident->full_name,
-                ];
+                    'privileges' => $activePrivileges,
+                    'has_privileges' => count($activePrivileges) > 0,
+                ], $privilegeFlags);
             })
             ->toArray();
     }
 
     /**
-     * Get household members list with roles
+     * Get household members list with roles and privileges
      */
-    private function getHouseholdMembersList(array $residentIds): array
+    private function getHouseholdMembersList(array $residentIds, array $allPrivileges): array
     {
         return Resident::query()
             ->whereIn('id', $residentIds)
-            ->with(['householdMemberships' => function ($query) {
-                $query->where('is_head', true);
-            }])
+            ->with([
+                'householdMemberships' => function ($query) {
+                    $query->where('is_head', true);
+                },
+                'residentPrivileges.privilege'
+            ])
             ->get()
-            ->map(function ($resident) {
+            ->map(function ($resident) use ($allPrivileges) {
                 $isHead = $resident->householdMemberships->isNotEmpty();
                 
-                return [
+                // Get active privileges
+                $activePrivileges = $resident->residentPrivileges
+                    ->filter(function ($rp) {
+                        return $rp->isActive();
+                    })
+                    ->map(function ($rp) {
+                        return [
+                            'code' => $rp->privilege->code,
+                            'name' => $rp->privilege->name,
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+
+                // DYNAMIC privilege flags
+                $privilegeFlags = [];
+                foreach ($activePrivileges as $priv) {
+                    $code = strtolower($priv['code']);
+                    $privilegeFlags["is_{$code}"] = true;
+                }
+                
+                return array_merge([
                     'id' => $resident->id,
                     'full_name' => $resident->full_name,
                     'is_head' => $isHead,
                     'age' => $resident->age,
                     'gender' => $resident->gender,
-                ];
+                    'privileges' => $activePrivileges,
+                    'has_privileges' => count($activePrivileges) > 0,
+                ], $privilegeFlags);
             })
             ->toArray();
     }
@@ -443,7 +521,7 @@ if ($request->filled('status') && $request->status !== 'all') {
     /**
      * Calculate fee statistics for the entire household
      */
-    private function calculateHouseholdFeeStats(array $residentIds, ?int $householdId): array
+    private function calculateHouseholdFeeStats(array $residentIds, ?int $householdId, array $allPrivileges): array
     {
         $now = now();
         $currentYear = $now->year;
@@ -451,13 +529,13 @@ if ($request->filled('status') && $request->status !== 'all') {
         $baseQuery = Fee::query()
             ->where(function ($query) use ($residentIds, $householdId) {
                 $query->where(function ($q) use ($residentIds) {
-                    $q->where('payer_type', 'App\\Models\\Resident') // FIXED: Use full model class name
+                    $q->where('payer_type', 'App\\Models\\Resident')
                       ->whereIn('payer_id', $residentIds);
                 });
                 
                 if ($householdId) {
                     $query->orWhere(function ($q) use ($householdId) {
-                        $q->where('payer_type', 'App\\Models\\Household') // FIXED: Use full model class name
+                        $q->where('payer_type', 'App\\Models\\Household')
                           ->where('payer_id', $householdId);
                     });
                 }
@@ -480,12 +558,12 @@ if ($request->filled('status') && $request->status !== 'all') {
             ->selectRaw('SUM(CASE WHEN status IN ("pending", "overdue", "issued", "partially_paid") THEN balance ELSE 0 END) as year_balance')
             ->first();
         
-        // Calculate per-resident stats
+        // Calculate per-resident stats with privilege info
         $perResidentStats = [];
         foreach ($residentIds as $residentId) {
-            $resident = Resident::find($residentId);
+            $resident = Resident::with(['residentPrivileges.privilege'])->find($residentId);
             if ($resident) {
-                $residentFees = Fee::where('payer_type', 'App\\Models\\Resident') // FIXED: Use full model class name
+                $residentFees = Fee::where('payer_type', 'App\\Models\\Resident')
                     ->where('payer_id', $residentId)
                     ->count();
                 
@@ -494,12 +572,35 @@ if ($request->filled('status') && $request->status !== 'all') {
                     ->whereIn('status', ['pending', 'overdue', 'issued', 'partially_paid'])
                     ->sum('balance');
                 
-                $perResidentStats[] = [
+                // Get active privileges
+                $activePrivileges = $resident->residentPrivileges
+                    ->filter(function ($rp) {
+                        return $rp->isActive();
+                    })
+                    ->map(function ($rp) {
+                        return [
+                            'code' => $rp->privilege->code,
+                            'name' => $rp->privilege->name,
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+
+                // DYNAMIC privilege flags
+                $privilegeFlags = [];
+                foreach ($activePrivileges as $priv) {
+                    $code = strtolower($priv['code']);
+                    $privilegeFlags["is_{$code}"] = true;
+                }
+                
+                $perResidentStats[] = array_merge([
                     'resident_id' => $residentId,
                     'resident_name' => $resident->full_name,
                     'fee_count' => $residentFees,
                     'balance' => (float) $residentBalance,
-                ];
+                    'privileges' => $activePrivileges,
+                    'has_privileges' => count($activePrivileges) > 0,
+                ], $privilegeFlags);
             }
         }
         
@@ -524,12 +625,12 @@ if ($request->filled('status') && $request->status !== 'all') {
     private function authorizeFeeAccess(Fee $fee, array $residentIds, ?int $householdId): bool
     {
         // Check if fee belongs to any resident in the household
-        if ($fee->payer_type === 'App\\Models\\Resident') { // FIXED: Use full model class name
+        if ($fee->payer_type === 'App\\Models\\Resident') {
             return in_array($fee->payer_id, $residentIds);
         }
         
         // Check if fee belongs to the household
-        if ($fee->payer_type === 'App\\Models\\Household') { // FIXED: Use full model class name
+        if ($fee->payer_type === 'App\\Models\\Household') {
             return $fee->payer_id === $householdId;
         }
         
@@ -537,20 +638,41 @@ if ($request->filled('status') && $request->status !== 'all') {
     }
 
     /**
-     * Get payer information
+     * Get payer information with privileges
      */
-    private function getPayerInfo(Fee $fee): array
+    private function getPayerInfo(Fee $fee, array $allPrivileges): array
     {
         if ($fee->payer_type === 'App\\Models\\Resident' && $fee->payer) {
-            return [
+            // Get resident's active privileges
+            $activePrivileges = $fee->payer->residentPrivileges
+                ->filter(function ($rp) {
+                    return $rp->isActive();
+                })
+                ->map(function ($rp) {
+                    return [
+                        'code' => $rp->privilege->code,
+                        'name' => $rp->privilege->name,
+                        'id_number' => $rp->id_number,
+                    ];
+                })
+                ->values()
+                ->toArray();
+
+            // DYNAMIC privilege flags
+            $privilegeFlags = [];
+            foreach ($activePrivileges as $priv) {
+                $code = strtolower($priv['code']);
+                $privilegeFlags["is_{$code}"] = true;
+            }
+
+            return array_merge([
                 'type' => 'resident',
                 'id' => $fee->payer->id,
                 'name' => $fee->payer->full_name,
-                'is_senior' => $fee->payer->is_senior,
-                'is_pwd' => $fee->payer->is_pwd,
-                'is_solo_parent' => $fee->payer->is_solo_parent,
-                'is_indigent' => $fee->payer->is_indigent,
-            ];
+                'privileges' => $activePrivileges,
+                'has_privileges' => count($activePrivileges) > 0,
+            ], $privilegeFlags);
+            
         } elseif ($fee->payer_type === 'App\\Models\\Household' && $fee->payer) {
             return [
                 'type' => 'household',
@@ -570,7 +692,7 @@ if ($request->filled('status') && $request->status !== 'all') {
     /**
      * Format fee for frontend
      */
-    private function formatFeeForFrontend($fee): array
+    private function formatFeeForFrontend($fee, array $allPrivileges): array
     {
         // Convert payer_type for frontend display
         $displayPayerType = 'other';
@@ -589,7 +711,7 @@ if ($request->filled('status') && $request->status !== 'all') {
             'certificate_number' => $fee->certificate_number,
             'purpose' => $fee->purpose,
             'payer_name' => $fee->payer_name,
-            'payer_type' => $displayPayerType, // Use display version for frontend
+            'payer_type' => $displayPayerType,
             'address' => $fee->address,
             'purok' => $fee->purok,
             'zone' => $fee->zone,
@@ -616,21 +738,41 @@ if ($request->filled('status') && $request->status !== 'all') {
             'days_overdue' => $this->calculateDaysOverdue($fee),
         ];
         
-        // Add payer data
+        // Add payer data with privileges
         if ($fee->payer) {
             if ($fee->payer_type === 'App\\Models\\Resident') {
-                $formatted['resident'] = [
+                // Get active privileges
+                $activePrivileges = $fee->payer->residentPrivileges
+                    ->filter(function ($rp) {
+                        return $rp->isActive();
+                    })
+                    ->map(function ($rp) {
+                        return [
+                            'code' => $rp->privilege->code,
+                            'name' => $rp->privilege->name,
+                        ];
+                    })
+                    ->values()
+                    ->toArray();
+
+                // DYNAMIC privilege flags
+                $privilegeFlags = [];
+                foreach ($activePrivileges as $priv) {
+                    $code = strtolower($priv['code']);
+                    $privilegeFlags["is_{$code}"] = true;
+                }
+
+                $formatted['resident'] = array_merge([
                     'id' => $fee->payer->id,
                     'first_name' => $fee->payer->first_name,
                     'last_name' => $fee->payer->last_name,
                     'middle_name' => $fee->payer->middle_name,
                     'suffix' => $fee->payer->suffix,
                     'full_name' => $fee->payer->full_name,
-                    'is_senior' => $fee->payer->is_senior,
-                    'is_pwd' => $fee->payer->is_pwd,
-                    'is_solo_parent' => $fee->payer->is_solo_parent,
-                    'is_indigent' => $fee->payer->is_indigent,
-                ];
+                    'privileges' => $activePrivileges,
+                    'has_privileges' => count($activePrivileges) > 0,
+                ], $privilegeFlags);
+                
             } elseif ($fee->payer_type === 'App\\Models\\Household') {
                 $formatted['household'] = [
                     'id' => $fee->payer->id,
@@ -768,6 +910,7 @@ if ($request->filled('status') && $request->status !== 'all') {
                 'currentResidentName' => null,
                 'householdSize' => 0,
             ],
+            'allPrivileges' => $this->getAllPrivileges(),
             'message' => $message,
         ]);
     }

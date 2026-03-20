@@ -105,7 +105,7 @@ export function ModernDocumentViewer({ document: doc, isOpen, onClose }: Documen
                     </div>
                 </div>
                 
-                <div className="flex-1 overflow-auto touch-pan-y bg-gray-50 dark:bg-gray-800/50">
+                <div className="flex-1 overflow-auto touch-pan-y bg-gray-50 dark:bg-gray-900/50">
                     {error ? (
                         <div className="h-full flex items-center justify-center p-8">
                             <ModernEmptyState
@@ -237,7 +237,7 @@ export function ModernDocumentThumbnail({ document: doc, onView, onDownload }: D
                             loading="lazy"
                         />
                         {imageError && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-900">
                                 <FileImage className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400" />
                             </div>
                         )}

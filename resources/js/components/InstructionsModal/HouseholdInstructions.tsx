@@ -299,7 +299,7 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
                     "relative rounded-xl p-2 transition-all duration-200",
                     isMobileMenuOpen 
                       ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400" 
-                      : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                      : "hover:bg-gray-100 dark:hover:bg-gray-900"
                   )}
                   aria-label="Toggle menu"
                 >
@@ -336,10 +336,10 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
             <div className="flex items-center gap-1 sm:gap-2">
               {!isMobile && (
                 <>
-                  <button className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300">
+                  <button className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-300">
                     <Search className="h-5 w-5" />
                   </button>
-                  <button className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300">
+                  <button className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-300">
                     <Share2 className="h-5 w-5" />
                   </button>
                   <div className="mx-2 h-6 w-px bg-gray-200 dark:bg-gray-700" />
@@ -347,7 +347,7 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
               )}
               <button
                 onClick={onClose}
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-300"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -383,7 +383,7 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
                             'group relative mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all',
                             isActive
                               ? `bg-${section.color}-50 text-${section.color}-700 dark:bg-${section.color}-900/20 dark:text-${section.color}-400`
-                              : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                              : 'hover:bg-gray-50 dark:hover:bg-gray-900/50'
                           )}
                         >
                           {isActive && (
@@ -396,7 +396,7 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
                             'rounded-lg p-2 transition-all',
                             isActive
                               ? `bg-${section.color}-100 text-${section.color}-600 dark:bg-${section.color}-800/30 dark:text-${section.color}-400`
-                              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                              : 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400'
                           )}>
                             <Icon className="h-5 w-5" />
                           </div>
@@ -570,7 +570,7 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
                             ].map((item, idx) => {
                               const Icon = item.icon;
                               return (
-                                <div key={idx} className="flex items-center gap-2 rounded-lg bg-gray-50 p-2 dark:bg-gray-800">
+                                <div key={idx} className="flex items-center gap-2 rounded-lg bg-gray-50 p-2 dark:bg-gray-900">
                                   <Icon className={`h-4 w-4 text-${item.color}-500`} />
                                   <span className="text-xs text-gray-600 dark:text-gray-400">{item.text}</span>
                                 </div>
@@ -598,7 +598,7 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
                         ].map((doc, idx) => {
                           const Icon = doc.icon;
                           return (
-                            <div key={idx} className="group relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50 p-4 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
+                            <div key={idx} className="group relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50 p-4 transition-all hover:shadow-md dark:border-gray-700 dark:bg-gray-900">
                               <div className={`absolute right-0 top-0 h-16 w-16 translate-x-4 -translate-y-4 rounded-full bg-${doc.color}-500/10 transition-transform group-hover:scale-150`} />
                               <Icon className={`mb-3 h-6 w-6 text-${doc.color}-600 dark:text-${doc.color}-400`} />
                               <h4 className="mb-1 text-sm font-medium text-gray-900 dark:text-white">{doc.title}</h4>
@@ -627,7 +627,7 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
                         ].map((faq, idx) => (
                           <div
                             key={idx}
-                            className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50 transition-all dark:border-gray-700 dark:bg-gray-800"
+                            className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50 transition-all dark:border-gray-700 dark:bg-gray-900"
                           >
                             <button
                               onClick={() => toggleFaq(idx)}
@@ -659,7 +659,7 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
                           { action: 'Export List', shortcut: 'Ctrl+E', location: 'Households → Export' },
                           { action: 'Generate Report', shortcut: 'Ctrl+R', location: 'Reports → Households' },
                         ].map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+                          <div key={idx} className="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
                             <div>
                               <div className="text-sm font-medium text-gray-900 dark:text-white">{item.action}</div>
                               <div className="text-xs text-gray-500 dark:text-gray-400">{item.location}</div>
@@ -681,14 +681,14 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Need Help?</h3>
                       </div>
                       <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                        <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-800">
+                        <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-900">
                           <div className="mb-1 font-medium text-gray-900 dark:text-white">Records Officer</div>
                           <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                             <div>📞 (082) 123-4567 loc. 101</div>
                             <div>📧 records@barangay.gov.ph</div>
                           </div>
                         </div>
-                        <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-800">
+                        <div className="rounded-xl bg-white p-4 shadow-sm dark:bg-gray-900">
                           <div className="mb-1 font-medium text-gray-900 dark:text-white">IT Support</div>
                           <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                             <div>📞 (082) 123-4567 loc. 105</div>
@@ -714,14 +714,14 @@ const HouseholdInstructions: React.FC<HouseholdInstructionsProps> = ({
                 <Eye className="h-4 w-4" />
                 <span>
                   <span className="hidden sm:inline">Press </span>
-                  <kbd className="rounded-lg bg-gray-100 px-1.5 py-0.5 font-mono text-xs dark:bg-gray-800">ESC</kbd>
+                  <kbd className="rounded-lg bg-gray-100 px-1.5 py-0.5 font-mono text-xs dark:bg-gray-900">ESC</kbd>
                   <span className="hidden sm:inline"> to close</span>
                 </span>
               </div>
               <div className="flex items-center gap-2 sm:gap-3">
                 <button
                   onClick={onClose}
-                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 sm:px-4 sm:py-2"
+                  className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-900 sm:px-4 sm:py-2"
                 >
                   Close
                 </button>

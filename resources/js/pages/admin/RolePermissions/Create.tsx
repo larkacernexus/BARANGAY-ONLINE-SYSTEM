@@ -244,7 +244,7 @@ export default function RolePermissionCreate({
         
         if (selectedRole.is_system_role) {
             return (
-                <Alert className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
+                <Alert className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800 dark:bg-gray-900/90">
                     <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                     <AlertDescription className="text-yellow-800 dark:text-yellow-300">
                         <strong>System Role Detected:</strong> This is a system role. Changes to system roles 
@@ -267,7 +267,7 @@ export default function RolePermissionCreate({
         >
             <Head title="Assign Permissions to Role" />
 
-            <div className="space-y-6">
+            <div className="space-y-6 min-h-screen p-6">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
@@ -276,12 +276,12 @@ export default function RolePermissionCreate({
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => router.visit(route('admin.role-permissions.index'))}
-                                className="h-8 w-8 p-0"
+                                className="h-8 w-8 p-0 dark:hover:bg-gray-700"
                             >
-                                <ArrowLeft className="h-4 w-4" />
+                                <ArrowLeft className="h-4 w-4 dark:text-gray-300" />
                             </Button>
                             <div>
-                                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Assign Permissions</h1>
+                                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-white">Assign Permissions</h1>
                                 <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
                                     Manage role permissions and access control
                                 </p>
@@ -293,7 +293,7 @@ export default function RolePermissionCreate({
                             variant="outline"
                             onClick={handleReset}
                             disabled={processing || isSubmitting}
-                            className="h-9"
+                            className="h-9 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                         >
                             <RefreshCw className="h-4 w-4 mr-2" />
                             Reset
@@ -303,7 +303,7 @@ export default function RolePermissionCreate({
 
                 {/* Success Message */}
                 {success_message && (
-                    <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+                    <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800 dark:bg-gray-900/90">
                         <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                         <AlertDescription className="text-green-800 dark:text-green-300">
                             {success_message}
@@ -316,43 +316,43 @@ export default function RolePermissionCreate({
                         {/* Left Column - Role Selection & Form */}
                         <div className="lg:col-span-2 space-y-6">
                             {/* Role Selection Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Users className="h-5 w-5" />
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
+                                        <Users className="h-5 w-5 dark:text-gray-300" />
                                         Select Role
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="dark:text-gray-400">
                                         Choose a role to assign permissions to
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     {/* Role Selection */}
                                     <div className="space-y-2">
-                                        <Label htmlFor="role">Role *</Label>
+                                        <Label htmlFor="role" className="dark:text-gray-300">Role *</Label>
                                         <Select
                                             value={selectedRoleId}
                                             onValueChange={setSelectedRoleId}
                                             disabled={processing || isSubmitting}
                                         >
-                                            <SelectTrigger className={errors.role_id ? 'border-red-500' : ''}>
+                                            <SelectTrigger className={`dark:bg-gray-900 dark:border-gray-700 dark:text-white ${errors.role_id ? 'border-red-500' : ''}`}>
                                                 <SelectValue placeholder="Select a role" />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                 {safeRoles.map((role) => (
-                                                    <SelectItem key={role.id} value={role.id.toString()}>
+                                                    <SelectItem key={role.id} value={role.id.toString()} className="dark:text-white dark:focus:bg-gray-700">
                                                         <div className="flex items-center gap-2">
-                                                            <Shield className="h-4 w-4" />
+                                                            <Shield className="h-4 w-4 dark:text-gray-400" />
                                                             <div className="flex-1">
                                                                 <div className="font-medium">{role.name}</div>
                                                                 {role.description && (
-                                                                    <div className="text-xs text-gray-500 truncate">
+                                                                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                                                         {role.description}
                                                                     </div>
                                                                 )}
                                                             </div>
                                                             {role.is_system_role && (
-                                                                <Badge variant="outline" className="ml-2">
+                                                                <Badge variant="outline" className="ml-2 dark:border-gray-600 dark:text-gray-300">
                                                                     System
                                                                 </Badge>
                                                             )}
@@ -362,20 +362,20 @@ export default function RolePermissionCreate({
                                             </SelectContent>
                                         </Select>
                                         {errors.role_id && (
-                                            <p className="text-sm text-red-600">{errors.role_id}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.role_id}</p>
                                         )}
                                     </div>
 
                                     {/* Selected Role Info */}
                                     {selectedRole && (
-                                        <div className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800/30">
+                                        <div className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-900/50 dark:border-gray-700">
                                             <div className="flex items-start justify-between">
                                                 <div className="space-y-2">
                                                     <div className="flex items-center gap-2">
                                                         <Shield className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                                                        <h3 className="font-semibold">{selectedRole.name}</h3>
+                                                        <h3 className="font-semibold dark:text-white">{selectedRole.name}</h3>
                                                         {selectedRole.is_system_role && (
-                                                            <Badge variant="secondary">
+                                                            <Badge variant="secondary" className="dark:bg-gray-700 dark:text-gray-300">
                                                                 <Lock className="h-3 w-3 mr-1" />
                                                                 System Role
                                                             </Badge>
@@ -388,16 +388,16 @@ export default function RolePermissionCreate({
                                                     )}
                                                     <div className="flex items-center gap-4 text-sm">
                                                         <div className="flex items-center gap-1">
-                                                            <Users className="h-3 w-3" />
-                                                            <span className="text-gray-500">Users:</span>
-                                                            <span className="font-medium ml-1">
+                                                            <Users className="h-3 w-3 dark:text-gray-500" />
+                                                            <span className="text-gray-500 dark:text-gray-400">Users:</span>
+                                                            <span className="font-medium ml-1 dark:text-white">
                                                                 {selectedRole.users_count || 0}
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center gap-1">
-                                                            <Key className="h-3 w-3" />
-                                                            <span className="text-gray-500">Current Permissions:</span>
-                                                            <span className="font-medium ml-1">
+                                                            <Key className="h-3 w-3 dark:text-gray-500" />
+                                                            <span className="text-gray-500 dark:text-gray-400">Current Permissions:</span>
+                                                            <span className="font-medium ml-1 dark:text-white">
                                                                 {selectedRole.permissions?.length || 0}
                                                             </span>
                                                         </div>
@@ -409,6 +409,7 @@ export default function RolePermissionCreate({
                                                         variant="outline"
                                                         size="sm"
                                                         onClick={() => router.visit(route('roles.show', selectedRole.id))}
+                                                        className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                                     >
                                                         <Eye className="h-3 w-3 mr-1" />
                                                         View Role
@@ -423,9 +424,9 @@ export default function RolePermissionCreate({
 
                                     {/* Additional Notes */}
                                     <div className="space-y-2">
-                                        <Label htmlFor="notes">
+                                        <Label htmlFor="notes" className="dark:text-gray-300">
                                             Notes
-                                            <span className="text-xs text-gray-500 font-normal ml-2">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400 font-normal ml-2">
                                                 (Optional - for tracking purposes)
                                             </span>
                                         </Label>
@@ -434,10 +435,10 @@ export default function RolePermissionCreate({
                                             value={data.notes}
                                             onChange={(e) => setData('notes', e.target.value)}
                                             placeholder="Add notes about this permission assignment..."
-                                            className="min-h-[80px]"
+                                            className="min-h-[80px] dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
                                             disabled={processing || isSubmitting}
                                         />
-                                        <p className="text-xs text-gray-500">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
                                             This note will be recorded in the assignment history
                                         </p>
                                     </div>
@@ -445,21 +446,21 @@ export default function RolePermissionCreate({
                             </Card>
 
                             {/* Permissions Selection Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                         <div>
-                                            <CardTitle className="flex items-center gap-2">
-                                                <Key className="h-5 w-5" />
+                                            <CardTitle className="flex items-center gap-2 dark:text-white">
+                                                <Key className="h-5 w-5 dark:text-gray-300" />
                                                 Select Permissions
                                             </CardTitle>
-                                            <CardDescription>
+                                            <CardDescription className="dark:text-gray-400">
                                                 Choose permissions to assign to the selected role
                                             </CardDescription>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <div className="text-sm text-gray-500">
-                                                Selected: <span className="font-semibold">{selectedPermissions.size}</span> / {safePermissions.length}
+                                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                Selected: <span className="font-semibold dark:text-white">{selectedPermissions.size}</span> / {safePermissions.length}
                                             </div>
                                         </div>
                                     </div>
@@ -469,12 +470,12 @@ export default function RolePermissionCreate({
                                     <div className="space-y-4">
                                         <div className="flex flex-col sm:flex-row gap-3">
                                             <div className="flex-1 relative">
-                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                 <Input
                                                     placeholder="Search permissions..."
                                                     value={searchQuery}
                                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                                    className="pl-9"
+                                                    className="pl-9 dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
                                                     disabled={!selectedRoleId}
                                                 />
                                             </div>
@@ -484,14 +485,14 @@ export default function RolePermissionCreate({
                                                     onValueChange={setModuleFilter}
                                                     disabled={!selectedRoleId}
                                                 >
-                                                    <SelectTrigger className="w-[150px]">
+                                                    <SelectTrigger className="w-[150px] dark:bg-gray-900 dark:border-gray-700 dark:text-white">
                                                         <Filter className="h-4 w-4 mr-2" />
                                                         <SelectValue placeholder="Module" />
                                                     </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="all">All Modules</SelectItem>
+                                                    <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                        <SelectItem value="all" className="dark:text-white dark:focus:bg-gray-700">All Modules</SelectItem>
                                                         {availableModules.map(module => (
-                                                            <SelectItem key={module} value={module}>
+                                                            <SelectItem key={module} value={module} className="dark:text-white dark:focus:bg-gray-700">
                                                                 {module}
                                                             </SelectItem>
                                                         ))}
@@ -503,13 +504,13 @@ export default function RolePermissionCreate({
                                                     onValueChange={(v: 'list' | 'grouped') => setViewMode(v)}
                                                     disabled={!selectedRoleId}
                                                 >
-                                                    <SelectTrigger className="w-[130px]">
+                                                    <SelectTrigger className="w-[130px] dark:bg-gray-900 dark:border-gray-700 dark:text-white">
                                                         <ListFilter className="h-4 w-4 mr-2" />
                                                         <SelectValue placeholder="View" />
                                                     </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="grouped">Grouped</SelectItem>
-                                                        <SelectItem value="list">List</SelectItem>
+                                                    <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                        <SelectItem value="grouped" className="dark:text-white dark:focus:bg-gray-700">Grouped</SelectItem>
+                                                        <SelectItem value="list" className="dark:text-white dark:focus:bg-gray-700">List</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -522,8 +523,9 @@ export default function RolePermissionCreate({
                                                     checked={showInactive}
                                                     onCheckedChange={setShowInactive}
                                                     disabled={!selectedRoleId}
+                                                    className="dark:data-[state=checked]:bg-gray-600"
                                                 />
-                                                <Label htmlFor="show-inactive" className="text-sm">
+                                                <Label htmlFor="show-inactive" className="text-sm dark:text-gray-300">
                                                     Show inactive permissions
                                                 </Label>
                                             </div>
@@ -535,6 +537,7 @@ export default function RolePermissionCreate({
                                                     size="sm"
                                                     onClick={grantAllPermissions}
                                                     disabled={!selectedRoleId}
+                                                    className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                                 >
                                                     <Check className="h-3 w-3 mr-1" />
                                                     Grant All
@@ -545,6 +548,7 @@ export default function RolePermissionCreate({
                                                     size="sm"
                                                     onClick={revokeAllPermissions}
                                                     disabled={!selectedRoleId}
+                                                    className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                                 >
                                                     <X className="h-3 w-3 mr-1" />
                                                     Revoke All
@@ -554,15 +558,15 @@ export default function RolePermissionCreate({
                                     </div>
 
                                     {/* Permissions List */}
-                                    <div className="border rounded-lg">
+                                    <div className="border rounded-lg dark:border-gray-700">
                                         <ScrollArea className="h-[400px]">
                                             {!selectedRoleId ? (
                                                 <div className="flex flex-col items-center justify-center h-64 text-center p-8">
-                                                    <Shield className="h-12 w-12 text-gray-300 mb-4" />
+                                                    <Shield className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-4" />
                                                     <h3 className="font-medium text-gray-700 dark:text-gray-300">
                                                         Select a Role First
                                                     </h3>
-                                                    <p className="text-sm text-gray-500 mt-1">
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                                         Please select a role to view and assign permissions
                                                     </p>
                                                 </div>
@@ -573,8 +577,8 @@ export default function RolePermissionCreate({
                                                         <div key={group.module} className="space-y-3">
                                                             <div className="flex items-center justify-between">
                                                                 <div className="flex items-center gap-2">
-                                                                    <h3 className="font-semibold text-lg">{group.module}</h3>
-                                                                    <Badge variant="secondary" className="ml-2">
+                                                                    <h3 className="font-semibold text-lg dark:text-white">{group.module}</h3>
+                                                                    <Badge variant="secondary" className="ml-2 dark:bg-gray-700 dark:text-gray-300">
                                                                         {group.permissions.length}
                                                                     </Badge>
                                                                 </div>
@@ -586,10 +590,11 @@ export default function RolePermissionCreate({
                                                                             toggleModulePermissions(group.module, !!checked)
                                                                         }
                                                                         disabled={!selectedRoleId}
+                                                                        className="dark:border-gray-600 dark:data-[state=checked]:bg-gray-600"
                                                                     />
                                                                     <Label
                                                                         htmlFor={`module-${group.module}`}
-                                                                        className="text-sm cursor-pointer"
+                                                                        className="text-sm cursor-pointer dark:text-gray-300"
                                                                     >
                                                                         Select All
                                                                     </Label>
@@ -599,7 +604,7 @@ export default function RolePermissionCreate({
                                                                 {group.permissions.map((permission) => (
                                                                     <div
                                                                         key={permission.id}
-                                                                        className={`flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
+                                                                        className={`flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:border-gray-700 ${
                                                                             !permission.is_active ? 'opacity-60' : ''
                                                                         }`}
                                                                     >
@@ -610,17 +615,18 @@ export default function RolePermissionCreate({
                                                                                 togglePermission(permission.id, !!checked)
                                                                             }
                                                                             disabled={!selectedRoleId}
+                                                                            className="dark:border-gray-600 dark:data-[state=checked]:bg-gray-600"
                                                                         />
                                                                         <div className="flex-1 space-y-1">
                                                                             <div className="flex items-center justify-between">
                                                                                 <Label
                                                                                     htmlFor={`perm-${permission.id}`}
-                                                                                    className="font-medium cursor-pointer"
+                                                                                    className="font-medium cursor-pointer dark:text-white"
                                                                                 >
                                                                                     {permission.display_name}
                                                                                 </Label>
                                                                                 {!permission.is_active && (
-                                                                                    <Badge variant="outline" size="sm">
+                                                                                    <Badge variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
                                                                                         Inactive
                                                                                     </Badge>
                                                                                 )}
@@ -629,7 +635,7 @@ export default function RolePermissionCreate({
                                                                                 {permission.name}
                                                                             </p>
                                                                             {permission.description && (
-                                                                                <p className="text-xs text-gray-500">
+                                                                                <p className="text-xs text-gray-500 dark:text-gray-500">
                                                                                     {permission.description}
                                                                                 </p>
                                                                             )}
@@ -647,7 +653,7 @@ export default function RolePermissionCreate({
                                                         {filteredPermissions.map((permission) => (
                                                             <div
                                                                 key={permission.id}
-                                                                className={`flex items-start gap-3 p-3 border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
+                                                                className={`flex items-start gap-3 p-3 border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/50 dark:border-gray-700 ${
                                                                     !permission.is_active ? 'opacity-60' : ''
                                                                 }`}
                                                             >
@@ -658,13 +664,14 @@ export default function RolePermissionCreate({
                                                                         togglePermission(permission.id, !!checked)
                                                                     }
                                                                     disabled={!selectedRoleId}
+                                                                    className="dark:border-gray-600 dark:data-[state=checked]:bg-gray-600"
                                                                 />
                                                                 <div className="flex-1">
                                                                     <div className="flex items-center justify-between">
                                                                         <div className="space-y-1">
                                                                             <Label
                                                                                 htmlFor={`perm-${permission.id}`}
-                                                                                className="font-medium cursor-pointer"
+                                                                                className="font-medium cursor-pointer dark:text-white"
                                                                             >
                                                                                 {permission.display_name}
                                                                             </Label>
@@ -673,11 +680,11 @@ export default function RolePermissionCreate({
                                                                             </p>
                                                                         </div>
                                                                         <div className="flex items-center gap-2">
-                                                                            <Badge variant="outline" size="sm">
+                                                                            <Badge variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
                                                                                 {permission.module}
                                                                             </Badge>
                                                                             {!permission.is_active && (
-                                                                                <Badge variant="secondary" size="sm">
+                                                                                <Badge variant="secondary" size="sm" className="dark:bg-gray-700 dark:text-gray-300">
                                                                                     Inactive
                                                                                 </Badge>
                                                                             )}
@@ -697,11 +704,11 @@ export default function RolePermissionCreate({
 
                                             {selectedRoleId && filteredPermissions.length === 0 && (
                                                 <div className="flex flex-col items-center justify-center h-64 text-center p-8">
-                                                    <Key className="h-12 w-12 text-gray-300 mb-4" />
+                                                    <Key className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-4" />
                                                     <h3 className="font-medium text-gray-700 dark:text-gray-300">
                                                         No permissions found
                                                     </h3>
-                                                    <p className="text-sm text-gray-500 mt-1">
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                                                         {searchQuery
                                                             ? 'Try a different search term'
                                                             : 'No permissions available for the selected filters'}
@@ -713,9 +720,9 @@ export default function RolePermissionCreate({
 
                                     {/* Validation Errors */}
                                     {Object.keys(validation_errors).length > 0 && (
-                                        <Alert variant="destructive">
+                                        <Alert variant="destructive" className="dark:bg-red-900/20 dark:border-red-800">
                                             <AlertCircle className="h-4 w-4" />
-                                            <AlertDescription>
+                                            <AlertDescription className="dark:text-red-300">
                                                 <ul className="list-disc list-inside space-y-1">
                                                     {Object.entries(validation_errors).map(([field, error]) => (
                                                         <li key={field}>
@@ -728,21 +735,23 @@ export default function RolePermissionCreate({
                                     )}
 
                                     {errors.permission_ids && (
-                                        <p className="text-sm text-red-600">{errors.permission_ids}</p>
+                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.permission_ids}</p>
                                     )}
                                 </CardContent>
-                                <CardFooter className="flex justify-between border-t px-6 py-4">
+                                <CardFooter className="flex justify-between border-t dark:border-gray-700 px-6 py-4">
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={() => router.visit(route('admin.role-permissions.index'))}
                                         disabled={processing || isSubmitting}
+                                        className="dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                     >
                                         Cancel
                                     </Button>
                                     <Button
                                         type="submit"
                                         disabled={processing || isSubmitting || !selectedRoleId || selectedPermissions.size === 0}
+                                        className="dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
                                     >
                                         {processing || isSubmitting ? (
                                             <>
@@ -763,28 +772,28 @@ export default function RolePermissionCreate({
                         {/* Right Column - Summary & Info */}
                         <div className="space-y-6">
                             {/* Summary Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Eye className="h-5 w-5" />
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
+                                        <Eye className="h-5 w-5 dark:text-gray-300" />
                                         Assignment Summary
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-500">Selected Role</span>
-                                            <span className="font-medium">
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">Selected Role</span>
+                                            <span className="font-medium dark:text-white">
                                                 {selectedRole?.name || 'None selected'}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-500">Permissions to Assign</span>
-                                            <span className="font-medium">{selectedPermissions.size}</span>
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">Permissions to Assign</span>
+                                            <span className="font-medium dark:text-white">{selectedPermissions.size}</span>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-500">Active Permissions</span>
-                                            <span className="font-medium">
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">Active Permissions</span>
+                                            <span className="font-medium dark:text-white">
                                                 {Array.from(selectedPermissions).filter(id => {
                                                     const perm = safePermissions.find(p => p.id === id);
                                                     return perm?.is_active;
@@ -792,8 +801,8 @@ export default function RolePermissionCreate({
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm text-gray-500">Modules Covered</span>
-                                            <span className="font-medium">
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">Modules Covered</span>
+                                            <span className="font-medium dark:text-white">
                                                 {Array.from(new Set(
                                                     Array.from(selectedPermissions).map(id => {
                                                         const perm = safePermissions.find(p => p.id === id);
@@ -804,10 +813,10 @@ export default function RolePermissionCreate({
                                         </div>
                                     </div>
 
-                                    <Separator />
+                                    <Separator className="dark:bg-gray-700" />
 
                                     <div className="space-y-2">
-                                        <h4 className="font-medium text-sm">Module Distribution</h4>
+                                        <h4 className="font-medium text-sm dark:text-white">Module Distribution</h4>
                                         <div className="space-y-1">
                                             {groupedPermissions
                                                 .filter(group =>
@@ -821,10 +830,10 @@ export default function RolePermissionCreate({
                                                         <div key={group.module} className="flex items-center justify-between text-sm">
                                                             <span className="text-gray-600 dark:text-gray-400">{group.module}</span>
                                                             <div className="flex items-center gap-2">
-                                                                <span>{selectedCount}/{group.permissions.length}</span>
+                                                                <span className="dark:text-white">{selectedCount}/{group.permissions.length}</span>
                                                                 <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                                                     <div
-                                                                        className="bg-blue-600 h-2 rounded-full"
+                                                                        className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full"
                                                                         style={{
                                                                             width: `${(selectedCount / group.permissions.length) * 100}%`
                                                                         }}
@@ -840,16 +849,16 @@ export default function RolePermissionCreate({
                             </Card>
 
                             {/* Quick Actions */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle>Quick Actions</CardTitle>
+                                    <CardTitle className="dark:text-white">Quick Actions</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={() => router.visit(route('permissions.create'))}
-                                        className="w-full"
+                                        className="w-full dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                     >
                                         <PlusCircle className="mr-2 h-4 w-4" />
                                         Create New Permission
@@ -858,7 +867,7 @@ export default function RolePermissionCreate({
                                         type="button"
                                         variant="outline"
                                         onClick={() => router.visit(route('roles.create'))}
-                                        className="w-full"
+                                        className="w-full dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                     >
                                         <Users className="mr-2 h-4 w-4" />
                                         Create New Role
@@ -867,7 +876,7 @@ export default function RolePermissionCreate({
                                         type="button"
                                         variant="outline"
                                         onClick={() => router.visit(route('admin.role-permissions.index'))}
-                                        className="w-full"
+                                        className="w-full dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                                     >
                                         <Calendar className="mr-2 h-4 w-4" />
                                         View Assignments
@@ -876,21 +885,21 @@ export default function RolePermissionCreate({
                             </Card>
 
                             {/* Tips Card */}
-                            <Card>
+                            <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="text-sm">Tips</CardTitle>
+                                    <CardTitle className="text-sm dark:text-white">Tips</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                                     <div className="flex items-start gap-2">
-                                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                                        <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5" />
                                         <span>Start by selecting a role, then choose permissions</span>
                                     </div>
                                     <div className="flex items-start gap-2">
-                                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                                        <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5" />
                                         <span>Use module-level select all for quick assignment</span>
                                     </div>
                                     <div className="flex items-start gap-2">
-                                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                                        <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5" />
                                         <span>Review the summary before final assignment</span>
                                     </div>
                                 </CardContent>

@@ -76,7 +76,7 @@ export function SecurityPrivacyCard({ data, setData, processing, errors }: Secur
                       onChange={(e) => setData('password', e.target.value)}
                       placeholder="Enter password"
                       disabled={processing}
-                      className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                      className="dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
                     />
                     {data.password && (
                       <button
@@ -103,7 +103,7 @@ export function SecurityPrivacyCard({ data, setData, processing, errors }: Secur
                       onChange={(e) => setData('confirm_password', e.target.value)}
                       placeholder="Confirm password"
                       disabled={processing}
-                      className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
+                      className="dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder:text-gray-500"
                     />
                     {data.confirm_password && (
                       <button

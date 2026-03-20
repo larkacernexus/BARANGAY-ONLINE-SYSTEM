@@ -150,7 +150,7 @@ export const ModernReportGridCard = ({
                     </div>
 
                     {/* Details Box */}
-                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 mb-3 space-y-2">
+                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 mb-3 space-y-2">
                         <div className="flex items-center gap-2 text-xs">
                             <Calendar className="h-3 w-3 text-gray-400" />
                             <span className="text-gray-600 dark:text-gray-400">

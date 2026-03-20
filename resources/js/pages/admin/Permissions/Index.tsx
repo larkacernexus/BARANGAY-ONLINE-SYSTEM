@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+// resources/js/pages/admin/permissions/index.tsx
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
 import { Permission, Paginated, FilterParams, Stats } from '@/types';
@@ -54,13 +55,20 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import DeveloperContactModal from '@/components/developer-contact-modal';
+import PermissionsStats from '@/components/admin/permissions/PermissionsStats';
 import { route } from 'ziggy-js';
 
 interface PermissionsIndexProps {
     permissions: Paginated<Permission>;
     modules: string[] | Array<{ name: string; display_name?: string; description?: string; icon?: string }>;
     filters: FilterParams;
-    stats?: Stats[] | any;
+    stats?: {
+        total: number;
+        active: number;
+        inactive: number;
+        modules: number;
+        rolesAssigned: number;
+    };
 }
 
 export default function PermissionsIndex({ 
@@ -82,31 +90,60 @@ export default function PermissionsIndex({
     const [itemsPerPage] = useState(permissions.meta?.per_page || 10);
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
 
-    // Normalize stats to always be an array
-    const stats = useMemo(() => {
-        if (Array.isArray(propsStats)) {
-            return propsStats;
-        }
-        
-        if (propsStats && typeof propsStats === 'object' && !Array.isArray(propsStats)) {
-            return Object.entries(propsStats).map(([label, value]) => ({
-                label: typeof label === 'string' ? label.replace(/_/g, ' ') : 'Stat',
-                value: typeof value === 'number' || typeof value === 'string' ? value : String(value),
-            })) as Stats[];
-        }
-        
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Calculate global stats from props
+    const globalStats = useMemo(() => {
         const totalPermissions = permissions.meta?.total || 0;
         const activePermissions = permissions.data.filter(p => p.is_active).length;
+        const inactivePermissions = permissions.data.filter(p => !p.is_active).length;
         const totalModules = Array.isArray(modules) ? modules.length : 0;
         const totalRolesAssigned = permissions.data.reduce((sum, p) => sum + (p.roles_count || 0), 0);
         
-        return [
-            { label: 'Total Permissions', value: totalPermissions },
-            { label: 'Active Permissions', value: activePermissions },
-            { label: 'Modules', value: totalModules },
-            { label: 'Roles Assigned', value: totalRolesAssigned },
-        ] as Stats[];
+        return {
+            total: propsStats?.total ?? totalPermissions,
+            active: propsStats?.active ?? activePermissions,
+            inactive: propsStats?.inactive ?? inactivePermissions,
+            modules: propsStats?.modules ?? totalModules,
+            rolesAssigned: propsStats?.rolesAssigned ?? totalRolesAssigned,
+        };
     }, [propsStats, permissions, modules]);
+
+    // Calculate filtered stats from current view
+    const filteredStats = useMemo(() => {
+        const filteredData = permissions.data.filter(permission => {
+            // Apply search filter
+            if (filters.search && !permission.name.toLowerCase().includes(filters.search.toLowerCase()) && 
+                !permission.display_name.toLowerCase().includes(filters.search.toLowerCase()) &&
+                !permission.description?.toLowerCase().includes(filters.search.toLowerCase())) {
+                return false;
+            }
+            
+            // Apply module filter
+            if (filters.module !== 'all' && permission.module !== filters.module) {
+                return false;
+            }
+            
+            // Apply status filter
+            if (filters.status !== 'all') {
+                const isActive = permission.is_active;
+                if (filters.status === 'active' && !isActive) return false;
+                if (filters.status === 'inactive' && isActive) return false;
+            }
+            
+            return true;
+        });
+
+        const uniqueModules = new Set(filteredData.map(p => p.module)).size;
+
+        return {
+            total: filteredData.length,
+            active: filteredData.filter(p => p.is_active).length,
+            inactive: filteredData.filter(p => !p.is_active).length,
+            modules: uniqueModules,
+            rolesAssigned: filteredData.reduce((sum, p) => sum + (p.roles_count || 0), 0),
+        };
+    }, [permissions.data, filters]);
 
     // Track window resize
     useEffect(() => {
@@ -295,10 +332,10 @@ export default function PermissionsIndex({
                 onClose={() => setShowDeveloperModal(false)}
                 developerDetails={{
                     name: "System Security Team",
-                    email: "security.team@yourcompany.com",
+                    email: "support@larkacernexus.com",
                     phone: "+1 (555) 987-6543",
                     department: "Security & Permissions",
-                    company: "Your Company",
+                    company: "LARKACER NEXUS IT SOLUTIONS",
                     website: "https://security.yourcompany.com/permissions",
                     officeHours: "Monday - Friday, 8:00 AM - 5:00 PM",
                     specialization: "Role-Based Access Control",
@@ -311,14 +348,14 @@ export default function PermissionsIndex({
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Permissions Management</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">Permissions Management</h1>
                         <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
                             Manage system permissions and access control
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Link href={route('admin.roles.index')}>
-                            <Button variant="outline" className="h-9">
+                            <Button variant="outline" className="h-9 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900">
                                 <Users className="h-4 w-4 mr-2" />
                                 <span className="hidden sm:inline">Manage Roles</span>
                                 <span className="sm:hidden">Roles</span>
@@ -330,7 +367,7 @@ export default function PermissionsIndex({
                                 <TooltipTrigger asChild>
                                     <Button 
                                         variant="outline"
-                                        className="h-9 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                                        className="h-9 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 dark:hover:text-blue-200"
                                         onClick={handleContactDeveloper}
                                     >
                                         <MessageCircle className="h-4 w-4 mr-2" />
@@ -338,7 +375,7 @@ export default function PermissionsIndex({
                                         <span className="sm:hidden">Request</span>
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="bottom">
+                                <TooltipContent side="bottom" className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                     <p className="text-sm max-w-xs">Contact the security team to request new permissions</p>
                                 </TooltipContent>
                             </Tooltip>
@@ -346,34 +383,24 @@ export default function PermissionsIndex({
                     </div>
                 </div>
 
-                {/* Stats Cards */}
-                {stats.length > 0 && (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        {stats.map((stat, index) => (
-                            <Card key={index} className="overflow-hidden">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-gray-500">
-                                        {stat.label}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-xl sm:text-2xl font-bold">{stat.value}</div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                {/* Stats Cards - Now using the separate component */}
+                <PermissionsStats 
+                    globalStats={globalStats}
+                    filteredStats={filteredStats}
+                    isLoading={isSearching}
+                />
 
                 {/* Search and Filters */}
-                <Card className="overflow-hidden">
-                    <CardContent className="pt-6">
+                <Card className="overflow-hidden border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                    <CardContent className="p-4 sm:p-6">
                         <div className="flex flex-col space-y-4">
                             <div className="flex flex-col md:flex-row gap-4">
                                 <div className="flex-1 relative">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
                                     <Input 
-                                        placeholder="Search permissions by name or description..." 
-                                        className="pl-10 pr-10"
+                                        ref={searchInputRef}
+                                        placeholder="Search permissions by name or description... (Ctrl+F)" 
+                                        className="pl-10 pr-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-200 dark:placeholder:text-gray-500"
                                         value={filters.search || ''}
                                         onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                                         onKeyPress={handleKeyPress}
@@ -382,7 +409,7 @@ export default function PermissionsIndex({
                                     {filters.search && (
                                         <button
                                             onClick={handleClearSearch}
-                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                                         >
                                             <X className="h-4 w-4" />
                                         </button>
@@ -390,7 +417,7 @@ export default function PermissionsIndex({
                                 </div>
                                 <div className="flex gap-2">
                                     <select 
-                                        className="border rounded px-3 py-2 text-sm w-32"
+                                        className="border rounded px-3 py-2 text-sm w-32 bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-gray-200"
                                         value={filters.module || 'all'}
                                         onChange={(e) => handleFilterChange('module', e.target.value)}
                                         disabled={isSearching}
@@ -404,7 +431,7 @@ export default function PermissionsIndex({
                                     </select>
                                     
                                     <select 
-                                        className="border rounded px-3 py-2 text-sm w-28"
+                                        className="border rounded px-3 py-2 text-sm w-28 bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-gray-200"
                                         value={filters.status || 'all'}
                                         onChange={(e) => handleFilterChange('status', e.target.value)}
                                         disabled={isSearching}
@@ -416,7 +443,7 @@ export default function PermissionsIndex({
                                     
                                     <Button 
                                         variant="outline"
-                                        className="h-9"
+                                        className="h-9 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                         onClick={handleApplyFilters}
                                         disabled={isSearching}
                                     >
@@ -430,7 +457,7 @@ export default function PermissionsIndex({
 
                                     <Button 
                                         variant="outline"
-                                        className="h-9"
+                                        className="h-9 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                         onClick={handleExport}
                                         disabled={isSearching}
                                     >
@@ -442,9 +469,11 @@ export default function PermissionsIndex({
 
                             {/* Active filters indicator and clear button */}
                             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
                                     Showing {startIndex} to {endIndex} of {totalItems} permissions
                                     {filters.search && ` matching "${filters.search}"`}
+                                    {filters.module !== 'all' && ` • Module: ${filters.module}`}
+                                    {filters.status !== 'all' && ` • Status: ${filters.status}`}
                                 </div>
                                 
                                 <div className="flex gap-2">
@@ -454,14 +483,14 @@ export default function PermissionsIndex({
                                             size="sm"
                                             onClick={resetFilters}
                                             disabled={isSearching}
-                                            className="text-red-600 hover:text-red-700 h-8"
+                                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8"
                                         >
                                             Clear All Filters
                                         </Button>
                                     )}
                                     
                                     {isSearching && (
-                                        <div className="flex items-center gap-2 text-sm text-blue-600">
+                                        <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
                                             <RefreshCw className="h-3 w-3 animate-spin" />
                                             Searching...
                                         </div>
@@ -473,10 +502,10 @@ export default function PermissionsIndex({
                 </Card>
 
                 {/* Permissions Table */}
-                <Card className="overflow-hidden">
-                    <CardHeader className="flex flex-row items-center justify-between pb-3">
-                        <CardTitle className="text-lg sm:text-xl">Permissions List</CardTitle>
-                        <div className="text-sm text-gray-500">
+                <Card className="overflow-hidden border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                    <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700">
+                        <CardTitle className="text-lg sm:text-xl dark:text-gray-100">Permissions List</CardTitle>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
                             Page {permissions.meta?.current_page || 1} of {totalPages}
                         </div>
                     </CardHeader>
@@ -486,26 +515,26 @@ export default function PermissionsIndex({
                                 <div className="overflow-hidden">
                                     <Table className="min-w-full">
                                         <TableHeader>
-                                            <TableRow className="bg-gray-50 dark:bg-gray-800">
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px]">
+                                            <TableRow className="bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700">
+                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[180px]">
                                                     Permission
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
+                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[150px]">
                                                     Display Name
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px]">
                                                     Module
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
+                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px]">
                                                     Status
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
+                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px]">
                                                     Roles
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px]">
                                                     Created
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[80px]">
+                                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900/50 min-w-[80px]">
                                                     Actions
                                                 </TableHead>
                                             </TableRow>
@@ -513,7 +542,7 @@ export default function PermissionsIndex({
                                         <TableBody className="divide-y divide-gray-200 dark:divide-gray-700">
                                             {permissions.data.length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                                                    <TableCell colSpan={7} className="text-center py-8 text-gray-500 dark:text-gray-400">
                                                         <div className="flex flex-col items-center justify-center space-y-4">
                                                             <Shield className="h-16 w-16 text-gray-300 dark:text-gray-700" />
                                                             <div>
@@ -531,7 +560,7 @@ export default function PermissionsIndex({
                                                                     <Button
                                                                         variant="outline"
                                                                         onClick={resetFilters}
-                                                                        className="h-8"
+                                                                        className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                                                         disabled={isSearching}
                                                                     >
                                                                         Clear Filters
@@ -542,14 +571,14 @@ export default function PermissionsIndex({
                                                                         <TooltipTrigger asChild>
                                                                             <Button 
                                                                                 variant="outline"
-                                                                                className="h-8 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                                                                                className="h-8 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 dark:hover:text-blue-200"
                                                                                 onClick={handleContactDeveloper}
                                                                             >
                                                                                 <MessageCircle className="h-3 w-3 mr-1" />
                                                                                 Request Permission
                                                                             </Button>
                                                                         </TooltipTrigger>
-                                                                        <TooltipContent side="top">
+                                                                        <TooltipContent side="top" className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                                                             <p className="text-sm max-w-xs">Contact the security team to request new permissions</p>
                                                                         </TooltipContent>
                                                                     </Tooltip>
@@ -565,8 +594,8 @@ export default function PermissionsIndex({
                                                     const moduleLength = getTruncationLength('module');
                                                     
                                                     return (
-                                                        <TableRow key={permission.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                                                            <TableCell className="px-4 py-3 whitespace-nowrap">
+                                                        <TableRow key={permission.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors border-gray-200 dark:border-gray-700">
+                                                            <TableCell className="px-4 py-3 whitespace-nowrap dark:text-gray-300">
                                                                 <div 
                                                                     className="flex items-center gap-3 cursor-text select-text"
                                                                     onDoubleClick={(e) => {
@@ -605,7 +634,7 @@ export default function PermissionsIndex({
                                                                     </div>
                                                                 </div>
                                                             </TableCell>
-                                                            <TableCell className="px-4 py-3">
+                                                            <TableCell className="px-4 py-3 dark:text-gray-300">
                                                                 <div 
                                                                     className="font-medium truncate"
                                                                     title={permission.display_name}
@@ -616,7 +645,7 @@ export default function PermissionsIndex({
                                                             <TableCell className="px-4 py-3">
                                                                 <Badge 
                                                                     variant="outline" 
-                                                                    className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300"
+                                                                    className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
                                                                     title={permission.module}
                                                                 >
                                                                     <span className="truncate">
@@ -633,8 +662,8 @@ export default function PermissionsIndex({
                                                                     onClick={() => togglePermissionStatus(permission)}
                                                                     className={`h-6 px-2 text-xs font-medium ${
                                                                         permission.is_active
-                                                                            ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300'
-                                                                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300'
+                                                                            ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50'
+                                                                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700'
                                                                     }`}
                                                                     disabled={isSearching}
                                                                 >
@@ -648,9 +677,9 @@ export default function PermissionsIndex({
                                                                     </span>
                                                                 </Button>
                                                             </TableCell>
-                                                            <TableCell className="px-4 py-3">
+                                                            <TableCell className="px-4 py-3 dark:text-gray-300">
                                                                 <div className="flex items-center gap-2">
-                                                                    <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                                                    <Users className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                                                     <span className="truncate">{permission.roles_count || 0}</span>
                                                                 </div>
                                                             </TableCell>
@@ -667,27 +696,26 @@ export default function PermissionsIndex({
                                                                     <DropdownMenuTrigger asChild>
                                                                         <Button 
                                                                             variant="ghost" 
-                                                                            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                                            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
                                                                             disabled={isSearching}
                                                                         >
                                                                             <span className="sr-only">Open menu</span>
                                                                             <MoreVertical className="h-4 w-4" />
                                                                         </Button>
                                                                     </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end" className="w-48">
-                                                                        <DropdownMenuItem asChild>
+                                                                    <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
+                                                                        <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-700">
                                                                             <Link href={route('admin.permissions.show', permission.id)} className="flex items-center cursor-pointer">
                                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                                 <span>View Details</span>
                                                                             </Link>
                                                                         </DropdownMenuItem>
                                                                         
-                                                                        
-                                                                        <DropdownMenuSeparator />
+                                                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                                         
                                                                         <DropdownMenuItem 
                                                                             onClick={() => handleCopyToClipboard(permission.name, 'Permission Name')}
-                                                                            className="flex items-center cursor-pointer"
+                                                                            className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
                                                                         >
                                                                             <Copy className="mr-2 h-4 w-4" />
                                                                             <span>Copy Name</span>
@@ -695,16 +723,16 @@ export default function PermissionsIndex({
                                                                         
                                                                         <DropdownMenuItem 
                                                                             onClick={() => handleCopyToClipboard(permission.display_name, 'Display Name')}
-                                                                            className="flex items-center cursor-pointer"
+                                                                            className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
                                                                         >
                                                                             <Copy className="mr-2 h-4 w-4" />
                                                                             <span>Copy Display Name</span>
                                                                         </DropdownMenuItem>
                                                                         
-                                                                        <DropdownMenuSeparator />
+                                                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                                         
                                                                         <DropdownMenuItem 
-                                                                            className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                                                            className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:text-red-400 dark:focus:text-red-300 dark:focus:bg-red-950/30"
                                                                             onClick={() => handleDelete(permission)}
                                                                         >
                                                                             <Trash2 className="mr-2 h-4 w-4" />
@@ -725,8 +753,8 @@ export default function PermissionsIndex({
 
                         {/* Pagination */}
                         {totalPages > 1 && (
-                            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-4 pt-4 px-4 border-t">
-                                <div className="text-sm text-gray-500">
+                            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-4 pt-4 px-4 border-t border-gray-200 dark:border-gray-700">
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
                                     Showing {startIndex} to {endIndex} of {totalItems} results
                                 </div>
                                 <div className="flex gap-2">
@@ -743,7 +771,7 @@ export default function PermissionsIndex({
                                             });
                                         }}
                                         disabled={(permissions.meta?.current_page || 1) === 1 || isSearching}
-                                        className="h-8"
+                                        className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50"
                                     >
                                         <ChevronLeft className="h-4 w-4 mr-1" />
                                         Previous
@@ -775,7 +803,11 @@ export default function PermissionsIndex({
                                                             onFinish: () => setIsSearching(false),
                                                         });
                                                     }}
-                                                    className="h-8 w-8 p-0"
+                                                    className={`h-8 w-8 p-0 ${
+                                                        currentPage === pageNum 
+                                                            ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
+                                                            : 'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900'
+                                                    }`}
                                                     disabled={isSearching}
                                                 >
                                                     {pageNum}
@@ -796,7 +828,7 @@ export default function PermissionsIndex({
                                             });
                                         }}
                                         disabled={(permissions.meta?.current_page || 1) === totalPages || isSearching}
-                                        className="h-8"
+                                        className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50"
                                     >
                                         Next
                                         <ChevronRight className="h-4 w-4 ml-1" />
@@ -809,14 +841,14 @@ export default function PermissionsIndex({
 
                 {/* Quick Actions & Info */}
                 <div className="grid gap-6 sm:grid-cols-2">
-                    <Card className="overflow-hidden">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg">Quick Actions</CardTitle>
+                    <Card className="overflow-hidden border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                        <CardHeader className="pb-3 border-b border-gray-200 dark:border-gray-700">
+                            <CardTitle className="text-lg dark:text-gray-100">Quick Actions</CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-4">
                             <div className="grid grid-cols-2 gap-3">
                                 <Link href={route('admin.roles.index')}>
-                                    <Button variant="outline" size="sm" className="w-full justify-start h-8" disabled={isSearching}>
+                                    <Button variant="outline" size="sm" className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900" disabled={isSearching}>
                                         <Users className="h-3 w-3 mr-2" />
                                         <span className="truncate">Manage Roles</span>
                                     </Button>
@@ -824,7 +856,7 @@ export default function PermissionsIndex({
                                 <Button 
                                     variant="outline" 
                                     size="sm" 
-                                    className="w-full justify-start h-8"
+                                    className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                     onClick={() => {
                                         // Bulk assign feature
                                         alert('Bulk assign feature coming soon!');
@@ -837,14 +869,14 @@ export default function PermissionsIndex({
                                 <Button 
                                     variant="outline" 
                                     size="sm" 
-                                    className="w-full justify-start h-8"
+                                    className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                     onClick={handleExport}
                                     disabled={isSearching}
                                 >
                                     <Download className="h-3 w-3 mr-2" />
                                     <span className="truncate">Export CSV</span>
                                 </Button>
-                                <Button variant="outline" size="sm" className="w-full justify-start h-8" disabled={isSearching}>
+                                <Button variant="outline" size="sm" className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900" disabled={isSearching}>
                                     <BarChart3 className="h-3 w-3 mr-2" />
                                     <span className="truncate">Usage Report</span>
                                 </Button>
@@ -854,14 +886,14 @@ export default function PermissionsIndex({
                                             <Button 
                                                 variant="outline" 
                                                 size="sm" 
-                                                className="w-full justify-start h-8 col-span-2 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                                                className="w-full justify-start h-8 col-span-2 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 dark:hover:text-blue-200"
                                                 onClick={handleContactDeveloper}
                                             >
                                                 <MessageCircle className="h-3 w-3 mr-2" />
                                                 <span className="truncate">Request New Permission</span>
                                             </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent side="top">
+                                        <TooltipContent side="top" className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                             <p className="text-sm max-w-xs">Contact the security team to request new permissions</p>
                                         </TooltipContent>
                                     </Tooltip>
@@ -870,11 +902,11 @@ export default function PermissionsIndex({
                         </CardContent>
                     </Card>
 
-                    <Card className="overflow-hidden">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg">Module Distribution</CardTitle>
+                    <Card className="overflow-hidden border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                        <CardHeader className="pb-3 border-b border-gray-200 dark:border-gray-700">
+                            <CardTitle className="text-lg dark:text-gray-100">Module Distribution</CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-4">
                             {permissions.data.length > 0 ? (
                                 <div className="space-y-3">
                                     {Array.from(new Set(permissions.data.map(p => p.module))).slice(0, 4).map((module) => {
@@ -886,18 +918,18 @@ export default function PermissionsIndex({
                                             <div key={module} className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <span 
-                                                        className="text-sm font-medium truncate"
+                                                        className="text-sm font-medium truncate dark:text-gray-200"
                                                         title={module || 'N/A'}
                                                     >
                                                         {module && module.length > moduleLength 
                                                             ? module.substring(0, moduleLength) + '...' 
                                                             : module || 'N/A'}
                                                     </span>
-                                                    <Badge variant="outline" className="text-xs">
+                                                    <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
                                                         {modulePermissions.length}
                                                     </Badge>
                                                 </div>
-                                                <div className="text-xs text-gray-500">
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">
                                                     {activeCount} active
                                                 </div>
                                             </div>
@@ -908,7 +940,7 @@ export default function PermissionsIndex({
                                             <Button 
                                                 variant="ghost" 
                                                 size="sm"
-                                                className="h-8"
+                                                className="h-8 dark:text-gray-300 dark:hover:bg-gray-900"
                                                 onClick={resetFilters}
                                                 disabled={isSearching}
                                             >
@@ -918,7 +950,7 @@ export default function PermissionsIndex({
                                     )}
                                 </div>
                             ) : (
-                                <p className="text-gray-500 text-center py-4 text-sm">No permission data available</p>
+                                <p className="text-gray-500 dark:text-gray-400 text-center py-4 text-sm">No permission data available</p>
                             )}
                         </CardContent>
                     </Card>

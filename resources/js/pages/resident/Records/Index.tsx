@@ -249,7 +249,6 @@ export default function MyRecords({
     const [search, setSearch] = useState(filters.search || '');
     const [activeTab, setActiveTab] = useState(filters.category || 'all');
     const [residentFilter, setResidentFilter] = useState(filters.resident || 'all');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
     const [loading, setLoading] = useState(false);
@@ -306,7 +305,7 @@ export default function MyRecords({
         setFilteredDocuments(initialDocuments.data || []);
     }, [initialDocuments.data]);
     
-    // CLIENT-SIDE FILTERING LOGIC
+    // CLIENT-SIDE FILTERING LOGIC - REMOVED DEBOUNCE, USING search DIRECTLY
     useEffect(() => {
         if (isModalMode) return;
         
@@ -317,8 +316,8 @@ export default function MyRecords({
         
         let result = [...allDocuments];
         
-        if (debouncedSearch) {
-            const searchLower = debouncedSearch.toLowerCase();
+        if (search) {
+            const searchLower = search.toLowerCase();
             result = result.filter(doc => 
                 doc.name?.toLowerCase().includes(searchLower) ||
                 doc.description?.toLowerCase().includes(searchLower) ||
@@ -340,24 +339,14 @@ export default function MyRecords({
             result = result.filter(doc => doc.resident_id === residentId);
         }
         
-        if (debouncedSearch || activeTab !== 'all' || residentFilter !== 'all') {
+        // Reset to page 1 when filters change
+        if (search || activeTab !== 'all' || residentFilter !== 'all') {
             setCurrentPage(1);
         }
         
         setFilteredDocuments(result);
         
-    }, [allDocuments, debouncedSearch, activeTab, residentFilter, isModalMode]);
-    
-    // Debounce search input
-    useEffect(() => {
-        if (!mounted) return;
-        
-        const timer = setTimeout(() => {
-            setDebouncedSearch(search);
-        }, 500);
-
-        return () => clearTimeout(timer);
-    }, [search, mounted]);
+    }, [allDocuments, search, activeTab, residentFilter, isModalMode]); 
     
     // Process categories with memoization
     const { processedCategories, allCategories, currentCategory } = useMemo(() => {
@@ -375,7 +364,7 @@ export default function MyRecords({
             iconName: cat.icon,
             count: cat.count || 0,
             color: COLOR_MAP[cat.color] || 'text-gray-600 dark:text-gray-400',
-            bgColor: BG_COLOR_MAP[cat.color] || 'bg-gray-50 dark:bg-gray-800',
+            bgColor: BG_COLOR_MAP[cat.color] || 'bg-gray-50 dark:bg-gray-900',
             ...cat
         }));
         
@@ -419,7 +408,6 @@ export default function MyRecords({
 
     const clearFilters = () => {
         setSearch('');
-        setDebouncedSearch('');
         setActiveTab('all');
         setResidentFilter('all');
         
@@ -810,7 +798,7 @@ export default function MyRecords({
                                 size="sm" 
                                 type="button"
                                 onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                                className="h-9 w-9 p-0 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                                className="h-9 w-9 p-0 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
                             >
                                 {viewMode === 'grid' ? (
                                     <GridIcon className="h-4 w-4" />
@@ -825,7 +813,7 @@ export default function MyRecords({
                             size="sm" 
                             type="button"
                             onClick={() => router.visit('/portal/my-records/export')} 
-                            className="hidden sm:inline-flex dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+                            className="hidden sm:inline-flex dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
                         >
                             <DownloadIcon className="h-4 w-4 mr-2" />
                             Export All
@@ -868,7 +856,7 @@ export default function MyRecords({
                             <span className="text-sm text-gray-500 dark:text-gray-400">Active filters:</span>
                             
                             {search && (
-                                <Badge variant="secondary" className="flex items-center gap-1 text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">
+                                <Badge variant="secondary" className="flex items-center gap-1 text-sm px-3 py-1.5 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">
                                     <span className="truncate max-w-[120px]">Search: "{search}"</span>
                                     <button 
                                         type="button"
@@ -881,7 +869,7 @@ export default function MyRecords({
                             )}
                             
                             {activeTab !== 'all' && currentCategory && (
-                                <Badge variant="secondary" className="flex items-center gap-1 text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">
+                                <Badge variant="secondary" className="flex items-center gap-1 text-sm px-3 py-1.5 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">
                                     <span className="truncate max-w-[100px]">{currentCategory.name}</span>
                                     <button 
                                         type="button"
@@ -894,7 +882,7 @@ export default function MyRecords({
                             )}
                             
                             {residentFilter !== 'all' && householdResidents && (
-                                <Badge variant="secondary" className="flex items-center gap-1 text-sm px-3 py-1.5 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">
+                                <Badge variant="secondary" className="flex items-center gap-1 text-sm px-3 py-1.5 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">
                                     <span className="truncate max-w-[100px]">
                                         {getResidentName(parseInt(residentFilter), householdResidents)}
                                     </span>
@@ -913,7 +901,7 @@ export default function MyRecords({
                                 size="sm"
                                 type="button"
                                 onClick={clearFilters}
-                                className="text-sm h-8 px-3 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800"
+                                className="text-sm h-8 px-3 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-900"
                             >
                                 Clear All
                             </Button>
@@ -1023,12 +1011,12 @@ export default function MyRecords({
                             hasFilters={hasActiveFilters}
                             onClearFilters={clearFilters}
                             icon={FolderIcon}
-                            title={debouncedSearch 
-                                ? `No documents match your search "${debouncedSearch}"` 
+                            title={search 
+                                ? `No documents match your search "${search}"` 
                                 : activeTab !== 'all' 
                                     ? `No documents found in ${currentCategory?.name || 'this category'}`
                                     : 'No documents found'}
-                            message={debouncedSearch || activeTab !== 'all' || residentFilter !== 'all'
+                            message={search || activeTab !== 'all' || residentFilter !== 'all'
                                 ? 'Try adjusting your filters or clear them to see all documents'
                                 : 'Upload your first document to get started'}
                             actionLabel="Upload Document"

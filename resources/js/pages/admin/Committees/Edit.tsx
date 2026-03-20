@@ -116,13 +116,13 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <Link href="/admin/committees">
-                                <Button variant="ghost" size="sm" type="button">
+                                <Button variant="ghost" size="sm" type="button" className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
                                 </Button>
                             </Link>
                             <div>
-                                <h1 className="text-3xl font-bold tracking-tight">Edit Committee</h1>
+                                <h1 className="text-3xl font-bold tracking-tight dark:text-white">Edit Committee</h1>
                                 <p className="text-gray-500 dark:text-gray-400">
                                     Update committee information
                                 </p>
@@ -134,11 +134,12 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                 variant="destructive"
                                 onClick={handleDelete}
                                 disabled={processing || (committee.positions_count && committee.positions_count > 0)}
+                                className="dark:bg-red-900 dark:hover:bg-red-800"
                             >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
                             </Button>
-                            <Button type="submit" disabled={processing}>
+                            <Button type="submit" disabled={processing} className="dark:bg-blue-600 dark:hover:bg-blue-700">
                                 <Save className="h-4 w-4 mr-2" />
                                 {processing ? 'Saving...' : 'Save Changes'}
                             </Button>
@@ -147,7 +148,7 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
 
                     {/* Warning for committees with positions */}
                     {committee.positions_count && committee.positions_count > 0 && (
-                        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded">
+                        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400">
                             <div className="flex items-center gap-2">
                                 <CheckCircle className="h-5 w-5" />
                                 <div>
@@ -162,7 +163,7 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
 
                     {/* Error Messages */}
                     {Object.keys(errors).length > 0 && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded dark:bg-red-950 dark:border-red-800 dark:text-red-400">
                             <p className="font-bold">Please fix the following errors:</p>
                             <ul className="list-disc list-inside mt-2">
                                 {Object.entries(errors).map(([field, error]) => (
@@ -174,48 +175,48 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
 
                     <div className="grid gap-6 lg:grid-cols-2">
                         {/* Left Column - Committee Details */}
-                        <Card className="lg:col-span-2">
+                        <Card className="lg:col-span-2 dark:bg-gray-900 dark:border-gray-700">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 dark:text-white">
                                     <Target className="h-5 w-5" />
                                     Committee Information
                                 </CardTitle>
-                                <CardDescription>
+                                <CardDescription className="dark:text-gray-400">
                                     Update committee details
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="name">Committee Name *</Label>
+                                        <Label htmlFor="name" className="dark:text-gray-300">Committee Name *</Label>
                                         <Input 
                                             id="name" 
                                             placeholder="e.g., Peace and Order" 
                                             value={data.name}
                                             onChange={(e) => handleNameChange(e.target.value)}
                                             required
-                                            className={isNameChanged ? 'border-blue-300 bg-blue-50' : ''}
+                                            className={`${isNameChanged ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                         />
                                         {isNameChanged && (
-                                            <p className="text-xs text-blue-600 flex items-center gap-1">
+                                            <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
                                                 <CheckCircle className="h-3 w-3" />
                                                 Changed from "{committee.name}"
                                             </p>
                                         )}
                                         {errors.name && (
-                                            <p className="text-sm text-red-600">{errors.name}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                                         )}
                                     </div>
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
-                                            <Label htmlFor="code">Code *</Label>
+                                            <Label htmlFor="code" className="dark:text-gray-300">Code *</Label>
                                             {isCodeManuallyEdited && (
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={resetCodeToAutoGenerate}
-                                                    className="h-6 text-xs"
+                                                    className="h-6 text-xs dark:text-gray-400 dark:hover:text-white"
                                                 >
                                                     Auto-generate
                                                 </Button>
@@ -229,15 +230,15 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                                 onChange={(e) => handleCodeChange(e.target.value)}
                                                 required
                                                 readOnly={!isCodeManuallyEdited}
-                                                className={`${!isCodeManuallyEdited ? "bg-gray-50 pr-10" : ""} ${isCodeChanged ? 'border-blue-300 bg-blue-50' : ''}`}
+                                                className={`${!isCodeManuallyEdited ? "bg-gray-50 dark:bg-gray-700 pr-10" : ""} ${isCodeChanged ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                             />
                                             {!isCodeManuallyEdited && (
                                                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                                                    <Lock className="h-4 w-4 text-gray-400" />
+                                                    <Lock className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                                             {isCodeManuallyEdited ? (
                                                 <>
                                                     <Lock className="h-3 w-3" />
@@ -245,38 +246,38 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <CheckCircle className="h-3 w-3 text-green-500" />
+                                                    <CheckCircle className="h-3 w-3 text-green-500 dark:text-green-400" />
                                                     <span>Auto-generated from name</span>
                                                 </>
                                             )}
                                             {isCodeChanged && (
-                                                <span className="ml-2 text-blue-600">
+                                                <span className="ml-2 text-blue-600 dark:text-blue-400">
                                                     (Was: {committee.code})
                                                 </span>
                                             )}
                                         </div>
                                         {errors.code && (
-                                            <p className="text-sm text-red-600">{errors.code}</p>
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.code}</p>
                                         )}
                                     </div>
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="order">Display Order</Label>
+                                        <Label htmlFor="order" className="dark:text-gray-300">Display Order</Label>
                                         <Input 
                                             id="order" 
                                             type="number" 
                                             min="0"
                                             value={data.order}
                                             onChange={(e) => setData('order', parseInt(e.target.value) || 0)}
-                                            className={data.order !== committee.order ? 'border-blue-300 bg-blue-50' : ''}
+                                            className={`${data.order !== committee.order ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                         />
-                                        <p className="text-xs text-gray-500">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
                                             Determines sorting order in lists
                                         </p>
                                         {data.order !== committee.order && (
-                                            <p className="text-xs text-blue-600">
+                                            <p className="text-xs text-blue-600 dark:text-blue-400">
                                                 Changed from {committee.order}
                                             </p>
                                         )}
@@ -284,17 +285,17 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="description">Description</Label>
+                                    <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
                                     <Textarea 
                                         id="description" 
                                         placeholder="Describe the committee's responsibilities and purpose..."
                                         rows={4}
                                         value={data.description}
                                         onChange={(e) => setData('description', e.target.value)}
-                                        className={data.description !== committee.description ? 'border-blue-300 bg-blue-50' : ''}
+                                        className={`${data.description !== committee.description ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                     />
                                     {data.description !== committee.description && (
-                                        <p className="text-xs text-blue-600">
+                                        <p className="text-xs text-blue-600 dark:text-blue-400">
                                             Description has been modified
                                         </p>
                                     )}
@@ -305,13 +306,13 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                         id="is_active" 
                                         checked={data.is_active}
                                         onCheckedChange={(checked) => setData('is_active', checked as boolean)}
-                                        className={data.is_active !== committee.is_active ? 'border-blue-300' : ''}
+                                        className={`${data.is_active !== committee.is_active ? 'border-blue-300 dark:border-blue-600' : ''} dark:border-gray-600`}
                                     />
-                                    <Label htmlFor="is_active" className="cursor-pointer">
+                                    <Label htmlFor="is_active" className="cursor-pointer dark:text-gray-300">
                                         Committee is active
                                     </Label>
                                     {data.is_active !== committee.is_active && (
-                                        <span className="text-xs text-blue-600 ml-2">
+                                        <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">
                                             {committee.is_active ? 'Was active' : 'Was inactive'}
                                         </span>
                                     )}
@@ -320,92 +321,92 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                         </Card>
 
                         {/* Right Column - Preview & Info */}
-                        <Card>
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
                             <CardHeader>
-                                <CardTitle>Current Information</CardTitle>
+                                <CardTitle className="dark:text-white">Current Information</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center">
-                                        <Target className="h-6 w-6 text-blue-600" />
+                                    <div className="h-12 w-12 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                                        <Target className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                                     </div>
                                     <div>
-                                        <h4 className="font-medium">{committee.name}</h4>
-                                        <p className="text-sm text-gray-500">
+                                        <h4 className="font-medium dark:text-white">{committee.name}</h4>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
                                             Committee
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="pt-4 border-t space-y-3">
+                                <div className="pt-4 border-t dark:border-gray-700 space-y-3">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Code:</span>
-                                        <code className="font-mono font-medium bg-gray-100 px-2 py-0.5 rounded text-xs">
+                                        <span className="text-gray-500 dark:text-gray-400">Code:</span>
+                                        <code className="font-mono font-medium bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded text-xs dark:text-gray-300">
                                             {committee.code}
                                         </code>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Order:</span>
-                                        <span className="font-medium">{committee.order}</span>
+                                        <span className="text-gray-500 dark:text-gray-400">Order:</span>
+                                        <span className="font-medium dark:text-white">{committee.order}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Status:</span>
-                                        <span className={`font-medium ${committee.is_active ? 'text-green-600' : 'text-gray-500'}`}>
+                                        <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                                        <span className={`font-medium ${committee.is_active ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                             {committee.is_active ? 'Active' : 'Inactive'}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Positions:</span>
-                                        <span className="font-medium flex items-center gap-1">
+                                        <span className="text-gray-500 dark:text-gray-400">Positions:</span>
+                                        <span className="font-medium flex items-center gap-1 dark:text-white">
                                             <Users className="h-3 w-3" />
                                             {committee.positions_count || 0}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Created:</span>
-                                        <span className="font-medium">
+                                        <span className="text-gray-500 dark:text-gray-400">Created:</span>
+                                        <span className="font-medium dark:text-white">
                                             {new Date(committee.created_at).toLocaleDateString()}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Last Updated:</span>
-                                        <span className="font-medium">
+                                        <span className="text-gray-500 dark:text-gray-400">Last Updated:</span>
+                                        <span className="font-medium dark:text-white">
                                             {new Date(committee.updated_at).toLocaleDateString()}
                                         </span>
                                     </div>
                                 </div>
 
                                 {committee.description && (
-                                    <div className="pt-4 border-t">
-                                        <h5 className="font-medium mb-2">Current Description:</h5>
-                                        <p className="text-sm text-gray-600">{committee.description}</p>
+                                    <div className="pt-4 border-t dark:border-gray-700">
+                                        <h5 className="font-medium mb-2 dark:text-gray-300">Current Description:</h5>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">{committee.description}</p>
                                     </div>
                                 )}
                             </CardContent>
                         </Card>
 
                         {/* Quick Actions */}
-                        <Card>
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
                             <CardHeader>
-                                <CardTitle>Quick Actions</CardTitle>
+                                <CardTitle className="dark:text-white">Quick Actions</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <Link href={`/admin/committees/${committee.id}`}>
-                                    <Button variant="outline" className="w-full justify-start">
+                                    <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
                                         <Target className="h-4 w-4 mr-2" />
                                         View Committee Details
                                     </Button>
                                 </Link>
                                 
                                 <Link href={`/admin/positions?committee=${committee.id}`}>
-                                    <Button variant="outline" className="w-full justify-start">
+                                    <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
                                         <Users className="h-4 w-4 mr-2" />
                                         View Assigned Positions
                                     </Button>
                                 </Link>
                                 
-                                <div className="pt-4 border-t">
-                                    <h4 className="font-medium mb-2">Status Actions</h4>
+                                <div className="pt-4 border-t dark:border-gray-700">
+                                    <h4 className="font-medium mb-2 dark:text-gray-300">Status Actions</h4>
                                     <div className="space-y-2">
                                         <Button
                                             variant={data.is_active ? "default" : "outline"}
@@ -430,15 +431,15 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                     </div>
 
                     {/* Form Actions */}
-                    <div className="flex items-center justify-between pt-6 border-t">
+                    <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
                         <div className="flex items-center gap-2">
                             <Link href={`/admin/committees/${committee.id}`}>
-                                <Button variant="outline" type="button">
+                                <Button variant="outline" type="button" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
                                     View Details
                                 </Button>
                             </Link>
                             <Link href="/admin/committees">
-                                <Button variant="outline" type="button">
+                                <Button variant="outline" type="button" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
                                     Back to List
                                 </Button>
                             </Link>
@@ -458,13 +459,14 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                     setIsCodeManuallyEdited(false);
                                 }}
                                 disabled={processing}
+                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                             >
                                 Reset Changes
                             </Button>
                             <Button 
                                 type="submit" 
                                 disabled={processing}
-                                className={Object.keys(errors).length === 0 ? '' : 'opacity-50'}
+                                className={`${Object.keys(errors).length === 0 ? '' : 'opacity-50'} dark:bg-blue-600 dark:hover:bg-blue-700`}
                             >
                                 <Save className="h-4 w-4 mr-2" />
                                 {processing ? 'Saving...' : 'Save Changes'}

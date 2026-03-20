@@ -3,7 +3,7 @@ import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { ResidentsProps, Resident, FilterState, BulkOperation, SelectionMode } from '@/types';
+import { ResidentsProps, Resident, FilterState, SelectionMode, SelectionStats } from '@/types';
 import { 
     filterResidents,
     getSelectionStats,
@@ -11,7 +11,7 @@ import {
     getFullName,
     isHeadOfHousehold,
     getStatusBadgeVariant,
-    formatDate
+    formatDate,
 } from '@/admin-utils/residentsUtils';
 
 // Import reusable components
@@ -26,7 +26,19 @@ import { KeyRound } from 'lucide-react';
 
 export default function Residents() {
     const { props } = usePage<ResidentsProps>();
-    const { residents, stats, filters, puroks, civilStatusOptions = [], ageRanges = [], allResidents } = props;
+    const { 
+        residents, 
+        stats, 
+        filters, 
+        puroks, 
+        civilStatusOptions = [], 
+        ageRanges = [], 
+        allResidents,
+        privileges = [] 
+    } = props;
+    
+    // Debug: Log privileges to verify they're being received
+    console.log('Privileges received from server:', privileges);
     
     // State management
     const [search, setSearch] = useState(filters.search || '');
@@ -39,6 +51,8 @@ export default function Residents() {
         civil_status: filters.civil_status || 'all',
         is_voter: filters.is_voter || 'all',
         is_head: filters.is_head || 'all',
+        privilege: filters.privilege || 'all',
+        privilege_id: filters.privilege_id || 'all',
         sort_by: filters.sort_by || 'last_name',
         sort_order: filters.sort_order || 'asc'
     });
@@ -59,8 +73,11 @@ export default function Residents() {
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
     const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
     const [showBulkPurokDialog, setShowBulkPurokDialog] = useState(false);
+    const [showBulkPrivilegeDialog, setShowBulkPrivilegeDialog] = useState(false);
+    const [showBulkRemovePrivilegeDialog, setShowBulkRemovePrivilegeDialog] = useState(false);
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
     const [bulkEditValue, setBulkEditValue] = useState<string>('');
+    const [bulkPrivilegeAction, setBulkPrivilegeAction] = useState<'add' | 'remove'>('add');
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,7 +94,7 @@ export default function Residents() {
         // Clean up empty values
         Object.keys(params).forEach(key => {
             const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
+            if (!params[k] || params[k] === 'all' || params[k] === '') {
                 delete params[k];
             }
         });
@@ -165,7 +182,7 @@ export default function Residents() {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isBulkMode, selectedResidents, isMobile]);
 
-    // Filter residents
+    // Filter residents with privilege support
     const filteredResidents = useMemo(() => {
         return filterResidents(
             allResidents,
@@ -209,8 +226,8 @@ export default function Residents() {
 
     const handleSelectAll = () => {
         if (confirm(`This will select ALL ${allResidents.length || 0} residents. This action may take a moment.`)) {
-            const pageIds = paginatedResidents.map(resident => resident.id);
-            setSelectedResidents(pageIds);
+            const allIds = allResidents.map(resident => resident.id);
+            setSelectedResidents(allIds);
             setSelectionMode('all');
         }
     };
@@ -237,13 +254,34 @@ export default function Residents() {
         return filteredResidents.filter(resident => selectedResidents.includes(resident.id));
     }, [selectedResidents, filteredResidents]);
 
-    // Calculate selection stats
+    // Calculate selection stats including privilege information
     const selectionStats = useMemo(() => {
-        return getSelectionStats(selectedResidentsData);
+        const baseStats = getSelectionStats(selectedResidentsData);
+        
+        // Add privilege stats
+        const privilegeCounts: Record<string, number> = {};
+        const heads = selectedResidentsData.filter(r => isHeadOfHousehold(r)).length;
+        
+        selectedResidentsData.forEach(resident => {
+            if (resident.privileges && Array.isArray(resident.privileges)) {
+                resident.privileges.forEach((privilege: any) => {
+                    if (privilege.code) {
+                        privilegeCounts[privilege.code] = (privilegeCounts[privilege.code] || 0) + 1;
+                    }
+                });
+            }
+        });
+        
+        return {
+            ...baseStats,
+            heads,
+            privilegeCounts,
+            hasPrivileges: selectedResidentsData.filter(r => r.privileges?.length > 0).length
+        };
     }, [selectedResidentsData]);
 
     // Bulk operations
-    const handleBulkOperation = async (operation: string) => {
+    const handleBulkOperation = async (operation: string, data?: any) => {
         if (selectedResidents.length === 0) {
             toast.error('Please select at least one resident');
             return;
@@ -254,22 +292,7 @@ export default function Residents() {
         try {
             switch (operation) {
                 case 'delete':
-                    if (confirm(`Are you sure you want to delete ${selectedResidents.length} selected resident(s)?`)) {
-                        await router.post('/admin/residents/bulk-action', {
-                            action: 'delete',
-                            resident_ids: selectedResidents,
-                        }, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                setSelectedResidents([]);
-                                setShowBulkDeleteDialog(false);
-                                toast.success('Residents deleted successfully');
-                            },
-                            onError: () => {
-                                toast.error('Failed to delete residents');
-                            }
-                        });
-                    }
+                    setShowBulkDeleteDialog(true);
                     break;
 
                 case 'activate':
@@ -280,10 +303,10 @@ export default function Residents() {
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedResidents([]);
-                            toast.success('Residents activated successfully');
+                            toast.success(`${selectedResidents.length} residents activated successfully`);
                         },
-                        onError: () => {
-                            toast.error('Failed to activate residents');
+                        onError: (errors) => {
+                            toast.error(errors.message || 'Failed to activate residents');
                         }
                     });
                     break;
@@ -296,10 +319,10 @@ export default function Residents() {
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedResidents([]);
-                            toast.success('Residents deactivated successfully');
+                            toast.success(`${selectedResidents.length} residents deactivated successfully`);
                         },
-                        onError: () => {
-                            toast.error('Failed to deactivate residents');
+                        onError: (errors) => {
+                            toast.error(errors.message || 'Failed to deactivate residents');
                         }
                     });
                     break;
@@ -312,12 +335,22 @@ export default function Residents() {
                     toast.info('Print functionality to be implemented');
                     break;
 
-                case 'change_status':
+                case 'update_status':
                     setShowBulkStatusDialog(true);
                     break;
 
-                case 'change_purok':
+                case 'update_purok':
                     setShowBulkPurokDialog(true);
+                    break;
+
+                case 'add_privilege':
+                    setBulkPrivilegeAction('add');
+                    setShowBulkPrivilegeDialog(true);
+                    break;
+
+                case 'remove_privilege':
+                    setBulkPrivilegeAction('remove');
+                    setShowBulkRemovePrivilegeDialog(true);
                     break;
 
                 case 'print_ids':
@@ -327,6 +360,9 @@ export default function Residents() {
                 case 'export_csv':
                     toast.info('Export CSV functionality to be implemented');
                     break;
+                    
+                default:
+                    toast.info(`Operation ${operation} to be implemented`);
             }
         } catch (error) {
             console.error('Bulk operation error:', error);
@@ -336,17 +372,147 @@ export default function Residents() {
         }
     };
 
-    // Copy selected data to clipboard
+    const handleBulkPrivilegeAction = async () => {
+        if (!bulkEditValue) {
+            toast.error('Please select a privilege');
+            return;
+        }
+
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/residents/bulk-action', {
+                action: bulkPrivilegeAction === 'add' ? 'add_privilege' : 'remove_privilege',
+                resident_ids: selectedResidents,
+                privilege_id: parseInt(bulkEditValue), // Send privilege_id instead of code
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedResidents([]);
+                    setShowBulkPrivilegeDialog(false);
+                    setShowBulkRemovePrivilegeDialog(false);
+                    setBulkEditValue('');
+                    toast.success(`Privilege ${bulkPrivilegeAction === 'add' ? 'added to' : 'removed from'} ${selectedResidents.length} resident(s) successfully`);
+                },
+                onError: (errors) => {
+                    toast.error(errors.message || `Failed to ${bulkPrivilegeAction} privilege`);
+                }
+            });
+        } catch (error) {
+            console.error('Bulk privilege operation error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkStatusUpdate = async (status: string) => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/residents/bulk-action', {
+                action: 'update_status',
+                resident_ids: selectedResidents,
+                status: status,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedResidents([]);
+                    setShowBulkStatusDialog(false);
+                    setBulkEditValue('');
+                    toast.success(`Status updated to ${status} for ${selectedResidents.length} residents`);
+                },
+                onError: (errors) => {
+                    toast.error(errors.message || 'Failed to update status');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk status update error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkPurokUpdate = async (purokId: number) => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/residents/bulk-action', {
+                action: 'update_purok',
+                resident_ids: selectedResidents,
+                purok_id: purokId,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedResidents([]);
+                    setShowBulkPurokDialog(false);
+                    setBulkEditValue('');
+                    toast.success(`Purok updated for ${selectedResidents.length} residents`);
+                },
+                onError: (errors) => {
+                    toast.error(errors.message || 'Failed to update purok');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk purok update error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/residents/bulk-action', {
+                action: 'delete',
+                resident_ids: selectedResidents,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedResidents([]);
+                    setShowBulkDeleteDialog(false);
+                    toast.success(`${selectedResidents.length} residents deleted successfully`);
+                },
+                onError: (errors) => {
+                    toast.error(errors.message || 'Failed to delete residents');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    // Copy selected data to clipboard (includes privilege information)
     const handleCopySelectedData = () => {
         if (selectedResidentsData.length === 0) {
             toast.error('No data to copy');
             return;
         }
         
-        const csv = formatForClipboard(selectedResidentsData);
+        // Format data with privilege information
+        const formattedData = selectedResidentsData.map(resident => ({
+            'Full Name': getFullName(resident),
+            'Age': resident.age,
+            'Gender': resident.gender || 'N/A',
+            'Purok': resident.purok?.name || 'N/A',
+            'Status': resident.status,
+            'Civil Status': resident.civil_status || 'N/A',
+            'Is Voter': resident.is_voter ? 'Yes' : 'No',
+            'Is Head': isHeadOfHousehold(resident) ? 'Yes' : 'No',
+            'Privileges': resident.privileges?.map((p: any) => p.name).join(', ') || 'None',
+            'Contact': resident.contact_number || 'N/A'
+        }));
+        
+        const csv = formatForClipboard(formattedData);
         
         navigator.clipboard.writeText(csv).then(() => {
-            toast.success('Data copied to clipboard');
+            toast.success(`${selectedResidentsData.length} records copied to clipboard`);
         }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
@@ -361,8 +527,8 @@ export default function Residents() {
                     setSelectedResidents(selectedResidents.filter(id => id !== resident.id));
                     toast.success('Resident deleted successfully');
                 },
-                onError: () => {
-                    toast.error('Failed to delete resident');
+                onError: (errors) => {
+                    toast.error(errors.message || 'Failed to delete resident');
                 }
             });
         }
@@ -375,10 +541,10 @@ export default function Residents() {
         }, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('Resident status updated');
+                toast.success(`Resident status updated to ${newStatus}`);
             },
-            onError: () => {
-                toast.error('Failed to update resident status');
+            onError: (errors) => {
+                toast.error(errors.message || 'Failed to update resident status');
             }
         });
     };
@@ -398,24 +564,26 @@ export default function Residents() {
     };
 
     const handleSort = (column: string) => {
+        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
+        
         setFiltersState(prev => ({
             ...prev,
             sort_by: column,
-            sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc'
+            sort_order: newOrder
         }));
         
         // Trigger server-side sort update
         const params = {
             ...filtersState,
             sort_by: column,
-            sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc',
+            sort_order: newOrder,
             search: search
         };
         
         // Clean up empty values
         Object.keys(params).forEach(key => {
             const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
+            if (!params[k] || params[k] === 'all' || params[k] === '') {
                 delete params[k];
             }
         });
@@ -438,6 +606,8 @@ export default function Residents() {
             civil_status: 'all',
             is_voter: 'all',
             is_head: 'all',
+            privilege: 'all',
+            privilege_id: 'all',
             sort_by: 'last_name',
             sort_order: 'asc'
         });
@@ -453,6 +623,8 @@ export default function Residents() {
             civil_status: 'all',
             is_voter: 'all',
             is_head: 'all',
+            privilege: 'all',
+            privilege_id: 'all',
             sort_by: 'last_name',
             sort_order: 'asc'
         }, {
@@ -480,7 +652,7 @@ export default function Residents() {
         // Clean up empty values
         Object.keys(params).forEach(key => {
             const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
+            if (!params[k] || params[k] === 'all' || params[k] === '') {
                 delete params[k];
             }
         });
@@ -501,7 +673,9 @@ export default function Residents() {
         filtersState.max_age ||
         filtersState.civil_status !== 'all' ||
         filtersState.is_voter !== 'all' ||
-        filtersState.is_head !== 'all';
+        filtersState.is_head !== 'all' ||
+        filtersState.privilege !== 'all' ||
+        filtersState.privilege_id !== 'all';
 
     return (
         <AppLayout
@@ -533,6 +707,7 @@ export default function Residents() {
                         handleClearFilters={handleClearFilters}
                         hasActiveFilters={hasActiveFilters}
                         puroks={puroks}
+                        privileges={privileges}
                         ageRanges={ageRanges}
                         civilStatusOptions={civilStatusOptions}
                         isMobile={isMobile}
@@ -572,6 +747,10 @@ export default function Residents() {
                         onSort={handleSort}
                         onBulkOperation={handleBulkOperation}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                        setShowBulkStatusDialog={setShowBulkStatusDialog}
+                        setShowBulkPurokDialog={setShowBulkPurokDialog}
+                        setShowBulkPrivilegeDialog={setShowBulkPrivilegeDialog}
+                        setShowBulkRemovePrivilegeDialog={setShowBulkRemovePrivilegeDialog}
                         filtersState={filtersState}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
@@ -581,7 +760,7 @@ export default function Residents() {
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 border hidden sm:block">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border hidden sm:block">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <KeyRound className="h-4 w-4 text-gray-500" />
@@ -597,7 +776,7 @@ export default function Residents() {
                                     Exit Bulk Mode
                                 </Button>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
                                 <div className="flex items-center gap-1">
                                     <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+A</kbd>
                                     <span>Select page</span>
@@ -614,6 +793,10 @@ export default function Residents() {
                                     <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
                                     <span>Exit/clear</span>
                                 </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+F</kbd>
+                                    <span>Focus search</span>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -627,13 +810,23 @@ export default function Residents() {
                 setShowBulkStatusDialog={setShowBulkStatusDialog}
                 showBulkPurokDialog={showBulkPurokDialog}
                 setShowBulkPurokDialog={setShowBulkPurokDialog}
+                showBulkPrivilegeDialog={showBulkPrivilegeDialog}
+                setShowBulkPrivilegeDialog={setShowBulkPrivilegeDialog}
+                showBulkRemovePrivilegeDialog={showBulkRemovePrivilegeDialog}
+                setShowBulkRemovePrivilegeDialog={setShowBulkRemovePrivilegeDialog}
                 isPerformingBulkAction={isPerformingBulkAction}
                 bulkEditValue={bulkEditValue}
                 setBulkEditValue={setBulkEditValue}
                 selectedResidents={selectedResidents}
                 handleBulkOperation={handleBulkOperation}
+                handleBulkPrivilegeAction={handleBulkPrivilegeAction}
+                handleBulkStatusUpdate={handleBulkStatusUpdate}
+                handleBulkPurokUpdate={handleBulkPurokUpdate}
+                handleBulkDelete={handleBulkDelete}
                 puroks={puroks}
+                privileges={privileges}
                 selectionStats={selectionStats}
+                bulkPrivilegeAction={bulkPrivilegeAction}
             />
         </AppLayout>
     );

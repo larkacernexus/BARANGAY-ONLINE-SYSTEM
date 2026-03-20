@@ -102,7 +102,7 @@ export default function HouseholdsTableView({
                 <div className="overflow-hidden">
                     <Table className="min-w-full">
                         <TableHeader>
-                            <TableRow className="bg-gray-50 dark:bg-gray-800">
+                            <TableRow className="bg-gray-50 dark:bg-gray-900">
                                 {isBulkMode && (
                                     <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-center w-10 sm:w-12">
                                         <div className="flex items-center justify-center">
@@ -169,7 +169,7 @@ export default function HouseholdsTableView({
                                         </TableHead>
                                     </>
                                 )}
-                                <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-800 min-w-[60px] sm:min-w-[80px]">
+                                <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[60px] sm:min-w-[80px]">
                                     Actions
                                 </TableHead>
                             </TableRow>
@@ -209,7 +209,7 @@ export default function HouseholdsTableView({
                                     return (
                                         <TableRow 
                                             key={household.id}
-                                            className={`hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${
+                                            className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors ${
                                                 isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
                                             }`}
                                             onClick={(e) => {

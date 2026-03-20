@@ -498,7 +498,7 @@ class UserController extends Controller
             // Mail::to($user->email)->send(new UserSetupMail($user, $request->password));
         }
         
-        return redirect()->route('users.show', $user)
+        return redirect()->route('admin.users.show', $user)
             ->with('success', 'User created successfully!');
     }
     
@@ -891,7 +891,7 @@ class UserController extends Controller
             $user->permissions()->detach();
         }
         
-        return redirect()->route('users.show', $user)
+        return redirect()->route('admin.users.show', $user)
             ->with('success', 'User updated successfully!');
     }
     

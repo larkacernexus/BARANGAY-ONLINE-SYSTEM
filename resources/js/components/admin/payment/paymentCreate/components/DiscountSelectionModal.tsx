@@ -285,7 +285,7 @@ export default function DiscountSelectionModal({
     
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-green-100 rounded-lg">
@@ -343,7 +343,7 @@ export default function DiscountSelectionModal({
                                 className={`relative flex items-start p-4 border rounded-lg transition-all cursor-pointer ${
                                     selectedDiscount === discount.type
                                         ? 'border-green-500 bg-green-50 dark:bg-green-900/20 ring-2 ring-green-500 ring-opacity-20'
-                                        : 'border-gray-200 dark:border-gray-700 hover:border-green-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                        : 'border-gray-200 dark:border-gray-700 hover:border-green-300 hover:bg-gray-50 dark:hover:bg-gray-900'
                                 }`}
                                 onClick={() => setSelectedDiscount(discount.type)}
                             >

@@ -115,6 +115,9 @@ export interface PaginationData {
 }
 
 export interface Stats {
+    issued_count: number;
+    partially_paid_count: number;
+    waived_count: number;
     total: number;
     total_amount: number;
     collected: number; // total amount collected (paid)

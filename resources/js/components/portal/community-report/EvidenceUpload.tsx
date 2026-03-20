@@ -92,7 +92,7 @@ export const EvidenceUpload: React.FC<EvidenceUploadProps> = ({
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex items-center gap-3 flex-1 min-w-0">
                                                             <div className={`w-10 h-10 rounded flex items-center justify-center flex-shrink-0 ${
-                                                                isImage ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800'
+                                                                isImage ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-900'
                                                             }`}>
                                                                 <FileIcon className={`h-5 w-5 ${
                                                                     isImage ? 'text-blue-500' : 'text-gray-500'
@@ -118,7 +118,7 @@ export const EvidenceUpload: React.FC<EvidenceUploadProps> = ({
                                                     {isImage && file.preview && (
                                                         <div className="mt-3">
                                                             <div 
-                                                                className="relative aspect-video rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer"
+                                                                className="relative aspect-video rounded-md overflow-hidden bg-gray-100 dark:bg-gray-900 cursor-pointer"
                                                                 onClick={() => onOpenPreview(file.preview!, file.type, file.name)}
                                                             >
                                                                 <img 
@@ -163,7 +163,7 @@ export const EvidenceUpload: React.FC<EvidenceUploadProps> = ({
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex items-center gap-3 flex-1 min-w-0">
                                                             <div className={`w-10 h-10 rounded flex items-center justify-center flex-shrink-0 ${
-                                                                isImage ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800'
+                                                                isImage ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-900'
                                                             }`}>
                                                                 <FileIcon className={`h-5 w-5 ${
                                                                     isImage ? 'text-blue-500' : 'text-gray-500'
@@ -189,7 +189,7 @@ export const EvidenceUpload: React.FC<EvidenceUploadProps> = ({
                                                     {isImage && file.preview && (
                                                         <div className="mt-3">
                                                             <div 
-                                                                className="relative aspect-video rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer"
+                                                                className="relative aspect-video rounded-md overflow-hidden bg-gray-100 dark:bg-gray-900 cursor-pointer"
                                                                 onClick={() => onOpenPreview(file.preview, file.type, file.name)}
                                                             >
                                                                 <img 

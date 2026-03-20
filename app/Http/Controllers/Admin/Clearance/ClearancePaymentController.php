@@ -6,11 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\ClearanceRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use App\Http\Controllers\Admin\Clearance\Traits\ClearanceNotificationTrait;
 
-class ClearancePaymentController extends Controller
+class ClearancePaymentController extends BaseClearanceController
 {
-    use ClearanceNotificationTrait;
+    protected $notificationController;
+
+    public function __construct(ClearanceNotificationController $notificationController)
+    {
+        $this->notificationController = $notificationController;
+    }
 
     /**
      * Request payment.
@@ -21,7 +25,6 @@ class ClearancePaymentController extends Controller
             $clearance->update(['status' => 'pending_payment']);
         }
 
-        // Notify payer about payment request
         $payerUsers = $this->getPayerUsersFromClearance($clearance);
         foreach ($payerUsers as $user) {
             $user->notify(new \App\Notifications\ClearancePaymentRequest($clearance));
@@ -54,14 +57,12 @@ class ClearancePaymentController extends Controller
             'status' => 'processing',
         ]);
 
-        // Send payment notification if payment exists
         if ($clearance->payment) {
-            $this->sendPaymentNotification($clearance, $clearance->payment, 'verified');
+            $this->notificationController->sendPaymentNotification($clearance, $clearance->payment, 'verified');
         }
 
-        // Send status update notification
         if ($oldStatus !== $clearance->status) {
-            $this->sendClearanceStatusNotification($clearance, $oldStatus, $clearance->status, 'Payment verified');
+            $this->notificationController->sendStatusNotification($clearance, $oldStatus, $clearance->status, 'Payment verified');
         }
 
         activity()
@@ -75,13 +76,12 @@ class ClearancePaymentController extends Controller
     /**
      * Send payment reminder.
      */
-    public function sendReminder(ClearanceRequest $clearance)
+    public function sendPaymentReminder(ClearanceRequest $clearance)
     {
         if ($clearance->payment_status === 'paid') {
             return redirect()->back()->with('info', 'Payment already completed.');
         }
 
-        // Notify payer about payment reminder
         $payerUsers = $this->getPayerUsersFromClearance($clearance);
         foreach ($payerUsers as $user) {
             $user->notify(new \App\Notifications\ClearancePaymentReminder($clearance));

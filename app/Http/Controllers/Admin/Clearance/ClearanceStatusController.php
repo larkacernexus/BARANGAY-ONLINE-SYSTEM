@@ -5,12 +5,16 @@ namespace App\Http\Controllers\Admin\Clearance;
 use App\Http\Controllers\Controller;
 use App\Models\ClearanceRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use App\Http\Controllers\Admin\Clearance\Traits\ClearanceNotificationTrait;
+use Illuminate\Support\Facades\Validator;
 
-class ClearanceStatusController extends Controller
+class ClearanceStatusController extends BaseClearanceController
 {
-    use ClearanceNotificationTrait;
+    protected $notificationController;
+
+    public function __construct(ClearanceNotificationController $notificationController)
+    {
+        $this->notificationController = $notificationController;
+    }
 
     /**
      * Mark clearance as processing.
@@ -24,7 +28,7 @@ class ClearanceStatusController extends Controller
         $oldStatus = $clearance->status;
         $clearance->markAsProcessing(auth()->id());
         
-        $this->sendClearanceStatusNotification($clearance, $oldStatus, 'processing');
+        $this->notificationController->sendStatusNotification($clearance, $oldStatus, 'processing');
 
         return redirect()->back()->with('success', 'Clearance request marked as processing.');
     }
@@ -38,7 +42,6 @@ class ClearanceStatusController extends Controller
             return redirect()->back()->with('error', 'Cannot approve clearance request in current status.');
         }
 
-        // Check if payment is required and completed
         if ($clearance->clearanceType->requires_payment && $clearance->payment_status !== 'paid') {
             return redirect()->back()->with('error', 'Cannot approve: Payment is required and not yet completed.');
         }
@@ -46,7 +49,7 @@ class ClearanceStatusController extends Controller
         $oldStatus = $clearance->status;
         $clearance->approve();
         
-        $this->sendClearanceStatusNotification($clearance, $oldStatus, 'approved');
+        $this->notificationController->sendStatusNotification($clearance, $oldStatus, 'approved');
 
         return redirect()->back()->with('success', 'Clearance request approved successfully.');
     }
@@ -63,7 +66,7 @@ class ClearanceStatusController extends Controller
         $oldStatus = $clearance->status;
         $clearance->issue();
         
-        $this->sendClearanceStatusNotification($clearance, $oldStatus, 'issued');
+        $this->notificationController->sendStatusNotification($clearance, $oldStatus, 'issued');
 
         return redirect()->back()->with('success', 'Clearance certificate issued successfully.');
     }
@@ -73,9 +76,7 @@ class ClearanceStatusController extends Controller
      */
     public function reject(Request $request, ClearanceRequest $clearance)
     {
-        $request->validate([
-            'reason' => 'required|string|max:500',
-        ]);
+        $request->validate(['reason' => 'required|string|max:500']);
 
         if (!in_array($clearance->status, ['pending', 'processing'])) {
             return redirect()->back()->with('error', 'Cannot reject clearance request in current status.');
@@ -84,7 +85,7 @@ class ClearanceStatusController extends Controller
         $oldStatus = $clearance->status;
         $clearance->reject($request->reason, auth()->id());
         
-        $this->sendClearanceStatusNotification($clearance, $oldStatus, 'rejected', $request->reason);
+        $this->notificationController->sendStatusNotification($clearance, $oldStatus, 'rejected', $request->reason);
 
         return redirect()->back()->with('success', 'Clearance request rejected.');
     }
@@ -94,9 +95,7 @@ class ClearanceStatusController extends Controller
      */
     public function cancel(Request $request, ClearanceRequest $clearance)
     {
-        $request->validate([
-            'reason' => 'nullable|string|max:500',
-        ]);
+        $request->validate(['reason' => 'nullable|string|max:500']);
 
         if (!in_array($clearance->status, ['pending', 'pending_payment', 'processing'])) {
             return redirect()->back()->with('error', 'Cannot cancel clearance request in current status.');
@@ -105,27 +104,39 @@ class ClearanceStatusController extends Controller
         $oldStatus = $clearance->status;
         $clearance->cancel($request->reason, false);
         
-        $this->sendClearanceStatusNotification($clearance, $oldStatus, 'cancelled', $request->reason);
+        $this->notificationController->sendStatusNotification($clearance, $oldStatus, 'cancelled', $request->reason);
 
         return redirect()->back()->with('success', 'Clearance request cancelled.');
     }
 
     /**
-     * Delete clearance request.
+     * Request more documents.
      */
-    public function destroy(ClearanceRequest $clearance)
+    public function requestMoreDocuments(Request $request, ClearanceRequest $clearance)
     {
-        if (!in_array($clearance->status, ['pending', 'pending_payment'])) {
-            return redirect()->back()->with('error', 'Cannot delete clearance request in current status.');
+        $request->validate(['reason' => 'required|string|max:500']);
+
+        if ($clearance->status === 'processing') {
+            $oldStatus = $clearance->status;
+            $clearance->update([
+                'status' => 'pending',
+                'admin_notes' => $clearance->admin_notes . "\nRequested more documents: " . $request->reason,
+            ]);
+            
+            $this->notificationController->sendStatusNotification($clearance, $oldStatus, 'pending', 'Additional documents required: ' . $request->reason);
         }
 
-        // Check if there are payments
-        if ($clearance->payment_id || $clearance->paymentItems()->exists()) {
-            return redirect()->back()->with('error', 'Cannot delete clearance request with associated payments.');
+        $payerUsers = $this->getPayerUsersFromClearance($clearance);
+        foreach ($payerUsers as $user) {
+            $user->notify(new \App\Notifications\ClearanceDocumentRequest($clearance, $request->reason));
         }
 
-        $clearance->delete();
+        activity()
+            ->performedOn($clearance)
+            ->causedBy(auth()->user())
+            ->withProperties(['reason' => $request->reason])
+            ->log('Requested more documents');
 
-        return redirect()->route('clearances.index')->with('success', 'Clearance request deleted.');
+        return redirect()->back()->with('success', 'Document request sent to resident.');
     }
 }

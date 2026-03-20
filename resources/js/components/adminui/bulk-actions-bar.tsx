@@ -33,7 +33,7 @@ export function BulkActionsBar({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 {/* Left section - Selection info */}
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 bg-white dark:bg-gray-800 px-3 py-1.5 rounded-full border">
+                    <div className="flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-1.5 rounded-full border">
                         <PackageCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         <span className="font-medium text-sm">
                             {selectedCount} selected

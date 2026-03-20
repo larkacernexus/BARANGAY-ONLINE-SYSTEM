@@ -119,24 +119,8 @@ Route::middleware('auth')->group(function () {
     Route::prefix('residentsettings/security/two-factor')->name('resident.two-factor.')->group(function () {
         Route::get('/', [ResidentTwoFactorAuthenticationController::class, 'show'])
             ->name('show');
-        
-        Route::post('/enable', [ResidentTwoFactorAuthenticationController::class, 'enable'])
-            ->name('enable');
-        
-        Route::post('/confirm', [ResidentTwoFactorAuthenticationController::class, 'confirm'])
-            ->name('confirm');
-        
-        Route::post('/disable', [ResidentTwoFactorAuthenticationController::class, 'disable'])
-            ->name('disable');
-        
-        Route::post('/cancel-setup', [ResidentTwoFactorAuthenticationController::class, 'cancelSetup'])
-            ->name('cancel-setup');
-        
-        Route::get('/recovery-codes', [ResidentTwoFactorAuthenticationController::class, 'getRecoveryCodes'])
-            ->name('recovery-codes');
-        
-        Route::post('/regenerate-recovery-codes', [ResidentTwoFactorAuthenticationController::class, 'regenerateRecoveryCodes'])
-            ->name('regenerate-recovery-codes');
+  
+     
     });
 
     // Settings controller routes

@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// components/admin/document-types/DocumentTypesStats.tsx
 import { 
     FileText, 
     CheckCircle, 
@@ -8,6 +8,7 @@ import {
     HardDrive,
     FileType
 } from 'lucide-react';
+import { StatCard } from '@/components/adminui/stats-grid';
 
 interface DocumentTypesStatsProps {
     stats: {
@@ -27,107 +28,62 @@ export default function DocumentTypesStats({
     categoryCounts, 
     categories 
 }: DocumentTypesStatsProps) {
+    // Safe stats with fallbacks
+    const safeStats = {
+        total: stats?.total || 0,
+        active: stats?.active || 0,
+        required: stats?.required || 0,
+        optional: stats?.optional || 0,
+        max_file_size_mb: stats?.max_file_size_mb || 0,
+        has_formats: stats?.has_formats || 0
+    };
+
+    const safeCategories = categories || [];
+    const inactiveCount = safeStats.total - safeStats.active;
+
     return (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <FileText className="h-4 w-4 mr-2 text-blue-500" />
-                        Total Types
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">{stats.total.toLocaleString()}</div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        {stats.active} active • {stats.total - stats.active} inactive
-                    </div>
-                </CardContent>
-            </Card>
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <StatCard
+                title="Total Types"
+                value={safeStats.total.toLocaleString()}
+                icon={<FileText className="h-4 w-4 text-blue-500" />}
+                description={`${safeStats.active} active • ${inactiveCount} inactive`}
+            />
             
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
-                        Required
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold text-green-600">
-                        {stats.required.toLocaleString()}
-                    </div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        {stats.optional} optional
-                    </div>
-                </CardContent>
-            </Card>
+            <StatCard
+                title="Required"
+                value={safeStats.required.toLocaleString()}
+                icon={<CheckCircle className="h-4 w-4 text-green-500" />}
+                description={`${safeStats.optional} optional`}
+            />
 
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <Folder className="h-4 w-4 mr-2 text-purple-500" />
-                        Categories
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">
-                        {categories.length}
-                    </div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        Active categories
-                    </div>
-                </CardContent>
-            </Card>
+            <StatCard
+                title="Categories"
+                value={safeCategories.length.toLocaleString()}
+                icon={<Folder className="h-4 w-4 text-purple-500" />}
+                description="Active categories"
+            />
 
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <FileType className="h-4 w-4 mr-2 text-indigo-500" />
-                        Has Formats
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">
-                        {stats.has_formats.toLocaleString()}
-                    </div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        With format restrictions
-                    </div>
-                </CardContent>
-            </Card>
+            <StatCard
+                title="Has Formats"
+                value={safeStats.has_formats.toLocaleString()}
+                icon={<FileType className="h-4 w-4 text-indigo-500" />}
+                description="With format restrictions"
+            />
 
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <HardDrive className="h-4 w-4 mr-2 text-amber-500" />
-                        Max Size
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold">
-                        {stats.max_file_size_mb} MB
-                    </div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        Maximum file size
-                    </div>
-                </CardContent>
-            </Card>
+            <StatCard
+                title="Max Size"
+                value={`${safeStats.max_file_size_mb} MB`}
+                icon={<HardDrive className="h-4 w-4 text-amber-500" />}
+                description="Maximum file size"
+            />
 
-            <Card className="overflow-hidden">
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-500 flex items-center">
-                        <AlertCircle className="h-4 w-4 mr-2 text-red-500" />
-                        Inactive
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-xl sm:text-2xl font-bold text-red-600">
-                        {(stats.total - stats.active).toLocaleString()}
-                    </div>
-                    <div className="text-xs sm:text-sm text-gray-500 mt-1">
-                        Disabled document types
-                    </div>
-                </CardContent>
-            </Card>
+            <StatCard
+                title="Inactive"
+                value={inactiveCount.toLocaleString()}
+                icon={<AlertCircle className="h-4 w-4 text-red-500" />}
+                description="Disabled document types"
+            />
         </div>
     );
 }

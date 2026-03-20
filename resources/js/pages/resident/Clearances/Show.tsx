@@ -554,19 +554,19 @@ export default function ClearanceDetail({ clearance, payment_items = [] }: PageP
                                             >
                                                 <div className="space-y-3">
                                                     <div className="grid grid-cols-2 gap-2">
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Reference</p>
                                                             <p className="text-xs font-mono truncate">{clearance.reference_number}</p>
                                                         </div>
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Date Requested</p>
                                                             <p className="text-xs">{formatDate(clearance.created_at)}</p>
                                                         </div>
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Date Needed</p>
                                                             <p className="text-xs">{formatDate(clearance.needed_date)}</p>
                                                         </div>
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Urgency</p>
                                                             <div className="mt-0.5">
                                                                 <ModernUrgencyBadge urgency={clearance.urgency} />
@@ -574,7 +574,7 @@ export default function ClearanceDetail({ clearance, payment_items = [] }: PageP
                                                         </div>
                                                     </div>
                                                     
-                                                    <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                    <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                         <p className="text-[10px] text-gray-500 mb-1">Purpose</p>
                                                         <p className="text-xs">{clearance.purpose}</p>
                                                         {clearance.specific_purpose && (
@@ -584,7 +584,7 @@ export default function ClearanceDetail({ clearance, payment_items = [] }: PageP
                                                         )}
                                                     </div>
                                                     
-                                                    <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                    <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                         <p className="text-[10px] text-gray-500 mb-1">Requested By</p>
                                                         <div className="flex items-center gap-2">
                                                             <div className="h-6 w-6 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
@@ -612,11 +612,11 @@ export default function ClearanceDetail({ clearance, payment_items = [] }: PageP
                                             >
                                                 <div className="space-y-3">
                                                     <div className="grid grid-cols-2 gap-2">
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Type</p>
                                                             <p className="text-xs">{clearance.clearance_type?.name || 'N/A'}</p>
                                                         </div>
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Processing</p>
                                                             <p className="text-xs">{clearance.clearance_type?.processing_days || 0} days</p>
                                                         </div>
@@ -624,12 +624,12 @@ export default function ClearanceDetail({ clearance, payment_items = [] }: PageP
                                                     
                                                     {clearance.issue_date && (
                                                         <div className="grid grid-cols-2 gap-2">
-                                                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                            <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                                 <p className="text-[10px] text-gray-500">Issued Date</p>
                                                                 <p className="text-xs">{formatDate(clearance.issue_date)}</p>
                                                             </div>
                                                             {clearance.valid_until && (
-                                                                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                                     <p className="text-[10px] text-gray-500">Valid Until</p>
                                                                     <p className="text-xs">{formatDate(clearance.valid_until)}</p>
                                                                 </div>
@@ -638,7 +638,7 @@ export default function ClearanceDetail({ clearance, payment_items = [] }: PageP
                                                     )}
                                                     
                                                     {clearance.clearance_number && (
-                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                             <p className="text-[10px] text-gray-500">Clearance Number</p>
                                                             <p className="text-xs font-mono">{clearance.clearance_number}</p>
                                                         </div>
@@ -831,7 +831,7 @@ export default function ClearanceDetail({ clearance, payment_items = [] }: PageP
                                         <ModernCard title="Payment History">
                                             <div className="space-y-2">
                                                 {paymentItems.map((item) => (
-                                                    <div key={item.id} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                    <div key={item.id} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                         <div className="flex items-start justify-between gap-2">
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="flex items-center gap-1.5 mb-1.5">
@@ -900,7 +900,7 @@ export default function ClearanceDetail({ clearance, payment_items = [] }: PageP
                                                                         </p>
                                                                     </div>
                                                                     {history.remarks && (
-                                                                        <div className="mt-1.5 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                                        <div className="mt-1.5 p-2 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                                                                             <p className="text-[10px]">{history.remarks}</p>
                                                                         </div>
                                                                     )}
@@ -1056,21 +1056,21 @@ export default function ClearanceDetail({ clearance, payment_items = [] }: PageP
 
                             <ModernCard title="Contact Information">
                                 <div className="space-y-3">
-                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <Building className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div>
                                             <p className="font-medium text-sm">Barangay Hall</p>
                                             <p className="text-xs text-gray-500">Open Mon-Fri, 8AM-5PM</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <Phone className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div>
                                             <p className="font-medium text-sm">Contact Us</p>
                                             <p className="text-xs text-gray-500">0999-999-9999</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                    <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                         <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
                                         <div>
                                             <p className="font-medium text-sm">Location</p>

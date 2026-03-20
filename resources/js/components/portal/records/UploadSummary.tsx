@@ -64,13 +64,13 @@ export function UploadSummary({
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-600 dark:text-gray-400">Visibility:</span>
-            <Badge variant={data.is_public ? "outline" : "secondary"} className="dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">
+            <Badge variant={data.is_public ? "outline" : "secondary"} className="dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">
               {data.is_public ? 'Public' : 'Private'}
             </Badge>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-600 dark:text-gray-400">Password:</span>
-            <Badge variant={data.requires_password ? "destructive" : "outline"} className={data.requires_password ? '' : 'dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'}>
+            <Badge variant={data.requires_password ? "destructive" : "outline"} className={data.requires_password ? '' : 'dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700'}>
               {data.requires_password ? 'Protected' : 'None'}
             </Badge>
           </div>

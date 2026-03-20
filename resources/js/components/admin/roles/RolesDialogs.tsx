@@ -97,7 +97,7 @@ export default function RolesDialogs({
                                 <option value="system">System Role</option>
                             </select>
                         </div>
-                        <div className="text-sm text-gray-500 p-3 bg-gray-50 dark:bg-gray-800 rounded">
+                        <div className="text-sm text-gray-500 p-3 bg-gray-50 dark:bg-gray-900 rounded">
                             <div className="font-medium mb-1">Current selection stats:</div>
                             <ul className="list-disc list-inside space-y-1">
                                 <li>{selectionStats.total} total roles</li>

@@ -72,7 +72,7 @@ export function FileUploadArea({
             variant="ghost"
             size="sm"
             onClick={onBackToTypeSelection}
-            className="gap-2 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800"
+            className="gap-2 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
             Change Type
@@ -127,7 +127,7 @@ export function FileUploadArea({
             type="button"
             variant="outline"
             onClick={onBrowseClick}
-            className="dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Browse Files
           </Button>

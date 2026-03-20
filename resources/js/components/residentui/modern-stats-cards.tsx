@@ -44,7 +44,7 @@ export const ModernStatsCards = ({
         return (
           <div
             key={index}
-            className="bg-white dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700/50 p-1.5 sm:p-6"
+            className="bg-white dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700/50 p-1.5 sm:p-6"
           >
             <div className="flex items-center gap-1.5 sm:gap-3">
               {/* Icon */}

@@ -76,7 +76,7 @@ export const StorageCard = ({ stats }: StorageCardProps) => {
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="w-full dark:bg-gray-800 dark:border-gray-700"
+                                className="w-full dark:bg-gray-900 dark:border-gray-700"
                                 onClick={() => {
                                     // Handle upgrade action - could be a modal or redirect
                                     toast.info('Upgrade feature coming soon');

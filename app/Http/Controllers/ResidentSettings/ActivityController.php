@@ -18,33 +18,20 @@ class ActivityController extends Controller
      */
     public function index(Request $request)
     {
-        // LOG 1: Page load started
         Log::channel('daily')->info('========== PAGE LOAD STARTED ==========');
         Log::channel('daily')->info('Timestamp: ' . now()->toDateTimeString());
         Log::channel('daily')->info('URL: ' . $request->fullUrl());
         Log::channel('daily')->info('Method: ' . $request->method());
-        Log::channel('daily')->info('IP: ' . $request->ip());
-        Log::channel('daily')->info('User Agent: ' . $request->userAgent());
         
-        // LOG 2: User info
         $user = auth()->user();
         $residentId = $user->resident_id;
         
         Log::channel('daily')->info('User authenticated', [
             'user_id' => $user->id,
             'username' => $user->username,
-            'email' => $user->email,
             'resident_id' => $residentId
         ]);
         
-        // LOG 3: Request parameters
-        Log::channel('daily')->info('Request parameters', [
-            'all' => $request->all(),
-            'query' => $request->query(),
-            'input' => $request->input()
-        ]);
-        
-        // Get filters
         $type = $request->get('type', 'all');
         $timeRange = $request->get('timeRange', 'all');
         $search = $request->get('search', '');
@@ -57,115 +44,12 @@ class ActivityController extends Controller
             'page' => $page
         ]);
         
-        // LOG 4: Check if tables exist
-        Log::channel('daily')->info('Checking if tables exist:');
-        $tables = [
-            'user_login_logs' => DB::getSchemaBuilder()->hasTable('user_login_logs'),
-            'payments' => DB::getSchemaBuilder()->hasTable('payments'),
-            'resident_documents' => DB::getSchemaBuilder()->hasTable('resident_documents'),
-            'clearance_requests' => DB::getSchemaBuilder()->hasTable('clearance_requests'),
-            'activity_log' => DB::getSchemaBuilder()->hasTable('activity_log'),
-        ];
-        Log::channel('daily')->info('Tables exist', $tables);
-        
-        // LOG 5: Raw counts before any filtering
-        Log::channel('daily')->info('RAW COUNTS (no filters):');
-        
-        $rawLoginCount = DB::table('user_login_logs')->where('user_id', $user->id)->count();
-        Log::channel('daily')->info('user_login_logs count for user ' . $user->id . ': ' . $rawLoginCount);
-        
-        if ($rawLoginCount > 0) {
-            $sampleLogin = DB::table('user_login_logs')->where('user_id', $user->id)->first();
-            Log::channel('daily')->info('Sample login record:', (array)$sampleLogin);
-        }
-        
-        $rawPaymentCount = DB::table('payments')
-            ->where(function($q) use ($user, $residentId) {
-                $q->where('recorded_by', $user->id)->orWhere('payer_id', $residentId);
-            })->count();
-        Log::channel('daily')->info('payments count for user ' . $user->id . '/resident ' . $residentId . ': ' . $rawPaymentCount);
-        
-        if ($rawPaymentCount > 0) {
-            $samplePayment = DB::table('payments')
-                ->where(function($q) use ($user, $residentId) {
-                    $q->where('recorded_by', $user->id)->orWhere('payer_id', $residentId);
-                })->first();
-            Log::channel('daily')->info('Sample payment record:', (array)$samplePayment);
-        }
-        
-        $rawDocumentCount = DB::table('resident_documents')
-            ->where(function($q) use ($user, $residentId) {
-                $q->where('uploaded_by', $user->id)->orWhere('resident_id', $residentId);
-            })->count();
-        Log::channel('daily')->info('resident_documents count: ' . $rawDocumentCount);
-        
-        if ($rawDocumentCount > 0) {
-            $sampleDoc = DB::table('resident_documents')
-                ->where(function($q) use ($user, $residentId) {
-                    $q->where('uploaded_by', $user->id)->orWhere('resident_id', $residentId);
-                })->first();
-            Log::channel('daily')->info('Sample document record:', (array)$sampleDoc);
-        }
-        
-        $rawClearanceCount = DB::table('clearance_requests')
-            ->where('resident_id', $residentId)->count();
-        Log::channel('daily')->info('clearance_requests count: ' . $rawClearanceCount);
-        
-        if ($rawClearanceCount > 0) {
-            $sampleClearance = DB::table('clearance_requests')
-                ->where('resident_id', $residentId)->first();
-            Log::channel('daily')->info('Sample clearance record:', (array)$sampleClearance);
-        }
-        
-        $rawSpatieCount = Activity::where('causer_id', $user->id)
-            ->where('causer_type', 'App\Models\User')->count();
-        Log::channel('daily')->info('spatie activity_log count: ' . $rawSpatieCount);
-        
-        if ($rawSpatieCount > 0) {
-            $sampleSpatie = Activity::where('causer_id', $user->id)
-                ->where('causer_type', 'App\Models\User')->first();
-            Log::channel('daily')->info('Sample spatie record:', $sampleSpatie ? $sampleSpatie->toArray() : []);
-        }
-        
-        $totalRaw = $rawLoginCount + $rawPaymentCount + $rawDocumentCount + $rawClearanceCount + $rawSpatieCount;
-        Log::channel('daily')->info('TOTAL RAW RECORDS AVAILABLE: ' . $totalRaw);
-        
-        // LOG 6: Now get filtered activities
-        Log::channel('daily')->info('Calling getAllActivities with filters...');
         $activities = $this->getAllActivities($user->id, $residentId, $type, $timeRange, $search);
-        
-        Log::channel('daily')->info('getAllActivities returned', [
-            'count' => $activities->count(),
-            'isEmpty' => $activities->isEmpty() ? 'YES' : 'NO'
-        ]);
-        
-        // LOG 7: If activities found, show first few
-        if ($activities->isNotEmpty()) {
-            Log::channel('daily')->info('First 3 activities:');
-            $activities->take(3)->each(function($activity, $index) {
-                Log::channel('daily')->info('Activity #' . ($index + 1), $activity);
-            });
-        } else {
-            Log::channel('daily')->warning('NO ACTIVITIES FOUND after filtering!');
-            Log::channel('daily')->info('This is why frontend shows mock data - empty collection');
-        }
-        
-        // LOG 8: Get stats
-        Log::channel('daily')->info('Calling getStats...');
         $stats = $this->getStats($user->id, $residentId);
-        Log::channel('daily')->info('getStats returned:', $stats);
         
-        // Manual pagination
         $perPage = 20;
         $currentPage = (int)$page;
         $currentItems = $activities->slice(($currentPage - 1) * $perPage, $perPage)->values();
-        
-        Log::channel('daily')->info('Pagination', [
-            'total' => $activities->count(),
-            'perPage' => $perPage,
-            'currentPage' => $currentPage,
-            'itemsOnCurrentPage' => $currentItems->count()
-        ]);
         
         $paginator = new LengthAwarePaginator(
             $currentItems,
@@ -175,7 +59,7 @@ class ActivityController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
         
-        Log::channel('daily')->info('========== PAGE LOAD COMPLETED ==========');
+        Log::channel('daily')->info('Returning activities: ' . $currentItems->count() . ' items');
         
         return Inertia::render('residentsettings/activities', [
             'activities' => $currentItems,
@@ -197,120 +81,182 @@ class ActivityController extends Controller
     }
     
     /**
-     * Get REAL activities from database tables
+     * Display single activity details
      */
-    private function getAllActivities($userId, $residentId, $type, $timeRange, $search): Collection
+    public function show($id)
     {
-        Log::channel('daily')->info('  --- INSIDE getAllActivities ---');
-        Log::channel('daily')->info('  Parameters:', [
-            'userId' => $userId,
-            'residentId' => $residentId,
-            'type' => $type,
-            'timeRange' => $timeRange,
-            'search' => $search
+        $user = auth()->user();
+        $residentId = $user->resident_id;
+        
+        $parts = explode('_', $id);
+        $source = $parts[0];
+        $actualId = $parts[1] ?? null;
+        
+        $activity = null;
+        
+        switch ($source) {
+            case 'login':
+                $activity = DB::table('user_login_logs')
+                    ->where('id', $actualId)
+                    ->where('user_id', $user->id)
+                    ->first();
+                break;
+                
+            case 'payment':
+                $activity = DB::table('payments')
+                    ->where('id', $actualId)
+                    ->where(function($q) use ($user, $residentId) {
+                        $q->where('recorded_by', $user->id)
+                          ->orWhere('payer_id', $residentId);
+                    })
+                    ->first();
+                break;
+                
+            case 'document':
+                $activity = DB::table('resident_documents')
+                    ->where('id', $actualId)
+                    ->where(function($q) use ($user, $residentId) {
+                        $q->where('uploaded_by', $user->id)
+                          ->orWhere('resident_id', $residentId);
+                    })
+                    ->first();
+                break;
+                
+            case 'clearance':
+                $activity = DB::table('clearance_requests')
+                    ->where('id', $actualId)
+                    ->where('resident_id', $residentId)
+                    ->first();
+                break;
+                
+            case 'spatie':
+                $activity = Activity::where('id', $actualId)
+                    ->where('causer_id', $user->id)
+                    ->where('causer_type', 'App\Models\User')
+                    ->first();
+                break;
+        }
+        
+        if (!$activity) {
+            return redirect()->back()->with('error', 'Activity not found');
+        }
+        
+        $formattedActivity = $this->formatSingleActivity($activity, $source, $id);
+        
+        return Inertia::render('residentsettings/activity-details', [
+            'activity' => $formattedActivity
         ]);
-        
-        $activities = collect();
-        
-        // 1. LOGIN ACTIVITIES
-        if ($type === 'all' || $type === 'login') {
-            Log::channel('daily')->info('  Fetching login activities...');
-            $loginActivities = $this->getLoginActivities($userId, $timeRange, $search);
-            Log::channel('daily')->info('  Login activities returned: ' . $loginActivities->count());
-            $activities = $activities->concat($loginActivities);
-        }
-        
-        // 2. PAYMENT ACTIVITIES
-        if ($type === 'all' || $type === 'payment') {
-            Log::channel('daily')->info('  Fetching payment activities...');
-            $paymentActivities = $this->getPaymentActivities($userId, $residentId, $timeRange, $search);
-            Log::channel('daily')->info('  Payment activities returned: ' . $paymentActivities->count());
-            $activities = $activities->concat($paymentActivities);
-        }
-        
-        // 3. DOCUMENT ACTIVITIES
-        if ($type === 'all' || $type === 'document') {
-            Log::channel('daily')->info('  Fetching document activities...');
-            $documentActivities = $this->getDocumentActivities($userId, $residentId, $timeRange, $search);
-            Log::channel('daily')->info('  Document activities returned: ' . $documentActivities->count());
-            $activities = $activities->concat($documentActivities);
-        }
-        
-        // 4. CLEARANCE ACTIVITIES
-        if ($type === 'all' || $type === 'clearance') {
-            Log::channel('daily')->info('  Fetching clearance activities...');
-            $clearanceActivities = $this->getClearanceActivities($residentId, $timeRange, $search);
-            Log::channel('daily')->info('  Clearance activities returned: ' . $clearanceActivities->count());
-            $activities = $activities->concat($clearanceActivities);
-        }
-        
-        // 5. SPATIE ACTIVITIES
-        if ($type === 'all' || in_array($type, ['profile', 'security', 'settings', 'audit'])) {
-            Log::channel('daily')->info('  Fetching spatie activities...');
-            $spatieActivities = $this->getSpatieActivities($userId, $type, $timeRange, $search);
-            Log::channel('daily')->info('  Spatie activities returned: ' . $spatieActivities->count());
-            $activities = $activities->concat($spatieActivities);
-        }
-        
-        $totalCount = $activities->count();
-        Log::channel('daily')->info('  TOTAL activities collected in getAllActivities: ' . $totalCount);
-        
-        if ($activities->isEmpty()) {
-            Log::channel('daily')->warning('  getAllActivities returning EMPTY collection');
-        }
-        
-        // Sort by timestamp
-        $sorted = $activities->sortByDesc('timestamp')->values();
-        Log::channel('daily')->info('  After sorting: ' . $sorted->count());
-        
-        return $sorted;
     }
     
     /**
-     * Get login activities from user_login_logs table
+     * Report an issue with an activity
+     */
+    public function report(Request $request)
+    {
+        $request->validate([
+            'id' => 'required|string',
+            'reason' => 'sometimes|string|max:500'
+        ]);
+        
+        $user = auth()->user();
+        
+        Log::channel('daily')->warning('Activity reported', [
+            'user_id' => $user->id,
+            'activity_id' => $request->id,
+            'reason' => $request->reason ?? 'No reason provided'
+        ]);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Thank you for your report. We will investigate this activity.'
+        ]);
+    }
+    
+    /**
+ * Export activities to CSV
+ */
+public function export(Request $request)
+{
+    $request->validate([
+        'format' => 'required|in:csv,json'
+    ]);
+    
+    $user = auth()->user();
+    $residentId = $user->resident_id;
+    $type = $request->input('filters.type', 'all');
+    $timeRange = $request->input('filters.timeRange', 'all');
+    $format = $request->input('format', 'csv'); // Get format from input, not property
+    
+    $activities = $this->getAllActivities($user->id, $residentId, $type, $timeRange, '');
+    
+    if ($format === 'json') {
+        return response()->json([
+            'activities' => $activities,
+            'exported_at' => now()->toDateTimeString(),
+            'total' => $activities->count()
+        ]);
+    }
+    
+    return $this->exportToCsv($activities);
+}
+    
+    /**
+     * Get ALL activities from database tables
+     */
+    private function getAllActivities($userId, $residentId, $type, $timeRange, $search): Collection
+    {
+        $activities = collect();
+        
+        if ($type === 'all' || $type === 'login') {
+            $loginActivities = $this->getLoginActivities($userId, $timeRange, $search);
+            $activities = $activities->concat($loginActivities);
+        }
+        
+        if ($type === 'all' || $type === 'payment') {
+            $paymentActivities = $this->getPaymentActivities($userId, $residentId, $timeRange, $search);
+            $activities = $activities->concat($paymentActivities);
+        }
+        
+        if ($type === 'all' || $type === 'document') {
+            $documentActivities = $this->getDocumentActivities($userId, $residentId, $timeRange, $search);
+            $activities = $activities->concat($documentActivities);
+        }
+        
+        if ($type === 'all' || $type === 'clearance') {
+            $clearanceActivities = $this->getClearanceActivities($residentId, $timeRange, $search);
+            $activities = $activities->concat($clearanceActivities);
+        }
+        
+        if ($type === 'all' || in_array($type, ['profile', 'security', 'settings', 'audit'])) {
+            $spatieActivities = $this->getSpatieActivities($userId, $type, $timeRange, $search);
+            $activities = $activities->concat($spatieActivities);
+        }
+        
+        return $activities->sortByDesc('timestamp')->values();
+    }
+    
+    /**
+     * Get login activities
      */
     private function getLoginActivities($userId, $timeRange, $search): Collection
     {
-        Log::channel('daily')->info('    --- INSIDE getLoginActivities ---');
-        
         $query = DB::table('user_login_logs')
             ->where('user_id', $userId)
             ->orderBy('login_at', 'desc');
         
-        Log::channel('daily')->info('    Base query: ' . $query->toSql());
-        Log::channel('daily')->info('    Base bindings: ', $query->getBindings());
-        
-        // Apply time range filter
         if ($timeRange !== 'all') {
-            Log::channel('daily')->info('    Applying timeRange filter: ' . $timeRange);
             $this->applyDateFilter($query, $timeRange, 'login_at');
-            Log::channel('daily')->info('    After time filter: ' . $query->toSql());
-            Log::channel('daily')->info('    After time bindings: ', $query->getBindings());
         }
         
-        // Apply search filter
         if ($search) {
-            Log::channel('daily')->info('    Applying search filter: ' . $search);
             $query->where(function($q) use ($search) {
                 $q->where('ip_address', 'like', "%{$search}%")
                   ->orWhere('user_agent', 'like', "%{$search}%")
                   ->orWhere('device_type', 'like', "%{$search}%");
             });
-            Log::channel('daily')->info('    After search filter: ' . $query->toSql());
-            Log::channel('daily')->info('    After search bindings: ', $query->getBindings());
         }
         
-        $results = $query->get();
-        $count = $results->count();
-        Log::channel('daily')->info('    FINAL login results count: ' . $count);
-        
-        if ($count > 0) {
-            Log::channel('daily')->info('    First login result:', (array)$results->first());
-        } else {
-            Log::channel('daily')->warning('    NO login results found');
-        }
-        
-        return $results->map(function($log) {
+        return $query->get()->map(function($log) {
             $deviceInfo = $this->parseUserAgent($log->user_agent ?? '');
             $isSuccessful = property_exists($log, 'is_successful') ? (int)$log->is_successful === 1 : true;
             $hasLogout = property_exists($log, 'logout_at') && !is_null($log->logout_at);
@@ -320,13 +266,10 @@ class ActivityController extends Controller
             if ($hasLogout) {
                 $description = "Logged out from system";
             } elseif ($isSuccessful) {
-                $browser = $deviceInfo['browser'] !== 'Unknown' ? $deviceInfo['browser'] : 'browser';
-                $os = $deviceInfo['os'] !== 'Unknown' ? $deviceInfo['os'] : 'device';
-                $description = "Successfully logged in from {$browser} on {$os}";
+                $description = "Successfully logged in from {$deviceInfo['browser']} on {$deviceInfo['os']}";
             } else {
                 $reason = property_exists($log, 'failure_reason') && $log->failure_reason 
-                    ? ": {$log->failure_reason}" 
-                    : '';
+                    ? ": {$log->failure_reason}" : '';
                 $description = "Failed login attempt" . $reason;
             }
             
@@ -351,12 +294,10 @@ class ActivityController extends Controller
     }
     
     /**
-     * Get payment activities from payments table
+     * Get payment activities
      */
     private function getPaymentActivities($userId, $residentId, $timeRange, $search): Collection
     {
-        Log::channel('daily')->info('    --- INSIDE getPaymentActivities ---');
-        
         $query = DB::table('payments')
             ->where(function($q) use ($userId, $residentId) {
                 $q->where('recorded_by', $userId)
@@ -364,36 +305,18 @@ class ActivityController extends Controller
             })
             ->orderBy('created_at', 'desc');
         
-        Log::channel('daily')->info('    Base query: ' . $query->toSql());
-        Log::channel('daily')->info('    Base bindings: ', $query->getBindings());
-        
         if ($timeRange !== 'all') {
-            Log::channel('daily')->info('    Applying timeRange filter: ' . $timeRange);
             $this->applyDateFilter($query, $timeRange, 'created_at');
         }
         
         if ($search) {
-            Log::channel('daily')->info('    Applying search filter: ' . $search);
             $query->where(function($q) use ($search) {
                 $q->where('or_number', 'like', "%{$search}%")
                   ->orWhere('purpose', 'like', "%{$search}%");
             });
         }
         
-        Log::channel('daily')->info('    Final query: ' . $query->toSql());
-        Log::channel('daily')->info('    Final bindings: ', $query->getBindings());
-        
-        $results = $query->get();
-        $count = $results->count();
-        Log::channel('daily')->info('    FINAL payment results count: ' . $count);
-        
-        if ($count > 0) {
-            Log::channel('daily')->info('    First payment result:', (array)$results->first());
-        } else {
-            Log::channel('daily')->warning('    NO payment results found');
-        }
-        
-        return $results->map(function($payment) {
+        return $query->get()->map(function($payment) {
             $statusMap = [
                 'completed' => 'success',
                 'pending' => 'pending',
@@ -436,12 +359,10 @@ class ActivityController extends Controller
     }
     
     /**
-     * Get document activities from resident_documents table
+     * Get document activities
      */
     private function getDocumentActivities($userId, $residentId, $timeRange, $search): Collection
     {
-        Log::channel('daily')->info('    --- INSIDE getDocumentActivities ---');
-        
         $query = DB::table('resident_documents')
             ->where(function($q) use ($userId, $residentId) {
                 $q->where('uploaded_by', $userId)
@@ -449,33 +370,15 @@ class ActivityController extends Controller
             })
             ->orderBy('created_at', 'desc');
         
-        Log::channel('daily')->info('    Base query: ' . $query->toSql());
-        Log::channel('daily')->info('    Base bindings: ', $query->getBindings());
-        
         if ($timeRange !== 'all') {
-            Log::channel('daily')->info('    Applying timeRange filter: ' . $timeRange);
             $this->applyDateFilter($query, $timeRange, 'created_at');
         }
         
         if ($search) {
-            Log::channel('daily')->info('    Applying search filter: ' . $search);
             $query->where('name', 'like', "%{$search}%");
         }
         
-        Log::channel('daily')->info('    Final query: ' . $query->toSql());
-        Log::channel('daily')->info('    Final bindings: ', $query->getBindings());
-        
-        $results = $query->get();
-        $count = $results->count();
-        Log::channel('daily')->info('    FINAL document results count: ' . $count);
-        
-        if ($count > 0) {
-            Log::channel('daily')->info('    First document result:', (array)$results->first());
-        } else {
-            Log::channel('daily')->warning('    NO document results found');
-        }
-        
-        return $results->map(function($doc) {
+        return $query->get()->map(function($doc) {
             $isUpdate = property_exists($doc, 'updated_at') && $doc->updated_at && 
                         property_exists($doc, 'created_at') && $doc->created_at != $doc->updated_at;
             
@@ -497,46 +400,26 @@ class ActivityController extends Controller
     }
     
     /**
-     * Get clearance activities from clearance_requests table
+     * Get clearance activities
      */
     private function getClearanceActivities($residentId, $timeRange, $search): Collection
     {
-        Log::channel('daily')->info('    --- INSIDE getClearanceActivities ---');
-        
         $query = DB::table('clearance_requests')
             ->where('resident_id', $residentId)
             ->orderBy('created_at', 'desc');
         
-        Log::channel('daily')->info('    Base query: ' . $query->toSql());
-        Log::channel('daily')->info('    Base bindings: ', $query->getBindings());
-        
         if ($timeRange !== 'all') {
-            Log::channel('daily')->info('    Applying timeRange filter: ' . $timeRange);
             $this->applyDateFilter($query, $timeRange, 'created_at');
         }
         
         if ($search) {
-            Log::channel('daily')->info('    Applying search filter: ' . $search);
             $query->where(function($q) use ($search) {
                 $q->where('reference_number', 'like', "%{$search}%")
                   ->orWhere('purpose', 'like', "%{$search}%");
             });
         }
         
-        Log::channel('daily')->info('    Final query: ' . $query->toSql());
-        Log::channel('daily')->info('    Final bindings: ', $query->getBindings());
-        
-        $results = $query->get();
-        $count = $results->count();
-        Log::channel('daily')->info('    FINAL clearance results count: ' . $count);
-        
-        if ($count > 0) {
-            Log::channel('daily')->info('    First clearance result:', (array)$results->first());
-        } else {
-            Log::channel('daily')->warning('    NO clearance results found');
-        }
-        
-        return $results->map(function($request) {
+        return $query->get()->map(function($request) {
             $statusMap = [
                 'paid' => 'success',
                 'completed' => 'success',
@@ -579,21 +462,16 @@ class ActivityController extends Controller
     }
     
     /**
-     * Get Spatie activity log activities
+     * Get Spatie activities
      */
     private function getSpatieActivities($userId, $type, $timeRange, $search): Collection
     {
-        Log::channel('daily')->info('    --- INSIDE getSpatieActivities ---');
-        
         $query = Activity::query()
             ->where('causer_id', $userId)
             ->where('causer_type', 'App\Models\User')
             ->orderBy('created_at', 'desc');
         
-        Log::channel('daily')->info('    Base query: ' . $query->toSql());
-        
         if ($type !== 'all') {
-            Log::channel('daily')->info('    Applying type filter: ' . $type);
             switch ($type) {
                 case 'profile':
                     $query->whereIn('log_name', ['profile', 'user']);
@@ -611,32 +489,17 @@ class ActivityController extends Controller
         }
         
         if ($timeRange !== 'all') {
-            Log::channel('daily')->info('    Applying timeRange filter: ' . $timeRange);
             $this->applySpatieDateFilter($query, $timeRange);
         }
         
         if ($search) {
-            Log::channel('daily')->info('    Applying search filter: ' . $search);
             $query->where(function($q) use ($search) {
                 $q->where('description', 'like', "%{$search}%")
                   ->orWhere('properties', 'like', "%{$search}%");
             });
         }
         
-        Log::channel('daily')->info('    Final query: ' . $query->toSql());
-        Log::channel('daily')->info('    Final bindings: ', $query->getBindings());
-        
-        $results = $query->get();
-        $count = $results->count();
-        Log::channel('daily')->info('    FINAL spatie results count: ' . $count);
-        
-        if ($count > 0) {
-            Log::channel('daily')->info('    First spatie result:', $results->first()->toArray());
-        } else {
-            Log::channel('daily')->warning('    NO spatie results found');
-        }
-        
-        return $results->map(function($activity) {
+        return $query->get()->map(function($activity) {
             $properties = $activity->properties ?? [];
             $event = $activity->event ?? 'updated';
             $type = $this->mapSpatieLogToType($activity->log_name ?? '');
@@ -665,12 +528,125 @@ class ActivityController extends Controller
     }
     
     /**
-     * Get REAL statistics from database
+     * Format single activity for display
+     */
+    private function formatSingleActivity($activity, $source, $fullId)
+    {
+        switch ($source) {
+            case 'login':
+                $deviceInfo = $this->parseUserAgent($activity->user_agent ?? '');
+                return [
+                    'id' => $fullId,
+                    'type' => $activity->logout_at ? 'logout' : 'login',
+                    'action' => $activity->logout_at ? 'Logged out' : ($activity->is_successful ? 'Logged in' : 'Failed login'),
+                    'description' => $activity->logout_at 
+                        ? 'Logged out from system'
+                        : ($activity->is_successful 
+                            ? "Login from {$deviceInfo['browser']} on {$deviceInfo['os']}"
+                            : "Failed login attempt" . ($activity->failure_reason ? ": {$activity->failure_reason}" : '')),
+                    'timestamp' => $activity->logout_at ?? $activity->login_at,
+                    'status' => $activity->is_successful ? 'success' : 'failed',
+                    'ip_address' => $activity->ip_address,
+                    'device' => "{$deviceInfo['browser']} / {$deviceInfo['os']}",
+                    'location' => $this->getIpLocation($activity->ip_address),
+                    'resource_type' => 'session',
+                    'resource_id' => null,
+                    'metadata' => [
+                        'browser' => $deviceInfo['browser'],
+                        'os' => $deviceInfo['os'],
+                        'user_agent' => $activity->user_agent,
+                        'session_id' => $activity->session_id,
+                    ],
+                ];
+                
+            case 'payment':
+                return [
+                    'id' => $fullId,
+                    'type' => 'payment',
+                    'action' => 'Payment ' . ucfirst($activity->status),
+                    'description' => $activity->purpose ?? "Payment of ₱" . number_format($activity->total_amount, 2),
+                    'timestamp' => $activity->payment_date ?? $activity->created_at,
+                    'status' => $activity->status === 'completed' ? 'success' : ($activity->status === 'pending' ? 'pending' : 'failed'),
+                    'ip_address' => null,
+                    'device' => $activity->collection_type === 'online' ? 'Online' : 'Barangay Hall',
+                    'location' => null,
+                    'resource_type' => 'payment',
+                    'resource_id' => $activity->or_number,
+                    'metadata' => [
+                        'or_number' => $activity->or_number,
+                        'amount' => $activity->total_amount,
+                        'payment_method' => $activity->payment_method,
+                        'reference_number' => $activity->reference_number,
+                    ],
+                ];
+                
+            case 'document':
+                return [
+                    'id' => $fullId,
+                    'type' => 'document',
+                    'action' => $activity->created_at == $activity->updated_at ? 'Document uploaded' : 'Document updated',
+                    'description' => $activity->name,
+                    'timestamp' => $activity->updated_at ?? $activity->created_at,
+                    'status' => 'success',
+                    'ip_address' => null,
+                    'device' => 'System',
+                    'location' => null,
+                    'resource_type' => 'document',
+                    'resource_id' => $activity->reference_number ?? $activity->id,
+                    'metadata' => [
+                        'file_name' => $activity->file_name,
+                        'file_size' => $activity->file_size_human ?? $activity->file_size,
+                        'mime_type' => $activity->mime_type,
+                    ],
+                ];
+                
+            case 'clearance':
+                return [
+                    'id' => $fullId,
+                    'type' => 'clearance',
+                    'action' => 'Clearance ' . ucfirst($activity->status),
+                    'description' => "Clearance request for: " . ($activity->purpose ?? 'General purposes'),
+                    'timestamp' => $activity->issue_date ?? $activity->updated_at ?? $activity->created_at,
+                    'status' => in_array($activity->status, ['paid', 'completed', 'issued', 'approved']) ? 'success' : 'pending',
+                    'ip_address' => null,
+                    'device' => 'System',
+                    'location' => null,
+                    'resource_type' => 'clearance',
+                    'resource_id' => $activity->clearance_number ?? $activity->reference_number,
+                    'metadata' => [
+                        'purpose' => $activity->purpose,
+                        'reference_number' => $activity->reference_number,
+                        'fee_amount' => $activity->fee_amount,
+                    ],
+                ];
+                
+            case 'spatie':
+                $properties = $activity->properties ?? [];
+                return [
+                    'id' => $fullId,
+                    'type' => $this->mapSpatieLogToType($activity->log_name ?? ''),
+                    'action' => $this->formatSpatieAction($activity->log_name ?? '', $activity->event ?? ''),
+                    'description' => $activity->description ?? 'System activity',
+                    'timestamp' => $activity->created_at->toISOString(),
+                    'status' => $activity->event === 'failed' ? 'failed' : 'success',
+                    'ip_address' => $properties['ip_address'] ?? null,
+                    'device' => isset($properties['user_agent']) ? $this->parseUserAgent($properties['user_agent'])['browser'] . ' / ' . $this->parseUserAgent($properties['user_agent'])['os'] : 'System',
+                    'location' => $this->getIpLocation($properties['ip_address'] ?? null),
+                    'resource_type' => $activity->log_name,
+                    'resource_id' => $this->extractResourceId($properties),
+                    'metadata' => $properties,
+                ];
+                
+            default:
+                return [];
+        }
+    }
+    
+    /**
+     * Get statistics
      */
     private function getStats($userId, $residentId): array
     {
-        Log::channel('daily')->info('    --- INSIDE getStats ---');
-        
         $todayStart = now()->startOfDay();
         $todayEnd = now()->endOfDay();
         $weekStart = now()->startOfWeek();
@@ -755,7 +731,7 @@ class ActivityController extends Controller
         
         $totalSpatie = $spatieProfile + $spatieSecurity + $spatieSettings + $spatieAudit;
         
-        $stats = [
+        return [
             'total' => $totalLogins + $totalPayments + $totalDocuments + $totalClearances + $totalSpatie,
             'successful' => $successfulLogins + $successfulPayments + $totalDocuments + $successfulClearances + $totalSpatie,
             'pending' => $pendingPayments + $pendingClearances,
@@ -780,10 +756,6 @@ class ActivityController extends Controller
             'thisWeek' => $weekLogins,
             'thisMonth' => $monthLogins,
         ];
-        
-        Log::channel('daily')->info('    Stats calculated', $stats);
-        
-        return $stats;
     }
     
     /**
@@ -929,23 +901,6 @@ class ActivityController extends Controller
         }
         
         return null;
-    }
-    
-    /**
-     * Export activities to CSV
-     */
-    public function export(Request $request)
-    {
-        $request->validate(['format' => 'required|in:csv']);
-        
-        $user = auth()->user();
-        $residentId = $user->resident_id;
-        $type = $request->input('filters.type', 'all');
-        $timeRange = $request->input('filters.timeRange', 'all');
-        
-        $activities = $this->getAllActivities($user->id, $residentId, $type, $timeRange, '');
-        
-        return $this->exportToCsv($activities);
     }
     
     /**

@@ -90,7 +90,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                 Dashboard Overview
               </h3>
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-blue-800 dark:text-blue-400">
                     <CheckCircle className="h-4 w-4" />
                     Key Metrics
@@ -114,7 +114,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                     </li>
                   </ul>
                 </div>
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-blue-800 dark:text-blue-400">
                     <Activity className="h-4 w-4" />
                     Quick Actions
@@ -148,7 +148,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                 Dashboard Views
               </h3>
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-gray-800 dark:text-gray-300">
                     <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Overview</span>
                     Default View
@@ -157,7 +157,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                     Quick glance at key metrics, recent activities, and quick action buttons.
                   </p>
                 </div>
-                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-gray-800 dark:text-gray-300">
                     <span className="rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">Detailed</span>
                     Analytics View
@@ -182,7 +182,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
               </h3>
               
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-emerald-800 dark:text-emerald-400">
                     <UserPlus className="h-4 w-4" />
                     Adding Residents
@@ -207,7 +207,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                   </ol>
                 </div>
                 
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-emerald-800 dark:text-emerald-400">
                     <UserCheck className="h-4 w-4" />
                     Resident Search
@@ -266,7 +266,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
               </h3>
               
               <div className="space-y-4">
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
                   <h4 className="mb-3 font-medium text-purple-800 dark:text-purple-400">Step-by-Step Process</h4>
                   <ol className="space-y-3 text-sm">
                     <li className="flex items-start gap-3">
@@ -366,7 +366,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
               </h3>
               
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-amber-800 dark:text-amber-400">
                     <DollarSign className="h-4 w-4" />
                     Payment Methods
@@ -391,7 +391,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                   </ul>
                 </div>
                 
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-amber-800 dark:text-amber-400">
                     <Receipt className="h-4 w-4" />
                     Official Receipts
@@ -457,7 +457,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                 Role-Based Access Control
               </h3>
               <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-blue-800 dark:text-blue-400">
                     <Shield className="h-4 w-4" />
                     Administrator
@@ -469,7 +469,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                     <li>• Report generation</li>
                   </ul>
                 </div>
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-emerald-800 dark:text-emerald-400">
                     <UserCheck className="h-4 w-4" />
                     Barangay Staff
@@ -481,7 +481,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                     <li>• Document generation</li>
                   </ul>
                 </div>
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
                   <h4 className="mb-2 flex items-center gap-2 font-medium text-purple-800 dark:text-purple-400">
                     <Users className="h-4 w-4" />
                     Residents (Portal)
@@ -505,7 +505,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                 </h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-3">
-                    <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
+                    <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900/50">
                       <h4 className="mb-1 font-medium text-gray-800 dark:text-gray-300">First-Time Setup</h4>
                       <ol className="ml-4 list-decimal space-y-1 text-sm text-gray-600 dark:text-gray-400">
                         <li>Complete your staff profile</li>
@@ -514,7 +514,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                         <li>Test the system with sample data</li>
                       </ol>
                     </div>
-                    <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
+                    <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900/50">
                       <h4 className="mb-1 font-medium text-gray-800 dark:text-gray-300">Daily Tasks</h4>
                       <ul className="ml-4 list-disc space-y-1 text-sm text-gray-600 dark:text-gray-400">
                         <li>Check pending clearances</li>
@@ -552,20 +552,20 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
             )}
 
             {/* Keyboard Shortcuts */}
-            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
               <h3 className="mb-3 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
                 <Keyboard className="h-5 w-5" />
                 Keyboard Shortcuts
               </h3>
               <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-                <div className="rounded-lg bg-white p-3 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
                   <div className="flex items-center gap-2">
                     <kbd className="rounded bg-gray-100 px-2 py-1 font-mono text-xs dark:bg-gray-700">F1</kbd>
                     <span className="font-medium text-gray-900 dark:text-white">Help</span>
                   </div>
                   <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">Open this guide</div>
                 </div>
-                <div className="rounded-lg bg-white p-3 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
                   <div className="flex items-center gap-2">
                     <kbd className="rounded bg-gray-100 px-2 py-1 font-mono text-xs dark:bg-gray-700">Ctrl</kbd>
                     <span className="font-medium">+</span>
@@ -573,7 +573,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                   </div>
                   <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">Command palette</div>
                 </div>
-                <div className="rounded-lg bg-white p-3 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
                   <div className="flex items-center gap-2">
                     <kbd className="rounded bg-gray-100 px-2 py-1 font-mono text-xs dark:bg-gray-700">Ctrl</kbd>
                     <span className="font-medium">+</span>
@@ -581,7 +581,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
                   </div>
                   <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">New record</div>
                 </div>
-                <div className="rounded-lg bg-white p-3 dark:bg-gray-800">
+                <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
                   <div className="flex items-center gap-2">
                     <kbd className="rounded bg-gray-100 px-2 py-1 font-mono text-xs dark:bg-gray-700">Esc</kbd>
                     <span className="font-medium text-gray-900 dark:text-white">Close</span>
@@ -619,9 +619,9 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative w-full max-w-4xl transform overflow-hidden rounded-xl bg-white shadow-2xl transition-all dark:bg-gray-800">
+        <div className="relative w-full max-w-4xl transform overflow-hidden rounded-xl bg-white shadow-2xl transition-all dark:bg-gray-900">
           {/* Header */}
-          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-sidebar-border/70 bg-white px-6 py-4 dark:border-sidebar-border dark:bg-gray-800">
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-sidebar-border/70 bg-white px-6 py-4 dark:border-sidebar-border dark:bg-gray-900">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
                 <HelpCircle className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -699,7 +699,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
             </div>
 
             {/* Contact Information */}
-            <div className="mt-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+            <div className="mt-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
               <h4 className="mb-3 font-medium text-gray-900 dark:text-white">Need Assistance?</h4>
               <div className="grid gap-4 text-sm md:grid-cols-2">
                 <div>
@@ -729,7 +729,7 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="border-t border-sidebar-border/70 bg-gray-50 px-6 py-4 dark:border-sidebar-border dark:bg-gray-800/50">
+          <div className="border-t border-sidebar-border/70 bg-gray-50 px-6 py-4 dark:border-sidebar-border dark:bg-gray-900/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <Eye className="h-4 w-4" />

@@ -135,7 +135,7 @@ export const ModernReceiptTable = ({
             const PaymentIcon = PAYMENT_METHOD_ICONS[receipt.payment_method as keyof typeof PAYMENT_METHOD_ICONS] || CreditCard;
 
             return (
-              <TableRow key={receipt.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors">
+              <TableRow key={receipt.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
                 {selectMode && (
                   <TableCell>
                     <input

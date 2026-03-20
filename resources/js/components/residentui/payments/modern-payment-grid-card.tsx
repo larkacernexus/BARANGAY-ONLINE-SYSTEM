@@ -157,7 +157,7 @@ export const ModernPaymentGridCard = ({
           </div>
 
           {/* Status and Amount */}
-          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 mb-3">
+          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 mb-3">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 {StatusIcon && (
