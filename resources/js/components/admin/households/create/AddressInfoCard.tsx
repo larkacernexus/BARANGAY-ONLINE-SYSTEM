@@ -1,10 +1,9 @@
-// components/admin/households/create/AddressInfoCard.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, AlertCircle, Home } from 'lucide-react';
+import { MapPin, AlertCircle, Home, Globe } from 'lucide-react';
 
 interface Purok {
     id: number;
@@ -105,6 +104,45 @@ export default function AddressInfoCard({ data, setData, errors, puroks }: Props
                         />
                     </div>
                 </div>
+
+                {/* GOOGLE MAPS URL FIELD - ADD THIS SECTION */}
+                <div className="space-y-2 pt-2">
+                    <Label htmlFor="google_maps_url" className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <Globe className="h-4 w-4" />
+                        Google Maps Link
+                    </Label>
+                    <Input 
+                        id="google_maps_url" 
+                        placeholder="https://maps.app.goo.gl/..." 
+                        value={data.google_maps_url || ''}
+                        onChange={(e) => setData('google_maps_url', e.target.value)}
+                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Paste any Google Maps share link. Coordinates will be extracted automatically when you save.
+                    </p>
+                </div>
+
+                {/* Coordinates Display - Shows after extraction */}
+                {(data.latitude || data.longitude) && (
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                        <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">📍 Extracted Coordinates</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span className="text-green-600 dark:text-green-400">Latitude:</span>
+                                <code className="ml-2 text-green-800 dark:text-green-300 font-mono">
+                                    {data.latitude?.toFixed(6)}
+                                </code>
+                            </div>
+                            <div>
+                                <span className="text-green-600 dark:text-green-400">Longitude:</span>
+                                <code className="ml-2 text-green-800 dark:text-green-300 font-mono">
+                                    {data.longitude?.toFixed(6)}
+                                </code>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Location Preview */}
                 {data.purok_name && data.address && (

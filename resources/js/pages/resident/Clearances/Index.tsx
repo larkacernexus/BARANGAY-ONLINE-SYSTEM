@@ -190,14 +190,14 @@ interface PageProps extends Record<string, any> {
     error?: string;
 }
 
-// StatusBadge Component
+// StatusBadge Component with dark mode
 const StatusBadge = ({ status }: { status: string }) => {
     const statusKey = status as keyof typeof STATUS_CONFIG;
     const config = STATUS_CONFIG[statusKey];
     
     if (!config) {
         return (
-            <Badge className="bg-gray-100 text-gray-800 border-0 px-2 py-1 flex items-center gap-1">
+            <Badge className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-0 px-2 py-1 flex items-center gap-1">
                 <span className="capitalize">{status.replace('_', ' ')}</span>
             </Badge>
         );
@@ -212,14 +212,14 @@ const StatusBadge = ({ status }: { status: string }) => {
     );
 };
 
-// UrgencyBadge Component
+// UrgencyBadge Component with dark mode
 const UrgencyBadge = ({ urgency }: { urgency: string }) => {
     const urgencyKey = urgency as keyof typeof URGENCY_CONFIG;
     const config = URGENCY_CONFIG[urgencyKey];
     
     if (!config) {
         return (
-            <Badge variant="outline" className="text-gray-700">
+            <Badge variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
                 {urgency}
             </Badge>
         );
@@ -243,7 +243,7 @@ const CollapsibleStats = ({
     <div className="md:hidden">
         <Button 
             variant="outline" 
-            className="w-full justify-between bg-white dark:bg-gray-900 rounded-xl border-gray-200 dark:border-gray-700"
+            className="w-full justify-between bg-white dark:bg-gray-900 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
             onClick={() => setShowStats(!showStats)}
         >
             <div className="flex items-center gap-2">
@@ -665,16 +665,14 @@ ${currentResident?.first_name} ${currentResident?.last_name}
         const currentClearances = getCurrentTabClearances();
         const tabHasData = currentClearances.length > 0;
         
-        // FIXED: Safely handle statusFilter for display
         const displayStatus = statusFilter && statusFilter !== 'all' 
             ? statusFilter.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
             : 'All';
         
-        // FIXED: Safely handle status for empty state message
         const emptyStateStatus = statusFilter === 'all' ? 'clearance requests' : (statusFilter || '').replace(/_/g, ' ');
         
         return (
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
                 <CardContent className="p-4 md:p-6">
                     <ModernSelectionBanner
                         selectMode={selectMode}
@@ -692,7 +690,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                     
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                                 {displayStatus} Clearance Requests
                             </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -710,21 +708,21 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                             {/* Sort Dropdown */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+                                    <Button variant="outline" size="sm" className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
                                         <ArrowUpDown className="h-4 w-4" />
                                         Sort
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem>
+                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                                    <DropdownMenuItem className="text-gray-700 dark:text-gray-300">
                                         <Calendar className="h-4 w-4 mr-2" />
                                         Date
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem className="text-gray-700 dark:text-gray-300">
                                         <DollarSign className="h-4 w-4 mr-2" />
                                         Amount
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem className="text-gray-700 dark:text-gray-300">
                                         <Info className="h-4 w-4 mr-2" />
                                         Status
                                     </DropdownMenuItem>
@@ -733,14 +731,14 @@ ${currentResident?.first_name} ${currentResident?.last_name}
 
                             {/* View Toggle */}
                             {!selectMode && tabHasData && (
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
+                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                                     <Button
                                         variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                         size="sm"
                                         onClick={() => setViewMode('grid')}
                                         className={cn(
                                             "h-8 w-8 p-0",
-                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm"
+                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                                         )}
                                     >
                                         <Grid className="h-4 w-4" />
@@ -751,7 +749,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                                         onClick={() => setViewMode('list')}
                                         className={cn(
                                             "h-8 w-8 p-0",
-                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm"
+                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                                         )}
                                     >
                                         <List className="h-4 w-4" />
@@ -765,7 +763,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                                     variant={selectMode ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={toggleSelectMode}
-                                    className="gap-2 rounded-xl"
+                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700"
                                 >
                                     <Square className="h-4 w-4" />
                                     {selectMode ? 'Cancel' : 'Select'}
@@ -889,18 +887,18 @@ ${currentResident?.first_name} ${currentResident?.last_name}
             >
                 <Head title="My Clearances" />
                 <div className="min-h-[50vh] flex items-center justify-center px-4">
-                    <Card className="w-full max-w-md border-0 shadow-xl">
+                    <Card className="w-full max-w-md border-0 shadow-xl bg-white dark:bg-gray-900">
                         <CardContent className="pt-6 text-center">
                             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl flex items-center justify-center mb-4">
                                 <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
                             </div>
-                            <h3 className="text-lg font-semibold mb-2">Error</h3>
+                            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Error</h3>
                             <p className="text-gray-500 dark:text-gray-400 mb-4">
                                 {pageProps.error}
                             </p>
                             <Button 
                                 onClick={() => window.location.href = '/dashboard'}
-                                className="bg-gradient-to-r from-blue-500 to-blue-600"
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white"
                             >
                                 Go to Dashboard
                             </Button>
@@ -926,8 +924,8 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                     {isMobile && (
                         <div className="flex items-center justify-between sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-10 py-3 px-4 -mx-4">
                             <div>
-                                <h1 className="text-xl font-bold">My Clearances</h1>
-                                <p className="text-xs text-gray-500">
+                                <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Clearances</h1>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     {stats.total_clearances} request{stats.total_clearances !== 1 ? 's' : ''} total
                                     {household && (
                                         <span className="block text-xs">
@@ -941,7 +939,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowStats(!showStats)}
-                                    className="h-8 px-2 rounded-lg"
+                                    className="h-8 px-2 rounded-lg border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                                 >
                                     {showStats ? (
                                         <ChevronUp className="h-4 w-4" />
@@ -953,15 +951,15 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowMobileFilters(true)}
-                                    className="h-8 px-2 rounded-lg relative"
+                                    className="h-8 px-2 rounded-lg relative border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                                 >
                                     <Filter className="h-4 w-4" />
                                     {hasActiveFilters && (
-                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 dark:bg-red-400 rounded-full animate-pulse" />
                                     )}
                                 </Button>
                                 <Link href="/portal/my-clearances/create">
-                                    <Button size="sm" className="h-8 px-3 bg-gradient-to-r from-blue-500 to-blue-600">
+                                    <Button size="sm" className="h-8 px-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
                                         <Plus className="h-4 w-4 mr-1" />
                                         Request
                                     </Button>
@@ -974,7 +972,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                     {!isMobile && (
                         <div className="flex items-center justify-between">
                             <div>
-                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                                     My Clearances
                                 </h1>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -991,7 +989,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                                     variant="outline"
                                     size="sm"
                                     onClick={handlePrint}
-                                    className="gap-2 rounded-xl"
+                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                                 >
                                     <Printer className="h-4 w-4" />
                                     Print
@@ -1001,13 +999,13 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                                     size="sm"
                                     onClick={handleExport}
                                     disabled={isExporting}
-                                    className="gap-2 rounded-xl"
+                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                                 >
                                     <Download className="h-4 w-4" />
                                     {isExporting ? 'Exporting...' : 'Export'}
                                 </Button>
                                 <Link href="/portal/my-clearances/create">
-                                    <Button className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl">
+                                    <Button className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl">
                                         <Plus className="h-4 w-4" />
                                         <span>New Request</span>
                                     </Button>
@@ -1174,7 +1172,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                         <Link href="/portal/my-clearances/create">
                             <Button 
                                 size="lg" 
-                                className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                                className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
                             >
                                 <Plus className="h-6 w-6" />
                             </Button>

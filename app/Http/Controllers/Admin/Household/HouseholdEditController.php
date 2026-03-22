@@ -7,62 +7,20 @@ use Inertia\Inertia;
 use App\Models\Household;
 use App\Models\Resident;
 use App\Models\Purok;
-use App\Models\Role;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
 
 class HouseholdEditController extends Controller
 {
     public function edit(Household $household)
     {
-        Log::info('Editing household', ['household_id' => $household->id]);
-        
         $currentMemberIds = $household->householdMembers()->pluck('resident_id')->toArray();
         
-        $heads = $this->getAvailableHeads($household);
-        $availableResidents = $this->getAvailableResidents($household);
-        $puroks = $this->getPuroks();
-        $currentMembers = $this->getCurrentMembers($household);
-        $roles = $this->getRoles();
-        
-        $householdPurok = $household->purok_id ? Purok::find($household->purok_id) : null;
-        
-        return Inertia::render('admin/Households/Edit', [
-            'household' => [
-                'id' => $household->id,
-                'household_number' => $household->household_number,
-                'contact_number' => $household->contact_number,
-                'email' => $household->email,
-                'address' => $household->address,
-                'purok_id' => $household->purok_id,
-                'purok_name' => $householdPurok?->name,
-                'member_count' => $household->member_count,
-                'income_range' => $household->income_range,
-                'housing_type' => $household->housing_type,
-                'ownership_status' => $household->ownership_status,
-                'water_source' => $household->water_source,
-                'electricity' => (bool) $household->electricity,
-                'internet' => (bool) $household->internet,
-                'vehicle' => (bool) $household->vehicle,
-                'remarks' => $household->remarks,
-                'status' => $household->status,
-                'created_at' => $household->created_at->toISOString(),
-                'updated_at' => $household->updated_at->toISOString(),
-            ],
-            'heads' => $heads,
-            'available_residents' => $availableResidents,
-            'puroks' => $puroks,
-            'current_members' => $currentMembers,
-            'roles' => $roles,
-        ]);
-    }
-
-    private function getAvailableHeads(Household $household)
-    {
-        return Resident::with('purok')
-            ->where(fn($q) => $q->whereDoesntHave('householdMemberships')
-                ->orWhereHas('householdMemberships', fn($q) => $q->where('household_id', $household->id)))
-            ->select(['id', 'first_name', 'last_name', 'middle_name', 'age', 'address', 'purok_id', 'photo_path'])
+        $heads = Resident::whereDoesntHave('householdMemberships', function($q) {
+                $q->where('is_head', true);
+            })
+            ->orWhereHas('householdMemberships', function($q) use ($household) {
+                $q->where('household_id', $household->id);
+            })
             ->get()
             ->map(fn($r) => [
                 'id' => $r->id,
@@ -74,16 +32,12 @@ class HouseholdEditController extends Controller
                 'purok_id' => $r->purok_id,
                 'purok_name' => $r->purok?->name,
                 'photo_url' => $r->photo_path ? Storage::url($r->photo_path) : null,
-            ])
-            ->values();
-    }
-
-    private function getAvailableResidents(Household $household)
-    {
-        return Resident::with('purok')
-            ->where(fn($q) => $q->whereDoesntHave('householdMemberships')
-                ->orWhereHas('householdMemberships', fn($q) => $q->where('household_id', $household->id)))
-            ->select(['id', 'first_name', 'last_name', 'middle_name', 'age', 'address', 'purok_id', 'photo_path'])
+            ]);
+        
+        $availableResidents = Resident::whereDoesntHave('householdMemberships')
+            ->orWhereHas('householdMemberships', function($q) use ($household) {
+                $q->where('household_id', $household->id);
+            })
             ->get()
             ->map(fn($r) => [
                 'id' => $r->id,
@@ -95,13 +49,11 @@ class HouseholdEditController extends Controller
                 'purok_id' => $r->purok_id,
                 'purok_name' => $r->purok?->name,
                 'photo_url' => $r->photo_path ? Storage::url($r->photo_path) : null,
-            ])
-            ->values();
-    }
-
-    private function getCurrentMembers(Household $household)
-    {
-        return $household->householdMembers()->with('resident.purok')->get()
+            ]);
+        
+        $puroks = Purok::active()->orderBy('name')->get(['id', 'name']);
+        
+        $currentMembers = $household->householdMembers()->with('resident.purok')->get()
             ->map(fn($m) => [
                 'id' => $m->resident_id,
                 'name' => trim($m->resident->first_name . ' ' . $m->resident->last_name),
@@ -116,18 +68,36 @@ class HouseholdEditController extends Controller
             ])
             ->values()
             ->toArray();
-    }
-
-    private function getPuroks()
-    {
-        return Purok::active()->orderBy('name')->get(['id', 'name'])->toArray();
-    }
-
-    private function getRoles()
-    {
-        return Role::where('name', 'like', '%household%')
-            ->orWhere('name', 'like', '%resident%')
-            ->select(['id', 'name', 'description'])
-            ->get();
+        
+        return Inertia::render('admin/Households/Edit', [
+            'household' => [
+                'id' => $household->id,
+                'household_number' => $household->household_number,
+                'contact_number' => $household->contact_number,
+                'email' => $household->email,
+                'address' => $household->address,
+                'purok_id' => $household->purok_id,
+                'purok_name' => $household->purok?->name,
+                'member_count' => $household->member_count,
+                'income_range' => $household->income_range,
+                'housing_type' => $household->housing_type,
+                'ownership_status' => $household->ownership_status,
+                'water_source' => $household->water_source,
+                'electricity' => (bool) $household->electricity,
+                'internet' => (bool) $household->internet,
+                'vehicle' => (bool) $household->vehicle,
+                'remarks' => $household->remarks,
+                'status' => $household->status,
+                'google_maps_url' => $household->google_maps_url,
+                'latitude' => $household->latitude,
+                'longitude' => $household->longitude,
+                'created_at' => $household->created_at?->toISOString(),
+                'updated_at' => $household->updated_at?->toISOString(),
+            ],
+            'heads' => $heads,
+            'available_residents' => $availableResidents,
+            'puroks' => $puroks,
+            'current_members' => $currentMembers,
+        ]);
     }
 }

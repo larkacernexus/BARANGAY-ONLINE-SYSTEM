@@ -15,7 +15,7 @@ export function DesktopHeader({ isMobile, hasDraft }: DesktopHeaderProps) {
         <div className="space-y-4 md:space-y-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Link href="/resident/clearances">
+                    <Link href="/portal/clearances">
                         <Button variant="ghost" size="sm" className="gap-2">
                             <ArrowLeft className="h-4 w-4" />
                             Back

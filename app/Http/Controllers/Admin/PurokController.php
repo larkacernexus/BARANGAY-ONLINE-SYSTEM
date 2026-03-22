@@ -100,18 +100,26 @@ class PurokController extends Controller
                 ->withInput();
         }
 
-        Purok::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'leader_name' => $request->leader_name,
-            'leader_contact' => $request->leader_contact,
-            'status' => $request->status,
-            'google_maps_url' => $request->google_maps_url,
-            'latitude' => $request->latitude,
-            'longitude' => $request->longitude,
-        ]);
+        $data = $request->all();
+        
+        // Handle empty google_maps_url
+        if (empty($data['google_maps_url'])) {
+            $data['google_maps_url'] = null;
+        }
+        
+        // Extract coordinates from URL if provided
+        if ($data['google_maps_url']) {
+            $coordinates = $this->extractCoordinatesFromUrl($data['google_maps_url']);
+            if ($coordinates) {
+                $data['latitude'] = $coordinates['lat'];
+                $data['longitude'] = $coordinates['lng'];
+                \Log::info('Coordinates extracted on create', $coordinates);
+            }
+        }
 
-        return redirect()->route('puroks.index')
+        Purok::create($data);
+
+        return redirect()->route('admin.puroks.index')
             ->with('success', 'Purok created successfully!');
     }
 
@@ -127,7 +135,7 @@ class PurokController extends Controller
         $householdsCount = $purok->households_count;
         $residentsCount = $purok->residents_count;
 
-        // Load households with pagination - FIXED: Properly load head of family
+        // Load households with pagination
         $householdsQuery = $purok->households()
             ->withCount(['householdMembers'])
             ->with(['householdMembers' => function ($query) {
@@ -187,9 +195,8 @@ class PurokController extends Controller
             ]
         ];
 
-        // Transform households for the view - FIXED: Get head_of_family from relationship
+        // Transform households for the view - ADD LATITUDE AND LONGITUDE
         $householdsData = $households->through(function ($household) {
-            // Get head of family from householdMembers relationship
             $headMember = $household->householdMembers->firstWhere('is_head', true);
             $headOfFamily = 'No head assigned';
             
@@ -205,6 +212,12 @@ class PurokController extends Controller
                 'address' => $household->address,
                 'contact_number' => $household->contact_number,
                 'created_at' => $household->created_at,
+                // ADD COORDINATES FOR MAP
+                'latitude' => $household->latitude,
+                'longitude' => $household->longitude,
+                'head_of_household' => $headMember && $headMember->resident ? [
+                    'full_name' => $headMember->resident->full_name,
+                ] : null,
             ];
         });
 
@@ -242,7 +255,6 @@ class PurokController extends Controller
             ],
             'stats' => $stats,
             'recentHouseholds' => $recentHouseholds->map(function ($household) {
-                // Get head of family from householdMembers relationship
                 $headMember = $household->householdMembers->firstWhere('is_head', true);
                 $headOfFamily = 'No head assigned';
                 
@@ -337,22 +349,30 @@ class PurokController extends Controller
                 ->withInput();
         }
 
-        // If changing status to inactive and purok has active records, show warning
-        if ($request->status === 'inactive' && $purok->status === 'active') {
-            $activeHouseholds = $purok->households()->where('status', 'active')->count();
-            $activeResidents = $purok->residents()->where('status', 'active')->count();
-            
-            if ($activeHouseholds > 0 || $activeResidents > 0) {
-                return redirect()->back()
-                    ->with('warning', "This purok has $activeHouseholds active households and $activeResidents active residents. Changing status to inactive may affect these records.")
-                    ->withInput();
-            }
-        }
-
-        // Handle google_maps_url data (allow empty string)
         $data = $request->all();
+        
+        // Handle empty google_maps_url
         if (empty($data['google_maps_url'])) {
             $data['google_maps_url'] = null;
+        }
+        
+        // If URL changed or is new, extract coordinates
+        if ($data['google_maps_url'] && $data['google_maps_url'] !== $purok->google_maps_url) {
+            $coordinates = $this->extractCoordinatesFromUrl($data['google_maps_url']);
+            
+            if ($coordinates) {
+                $data['latitude'] = $coordinates['lat'];
+                $data['longitude'] = $coordinates['lng'];
+                \Log::info('Coordinates extracted successfully', [
+                    'url' => $data['google_maps_url'],
+                    'lat' => $coordinates['lat'],
+                    'lng' => $coordinates['lng']
+                ]);
+            } else {
+                \Log::warning('Could not extract coordinates from URL', ['url' => $data['google_maps_url']]);
+                $data['latitude'] = null;
+                $data['longitude'] = null;
+            }
         }
 
         $purok->update($data);
@@ -374,7 +394,7 @@ class PurokController extends Controller
 
         $purok->delete();
 
-        return redirect()->route('puroks.index')
+        return redirect()->route('admin.puroks.index')
             ->with('success', 'Purok deleted successfully!');
     }
 
@@ -389,7 +409,7 @@ class PurokController extends Controller
             $purok->updateStatistics();
         }
 
-        return redirect()->route('puroks.index')
+        return redirect()->route('admin.puroks.index')
             ->with('success', 'Purok statistics updated successfully!');
     }
 
@@ -404,5 +424,120 @@ class PurokController extends Controller
             ->get();
 
         return response()->json($puroks);
+    }
+
+    /**
+     * Extract latitude and longitude from Google Maps URL
+     */
+    private function extractCoordinatesFromUrl($url)
+    {
+        if (!$url) {
+            return null;
+        }
+
+        try {
+            // Handle Google Maps short URLs (maps.app.goo.gl)
+            if (strpos($url, 'maps.app.goo.gl') !== false) {
+                return $this->extractFromShortUrl($url);
+            }
+            
+            // Try to parse coordinates from URL with @ symbol
+            if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches)) {
+                return [
+                    'lat' => (float) $matches[1],
+                    'lng' => (float) $matches[2]
+                ];
+            }
+            
+            // Try to parse from query parameter q=
+            if (preg_match('/[?&]q=([^&]+)/', $url, $matches)) {
+                $query = urldecode($matches[1]);
+                if (preg_match('/(-?\d+\.\d+),(-?\d+\.\d+)/', $query, $coordMatches)) {
+                    return [
+                        'lat' => (float) $coordMatches[1],
+                        'lng' => (float) $coordMatches[2]
+                    ];
+                }
+            }
+            
+            return null;
+            
+        } catch (\Exception $e) {
+            \Log::error('Error extracting coordinates', [
+                'url' => $url,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Extract coordinates from Google Maps short URL using cURL
+     */
+    private function extractFromShortUrl($shortUrl)
+    {
+        try {
+            // Initialize cURL to follow redirects
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $shortUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
+            curl_setopt($ch, CURLOPT_HEADER, true);
+            curl_setopt($ch, CURLOPT_NOBODY, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+            
+            $response = curl_exec($ch);
+            $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            \Log::info('cURL resolved short URL', [
+                'original' => $shortUrl,
+                'resolved' => $finalUrl,
+                'http_code' => $httpCode
+            ]);
+            
+            if (!$finalUrl) {
+                return null;
+            }
+            
+            // Extract coordinates from the resolved URL
+            // Pattern: @lat,lng
+            if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $finalUrl, $matches)) {
+                return [
+                    'lat' => (float) $matches[1],
+                    'lng' => (float) $matches[2]
+                ];
+            }
+            
+            // Pattern: q=lat,lng
+            if (preg_match('/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/', $finalUrl, $matches)) {
+                return [
+                    'lat' => (float) $matches[1],
+                    'lng' => (float) $matches[2]
+                ];
+            }
+            
+            // Pattern: /lat,lng/ in path
+            if (preg_match('/(\d+\.\d+),(\d+\.\d+)/', $finalUrl, $matches)) {
+                return [
+                    'lat' => (float) $matches[1],
+                    'lng' => (float) $matches[2]
+                ];
+            }
+            
+            return null;
+            
+        } catch (\Exception $e) {
+            \Log::error('cURL failed to resolve short URL', [
+                'url' => $shortUrl,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
     }
 }

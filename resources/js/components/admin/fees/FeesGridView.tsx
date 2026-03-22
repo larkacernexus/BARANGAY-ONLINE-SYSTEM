@@ -2,6 +2,13 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
@@ -30,10 +37,14 @@ import {
     Phone,
     MapPin,
     Hash,
-    Info
+    Info,
+    MoreVertical,
+    Square,
+    CheckSquare,
+    Printer
 } from 'lucide-react';
 import { Fee } from '@/types/fees.types';
-import { format, isAfter } from 'date-fns';
+import { format, isAfter, isValid, parseISO } from 'date-fns';
 
 interface FeesGridViewProps {
     fees: Fee[];
@@ -52,18 +63,49 @@ interface FeesGridViewProps {
     categories?: Record<string, string>;
 }
 
-const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'MMM dd, yyyy');
+// Safe date formatting functions
+const safeFormatDate = (dateString: string | null | undefined, formatStr: string = 'MMM dd, yyyy'): string => {
+    if (!dateString) return 'N/A';
+    try {
+        const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
+        if (!isValid(date)) return 'Invalid date';
+        return format(date, formatStr);
+    } catch (error) {
+        return 'Invalid date';
+    }
 };
 
-const formatDateTime = (dateString: string) => {
-    return format(new Date(dateString), 'MMM dd, yyyy h:mm a');
+const formatDate = (dateString: string | null | undefined): string => {
+    return safeFormatDate(dateString, 'MMM dd, yyyy');
 };
 
-const isOverdue = (dueDate: string) => {
-    const due = new Date(dueDate);
-    const today = new Date();
-    return isAfter(today, due);
+const formatDateTime = (dateString: string | null | undefined): string => {
+    return safeFormatDate(dateString, 'MMM dd, yyyy h:mm a');
+};
+
+const isOverdue = (dueDate: string | null | undefined): boolean => {
+    if (!dueDate) return false;
+    try {
+        const due = new Date(dueDate);
+        const today = new Date();
+        return isValid(due) && isAfter(today, due);
+    } catch {
+        return false;
+    }
+};
+
+const getDaysOverdue = (dueDate: string | null | undefined): number => {
+    if (!dueDate) return 0;
+    try {
+        const due = new Date(dueDate);
+        const today = new Date();
+        if (!isValid(due)) return 0;
+        const diffTime = today.getTime() - due.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays > 0 ? diffDays : 0;
+    } catch {
+        return 0;
+    }
 };
 
 const getPayerIcon = (payerType: string) => {
@@ -72,6 +114,17 @@ const getPayerIcon = (payerType: string) => {
         case 'household': return <Home className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />;
         case 'business': return <Building className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />;
         default: return <User className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />;
+    }
+};
+
+const getStatusIcon = (status: string) => {
+    switch (status) {
+        case 'paid': return <CheckCircle className="h-4 w-4 text-green-500" />;
+        case 'issued': return <FileText className="h-4 w-4 text-blue-500" />;
+        case 'pending': return <Clock className="h-4 w-4 text-amber-500" />;
+        case 'partially_paid': return <CreditCard className="h-4 w-4 text-indigo-500" />;
+        case 'overdue': return <AlertCircle className="h-4 w-4 text-red-500" />;
+        default: return null;
     }
 };
 
@@ -165,6 +218,26 @@ export default function FeesGridView({
         }
     };
 
+    const handlePaymentClick = (fee: Fee, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        router.get(route('admin.payments.create', { 
+            fee_id: fee.id,
+            payer_type: fee.payer_type,
+            payer_id: fee.payer_type === 'resident' ? fee.resident_id : fee.household_id,
+            payer_name: fee.payer_name,
+            contact_number: fee.contact_number,
+            address: fee.address,
+            purok: fee.purok,
+            fee_code: fee.fee_code,
+            balance: fee.balance
+        }));
+    };
+
+    const handlePrint = (fee: Fee, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        window.open(`/admin/fees/${fee.id}/print`, '_blank');
+    };
+
     const emptyState = (
         <EmptyState
             title="No fees found"
@@ -191,7 +264,8 @@ export default function FeesGridView({
                 const isSelected = selectedFees.includes(fee.id);
                 const isExpanded = expandedCards.has(fee.id);
                 const isFeeOverdue = isOverdue(fee.due_date) && fee.status !== 'paid';
-                const isMobile = window.innerWidth < 768;
+                const daysOverdue = getDaysOverdue(fee.due_date);
+                const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
                 const isCompactView = isMobile;
                 
                 // Truncation lengths based on view
@@ -224,9 +298,94 @@ export default function FeesGridView({
                             </div>
                         )}
 
+                        {/* Dropdown Menu - 3 dots */}
+                        <div className="absolute top-2 right-2 z-20">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button 
+                                        variant="ghost" 
+                                        className="h-7 w-7 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem onClick={(e) => handleViewClick(fee, e)}>
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        View Details
+                                    </DropdownMenuItem>
+                                    
+                                    {(fee.status === 'pending' || fee.status === 'issued') && (
+                                        <DropdownMenuItem onClick={(e) => handleEditClick(fee, e)}>
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            Edit Fee
+                                        </DropdownMenuItem>
+                                    )}
+                                    
+                                    <DropdownMenuSeparator />
+                                    
+                                    <DropdownMenuItem onClick={(e) => handleCopyFeeCode(fee, e)}>
+                                        <Copy className="mr-2 h-4 w-4" />
+                                        Copy Fee Code
+                                    </DropdownMenuItem>
+                                    
+                                    <DropdownMenuItem onClick={(e) => handlePrint(fee, e)}>
+                                        <Printer className="mr-2 h-4 w-4" />
+                                        Print Invoice
+                                    </DropdownMenuItem>
+                                    
+                                    {fee.status !== 'paid' && fee.balance > 0 && (
+                                        <DropdownMenuItem onClick={(e) => handlePaymentClick(fee, e)}>
+                                            <CreditCard className="mr-2 h-4 w-4" />
+                                            Pay Fee
+                                        </DropdownMenuItem>
+                                    )}
+                                    
+                                    {isBulkMode && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                onItemSelect(fee.id);
+                                            }}>
+                                                {isSelected ? (
+                                                    <>
+                                                        <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
+                                                        <span className="text-green-600">Deselect</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Square className="mr-2 h-4 w-4" />
+                                                        Select for Bulk
+                                                    </>
+                                                )}
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                    
+                                    {fee.status === 'pending' && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onDelete(fee);
+                                                }}
+                                                className="text-red-600"
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Delete Fee
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+
                         <CardContent className={`p-3 ${isCompactView && !isExpanded ? 'pb-1' : ''} bg-white dark:bg-gray-900`}>
                             {/* Header row with icon and fee code */}
-                            <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-start justify-between mb-2 pr-6">
                                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                     <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex-shrink-0">
                                         <DollarSign className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
@@ -249,7 +408,7 @@ export default function FeesGridView({
                                         variant="outline" 
                                         className={`text-[10px] px-1.5 py-0 h-4 border ${getStatusColorClass(fee.status, isFeeOverdue)}`}
                                     >
-                                        {isFeeOverdue ? 'Overdue' : 
+                                        {isFeeOverdue ? `Overdue (${daysOverdue}d)` : 
                                          fee.status === 'paid' ? 'Paid' :
                                          fee.status === 'pending' ? 'Pending' :
                                          fee.status === 'partial' ? 'Partial' : fee.status}
@@ -259,7 +418,7 @@ export default function FeesGridView({
                             
                             {/* Fee Type/Payer Name - always visible */}
                             <h3 
-                                className="font-semibold text-sm mb-1.5 line-clamp-2 text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-200"
+                                className="font-semibold text-sm mb-1.5 line-clamp-2 text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-200 pr-6"
                                 title={fee.fee_type?.name || 'Fee Assessment'}
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -275,8 +434,8 @@ export default function FeesGridView({
                                 <div className="flex items-center gap-1.5">
                                     {getPayerIcon(fee.payer_type)}
                                     <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
-                                        {fee.payer_name.substring(0, nameLength)}
-                                        {fee.payer_name.length > nameLength ? '...' : ''}
+                                        {fee.payer_name ? fee.payer_name.substring(0, nameLength) : 'N/A'}
+                                        {fee.payer_name && fee.payer_name.length > nameLength ? '...' : ''}
                                     </span>
                                 </div>
                                 
@@ -308,7 +467,7 @@ export default function FeesGridView({
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-gray-500 dark:text-gray-400">Total:</span>
                                     <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                        {formatCurrency(fee.total_amount)}
+                                        {formatCurrency(fee.total_amount || 0)}
                                     </span>
                                 </div>
                                 
@@ -316,7 +475,7 @@ export default function FeesGridView({
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-gray-500 dark:text-gray-400">Balance:</span>
                                         <span className="text-xs font-medium text-red-600 dark:text-red-400">
-                                            {formatCurrency(fee.balance)}
+                                            {formatCurrency(fee.balance || 0)}
                                         </span>
                                     </div>
                                 )}
@@ -325,7 +484,7 @@ export default function FeesGridView({
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-gray-500 dark:text-gray-400">Paid:</span>
                                         <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                                            {formatCurrency(fee.amount_paid)}
+                                            {formatCurrency(fee.amount_paid || 0)}
                                         </span>
                                     </div>
                                 )}
@@ -351,6 +510,17 @@ export default function FeesGridView({
                             {/* Expanded Details */}
                             {isExpanded && (
                                 <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-2 animate-in fade-in-50">
+                                    {/* Fee Type Category */}
+                                    {fee.fee_type?.category && (
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <Hash className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                            <span className="text-gray-600 dark:text-gray-400">Category:</span>
+                                            <span className="text-gray-900 dark:text-white">
+                                                {categories[fee.fee_type.category] || fee.fee_type.category}
+                                            </span>
+                                        </div>
+                                    )}
+
                                     {/* Contact Information */}
                                     {fee.contact_number && (
                                         <div className="flex items-center gap-1.5 text-xs">
@@ -378,32 +548,23 @@ export default function FeesGridView({
                                         </div>
                                     )}
 
-                                    {/* Fee Type Details */}
-                                    {fee.fee_type && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <Hash className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                            <span className="text-gray-600 dark:text-gray-400">Category:</span>
-                                            <span className="text-gray-900 dark:text-white">{fee.fee_type.category || 'General'}</span>
-                                        </div>
-                                    )}
-
                                     {/* Payment Details */}
                                     <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                                         <div>
                                             <span className="text-gray-600 dark:text-gray-400">Total:</span>
-                                            <span className="text-gray-900 dark:text-white ml-1 font-medium">{formatCurrency(fee.total_amount)}</span>
+                                            <span className="text-gray-900 dark:text-white ml-1 font-medium">{formatCurrency(fee.total_amount || 0)}</span>
                                         </div>
                                         <div>
                                             <span className="text-gray-600 dark:text-gray-400">Paid:</span>
-                                            <span className="text-green-600 dark:text-green-400 ml-1 font-medium">{formatCurrency(fee.amount_paid)}</span>
+                                            <span className="text-green-600 dark:text-green-400 ml-1 font-medium">{formatCurrency(fee.amount_paid || 0)}</span>
                                         </div>
                                         <div>
                                             <span className="text-gray-600 dark:text-gray-400">Balance:</span>
-                                            <span className="text-red-600 dark:text-red-400 ml-1 font-medium">{formatCurrency(fee.balance)}</span>
+                                            <span className="text-red-600 dark:text-red-400 ml-1 font-medium">{formatCurrency(fee.balance || 0)}</span>
                                         </div>
                                         <div>
                                             <span className="text-gray-600 dark:text-gray-400">Status:</span>
-                                            <span className="text-gray-900 dark:text-white ml-1 capitalize">{fee.status}</span>
+                                            <span className="text-gray-900 dark:text-white ml-1 capitalize">{fee.status || 'N/A'}</span>
                                         </div>
                                     </div>
 
@@ -427,17 +588,7 @@ export default function FeesGridView({
                                                 className="w-full h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    router.get(route('admin.payments.create', { 
-                                                        fee_id: fee.id,
-                                                        payer_type: fee.payer_type,
-                                                        payer_id: fee.payer_type === 'resident' ? fee.resident_id : fee.household_id,
-                                                        payer_name: fee.payer_name,
-                                                        contact_number: fee.contact_number,
-                                                        address: fee.address,
-                                                        purok: fee.purok,
-                                                        fee_code: fee.fee_code,
-                                                        balance: fee.balance
-                                                    }));
+                                                    handlePaymentClick(fee, e);
                                                 }}
                                             >
                                                 <CreditCard className="h-3 w-3 mr-1" />
@@ -470,7 +621,7 @@ export default function FeesGridView({
                             )}
                         </CardContent>
 
-                        {/* Footer Actions */}
+                        {/* Footer Actions - Keep as quick action buttons */}
                         <CardFooter className={`px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 ${isCompactView ? 'py-1.5' : ''}`}>
                             <div className="flex items-center justify-between w-full">
                                 <div className="flex items-center gap-0.5">
@@ -492,21 +643,23 @@ export default function FeesGridView({
                                     </Tooltip>
 
                                     {/* Edit */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                onClick={(e) => handleEditClick(fee, e)}
-                                            >
-                                                <Edit className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">Edit</p>
-                                        </TooltipContent>
-                                    </Tooltip>
+                                    {(fee.status === 'pending' || fee.status === 'issued') && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
+                                                    onClick={(e) => handleEditClick(fee, e)}
+                                                >
+                                                    <Edit className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
+                                                <p className="text-xs">Edit</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    )}
 
                                     {/* Pay - for unpaid fees */}
                                     {fee.status !== 'paid' && fee.balance > 0 && (
@@ -516,20 +669,7 @@ export default function FeesGridView({
                                                     variant="ghost"
                                                     size="sm"
                                                     className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-950`}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        router.get(route('admin.payments.create', { 
-                                                            fee_id: fee.id,
-                                                            payer_type: fee.payer_type,
-                                                            payer_id: fee.payer_type === 'resident' ? fee.resident_id : fee.household_id,
-                                                            payer_name: fee.payer_name,
-                                                            contact_number: fee.contact_number,
-                                                            address: fee.address,
-                                                            purok: fee.purok,
-                                                            fee_code: fee.fee_code,
-                                                            balance: fee.balance
-                                                        }));
-                                                    }}
+                                                    onClick={(e) => handlePaymentClick(fee, e)}
                                                 >
                                                     <CreditCard className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
                                                 </Button>
@@ -547,10 +687,7 @@ export default function FeesGridView({
                                                 variant="ghost"
                                                 size="sm"
                                                 className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    window.location.href = `/admin/fees/${fee.id}/print`;
-                                                }}
+                                                onClick={(e) => handlePrint(fee, e)}
                                             >
                                                 <Receipt className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
                                             </Button>
@@ -578,25 +715,27 @@ export default function FeesGridView({
                                     </Tooltip>
                                 </div>
 
-                                {/* Delete button */}
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950`}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onDelete(fee);
-                                            }}
-                                        >
-                                            <Trash2 className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                        <p className="text-xs">Delete</p>
-                                    </TooltipContent>
-                                </Tooltip>
+                                {/* Delete button - only show if pending */}
+                                {fee.status === 'pending' && (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onDelete(fee);
+                                                }}
+                                            >
+                                                <Trash2 className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
+                                            <p className="text-xs">Delete</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
                             </div>
                         </CardFooter>
                     </Card>

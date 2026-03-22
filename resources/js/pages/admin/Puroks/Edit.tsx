@@ -9,27 +9,21 @@ import {
     ArrowLeft,
     Save,
     MapPin,
-    Calendar,
     Users,
     Home,
     AlertCircle,
-    ExternalLink
+    ExternalLink,
+    Globe,
+    User,
+    Phone,
+    CheckCircle,
+    XCircle
 } from 'lucide-react';
-import { Link, useForm, usePage } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { Link, useForm } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-interface PurokFormData {
-    name: string;
-    description: string;
-    leader_name: string;
-    leader_contact: string;
-    status: string;
-    google_maps_url?: string;
-}
-
-interface EditPurokProps extends PageProps {
+interface EditPurokProps {
     purok: {
         id: number;
         name: string;
@@ -38,6 +32,8 @@ interface EditPurokProps extends PageProps {
         leader_contact?: string;
         status: string;
         google_maps_url?: string;
+        latitude?: number | null;
+        longitude?: number | null;
         created_at: string;
         updated_at: string;
         households_count?: number;
@@ -46,13 +42,15 @@ interface EditPurokProps extends PageProps {
 }
 
 export default function EditPurok({ purok }: EditPurokProps) {
-    const { data, setData, put, processing, errors, delete: deletePurok } = useForm<PurokFormData>({
+    const { data, setData, put, processing, errors, delete: deletePurok } = useForm({
         name: purok.name,
         description: purok.description || '',
         leader_name: purok.leader_name || '',
         leader_contact: purok.leader_contact || '',
         status: purok.status,
         google_maps_url: purok.google_maps_url || '',
+        latitude: purok.latitude?.toString() || '',
+        longitude: purok.longitude?.toString() || '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -88,7 +86,7 @@ export default function EditPurok({ purok }: EditPurokProps) {
                 { title: 'Dashboard', href: '/dashboard' },
                 { title: 'Puroks', href: '/admin/puroks' },
                 { title: purok.name, href: `/admin/puroks/${purok.id}` },
-                { title: 'Edit Purok', href: `/admin/puroks/${purok.id}/edit` }
+                { title: 'Edit', href: `/admin/puroks/${purok.id}/edit` }
             ]}
         >
             <form onSubmit={handleSubmit}>
@@ -113,27 +111,17 @@ export default function EditPurok({ purok }: EditPurokProps) {
                                     </Badge>
                                 </div>
                                 <p className="text-gray-500 dark:text-gray-400">
-                                    Purok ID: {purok.id} • Last updated: {formatDate(purok.updated_at)}
+                                    ID: #{purok.id} • Last updated: {formatDate(purok.updated_at)}
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Button 
-                                variant="destructive" 
-                                type="button"
-                                onClick={handleDelete}
-                                className="dark:bg-red-900 dark:hover:bg-red-800"
-                            >
-                                Delete Purok
-                            </Button>
-                            <Button type="submit" disabled={processing} className="dark:bg-blue-600 dark:hover:bg-blue-700">
-                                <Save className="h-4 w-4 mr-2" />
-                                {processing ? 'Saving...' : 'Update Purok'}
-                            </Button>
-                        </div>
+                        <Button type="submit" disabled={processing} className="dark:bg-blue-600 dark:hover:bg-blue-700">
+                            <Save className="h-4 w-4 mr-2" />
+                            {processing ? 'Saving...' : 'Update Purok'}
+                        </Button>
                     </div>
 
-                    {/* Warning for active purok */}
+                    {/* Warning for active purok with data */}
                     {purok.status === 'active' && (purok.households_count || 0) > 0 && (
                         <Alert className="dark:bg-yellow-950 dark:border-yellow-800">
                             <AlertCircle className="h-4 w-4 dark:text-yellow-400" />
@@ -183,9 +171,6 @@ export default function EditPurok({ purok }: EditPurokProps) {
                                         {errors.name && (
                                             <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                                         )}
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Unique name for this purok/zone
-                                        </p>
                                     </div>
 
                                     <div className="space-y-2">
@@ -213,25 +198,35 @@ export default function EditPurok({ purok }: EditPurokProps) {
                                                 <SelectValue placeholder="Select status" />
                                             </SelectTrigger>
                                             <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                <SelectItem value="active" className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">Active</SelectItem>
-                                                <SelectItem value="inactive" className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">Inactive</SelectItem>
+                                                <SelectItem value="active" className="dark:text-white">
+                                                    <div className="flex items-center gap-2">
+                                                        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                                        Active
+                                                    </div>
+                                                </SelectItem>
+                                                <SelectItem value="inactive" className="dark:text-white">
+                                                    <div className="flex items-center gap-2">
+                                                        <XCircle className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                                                        Inactive
+                                                    </div>
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
                                         {errors.status && (
                                             <p className="text-sm text-red-600 dark:text-red-400">{errors.status}</p>
                                         )}
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Inactive puroks won't appear in dropdowns for new records
-                                        </p>
                                     </div>
                                 </CardContent>
                             </Card>
 
                             <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="dark:text-white">Purok Leader</CardTitle>
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
+                                        <User className="h-5 w-5" />
+                                        Purok Leader
+                                    </CardTitle>
                                     <CardDescription className="dark:text-gray-400">
-                                        Update the leader information for this purok
+                                        Update the leader information for this purok (optional)
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
@@ -251,13 +246,16 @@ export default function EditPurok({ purok }: EditPurokProps) {
 
                                     <div className="space-y-2">
                                         <Label htmlFor="leader_contact" className="dark:text-gray-300">Contact Number</Label>
-                                        <Input 
-                                            id="leader_contact" 
-                                            placeholder="09123456789"
-                                            value={data.leader_contact}
-                                            onChange={(e) => setData('leader_contact', e.target.value)}
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                                        />
+                                        <div className="relative">
+                                            <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                            <Input 
+                                                id="leader_contact" 
+                                                placeholder="09123456789"
+                                                value={data.leader_contact}
+                                                onChange={(e) => setData('leader_contact', e.target.value)}
+                                                className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                            />
+                                        </div>
                                         {errors.leader_contact && (
                                             <p className="text-sm text-red-600 dark:text-red-400">{errors.leader_contact}</p>
                                         )}
@@ -267,9 +265,12 @@ export default function EditPurok({ purok }: EditPurokProps) {
 
                             <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="dark:text-white">Google Maps Location</CardTitle>
+                                    <CardTitle className="flex items-center gap-2 dark:text-white">
+                                        <Globe className="h-5 w-5" />
+                                        Google Maps Location
+                                    </CardTitle>
                                     <CardDescription className="dark:text-gray-400">
-                                        Update the Google Maps link for this purok
+                                        Paste any Google Maps link - coordinates will be extracted automatically
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
@@ -278,17 +279,13 @@ export default function EditPurok({ purok }: EditPurokProps) {
                                         <div className="flex gap-2">
                                             <Input 
                                                 id="google_maps_url" 
-                                                placeholder="https://www.google.com/maps?q=14.5995,120.9842"
+                                                placeholder="https://maps.app.goo.gl/..."
                                                 value={data.google_maps_url}
                                                 onChange={(e) => setData('google_maps_url', e.target.value)}
                                                 className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                             />
                                             {data.google_maps_url && (
-                                                <a 
-                                                    href={data.google_maps_url} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                >
+                                                <a href={data.google_maps_url} target="_blank" rel="noopener noreferrer">
                                                     <Button type="button" variant="outline" size="icon" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
                                                         <ExternalLink className="h-4 w-4" />
                                                     </Button>
@@ -299,8 +296,45 @@ export default function EditPurok({ purok }: EditPurokProps) {
                                             <p className="text-sm text-red-600 dark:text-red-400">{errors.google_maps_url}</p>
                                         )}
                                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Go to Google Maps, pin the purok location, click "Share" and copy the link here
+                                            Paste any Google Maps link (short or long). When you save, coordinates will be automatically extracted.
                                         </p>
+                                    </div>
+
+                                    {/* Hidden fields for coordinates */}
+                                    <input type="hidden" name="latitude" value={data.latitude} />
+                                    <input type="hidden" name="longitude" value={data.longitude} />
+
+                                    {/* Show current coordinates if available */}
+                                    {(purok.latitude || purok.longitude) && (
+                                        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Current Coordinates:</p>
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div>
+                                                    <span className="text-gray-500 dark:text-gray-400">Latitude:</span>
+                                                    <code className="ml-2 text-gray-700 dark:text-gray-300 font-mono">
+                                                        {purok.latitude?.toFixed(6) || 'N/A'}
+                                                    </code>
+                                                </div>
+                                                <div>
+                                                    <span className="text-gray-500 dark:text-gray-400">Longitude:</span>
+                                                    <code className="ml-2 text-gray-700 dark:text-gray-300 font-mono">
+                                                        {purok.longitude?.toFixed(6) || 'N/A'}
+                                                    </code>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                                                These coordinates were automatically extracted from your Google Maps link.
+                                                If you change the link, new coordinates will be extracted on save.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800">
+                                        <p>💡 <strong>How it works:</strong></p>
+                                        <p>1. Paste any Google Maps share link (short or long)</p>
+                                        <p>2. Click Save</p>
+                                        <p>3. The system automatically extracts the coordinates</p>
+                                        <p>4. The map will show the exact pinned location</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -331,10 +365,6 @@ export default function EditPurok({ purok }: EditPurokProps) {
                                             <span className="text-gray-500 dark:text-gray-400">Created:</span>
                                             <span className="text-sm dark:text-gray-300">{formatDate(purok.created_at)}</span>
                                         </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-gray-500 dark:text-gray-400">Last Updated:</span>
-                                            <span className="text-sm dark:text-gray-300">{formatDate(purok.updated_at)}</span>
-                                        </div>
                                         
                                         <div className="border-t dark:border-gray-700 pt-4">
                                             <div className="space-y-3">
@@ -343,12 +373,7 @@ export default function EditPurok({ purok }: EditPurokProps) {
                                                         <Home className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                         <span className="text-gray-500 dark:text-gray-400">Households:</span>
                                                     </div>
-                                                    <Link 
-                                                        href={`/households?purok=${encodeURIComponent(purok.name)}`}
-                                                        className="font-bold text-blue-600 hover:underline dark:text-blue-400"
-                                                    >
-                                                        {purok.households_count || 0}
-                                                    </Link>
+                                                    <span className="font-bold dark:text-white">{purok.households_count || 0}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
@@ -365,100 +390,29 @@ export default function EditPurok({ purok }: EditPurokProps) {
 
                             <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
-                                    <CardTitle className="dark:text-white">Current Map Location</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2">
-                                        <div className="text-sm text-gray-500 dark:text-gray-400">Current Google Maps link:</div>
-                                        {purok.google_maps_url ? (
-                                            <div className="space-y-2">
-                                                <div className="text-xs break-all bg-gray-50 p-3 rounded border dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                    {purok.google_maps_url}
-                                                </div>
-                                                <a 
-                                                    href={purok.google_maps_url} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm dark:text-blue-400"
-                                                >
-                                                    <ExternalLink className="h-3 w-3" />
-                                                    Open in Google Maps
-                                                </a>
-                                            </div>
-                                        ) : (
-                                            <div className="text-sm text-gray-500 italic dark:text-gray-400">
-                                                No Google Maps link set
-                                            </div>
-                                        )}
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Update in the textbox on the left
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
                                     <CardTitle className="dark:text-white">Quick Actions</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
                                     <Link href={`/households/create?purok=${encodeURIComponent(purok.name)}`}>
                                         <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
+                                            <Home className="h-4 w-4 mr-2" />
                                             Add Household
                                         </Button>
                                     </Link>
                                     <Link href={`/residents/create?purok=${encodeURIComponent(purok.name)}`}>
                                         <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
+                                            <Users className="h-4 w-4 mr-2" />
                                             Add Resident
                                         </Button>
                                     </Link>
-                                    <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
-                                        Export Purok Data
+                                    <Button 
+                                        variant="destructive" 
+                                        type="button"
+                                        onClick={handleDelete}
+                                        className="w-full justify-start dark:bg-red-900 dark:hover:bg-red-800"
+                                    >
+                                        Delete Purok
                                     </Button>
-                                    <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
-                                        View Activity Log
-                                    </Button>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="dark:text-white">Form Status</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2 text-sm">
-                                        <div className={`flex items-center justify-between ${data.name !== purok.name ? 'text-blue-600 dark:text-blue-400' : 'dark:text-gray-300'}`}>
-                                            <span>Name changed:</span>
-                                            <span>{data.name !== purok.name ? 'Yes' : 'No'}</span>
-                                        </div>
-                                        <div className={`flex items-center justify-between ${data.status !== purok.status ? 'text-blue-600 dark:text-blue-400' : 'dark:text-gray-300'}`}>
-                                            <span>Status changed:</span>
-                                            <span>{data.status !== purok.status ? 'Yes' : 'No'}</span>
-                                        </div>
-                                        <div className={`flex items-center justify-between ${data.leader_name !== (purok.leader_name || '') ? 'text-blue-600 dark:text-blue-400' : 'dark:text-gray-300'}`}>
-                                            <span>Leader changed:</span>
-                                            <span>{data.leader_name !== (purok.leader_name || '') ? 'Yes' : 'No'}</span>
-                                        </div>
-                                        <div className={`flex items-center justify-between ${data.google_maps_url !== (purok.google_maps_url || '') ? 'text-blue-600 dark:text-blue-400' : 'dark:text-gray-300'}`}>
-                                            <span>Google Maps changed:</span>
-                                            <span>{data.google_maps_url !== (purok.google_maps_url || '') ? 'Yes' : 'No'}</span>
-                                        </div>
-                                        <div className="border-t dark:border-gray-700 pt-2 mt-2">
-                                            <div className="flex items-center justify-between font-medium">
-                                                <span className="dark:text-gray-300">Total changes:</span>
-                                                <span className="dark:text-white">
-                                                    {[
-                                                        data.name !== purok.name,
-                                                        data.description !== (purok.description || ''),
-                                                        data.leader_name !== (purok.leader_name || ''),
-                                                        data.leader_contact !== (purok.leader_contact || ''),
-                                                        data.status !== purok.status,
-                                                        data.google_maps_url !== (purok.google_maps_url || '')
-                                                    ].filter(Boolean).length}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </CardContent>
                             </Card>
                         </div>
@@ -466,17 +420,16 @@ export default function EditPurok({ purok }: EditPurokProps) {
 
                     {/* Form Actions */}
                     <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
+                        <Link href={`/admin/puroks/${purok.id}`}>
+                            <Button variant="ghost" type="button" className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700">
+                                Cancel
+                            </Button>
+                        </Link>
                         <div className="flex items-center gap-2">
-                            <Link href={`/admin/puroks/${purok.id}`}>
-                                <Button variant="ghost" type="button" className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700">
-                                    Cancel
-                                </Button>
-                            </Link>
                             <Button 
                                 variant="outline" 
                                 type="button"
                                 onClick={() => {
-                                    // Reset form to original values
                                     setData({
                                         name: purok.name,
                                         description: purok.description || '',
@@ -484,21 +437,13 @@ export default function EditPurok({ purok }: EditPurokProps) {
                                         leader_contact: purok.leader_contact || '',
                                         status: purok.status,
                                         google_maps_url: purok.google_maps_url || '',
+                                        latitude: purok.latitude?.toString() || '',
+                                        longitude: purok.longitude?.toString() || '',
                                     });
                                 }}
                                 className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                             >
                                 Reset Changes
-                            </Button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button 
-                                variant="outline" 
-                                type="button"
-                                onClick={handleDelete}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20 dark:border-gray-600"
-                            >
-                                Delete Purok
                             </Button>
                             <Button type="submit" disabled={processing} className="dark:bg-blue-600 dark:hover:bg-blue-700">
                                 <Save className="h-4 w-4 mr-2" />

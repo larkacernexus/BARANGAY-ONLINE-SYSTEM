@@ -187,7 +187,7 @@ const getCategoryColor = (category: string): string => {
         'Legal & Police': 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300',
         'Employment': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300',
         'Housing': 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-300',
-        'Other': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300',
+        'Other': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300',
     };
     return colors[category] || colors['Other'];
 };
@@ -210,11 +210,11 @@ const getFileTypeIcon = (fileType: string) => {
 };
 
 const getFileTypeColor = (fileType: string): string => {
-    if (!fileType) return 'text-gray-500';
-    if (fileType.includes('pdf')) return 'text-red-500';
-    if (fileType.includes('word') || fileType.includes('doc')) return 'text-blue-500';
-    if (fileType.includes('excel') || fileType.includes('sheet')) return 'text-green-500';
-    return 'text-gray-500';
+    if (!fileType) return 'text-gray-500 dark:text-gray-400';
+    if (fileType.includes('pdf')) return 'text-red-500 dark:text-red-400';
+    if (fileType.includes('word') || fileType.includes('doc')) return 'text-blue-500 dark:text-blue-400';
+    if (fileType.includes('excel') || fileType.includes('sheet')) return 'text-green-500 dark:text-green-400';
+    return 'text-gray-500 dark:text-gray-400';
 };
 
 const truncateText = (text: string, maxLength: number = 50): string => {
@@ -250,7 +250,7 @@ const printFormsList = (forms: Form[], filter: string, stats: Stats) => {
         <head>
             <title>Forms Catalog Report</title>
             <style>
-                body { font-family: 'Inter', system-ui, -apple-system, sans-serif; margin: 40px; }
+                body { font-family: 'Inter', system-ui, -apple-system, sans-serif; margin: 40px; background: white; color: #333; }
                 h1 { color: #111; font-size: 24px; font-weight: 600; margin-bottom: 8px; }
                 .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
                 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
@@ -435,7 +435,7 @@ const CollapsibleStats = ({
     <div className="md:hidden">
         <Button 
             variant="outline" 
-            className="w-full justify-between bg-white dark:bg-gray-900 rounded-xl border-gray-200 dark:border-gray-700"
+            className="w-full justify-between bg-white dark:bg-gray-900 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
             onClick={() => setShowStats(!showStats)}
         >
             <div className="flex items-center gap-2">
@@ -842,7 +842,7 @@ Forms Catalog System
                           activeTab === 'popular' ? 'Most Downloaded' : 'Recently Added';
         
         return (
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
                 <CardContent className="p-4 md:p-6">
                     <ModernSelectionBanner
                         selectMode={selectMode}
@@ -860,7 +860,7 @@ Forms Catalog System
                     
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                                 {displayTab} Forms
                             </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -877,17 +877,20 @@ Forms Catalog System
                             {/* Sort Dropdown */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+                                    <Button variant="outline" size="sm" className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
                                         <ArrowUpDown className="h-4 w-4" />
                                         Sort
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
                                     {SORT_OPTIONS.map(option => (
                                         <DropdownMenuItem 
                                             key={option.value}
                                             onClick={() => handleSortChange(option.value)}
-                                            className={sortBy === option.value ? 'bg-gray-100 dark:bg-gray-700' : ''}
+                                            className={cn(
+                                                "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800",
+                                                sortBy === option.value && "bg-gray-100 dark:bg-gray-800"
+                                            )}
                                         >
                                             {option.value === 'title' && <FileText className="h-4 w-4 mr-2" />}
                                             {option.value === 'created_at' && <Calendar className="h-4 w-4 mr-2" />}
@@ -897,8 +900,8 @@ Forms Catalog System
                                             {option.label}
                                         </DropdownMenuItem>
                                     ))}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={handleSortOrderToggle}>
+                                    <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                                    <DropdownMenuItem onClick={handleSortOrderToggle} className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
                                         {sortOrder === 'asc' ? (
                                             <ChevronUp className="h-4 w-4 mr-2" />
                                         ) : (
@@ -911,14 +914,14 @@ Forms Catalog System
 
                             {/* View Toggle */}
                             {!selectMode && tabHasData && (
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
+                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                                     <Button
                                         variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                         size="sm"
                                         onClick={() => setViewMode('grid')}
                                         className={cn(
                                             "h-8 w-8 p-0",
-                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm"
+                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                                         )}
                                     >
                                         <Grid className="h-4 w-4" />
@@ -929,7 +932,7 @@ Forms Catalog System
                                         onClick={() => setViewMode('list')}
                                         className={cn(
                                             "h-8 w-8 p-0",
-                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm"
+                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                                         )}
                                     >
                                         <List className="h-4 w-4" />
@@ -943,7 +946,7 @@ Forms Catalog System
                                     variant={selectMode ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={toggleSelectMode}
-                                    className="gap-2 rounded-xl"
+                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700"
                                 >
                                     <CheckCircle className="h-4 w-4" />
                                     {selectMode ? 'Cancel' : 'Select'}
@@ -1076,18 +1079,18 @@ Forms Catalog System
             >
                 <Head title="Forms Catalog" />
                 <div className="min-h-[50vh] flex items-center justify-center px-4">
-                    <Card className="w-full max-w-md border-0 shadow-xl">
+                    <Card className="w-full max-w-md border-0 shadow-xl bg-white dark:bg-gray-900">
                         <CardContent className="pt-6 text-center">
                             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl flex items-center justify-center mb-4">
                                 <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
                             </div>
-                            <h3 className="text-lg font-semibold mb-2">Error</h3>
+                            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Error</h3>
                             <p className="text-gray-500 dark:text-gray-400 mb-4">
                                 {pageProps.error}
                             </p>
                             <Button 
                                 onClick={() => window.location.href = '/portal/dashboard'}
-                                className="bg-gradient-to-r from-blue-500 to-blue-600"
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white"
                             >
                                 Go to Dashboard
                             </Button>
@@ -1113,8 +1116,8 @@ Forms Catalog System
                     {isMobile && (
                         <div className="flex items-center justify-between sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-10 py-3 px-4 -mx-4">
                             <div>
-                                <h1 className="text-xl font-bold">Forms Catalog</h1>
-                                <p className="text-xs text-gray-500">
+                                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Forms Catalog</h1>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     {stats.total} form{stats.total !== 1 ? 's' : ''} available
                                 </p>
                             </div>
@@ -1123,7 +1126,7 @@ Forms Catalog System
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowStats(!showStats)}
-                                    className="h-8 px-2 rounded-lg"
+                                    className="h-8 px-2 rounded-lg border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                                 >
                                     {showStats ? (
                                         <ChevronUp className="h-4 w-4" />
@@ -1135,11 +1138,11 @@ Forms Catalog System
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowMobileFilters(true)}
-                                    className="h-8 px-2 rounded-lg relative"
+                                    className="h-8 px-2 rounded-lg relative border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                                 >
                                     <Filter className="h-4 w-4" />
                                     {hasActiveFilters && (
-                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 dark:bg-red-400 rounded-full animate-pulse" />
                                     )}
                                 </Button>
                             </div>
@@ -1150,7 +1153,7 @@ Forms Catalog System
                     {!isMobile && (
                         <div className="flex items-center justify-between">
                             <div>
-                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                                     Forms Catalog
                                 </h1>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -1162,7 +1165,7 @@ Forms Catalog System
                                     variant="outline"
                                     size="sm"
                                     onClick={handlePrint}
-                                    className="gap-2 rounded-xl"
+                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                                 >
                                     <Printer className="h-4 w-4" />
                                     Print
@@ -1172,7 +1175,7 @@ Forms Catalog System
                                     size="sm"
                                     onClick={handleExport}
                                     disabled={isExporting}
-                                    className="gap-2 rounded-xl"
+                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                                 >
                                     <Download className="h-4 w-4" />
                                     {isExporting ? 'Exporting...' : 'Export'}

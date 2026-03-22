@@ -30,7 +30,8 @@ import {
     CheckSquare,
     Square,
     ExternalLink,
-    Phone
+    Phone,
+    Map
 } from 'lucide-react';
 import { Purok, PurokFilters } from '@/types/purok';
 import { purokUtils } from '@/admin-utils/purok-utils';
@@ -49,6 +50,7 @@ interface PuroksTableViewProps {
     onDelete: (purok: Purok) => void;
     selectionStats: any;
     getSortIcon: (column: string) => string | null;
+    onViewOnMap?: (purok: Purok) => void;
 }
 
 export default function PuroksTableView({
@@ -63,7 +65,8 @@ export default function PuroksTableView({
     onClearFilters,
     onDelete,
     selectionStats,
-    getSortIcon
+    getSortIcon,
+    onViewOnMap
 }: PuroksTableViewProps) {
     const getTruncationLength = (type: 'name' | 'description' | 'contact' | 'leader' = 'name'): number => {
         if (typeof window === 'undefined') return 30;
@@ -152,6 +155,14 @@ export default function PuroksTableView({
         }).catch(() => {
             // Toast would be handled by parent
         });
+    };
+
+    const handleViewOnMap = (purok: Purok) => {
+        if (onViewOnMap) {
+            onViewOnMap(purok);
+        } else if (purok.google_maps_url) {
+            window.open(purok.google_maps_url, '_blank', 'noopener,noreferrer');
+        }
     };
 
     return (
@@ -309,15 +320,13 @@ export default function PuroksTableView({
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
                                             {purok.google_maps_url ? (
-                                                <a 
-                                                    href={purok.google_maps_url} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm"
+                                                <button
+                                                    onClick={() => handleViewOnMap(purok)}
+                                                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline text-sm transition-colors"
                                                 >
-                                                    <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                                                    <Map className="h-4 w-4 flex-shrink-0" />
                                                     <span className="truncate">View Map</span>
-                                                </a>
+                                                </button>
                                             ) : (
                                                 <span className="text-gray-400 italic text-sm truncate">No map link</span>
                                             )}
@@ -376,6 +385,16 @@ export default function PuroksTableView({
                                                             <span>Edit Purok</span>
                                                         </Link>
                                                     </DropdownMenuItem>
+                                                    
+                                                    {purok.google_maps_url && (
+                                                        <DropdownMenuItem 
+                                                            onClick={() => handleViewOnMap(purok)}
+                                                            className="flex items-center cursor-pointer"
+                                                        >
+                                                            <Map className="mr-2 h-4 w-4" />
+                                                            <span>View on Map</span>
+                                                        </DropdownMenuItem>
+                                                    )}
                                                     
                                                     <DropdownMenuItem asChild>
                                                         <Link href={`/residents?purok_id=${purok.id}`} className="flex items-center cursor-pointer">

@@ -2,22 +2,23 @@
 
 namespace App\Http\Controllers\Admin\Household;
 
+use App\Http\Controllers\Controller;
 use App\Models\Household;
 use App\Models\Resident;
-use App\Models\Purok;
 use App\Models\HouseholdMember;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class HouseholdStoreController extends BaseHouseholdController
+class HouseholdStoreController extends Controller
 {
     public function store(Request $request)
     {
         Log::info('Household creation started');
         
         $validator = Validator::make($request->all(), [
+            'household_number' => 'required|string|max:50|unique:households',
             'contact_number' => 'required|string|max:20',
             'email' => 'nullable|email|max:100',
             'address' => 'required|string',
@@ -27,7 +28,9 @@ class HouseholdStoreController extends BaseHouseholdController
             'members.*.name' => 'required|string|max:200',
             'members.*.relationship' => 'required|string|max:50',
             'members.*.resident_id' => 'nullable|exists:residents,id',
-            'create_user_account' => 'boolean',
+            'google_maps_url' => 'nullable|url|max:500',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
         ]);
         
         if ($validator->fails()) {
@@ -48,18 +51,11 @@ class HouseholdStoreController extends BaseHouseholdController
         
         try {
             $household = $this->createHousehold($request);
-            $headResident = $this->processMembers($household, $request);
-            
-            if ($request->boolean('create_user_account') && $headResident) {
-                $credentials = $this->createUserForHouseholdHead($household, $headResident, $request);
-                if ($credentials) {
-                    session()->flash('user_credentials', $credentials);
-                }
-            }
+            $this->processMembers($household, $request);
             
             DB::commit();
             
-            return redirect()->route('households.index')
+            return redirect()->route('admin.households.show', $household)
                 ->with('success', 'Household created successfully.');
                 
         } catch (\Exception $e) {
@@ -74,10 +70,8 @@ class HouseholdStoreController extends BaseHouseholdController
 
     private function createHousehold(Request $request)
     {
-        $householdNumber = $this->generateHouseholdNumber($request->household_number);
-        
         return Household::create([
-            'household_number' => $householdNumber,
+            'household_number' => $request->household_number,
             'contact_number' => $request->contact_number,
             'email' => $request->email,
             'address' => $request->address,
@@ -92,13 +86,14 @@ class HouseholdStoreController extends BaseHouseholdController
             'vehicle' => $request->boolean('vehicle'),
             'remarks' => $request->remarks,
             'status' => 'active',
+            'google_maps_url' => $request->google_maps_url,
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
         ]);
     }
 
     private function processMembers(Household $household, Request $request)
     {
-        $headResident = null;
-        
         foreach ($request->members as $member) {
             $isHead = strtolower(trim($member['relationship'])) === 'head';
             
@@ -106,16 +101,12 @@ class HouseholdStoreController extends BaseHouseholdController
                 $resident = Resident::find($member['resident_id']);
                 if ($resident) {
                     $this->createMember($household, $resident, $member, $isHead);
-                    if ($isHead) $headResident = $resident;
                 }
             } elseif (!empty($member['name'])) {
                 $resident = $this->createNewResident($member, $request, $isHead);
                 $this->createMember($household, $resident, $member, $isHead);
-                if ($isHead) $headResident = $resident;
             }
         }
-        
-        return $headResident;
     }
 
     private function createMember(Household $household, Resident $resident, array $member, bool $isHead)
@@ -125,6 +116,12 @@ class HouseholdStoreController extends BaseHouseholdController
             'resident_id' => $resident->id,
             'relationship_to_head' => $member['relationship'],
             'is_head' => $isHead,
+        ]);
+        
+        // Update resident's household and purok
+        $resident->update([
+            'household_id' => $household->id,
+            'purok_id' => $household->purok_id,
         ]);
     }
 

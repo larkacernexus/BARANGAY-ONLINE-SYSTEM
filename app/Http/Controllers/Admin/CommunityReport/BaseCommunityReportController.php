@@ -154,59 +154,110 @@ abstract class BaseCommunityReportController extends Controller
     /**
      * Get staff for assignment
      */
-    protected function getStaffForAssignment()
-    {
-        return User::whereHas('role', function ($query) {
-                $query->where('is_system_role', 1);
-            })
-            ->whereNotNull('role_id')
-            ->where('status', 'active')
-            ->with(['role:id,name,is_system_role', 'currentResident:id,first_name,middle_name,last_name'])
-            ->get()
-            ->sortBy(function ($user) {
-                $lastName = $user->currentResident->last_name ?? '';
-                $firstName = $user->currentResident->first_name ?? '';
-                return $lastName . $firstName;
-            })
-            ->values()
-            ->map(function ($user) {
-                $firstName = $user->currentResident->first_name ?? '';
-                $middleName = $user->currentResident->middle_name ?? '';
-                $lastName = $user->currentResident->last_name ?? '';
-                $fullName = trim("{$firstName} {$middleName} {$lastName}");
+protected function getStaffForAssignment()
+{
+    return User::whereHas('role', function ($query) {
+            $query->where('is_system_role', 1);
+        })
+        ->whereNotNull('role_id')
+        ->where('status', 'active')
+        ->with([
+            'role:id,name,is_system_role',
+            'currentResident' => function($query) {
+                $query->select([
+                    'id', 'first_name', 'middle_name', 'last_name', 
+                    'suffix', 'address', 'purok_id', 'contact_number', 'email'
+                ])->with('purok:id,name');
+            }
+        ])
+        ->get()
+        ->sortBy(function ($user) {
+            $resident = $user->currentResident;
+            if ($resident && $resident->last_name) {
+                return $resident->last_name . ($resident->first_name ?? '');
+            }
+            return $user->position ?? $user->username ?? $user->email;
+        })
+        ->values()
+        ->map(function ($user) {
+            $resident = $user->currentResident;
+            
+            // If resident exists with name data, use resident data
+            if ($resident && ($resident->first_name || $resident->last_name)) {
+                // Build full name from resident data
+                $fullName = trim(implode(' ', array_filter([
+                    $resident->first_name,
+                    $resident->middle_name,
+                    $resident->last_name,
+                    $resident->suffix
+                ])));
                 
-                if (empty($fullName)) {
-                    $fullName = trim($user->first_name . ' ' . $user->last_name);
-                }
-                if (empty($fullName)) {
-                    $fullName = $user->email ?? 'Unknown User';
-                }
+                $firstName = $resident->first_name;
+                $lastName = $resident->last_name;
+                $phone = $resident->contact_number;
+                $email = $resident->email ?: $user->email;
+                $address = $resident->address;
+                $purok = $resident->purok ? $resident->purok->name : null;
                 
+                // Generate initials from resident name
                 $initials = '';
                 if ($firstName && $lastName) {
                     $initials = strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1));
                 } elseif ($firstName) {
                     $initials = strtoupper(substr($firstName, 0, 2));
-                } elseif ($user->first_name && $user->last_name) {
-                    $initials = strtoupper(substr($user->first_name, 0, 1) . substr($user->last_name, 0, 1));
-                } elseif ($user->email) {
-                    $initials = strtoupper(substr($user->email, 0, 2));
+                } elseif ($lastName) {
+                    $initials = strtoupper(substr($lastName, 0, 2));
                 }
                 
                 return [
                     'id' => $user->id,
+                    'user_id' => $user->id,
+                    'resident_id' => $resident->id,
                     'name' => $fullName,
                     'first_name' => $firstName,
                     'last_name' => $lastName,
-                    'email' => $user->email,
-                    'phone' => $user->contact_number,
+                    'email' => $email,
+                    'phone' => $phone,
+                    'username' => $user->username,
                     'position' => $user->position,
                     'role' => $user->role ? $user->role->name : 'No role assigned',
-                    'role_id' => $user->role_id,
-                    'is_system_role' => $user->role ? $user->role->is_system_role : false,
+                    'purok' => $purok,
+                    'address' => $address,
+                    'is_active' => $user->status === 'active',
                     'initials' => $initials,
                     'avatar' => null,
                 ];
-            });
-    }
+            } 
+            
+            // Fallback for staff without resident records (use user data)
+            $fullName = $user->position ?? $user->username ?? $user->email;
+            $initials = '';
+            if ($user->username) {
+                $initials = strtoupper(substr($user->username, 0, 2));
+            } elseif ($user->email) {
+                $initials = strtoupper(substr($user->email, 0, 2));
+            } elseif ($user->position) {
+                $initials = strtoupper(substr($user->position, 0, 2));
+            }
+            
+            return [
+                'id' => $user->id,
+                'user_id' => $user->id,
+                'resident_id' => null,
+                'name' => $fullName,
+                'first_name' => null,
+                'last_name' => null,
+                'email' => $user->email,
+                'phone' => $user->contact_number,
+                'username' => $user->username,
+                'position' => $user->position,
+                'role' => $user->role ? $user->role->name : 'No role assigned',
+                'purok' => null,
+                'address' => null,
+                'is_active' => $user->status === 'active',
+                'initials' => $initials,
+                'avatar' => null,
+            ];
+        });
+}
 }

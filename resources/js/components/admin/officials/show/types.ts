@@ -26,6 +26,7 @@ export interface Resident {
 }
 
 export interface Official {
+    user: any;
     official_id: string;
     first_name: any;
     middle_name: any;

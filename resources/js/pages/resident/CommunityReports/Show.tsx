@@ -473,7 +473,6 @@ export default function ShowReport({ report }: Props) {
     const [activeTab, setActiveTab] = useState('details');
     const [isMobile, setIsMobile] = useState(false);
     const [showActionsSheet, setShowActionsSheet] = useState(false);
-    const [showStatusDetails, setShowStatusDetails] = useState(false);
     const [deletingEvidence, setDeletingEvidence] = useState<number | null>(null);
 
     // Check mobile viewport
@@ -571,90 +570,88 @@ export default function ShowReport({ report }: Props) {
         link.click();
     };
 
-    // Modern Status Banner Component
-    const ModernStatusBanner = () => {
-        const config = getStatusConfig(report.status);
-        const Icon = config.icon;
-        const PriorityIcon = getPriorityConfig(report.priority).icon;
-        
-        return (
-            <Alert className={cn(
-                "border-0 rounded-xl shadow-lg",
-                config.gradient
-            )}>
-                <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+// Modern Status Banner Component - ONE LINE HORIZONTAL with Resolution Notes Below
+const ModernStatusBanner = () => {
+    const config = getStatusConfig(report.status);
+    const Icon = config.icon;
+    const PriorityIcon = getPriorityConfig(report.priority).icon;
+    
+    return (
+        <Alert className={cn(
+            "border-0 rounded-xl shadow-lg overflow-x-auto",
+            config.gradient
+        )}>
+            <div className="p-4 min-w-[900px]">
+                {/* ALL IN ONE HORIZONTAL ROW */}
+                <div className="flex items-center gap-6 whitespace-nowrap">
+                    {/* Icon */}
+                    <div className="p-2 rounded-lg bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm flex-shrink-0">
                         <Icon className="h-5 w-5" />
                     </div>
-                    <div className="flex-1">
-                        <AlertTitle className="font-semibold text-sm sm:text-base flex items-center gap-2">
-                            Status: {config.label}
-                            <Badge className={cn(getPriorityConfig(report.priority).color, "border-0 ml-2")}>
-                                <PriorityIcon className="h-3 w-3 mr-1" />
-                                {report.priority.toUpperCase()}
-                            </Badge>
-                        </AlertTitle>
-                        <AlertDescription className="text-xs sm:text-sm mt-1">
-                            {config.description}
-                        </AlertDescription>
-                        {report.assigned_to_user && (
-                            <div className="mt-2 flex items-center gap-2 text-xs">
-                                <Users className="h-3 w-3" />
-                                <span>Assigned to: <strong>{report.assigned_to_user.name}</strong></span>
-                                {report.assigned_to_user.role && (
-                                    <Badge variant="outline" className="text-[10px]">
-                                        {report.assigned_to_user.role}
-                                    </Badge>
-                                )}
-                            </div>
-                        )}
+                    
+                    {/* Status */}
+                    <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm">Status:</span>
+                        <span className="text-sm">{config.label}</span>
+                        <Badge className={cn(getPriorityConfig(report.priority).color, "border-0")}>
+                            <PriorityIcon className="h-3 w-3 mr-1" />
+                            {report.priority.toUpperCase()}
+                        </Badge>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowStatusDetails(!showStatusDetails)}
-                        className="h-8 w-8 p-0 rounded-xl"
-                    >
-                        {showStatusDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </Button>
-                </div>
-
-                {/* Expanded Details */}
-                {showStatusDetails && (
-                    <div className="mt-4 pt-4 border-t border-white/20 dark:border-gray-700/50 space-y-3 animate-slide-down">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs text-gray-600 dark:text-gray-400">Reported Date</p>
-                                <p className="font-medium text-sm">{formatDateTime(report.created_at)}</p>
-                            </div>
-                            {report.acknowledged_at && (
-                                <div>
-                                    <p className="text-xs text-gray-600 dark:text-gray-400">Acknowledged</p>
-                                    <p className="font-medium text-sm">{formatDateTime(report.acknowledged_at)}</p>
-                                </div>
-                            )}
-                            {report.resolved_at && (
-                                <div>
-                                    <p className="text-xs text-gray-600 dark:text-gray-400">Resolved</p>
-                                    <p className="font-medium text-sm">{formatDateTime(report.resolved_at)}</p>
-                                </div>
-                            )}
-                            <div>
-                                <p className="text-xs text-gray-600 dark:text-gray-400">Last Updated</p>
-                                <p className="font-medium text-sm">{formatDateTime(report.updated_at)}</p>
-                            </div>
+                    
+                    {/* Description */}
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                        {config.description}
+                    </div>
+                    
+                    {/* Assigned To */}
+                    {report.assigned_to_user && (
+                        <div className="flex items-center gap-1 text-xs">
+                            <Users className="h-3 w-3" />
+                            <span>Assigned: <strong>{report.assigned_to_user.name}</strong></span>
                         </div>
-                        {report.resolution_notes && (
-                            <div className="p-3 rounded-lg bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
-                                <p className="text-xs font-medium mb-1">Resolution Notes</p>
-                                <p className="text-sm">{report.resolution_notes}</p>
-                            </div>
-                        )}
+                    )}
+                    
+                    {/* Reported Date */}
+                    <div>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Reported:</span>
+                        <span className="text-sm font-medium ml-1">{formatDateTime(report.created_at)}</span>
+                    </div>
+                    
+                    {/* Last Updated */}
+                    <div>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Updated:</span>
+                        <span className="text-sm font-medium ml-1">{formatDateTime(report.updated_at)}</span>
+                    </div>
+                    
+                    {/* Acknowledged */}
+                    {report.acknowledged_at && (
+                        <div>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">Acknowledged:</span>
+                            <span className="text-sm font-medium ml-1">{formatDateTime(report.acknowledged_at)}</span>
+                        </div>
+                    )}
+                    
+                    {/* Resolved */}
+                    {report.resolved_at && (
+                        <div>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">Resolved:</span>
+                            <span className="text-sm font-medium ml-1">{formatDateTime(report.resolved_at)}</span>
+                        </div>
+                    )}
+                </div>
+                
+                {/* Resolution Notes - SEPARATE LINE BELOW */}
+                {report.resolution_notes && (
+                    <div className="mt-3 pt-3 border-t border-white/20 dark:border-gray-700/50">
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Resolution Notes:</span>
+                        <span className="text-sm ml-2">{report.resolution_notes}</span>
                     </div>
                 )}
-            </Alert>
-        );
-    };
+            </div>
+        </Alert>
+    );
+};
 
     // Modern Report Info Card
     const ModernReportInfoCard = () => {

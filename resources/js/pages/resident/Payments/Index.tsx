@@ -317,7 +317,7 @@ const printPaymentsList = (payments: Payment[], statusFilter: string, formatDate
         <head>
             <title>My Payments Report</title>
             <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
+                body { font-family: Arial, sans-serif; margin: 20px; background: white; color: #333; }
                 h1 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
                 .print-header { margin-bottom: 30px; }
                 .print-info { display: flex; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; }
@@ -752,7 +752,7 @@ export default function MyPayments() {
         const tabHasData = currentPayments.length > 0;
         
         return (
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
                 <CardContent className="p-4 md:p-6">
                     {/* Selection Mode Banner */}
                     {selectMode && tabHasData && (
@@ -774,7 +774,7 @@ export default function MyPayments() {
                     {/* Header with Sort */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                                 {statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Payments
                             </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -789,30 +789,30 @@ export default function MyPayments() {
                             {/* Sort Dropdown */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="gap-2">
+                                    <Button variant="outline" size="sm" className="gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
                                         <ArrowUpDown className="h-4 w-4" />
                                         Sort
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
                                     <DropdownMenuItem onClick={() => {
                                         setSortBy('date');
                                         setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                                    }}>
+                                    }} className="text-gray-700 dark:text-gray-300">
                                         <Calendar className="h-4 w-4 mr-2" />
                                         Date {sortBy === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => {
                                         setSortBy('amount');
                                         setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                                    }}>
+                                    }} className="text-gray-700 dark:text-gray-300">
                                         <DollarSign className="h-4 w-4 mr-2" />
                                         Amount {sortBy === 'amount' && (sortOrder === 'asc' ? '↑' : '↓')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => {
                                         setSortBy('status');
                                         setSortOrder('asc');
-                                    }}>
+                                    }} className="text-gray-700 dark:text-gray-300">
                                         <Info className="h-4 w-4 mr-2" />
                                         Status
                                     </DropdownMenuItem>
@@ -821,14 +821,14 @@ export default function MyPayments() {
 
                             {/* View Toggle */}
                             {!selectMode && tabHasData && (
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
+                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                                     <Button
                                         variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                         size="sm"
                                         onClick={() => setViewMode('grid')}
                                         className={cn(
                                             "h-8 w-8 p-0",
-                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm"
+                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                                         )}
                                     >
                                         <Grid className="h-4 w-4" />
@@ -839,7 +839,7 @@ export default function MyPayments() {
                                         onClick={() => setViewMode('list')}
                                         className={cn(
                                             "h-8 w-8 p-0",
-                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm"
+                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                                         )}
                                     >
                                         <List className="h-4 w-4" />
@@ -853,7 +853,7 @@ export default function MyPayments() {
                                     variant={selectMode ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={toggleSelectMode}
-                                    className="gap-2"
+                                    className="gap-2 border-gray-200 dark:border-gray-700"
                                 >
                                     <Square className="h-4 w-4" />
                                     {selectMode ? 'Cancel' : 'Select'}
@@ -919,36 +919,36 @@ export default function MyPayments() {
                                 <div className="overflow-x-auto">
                                     <Table>
                                         <TableHeader>
-                                            <TableRow className="hover:bg-transparent">
+                                            <TableRow className="hover:bg-transparent border-gray-200 dark:border-gray-700">
                                                 {selectMode && (
                                                     <TableHead className="w-12">
                                                         <input
                                                             type="checkbox"
                                                             checked={selectedPayments.length === currentPayments.length && currentPayments.length > 0}
                                                             onChange={selectAllPayments}
-                                                            className="h-4 w-4 rounded border-gray-300"
+                                                            className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
                                                         />
                                                     </TableHead>
                                                 )}
-                                                <TableHead className="font-semibold">OR Details</TableHead>
-                                                <TableHead className="font-semibold">Purpose & Type</TableHead>
-                                                <TableHead className="font-semibold">Dates</TableHead>
-                                                <TableHead className="font-semibold">Method</TableHead>
-                                                <TableHead className="font-semibold">Status</TableHead>
-                                                <TableHead className="font-semibold">Amount</TableHead>
-                                                <TableHead className="font-semibold text-right">Actions</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300">OR Details</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Purpose & Type</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Dates</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Method</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Status</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Amount</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-right">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {currentPayments.map((payment) => (
-                                                <TableRow key={`table-${payment.id}`} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
+                                                <TableRow key={`table-${payment.id}`} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors border-gray-200 dark:border-gray-700">
                                                     {selectMode && (
                                                         <TableCell>
                                                             <input
                                                                 type="checkbox"
                                                                 checked={selectedPayments.includes(payment.id)}
                                                                 onChange={() => toggleSelectPayment(payment.id)}
-                                                                className="h-4 w-4 rounded border-gray-300"
+                                                                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
                                                             />
                                                         </TableCell>
                                                     )}
@@ -983,20 +983,20 @@ export default function MyPayments() {
                                                     <TableCell>
                                                         <div className="space-y-1">
                                                             <div>
-                                                                <p className="text-xs text-gray-500">Paid</p>
-                                                                <p className="text-sm">{formatDate(payment.payment_date)}</p>
+                                                                <p className="text-xs text-gray-500 dark:text-gray-400">Paid</p>
+                                                                <p className="text-sm text-gray-700 dark:text-gray-300">{formatDate(payment.payment_date)}</p>
                                                             </div>
                                                             {payment.due_date && (
                                                                 <div>
                                                                     <p className={cn(
                                                                         "text-xs",
-                                                                        payment.status === 'overdue' ? 'text-red-600' : 'text-gray-500'
+                                                                        payment.status === 'overdue' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'
                                                                     )}>
                                                                         Due
                                                                     </p>
                                                                     <p className={cn(
                                                                         "text-sm",
-                                                                        payment.status === 'overdue' && "text-red-600 font-medium"
+                                                                        payment.status === 'overdue' && "text-red-600 dark:text-red-400 font-medium"
                                                                     )}>
                                                                         {formatDate(payment.due_date)}
                                                                     </p>
@@ -1005,7 +1005,7 @@ export default function MyPayments() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
                                                             {getPaymentMethodDisplay(payment.payment_method)}
                                                         </span>
                                                     </TableCell>
@@ -1015,7 +1015,7 @@ export default function MyPayments() {
                                                             payment.status === 'paid' || payment.status === 'completed' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "",
                                                             payment.status === 'pending' ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "",
                                                             payment.status === 'overdue' ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "",
-                                                            payment.status === 'cancelled' ? "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-400" : "",
+                                                            payment.status === 'cancelled' ? "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400" : "",
                                                         )}>
                                                             {payment.status === 'paid' || payment.status === 'completed' ? 'Paid' :
                                                              payment.status === 'pending' ? 'Pending' :
@@ -1031,7 +1031,7 @@ export default function MyPayments() {
                                                             {((payment.surcharge || 0) > 0 ||
                                                               (payment.penalty || 0) > 0 ||
                                                               (payment.discount || 0) > 0) && (
-                                                                <p className="text-xs text-gray-500">
+                                                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                                                     Base: {formatCurrency(payment.subtotal)}
                                                                 </p>
                                                             )}
@@ -1045,7 +1045,7 @@ export default function MyPayments() {
                                                                         <Button
                                                                             size="sm"
                                                                             variant="ghost"
-                                                                            className="h-8 w-8 p-0"
+                                                                            className="h-8 w-8 p-0 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                                                                             onClick={() => handleViewDetails(payment.id)}
                                                                         >
                                                                             <Eye className="h-4 w-4" />
@@ -1062,45 +1062,44 @@ export default function MyPayments() {
                                                                             <Button
                                                                                 size="sm"
                                                                                 variant="default"
-                                                                                className="h-8 px-3 text-xs bg-gradient-to-r from-blue-500 to-blue-600"
+                                                                                className="h-8 px-3 text-xs bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
                                                                                 onClick={() => handleMakePayment(payment.id)}
                                                                             >
                                                                                 Pay
                                                                             </Button>
                                                                         </TooltipTrigger>
-                                                                        {/* <TooltipContent>Make Payment</TooltipContent> */}
                                                                     </Tooltip>
                                                                 </TooltipProvider>
                                                             )}
                                                             
                                                             <DropdownMenu>
                                                                 <DropdownMenuTrigger asChild>
-                                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
                                                                         <MoreVertical className="h-4 w-4" />
                                                                     </Button>
                                                                 </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" className="w-48">
-                                                                    <DropdownMenuItem onClick={() => handleCopyOrNumber(payment.or_number)}>
+                                                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                                                                    <DropdownMenuItem onClick={() => handleCopyOrNumber(payment.or_number)} className="text-gray-700 dark:text-gray-300">
                                                                         <Copy className="h-4 w-4 mr-2" />
                                                                         Copy OR Number
                                                                     </DropdownMenuItem>
                                                                     {payment.reference_number && (
-                                                                        <DropdownMenuItem onClick={() => handleCopyReference(payment.reference_number!)}>
+                                                                        <DropdownMenuItem onClick={() => handleCopyReference(payment.reference_number!)} className="text-gray-700 dark:text-gray-300">
                                                                             <Copy className="h-4 w-4 mr-2" />
                                                                             Copy Reference
                                                                         </DropdownMenuItem>
                                                                     )}
                                                                     {(payment.status === 'paid' || payment.status === 'completed') && (
-                                                                        <DropdownMenuItem onClick={() => handleDownloadReceipt(payment)}>
+                                                                        <DropdownMenuItem onClick={() => handleDownloadReceipt(payment)} className="text-gray-700 dark:text-gray-300">
                                                                             <Download className="h-4 w-4 mr-2" />
                                                                             Download Receipt
                                                                         </DropdownMenuItem>
                                                                     )}
-                                                                    <DropdownMenuItem onClick={() => handleGenerateReceipt(payment)}>
+                                                                    <DropdownMenuItem onClick={() => handleGenerateReceipt(payment)} className="text-gray-700 dark:text-gray-300">
                                                                         <FileText className="h-4 w-4 mr-2" />
                                                                         Generate Receipt
                                                                     </DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={handlePrintPayments}>
+                                                                    <DropdownMenuItem onClick={handlePrintPayments} className="text-gray-700 dark:text-gray-300">
                                                                         <Printer className="h-4 w-4 mr-2" />
                                                                         Print
                                                                     </DropdownMenuItem>
@@ -1143,17 +1142,17 @@ export default function MyPayments() {
             >
                 <Head title="My Payments" />
                 <div className="min-h-[50vh] flex items-center justify-center px-4">
-                    <Card className="w-full max-w-md border-0 shadow-xl">
+                    <Card className="w-full max-w-md border-0 shadow-xl bg-white dark:bg-gray-900">
                         <CardContent className="pt-6 text-center">
                             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/30 dark:to-amber-800/30 rounded-2xl flex items-center justify-center mb-4">
                                 <AlertCircle className="h-8 w-8 text-amber-600 dark:text-amber-400" />
                             </div>
-                            <h3 className="text-lg font-semibold mb-2">Complete Your Profile</h3>
+                            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Complete Your Profile</h3>
                             <p className="text-gray-500 dark:text-gray-400 mb-4">
                                 You need to complete your resident profile before you can view payments.
                             </p>
                             <Link href="/resident/profile/create">
-                                <Button className="bg-gradient-to-r from-blue-500 to-blue-600">
+                                <Button className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
                                     Complete Profile
                                 </Button>
                             </Link>
@@ -1174,20 +1173,20 @@ export default function MyPayments() {
             >
                 <div className="space-y-6">
                     <div>
-                        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">My Payments</h1>
+                        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">My Payments</h1>
                     </div>
-                    <Card className="border-0 shadow-lg">
+                    <Card className="border-0 shadow-lg bg-white dark:bg-gray-900">
                         <CardContent className="py-12 text-center">
                             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl flex items-center justify-center mb-4">
                                 <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
                             </div>
-                            <h3 className="text-lg font-semibold mb-2">Error</h3>
+                            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Error</h3>
                             <p className="text-gray-500 dark:text-gray-400 mb-4">
                                 {pageProps.error}
                             </p>
                             <Button 
                                 onClick={() => window.location.href = '/dashboard'}
-                                className="bg-gradient-to-r from-blue-500 to-blue-600"
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white"
                             >
                                 Go to Dashboard
                             </Button>
@@ -1213,8 +1212,8 @@ export default function MyPayments() {
                     {isMobile && (
                         <div className="flex items-center justify-between sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-10 py-3 px-4 -mx-4">
                             <div>
-                                <h1 className="text-xl font-bold">My Payments</h1>
-                                <p className="text-xs text-gray-500">
+                                <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Payments</h1>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     {stats.total_payments} payment{stats.total_payments !== 1 ? 's' : ''} total
                                 </p>
                             </div>
@@ -1223,7 +1222,7 @@ export default function MyPayments() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowStats(!showStats)}
-                                    className="h-8 px-2 rounded-lg"
+                                    className="h-8 px-2 rounded-lg border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                                 >
                                     {showStats ? (
                                         <ChevronUp className="h-4 w-4" />
@@ -1235,15 +1234,15 @@ export default function MyPayments() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowMobileFilters(true)}
-                                    className="h-8 px-2 rounded-lg relative"
+                                    className="h-8 px-2 rounded-lg relative border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                                 >
                                     <Filter className="h-4 w-4" />
                                     {hasActiveFilters && (
-                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 dark:bg-red-400 rounded-full animate-pulse" />
                                     )}
                                 </Button>
                                 <Link href="/portal/payments/create">
-                                    <Button size="sm" className="h-8 px-3 bg-gradient-to-r from-blue-500 to-blue-600">
+                                    <Button size="sm" className="h-8 px-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
                                         <Plus className="h-4 w-4 mr-1" />
                                         Pay
                                     </Button>
@@ -1256,7 +1255,7 @@ export default function MyPayments() {
                     {!isMobile && (
                         <div className="flex items-center justify-between">
                             <div>
-                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                                     My Payments
                                 </h1>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -1268,7 +1267,7 @@ export default function MyPayments() {
                                     variant="outline"
                                     size="sm"
                                     onClick={handlePrintPayments}
-                                    className="gap-2"
+                                    className="gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                                 >
                                     <Printer className="h-4 w-4" />
                                     Print
@@ -1278,17 +1277,11 @@ export default function MyPayments() {
                                     size="sm"
                                     onClick={handleExportCSV}
                                     disabled={isExporting}
-                                    className="gap-2"
+                                    className="gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                                 >
                                     <Download className="h-4 w-4" />
                                     {isExporting ? 'Exporting...' : 'Export'}
                                 </Button>
-                                {/* <Link href="/portal/payments/create">
-                                    <Button className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600">
-                                        <Plus className="h-4 w-4" />
-                                        <span>Make Payment</span>
-                                    </Button>
-                                </Link> */}
                             </div>
                         </div>
                     )}
@@ -1358,7 +1351,7 @@ export default function MyPayments() {
                         <Link href="/portal/payments/create">
                             <Button 
                                 size="lg" 
-                                className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                                className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
                             >
                                 <Plus className="h-6 w-6" />
                             </Button>

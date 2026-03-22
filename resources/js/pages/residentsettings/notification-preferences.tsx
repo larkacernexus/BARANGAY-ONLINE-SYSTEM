@@ -77,16 +77,16 @@ const CategoryToggle = ({
 }) => (
   <div className="flex items-center justify-between py-3">
     <div className="flex items-center gap-3">
-      <div className="p-2 bg-primary/10 rounded-lg">
-        <Icon className="h-5 w-5 text-primary" />
+      <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+        <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
       </div>
       <div>
-        <Label className="font-medium">{label}</Label>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <Label className="font-medium text-gray-900 dark:text-white">{label}</Label>
+        <p className="text-xs text-gray-600 dark:text-gray-400">{description}</p>
       </div>
     </div>
     <div className="flex items-center gap-2">
-      {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+      {saving && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
       <Switch checked={checked} onCheckedChange={onToggle} disabled={saving} />
     </div>
   </div>
@@ -165,17 +165,19 @@ export default function NotificationPreferences() {
         <div className="space-y-6">
           {/* Flash error message */}
           {flash?.error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{flash.error}</AlertDescription>
+            <Alert variant="destructive" className="mb-4 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30">
+              <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+              <AlertDescription className="text-red-800 dark:text-red-300">
+                {flash.error}
+              </AlertDescription>
             </Alert>
           )}
 
           {/* Flash success message */}
           {flash?.success && (
-            <Alert className="bg-green-50 border-green-200 mb-4">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800">
+            <Alert className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 mb-4">
+              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertDescription className="text-green-800 dark:text-green-300">
                 {flash.success}
               </AlertDescription>
             </Alert>
@@ -184,32 +186,35 @@ export default function NotificationPreferences() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <Bell className="h-6 w-6" />
+              <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
+                <Bell className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 Notification Preferences
               </h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Choose what notifications you want to receive
               </p>
             </div>
             <div className="flex items-center gap-2">
               {saving && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   <span>Saving...</span>
                 </div>
               )}
-              <Badge variant="outline" className="text-sm">
+              <Badge 
+                variant="outline" 
+                className="text-sm border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800"
+              >
                 {stats.unread} unread of {stats.total}
               </Badge>
             </div>
           </div>
 
           {/* Main Card */}
-          <Card>
+          <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
             <CardHeader>
-              <CardTitle>Notification Categories</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-gray-900 dark:text-white">Notification Categories</CardTitle>
+              <CardDescription className="text-gray-600 dark:text-gray-400">
                 Turn notifications on/off for each category
               </CardDescription>
             </CardHeader>
@@ -222,7 +227,7 @@ export default function NotificationPreferences() {
                 onToggle={() => toggle('clearance')}
                 saving={saving}
               />
-              <Separator />
+              <Separator className="bg-gray-200 dark:bg-gray-700" />
               
               <CategoryToggle
                 icon={DollarSign}
@@ -232,7 +237,7 @@ export default function NotificationPreferences() {
                 onToggle={() => toggle('fees')}
                 saving={saving}
               />
-              <Separator />
+              <Separator className="bg-gray-200 dark:bg-gray-700" />
               
               <CategoryToggle
                 icon={Home}
@@ -242,7 +247,7 @@ export default function NotificationPreferences() {
                 onToggle={() => toggle('household')}
                 saving={saving}
               />
-              <Separator />
+              <Separator className="bg-gray-200 dark:bg-gray-700" />
               
               <CategoryToggle
                 icon={Megaphone}
@@ -252,7 +257,7 @@ export default function NotificationPreferences() {
                 onToggle={() => toggle('announcements')}
                 saving={saving}
               />
-              <Separator />
+              <Separator className="bg-gray-200 dark:bg-gray-700" />
               
               <CategoryToggle
                 icon={Flag}
@@ -266,22 +271,24 @@ export default function NotificationPreferences() {
           </Card>
 
           {/* Delivery Channels */}
-          <Card>
+          <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
             <CardHeader>
-              <CardTitle>Where to receive</CardTitle>
-              <CardDescription>Choose your notification channels</CardDescription>
+              <CardTitle className="text-gray-900 dark:text-white">Where to receive</CardTitle>
+              <CardDescription className="text-gray-600 dark:text-gray-400">
+                Choose your notification channels
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Mail className="h-5 w-5 text-blue-500" />
+                  <Mail className="h-5 w-5 text-blue-500 dark:text-blue-400" />
                   <div>
-                    <Label>Email</Label>
-                    <p className="text-xs text-muted-foreground">{channels.email}</p>
+                    <Label className="text-gray-900 dark:text-white">Email</Label>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{channels.email}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {saving && preferences.email !== initial.email && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {saving && preferences.email !== initial.email && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
                   <Switch 
                     checked={preferences.email} 
                     onCheckedChange={() => toggle('email')}
@@ -290,20 +297,20 @@ export default function NotificationPreferences() {
                 </div>
               </div>
               
-              <Separator />
+              <Separator className="bg-gray-200 dark:bg-gray-700" />
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <MessageCircle className="h-5 w-5 text-green-500" />
+                  <MessageCircle className="h-5 w-5 text-green-500 dark:text-green-400" />
                   <div>
-                    <Label>SMS</Label>
-                    <p className="text-xs text-muted-foreground">
+                    <Label className="text-gray-900 dark:text-white">SMS</Label>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
                       {channels.phone || 'No phone number set'}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {saving && preferences.sms !== initial.sms && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {saving && preferences.sms !== initial.sms && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
                   <Switch 
                     checked={preferences.sms} 
                     onCheckedChange={() => toggle('sms')}
@@ -312,20 +319,20 @@ export default function NotificationPreferences() {
                 </div>
               </div>
               
-              <Separator />
+              <Separator className="bg-gray-200 dark:bg-gray-700" />
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Moon className="h-5 w-5 text-purple-500" />
+                  <Moon className="h-5 w-5 text-purple-500 dark:text-purple-400" />
                   <div>
-                    <Label>Quiet Hours</Label>
-                    <p className="text-xs text-muted-foreground">
+                    <Label className="text-gray-900 dark:text-white">Quiet Hours</Label>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
                       Mute notifications at night
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {saving && preferences.quiet_hours !== initial.quiet_hours && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {saving && preferences.quiet_hours !== initial.quiet_hours && <Loader2 className="h-4 w-4 animate-spin text-gray-500 dark:text-gray-400" />}
                   <Switch 
                     checked={preferences.quiet_hours} 
                     onCheckedChange={() => toggle('quiet_hours')}
@@ -339,7 +346,7 @@ export default function NotificationPreferences() {
           {/* Optional: Manual Save Button (as backup) */}
           <div className="flex justify-end gap-2">
             {saving && (
-              <div className="flex items-center gap-1 text-sm text-muted-foreground mr-2">
+              <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mr-2">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 <span>Saving...</span>
               </div>
@@ -348,7 +355,7 @@ export default function NotificationPreferences() {
               onClick={() => savePreferences(preferences)} 
               disabled={saving} 
               variant="outline"
-              className="gap-2"
+              className="gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               <Save className="h-4 w-4" />
               Save Now

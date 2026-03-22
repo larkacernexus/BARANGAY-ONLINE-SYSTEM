@@ -29,6 +29,9 @@ class Household extends Model
         'vehicle',
         'remarks',
         'status',
+        'google_maps_url',
+        'latitude',
+        'longitude',
     ];
 
     protected $casts = [
@@ -36,6 +39,8 @@ class Household extends Model
         'internet' => 'boolean',
         'vehicle' => 'boolean',
         'member_count' => 'integer',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     protected $appends = [
@@ -47,6 +52,144 @@ class Household extends Model
         'has_user_account',
         'current_head_name',
     ];
+
+    // ========== BOOT METHOD FOR AUTO COORDINATE EXTRACTION ==========
+    protected static function boot()
+    {
+        parent::boot();
+        
+        static::saving(function ($household) {
+            if ($household->google_maps_url && $household->isDirty('google_maps_url')) {
+                $household->extractCoordinatesFromUrl();
+            }
+        });
+    }
+
+    // ========== GOOGLE MAPS COORDINATE EXTRACTION METHODS ==========
+
+    /**
+     * Extract latitude and longitude from Google Maps URL
+     * This runs automatically when saving
+     */
+    public function extractCoordinatesFromUrl()
+    {
+        if (!$this->google_maps_url) {
+            return;
+        }
+
+        try {
+            $url = $this->google_maps_url;
+            
+            // Handle Google Maps short URLs (maps.app.goo.gl)
+            if (strpos($url, 'maps.app.goo.gl') !== false) {
+                $this->extractFromShortUrl($url);
+                return;
+            }
+            
+            // Try to parse coordinates from URL with @ symbol
+            if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches)) {
+                $this->latitude = (float) $matches[1];
+                $this->longitude = (float) $matches[2];
+                return;
+            }
+            
+            // Try to parse from search format
+            if (preg_match('/\/search\/(\d+\.\d+),[\+ ]*(\d+\.\d+)/', $url, $matches)) {
+                $this->latitude = (float) $matches[1];
+                $this->longitude = (float) $matches[2];
+                return;
+            }
+            
+            // Try to parse from query parameter
+            if (preg_match('/[?&]q=([^&]+)/', $url, $matches)) {
+                $query = urldecode($matches[1]);
+                if (preg_match('/(-?\d+\.\d+),(-?\d+\.\d+)/', $query, $coordMatches)) {
+                    $this->latitude = (float) $coordMatches[1];
+                    $this->longitude = (float) $coordMatches[2];
+                    return;
+                }
+            }
+            
+        } catch (\Exception $e) {
+            \Log::warning("Failed to extract coordinates from URL: {$this->google_maps_url}", [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Extract coordinates from Google Maps short URL
+     */
+    private function extractFromShortUrl($shortUrl)
+    {
+        try {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $shortUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
+            curl_setopt($ch, CURLOPT_HEADER, true);
+            curl_setopt($ch, CURLOPT_NOBODY, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+            
+            $response = curl_exec($ch);
+            $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+            curl_close($ch);
+            
+            if (!$finalUrl) {
+                return;
+            }
+            
+            // Extract coordinates from the resolved URL
+            if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $finalUrl, $matches)) {
+                $this->latitude = (float) $matches[1];
+                $this->longitude = (float) $matches[2];
+                return;
+            }
+            
+            if (preg_match('%\/search\/(\d+\.\d+),[\+ ]*(\d+\.\d+)%', $finalUrl, $matches)) {
+                $this->latitude = (float) $matches[1];
+                $this->longitude = (float) $matches[2];
+                return;
+            }
+            
+            if (preg_match('/(\d+\.\d+),(\d+\.\d+)/', $finalUrl, $matches)) {
+                $this->latitude = (float) $matches[1];
+                $this->longitude = (float) $matches[2];
+                return;
+            }
+            
+        } catch (\Exception $e) {
+            \Log::warning("Failed to resolve short URL: {$shortUrl}", [
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Get embed URL for Google Maps
+     */
+    public function getEmbedUrlAttribute()
+    {
+        $apiKey = env('VITE_GOOGLE_MAPS_API_KEY');
+        
+        if (!$apiKey) {
+            return null;
+        }
+        
+        if ($this->latitude && $this->longitude) {
+            return "https://www.google.com/maps/embed/v1/place?key={$apiKey}&q={$this->latitude},{$this->longitude}&zoom=16";
+        }
+        
+        if ($this->google_maps_url) {
+            return "https://www.google.com/maps/embed/v1/place?key={$apiKey}&q=" . urlencode($this->google_maps_url);
+        }
+        
+        return null;
+    }
 
     // ========== ACTIVITY LOG CONFIGURATION ==========
 
@@ -73,6 +216,9 @@ class Household extends Model
                 'remarks',
                 'status',
                 'user_id',
+                'google_maps_url',
+                'latitude',
+                'longitude',
             ])
             ->logOnlyDirty() // Only log changed attributes
             ->setDescriptionForEvent(fn(string $eventName) => $this->getDescriptionForEvent($eventName))

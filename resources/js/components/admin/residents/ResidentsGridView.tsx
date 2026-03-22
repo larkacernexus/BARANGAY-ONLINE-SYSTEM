@@ -426,6 +426,18 @@ export default function ResidentsGridView({
                                                     <span>Copy Name</span>
                                                 </DropdownMenuItem>
                                                 
+                                                  {resident.contact_number && (
+                                                    <DropdownMenuItem 
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            window.location.href = `tel:${resident.contact_number}`;
+                                                        }}
+                                                        className="flex items-center gap-2 cursor-pointer"
+                                                    >
+                                                        <Phone className="h-4 w-4" />
+                                                        <span>Call Resident</span>
+                                                    </DropdownMenuItem>
+                                                )}
                                                 {contactNumber && (
                                                     <DropdownMenuItem 
                                                         onClick={(e) => {

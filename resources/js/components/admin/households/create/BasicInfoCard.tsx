@@ -4,13 +4,29 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Home, Phone, Mail, Key, AlertCircle, Users } from 'lucide-react';
+import { Home, Phone, Mail, Key, AlertCircle, Users, ArrowRight, Ban, Info } from 'lucide-react';
 import { Link } from '@inertiajs/react';
+import { Badge } from '@/components/ui/badge';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { useState, useEffect } from 'react';
 
 interface Resident {
     id: number;
     first_name: string;
     last_name: string;
+    middle_name?: string;
+    household_status?: 'none' | 'member' | 'head';
+    current_household?: {
+        id: number;
+        number: string;
+        is_head: boolean;
+        relationship: string;
+    } | null;
 }
 
 interface Props {
@@ -21,10 +37,23 @@ interface Props {
 }
 
 export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
+    const [selectedHeadDetails, setSelectedHeadDetails] = useState<Resident | null>(null);
+
+    // Update selected head details when head_resident_id changes
+    useEffect(() => {
+        if (data.head_resident_id) {
+            const head = heads.find(h => h.id === data.head_resident_id);
+            setSelectedHeadDetails(head || null);
+        } else {
+            setSelectedHeadDetails(null);
+        }
+    }, [data.head_resident_id, heads]);
+
     const handleHeadChange = (value: string) => {
         if (!value) {
             setData('head_of_family', '');
             setData('head_resident_id', null);
+            setSelectedHeadDetails(null);
             return;
         }
 
@@ -33,8 +62,40 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
             const fullName = `${selectedHead.first_name} ${selectedHead.last_name}`.trim();
             setData('head_of_family', fullName);
             setData('head_resident_id', parseInt(value));
+            setSelectedHeadDetails(selectedHead);
         }
     };
+
+    // Get head status indicator
+    const getHeadStatusIndicator = () => {
+        if (!selectedHeadDetails) return null;
+
+        // Check if this head is currently a member of another household
+        if (selectedHeadDetails.household_status === 'member') {
+            return {
+                type: 'info',
+                icon: <ArrowRight className="h-4 w-4 text-purple-500" />,
+                title: 'Currently in Another Household',
+                message: selectedHeadDetails.current_household 
+                    ? `Currently a member of Household #${selectedHeadDetails.current_household.number} as ${selectedHeadDetails.current_household.relationship}. Will be transferred to become head of this new household.`
+                    : 'Currently a member of another household. Will be transferred to become head of this new household.',
+                className: 'bg-purple-50 border-purple-200 text-purple-800 dark:bg-purple-900/20 dark:border-purple-800 dark:text-purple-300',
+                iconBg: 'bg-purple-100 dark:bg-purple-900/30'
+            };
+        }
+
+        // Not in any household
+        return {
+            type: 'none',
+            icon: <Users className="h-4 w-4 text-gray-500" />,
+            title: 'Not in Any Household',
+            message: 'This person is not currently part of any household.',
+            className: 'bg-gray-50 border-gray-200 text-gray-800 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300',
+            iconBg: 'bg-gray-100 dark:bg-gray-700'
+        };
+    };
+
+    const statusIndicator = getHeadStatusIndicator();
 
     return (
         <Card className="dark:bg-gray-900">
@@ -88,6 +149,8 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
                     <Label htmlFor="head_resident_id" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         Head of Family <span className="text-red-500">*</span>
                     </Label>
+                    
+                    {/* Head Selection Dropdown */}
                     <Select 
                         value={data.head_resident_id?.toString() || ''}
                         onValueChange={handleHeadChange}
@@ -104,17 +167,82 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
                             ) : (
                                 heads.map((head) => {
                                     const fullName = `${head.first_name} ${head.last_name}`.trim();
+                                    const isMemberOfOther = head.household_status === 'member';
+                                    
                                     return (
-                                        <SelectItem key={head.id} value={head.id.toString()} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                            {fullName}
+                                        <SelectItem 
+                                            key={head.id} 
+                                            value={head.id.toString()} 
+                                            className={`dark:text-gray-300 dark:focus:bg-gray-700 ${
+                                                isMemberOfOther ? 'text-purple-600 dark:text-purple-400' : ''
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between w-full">
+                                                <span>{fullName}</span>
+                                                {isMemberOfOther && head.current_household && (
+                                                    <Badge variant="outline" className="ml-2 bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 text-xs">
+                                                        <Users className="h-3 w-3 mr-1" />
+                                                        HH #{head.current_household.number}
+                                                    </Badge>
+                                                )}
+                                                {!isMemberOfOther && (
+                                                    <Badge variant="outline" className="ml-2 bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 text-xs">
+                                                        No Household
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </SelectItem>
                                     );
                                 })
                             )}
                         </SelectContent>
                     </Select>
+                    
                     {errors.head_resident_id && (
                         <p className="text-sm text-red-600 dark:text-red-400">{errors.head_resident_id}</p>
+                    )}
+                    
+                    {/* Status Indicator for Selected Head */}
+                    {statusIndicator && (
+                        <TooltipProvider>
+                            <div className={`mt-3 p-3 rounded-lg border ${statusIndicator.className}`}>
+                                <div className="flex items-start gap-3">
+                                    <div className={`h-8 w-8 rounded-full ${statusIndicator.iconBg} flex items-center justify-center flex-shrink-0`}>
+                                        {statusIndicator.icon}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-sm font-medium">
+                                                {statusIndicator.title}
+                                            </h4>
+                                            {selectedHeadDetails?.current_household && (
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-xs">
+                                                        <p className="font-medium mb-1">Household Details:</p>
+                                                        <p>Number: #{selectedHeadDetails.current_household.number}</p>
+                                                        <p>Relationship: {selectedHeadDetails.current_household.relationship}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            )}
+                                        </div>
+                                        <p className="text-xs mt-1 opacity-90">
+                                            {statusIndicator.message}
+                                        </p>
+                                        
+                                        {/* Show current household details if member */}
+                                        {selectedHeadDetails?.household_status === 'member' && selectedHeadDetails.current_household && (
+                                            <div className="mt-2 text-xs border-t border-purple-200 dark:border-purple-800 pt-2">
+                                                <span className="font-medium">Current Household:</span>{' '}
+                                                #{selectedHeadDetails.current_household.number} as {selectedHeadDetails.current_household.relationship}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </TooltipProvider>
                     )}
                     
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -126,15 +254,39 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
                         )}
                     </div>
                     
+                    {/* Manual Entry Option */}
+                    <div className="relative mt-4">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t dark:border-gray-700" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-white dark:bg-gray-900 px-2 text-gray-500 dark:text-gray-400">
+                                Or enter manually
+                            </span>
+                        </div>
+                    </div>
+                    
                     <Input 
                         value={data.head_of_family}
-                        onChange={(e) => setData('head_of_family', e.target.value)}
-                        placeholder="Or enter name manually"
+                        onChange={(e) => {
+                            setData('head_of_family', e.target.value);
+                            // Clear selected head if manually entering
+                            if (data.head_resident_id) {
+                                setData('head_resident_id', null);
+                                setSelectedHeadDetails(null);
+                            }
+                        }}
+                        placeholder="Enter head of family name manually"
                         className="mt-2 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                     />
                     {errors.head_of_family && (
                         <p className="text-sm text-red-600 dark:text-red-400">{errors.head_of_family}</p>
                     )}
+                    
+                    {/* Helper text for manual entry */}
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Manual entry is useful if the resident is not yet registered in the system.
+                    </p>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">

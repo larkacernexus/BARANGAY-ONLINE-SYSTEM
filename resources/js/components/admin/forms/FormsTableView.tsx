@@ -8,14 +8,20 @@ import {
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ChevronUp, ChevronDown, DownloadIcon, Eye, Edit, Trash2, MoreVertical, FileText, Building, CheckCircle, XCircle, PlayCircle, PauseCircle } from 'lucide-react';
+import { ChevronUp, ChevronDown, DownloadIcon, Eye, Edit, Trash2, MoreVertical, FileText, Building, CheckCircle, XCircle, PlayCircle, PauseCircle, CheckSquare, Copy, Square } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { EmptyState } from '@/components/adminui/empty-state';
-import { ActionDropdown, ActionDropdownItem, ActionDropdownSeparator } from '@/components/adminui/action-dropdown';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Form, Filters } from '@/types';
 import { formUtils } from '@/admin-utils/form-utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, MouseEvent } from 'react';
 
 interface FormsTableViewProps {
     forms: Form[];
@@ -89,6 +95,18 @@ export default function FormsTableView({
         return 50;
     };
 
+    const handleViewDetails = (id: number, e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.location.href = route('admin.forms.show', id);
+    };
+
+    const handleEdit = (id: number, e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.location.href = route('admin.forms.edit', id);
+    };
+
     const renderTableRow = (form: Form) => {
         const titleLength = getTruncationLength('title');
         const descLength = getTruncationLength('description');
@@ -105,7 +123,7 @@ export default function FormsTableView({
                     if (isBulkMode && e.target instanceof HTMLElement && 
                         !e.target.closest('a') && 
                         !e.target.closest('button') &&
-                        !e.target.closest('.dropdown-menu-content') &&
+                        !e.target.closest('[role="menu"]') &&
                         !e.target.closest('input[type="checkbox"]')) {
                         onItemSelect(form.id);
                     }
@@ -191,67 +209,134 @@ export default function FormsTableView({
                     </Badge>
                 </TableCell>
                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
-                    <ActionDropdown>
-                        {/* View Action */}
-                        <Link href={route('admin.forms.show', form.id)}>
-                            <ActionDropdownItem
-                                icon={<Eye className="h-4 w-4" />}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button 
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                                onClick={(e) => e.stopPropagation()}
                             >
-                                View Details
-                            </ActionDropdownItem>
-                        </Link>
-
-                        {/* Edit Action */}
-                        <Link href={route('admin.forms.edit', form.id)}>
-                            <ActionDropdownItem
-                                icon={<Edit className="h-4 w-4" />}
+                                <MoreVertical className="h-4 w-4 text-gray-500" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleViewDetails(form.id, e);
+                                }}
+                                className="flex items-center gap-2 cursor-pointer"
                             >
-                                Edit Form
-                            </ActionDropdownItem>
-                        </Link>
+                                <Eye className="h-4 w-4" />
+                                <span>View Details</span>
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleEdit(form.id, e);
+                                }}
+                                className="flex items-center gap-2 cursor-pointer"
+                            >
+                                <Edit className="h-4 w-4" />
+                                <span>Edit Form</span>
+                            </DropdownMenuItem>
 
-                        {/* Download Action */}
-                        <ActionDropdownItem
-                            icon={<DownloadIcon className="h-4 w-4" />}
-                            onClick={() => onDownload(form)}
-                        >
-                            Download File
-                        </ActionDropdownItem>
+                            <DropdownMenuItem 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    onDownload(form);
+                                }}
+                                className="flex items-center gap-2 cursor-pointer"
+                            >
+                                <DownloadIcon className="h-4 w-4" />
+                                <span>Download File</span>
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            <DropdownMenuItem 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    onToggleStatus(form);
+                                }}
+                                className="flex items-center gap-2 cursor-pointer"
+                            >
+                                {form.is_active ? (
+                                    <>
+                                        <PauseCircle className="h-4 w-4" />
+                                        <span>Deactivate</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <PlayCircle className="h-4 w-4" />
+                                        <span>Activate</span>
+                                    </>
+                                )}
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    navigator.clipboard.writeText(form.id.toString());
+                                }}
+                                className="flex items-center gap-2 cursor-pointer"
+                            >
+                                <Copy className="h-4 w-4" />
+                                <span>Copy Form ID</span>
+                            </DropdownMenuItem>
 
-                        <ActionDropdownSeparator />
-
-                        {/* Toggle Status Action */}
-                        <ActionDropdownItem
-                            icon={form.is_active ? <PauseCircle className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}
-                            onClick={() => onToggleStatus(form)}
-                        >
-                            {form.is_active ? 'Deactivate' : 'Activate'}
-                        </ActionDropdownItem>
-
-                        {/* Bulk Mode Actions */}
-                        {isBulkMode && (
-                            <>
-                                <ActionDropdownSeparator />
-                                <ActionDropdownItem
-                                    icon={isSelected ? <CheckCircle className="h-4 w-4" /> : <MoreVertical className="h-4 w-4" />}
-                                    onClick={() => onItemSelect(form.id)}
+                            {form.file_name && (
+                                <DropdownMenuItem 
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        navigator.clipboard.writeText(form.file_name);
+                                    }}
+                                    className="flex items-center gap-2 cursor-pointer"
                                 >
-                                    {isSelected ? 'Deselect for Bulk' : 'Select for Bulk'}
-                                </ActionDropdownItem>
-                            </>
-                        )}
+                                    <FileText className="h-4 w-4" />
+                                    <span>Copy Filename</span>
+                                </DropdownMenuItem>
+                            )}
 
-                        <ActionDropdownSeparator />
-
-                        {/* Delete Action */}
-                        <ActionDropdownItem
-                            icon={<Trash2 className="h-4 w-4" />}
-                            onClick={() => onDelete(form)}
-                            dangerous
-                        >
-                            Delete Form
-                        </ActionDropdownItem>
-                    </ActionDropdown>
+                            {isBulkMode && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            onItemSelect(form.id);
+                                        }}
+                                        className="flex items-center gap-2 cursor-pointer"
+                                    >
+                                        {isSelected ? (
+                                            <>
+                                                <CheckSquare className="h-4 w-4 text-green-600" />
+                                                <span className="text-green-600">Deselect</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Square className="h-4 w-4" />
+                                                <span>Select for Bulk</span>
+                                            </>
+                                        )}
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                            
+                            <DropdownMenuSeparator />
+                            
+                            <DropdownMenuItem 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    onDelete(form);
+                                }}
+                                className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/30"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                <span>Delete Form</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </TableCell>
             </TableRow>
         );

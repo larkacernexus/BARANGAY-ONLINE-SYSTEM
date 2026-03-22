@@ -490,7 +490,7 @@ export default function MyFees() {
         const tabHasData = currentFees.length > 0;
         
         return (
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
                 <CardContent className="p-4 md:p-6">
                     {/* Selection Mode Banner */}
                     {selectMode && tabHasData && (
@@ -512,7 +512,7 @@ export default function MyFees() {
                     {/* Header with Sort */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                                 {statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Fees
                             </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -527,30 +527,30 @@ export default function MyFees() {
                             {/* Sort Dropdown */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="gap-2">
+                                    <Button variant="outline" size="sm" className="gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
                                         <ArrowUpDown className="h-4 w-4" />
                                         Sort
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
                                     <DropdownMenuItem onClick={() => {
                                         setSortBy('date');
                                         setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                                    }}>
+                                    }} className="text-gray-700 dark:text-gray-300">
                                         <Calendar className="h-4 w-4 mr-2" />
                                         Date {sortBy === 'date' && (sortOrder === 'asc' ? '↑' : '↓')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => {
                                         setSortBy('amount');
                                         setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                                    }}>
+                                    }} className="text-gray-700 dark:text-gray-300">
                                         <DollarSign className="h-4 w-4 mr-2" />
                                         Amount {sortBy === 'amount' && (sortOrder === 'asc' ? '↑' : '↓')}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => {
                                         setSortBy('status');
                                         setSortOrder('asc');
-                                    }}>
+                                    }} className="text-gray-700 dark:text-gray-300">
                                         <Info className="h-4 w-4 mr-2" />
                                         Status
                                     </DropdownMenuItem>
@@ -559,14 +559,14 @@ export default function MyFees() {
 
                             {/* View Toggle */}
                             {!selectMode && tabHasData && (
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-lg">
+                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                                     <Button
                                         variant={viewMode === 'grid' ? 'default' : 'ghost'}
                                         size="sm"
                                         onClick={() => setViewMode('grid')}
                                         className={cn(
                                             "h-8 w-8 p-0",
-                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm"
+                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                                         )}
                                     >
                                         <Grid className="h-4 w-4" />
@@ -577,7 +577,7 @@ export default function MyFees() {
                                         onClick={() => setViewMode('list')}
                                         className={cn(
                                             "h-8 w-8 p-0",
-                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm"
+                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
                                         )}
                                     >
                                         <List className="h-4 w-4" />
@@ -591,7 +591,7 @@ export default function MyFees() {
                                     variant={selectMode ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={toggleSelectMode}
-                                    className="gap-2"
+                                    className="gap-2 border-gray-200 dark:border-gray-700"
                                 >
                                     <Square className="h-4 w-4" />
                                     {selectMode ? 'Cancel' : 'Select'}
@@ -648,34 +648,34 @@ export default function MyFees() {
                                 <div className="overflow-x-auto">
                                     <Table>
                                         <TableHeader>
-                                            <TableRow className="hover:bg-transparent">
+                                            <TableRow className="hover:bg-transparent border-gray-200 dark:border-gray-700">
                                                 {selectMode && (
                                                     <TableHead className="w-12">
                                                         <input
                                                             type="checkbox"
                                                             checked={selectedFees.length === currentFees.length && currentFees.length > 0}
                                                             onChange={selectAllFees}
-                                                            className="h-4 w-4 rounded border-gray-300"
+                                                            className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
                                                         />
                                                     </TableHead>
                                                 )}
-                                                <TableHead className="font-semibold">Fee Details</TableHead>
-                                                <TableHead className="font-semibold">Dates</TableHead>
-                                                <TableHead className="font-semibold">Amount</TableHead>
-                                                <TableHead className="font-semibold">Status</TableHead>
-                                                <TableHead className="font-semibold text-right">Actions</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Fee Details</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Dates</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Amount</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300">Status</TableHead>
+                                                <TableHead className="font-semibold text-gray-700 dark:text-gray-300 text-right">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {currentFees.map((fee) => (
-                                                <TableRow key={`table-${fee.id}`} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
+                                                <TableRow key={`table-${fee.id}`} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors border-gray-200 dark:border-gray-700">
                                                     {selectMode && (
                                                         <TableCell>
                                                             <input
                                                                 type="checkbox"
                                                                 checked={selectedFees.includes(fee.id)}
                                                                 onChange={() => toggleSelectFee(fee.id)}
-                                                                className="h-4 w-4 rounded border-gray-300"
+                                                                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
                                                             />
                                                         </TableCell>
                                                     )}
@@ -701,18 +701,18 @@ export default function MyFees() {
                                                     <TableCell>
                                                         <div className="space-y-1">
                                                             <div>
-                                                                <p className="text-xs text-gray-500">Issued</p>
-                                                                <p className="text-sm">{formatDate(fee.issue_date)}</p>
+                                                                <p className="text-xs text-gray-500 dark:text-gray-400">Issued</p>
+                                                                <p className="text-sm text-gray-700 dark:text-gray-300">{formatDate(fee.issue_date)}</p>
                                                             </div>
                                                             <div>
-                                                                <p className="text-xs text-gray-500">Due</p>
+                                                                <p className="text-xs text-gray-500 dark:text-gray-400">Due</p>
                                                                 <p className={cn(
                                                                     "text-sm",
-                                                                    fee.is_overdue && "text-red-600 font-medium"
+                                                                    fee.is_overdue && "text-red-600 dark:text-red-400 font-medium"
                                                                 )}>
                                                                     {formatDate(fee.due_date)}
                                                                     {fee.is_overdue && fee.days_overdue > 0 && (
-                                                                        <span className="ml-1 text-xs text-red-500">
+                                                                        <span className="ml-1 text-xs text-red-500 dark:text-red-400">
                                                                             ({fee.days_overdue}d)
                                                                         </span>
                                                                     )}
@@ -726,11 +726,11 @@ export default function MyFees() {
                                                                 {fee.formatted_total}
                                                             </p>
                                                             {fee.balance > 0 ? (
-                                                                <p className="text-sm font-medium text-red-600">
+                                                                <p className="text-sm font-medium text-red-600 dark:text-red-400">
                                                                     Balance: {fee.formatted_balance}
                                                                 </p>
                                                             ) : (
-                                                                <p className="text-sm font-medium text-emerald-600">
+                                                                <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
                                                                     Paid: {fee.formatted_amount_paid}
                                                                 </p>
                                                             )}
@@ -745,7 +745,7 @@ export default function MyFees() {
                                                                 <Tooltip>
                                                                     <TooltipTrigger asChild>
                                                                         <Link href={`/portal/fees/${fee.id}`}>
-                                                                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                                                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
                                                                                 <Eye className="h-4 w-4" />
                                                                             </Button>
                                                                         </Link>
@@ -756,26 +756,26 @@ export default function MyFees() {
                                                             
                                                             <DropdownMenu>
                                                                 <DropdownMenuTrigger asChild>
-                                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                                                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
                                                                         <MoreVertical className="h-4 w-4" />
                                                                     </Button>
                                                                 </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" className="w-48">
-                                                                    <DropdownMenuItem onClick={() => navigator.clipboard.writeText(fee.fee_code)}>
+                                                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                                                                    <DropdownMenuItem onClick={() => navigator.clipboard.writeText(fee.fee_code)} className="text-gray-700 dark:text-gray-300">
                                                                         <Copy className="h-4 w-4 mr-2" />
                                                                         Copy Fee Code
                                                                     </DropdownMenuItem>
                                                                     {fee.or_number && (
-                                                                        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(fee.or_number)}>
+                                                                        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(fee.or_number)} className="text-gray-700 dark:text-gray-300">
                                                                             <Copy className="h-4 w-4 mr-2" />
                                                                             Copy OR Number
                                                                         </DropdownMenuItem>
                                                                     )}
-                                                                    <DropdownMenuItem>
+                                                                    <DropdownMenuItem className="text-gray-700 dark:text-gray-300">
                                                                         <FileText className="h-4 w-4 mr-2" />
                                                                         Generate Report
                                                                     </DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={handlePrintFees}>
+                                                                    <DropdownMenuItem onClick={handlePrintFees} className="text-gray-700 dark:text-gray-300">
                                                                         <Printer className="h-4 w-4 mr-2" />
                                                                         Print
                                                                     </DropdownMenuItem>
@@ -817,7 +817,7 @@ export default function MyFees() {
                 ]}
             >
                 <Head title="My Fees" />
-               
+                {/* Add your no profile content here */}
             </ResidentLayout>
         );
     }
@@ -832,20 +832,20 @@ export default function MyFees() {
             >
                 <div className="space-y-6">
                     <div>
-                        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">My Fees</h1>
+                        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">My Fees</h1>
                     </div>
-                    <Card className="border-0 shadow-lg">
+                    <Card className="border-0 shadow-lg bg-white dark:bg-gray-900">
                         <CardContent className="py-12 text-center">
                             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl flex items-center justify-center mb-4">
                                 <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
                             </div>
-                            <h3 className="text-lg font-semibold mb-2">Error</h3>
+                            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Error</h3>
                             <p className="text-gray-500 dark:text-gray-400 mb-4">
                                 {pageProps.error}
                             </p>
                             <Button 
                                 onClick={() => window.location.href = '/dashboard'}
-                                className="bg-gradient-to-r from-blue-500 to-blue-600"
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white"
                             >
                                 Go to Dashboard
                             </Button>
@@ -871,8 +871,8 @@ export default function MyFees() {
                     {isMobile && (
                         <div className="flex items-center justify-between sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-10 py-3 px-4 -mx-4">
                             <div>
-                                <h1 className="text-xl font-bold">My Fees</h1>
-                                <p className="text-xs text-gray-500">
+                                <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Fees</h1>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     {stats.total_fees} fee{stats.total_fees !== 1 ? 's' : ''} total
                                 </p>
                             </div>
@@ -881,7 +881,7 @@ export default function MyFees() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowStats(!showStats)}
-                                    className="h-8 px-2 rounded-lg"
+                                    className="h-8 px-2 rounded-lg border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                                 >
                                     {showStats ? (
                                         <ChevronUp className="h-4 w-4" />
@@ -893,11 +893,11 @@ export default function MyFees() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowMobileFilters(true)}
-                                    className="h-8 px-2 rounded-lg relative"
+                                    className="h-8 px-2 rounded-lg relative border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
                                 >
                                     <Filter className="h-4 w-4" />
                                     {hasActiveFilters && (
-                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full animate-pulse" />
+                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 dark:bg-red-400 rounded-full animate-pulse" />
                                     )}
                                 </Button>
                             </div>
@@ -908,7 +908,7 @@ export default function MyFees() {
                     {!isMobile && (
                         <div className="flex items-center justify-between">
                             <div>
-                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                                     My Fees
                                 </h1>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -920,7 +920,7 @@ export default function MyFees() {
                                     variant="outline"
                                     size="sm"
                                     onClick={handlePrintFees}
-                                    className="gap-2"
+                                    className="gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                                 >
                                     <Printer className="h-4 w-4" />
                                     Print
@@ -930,7 +930,7 @@ export default function MyFees() {
                                     size="sm"
                                     onClick={handleExportCSV}
                                     disabled={isExporting}
-                                    className="gap-2"
+                                    className="gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                                 >
                                     <Download className="h-4 w-4" />
                                     {isExporting ? 'Exporting...' : 'Export'}
@@ -992,7 +992,6 @@ export default function MyFees() {
                         </div>
                     </div>
                 </div>
-                
                 
                 {/* Mobile Filter Modal */}
                 <ModernFilterModal

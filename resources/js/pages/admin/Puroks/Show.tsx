@@ -1,13 +1,6 @@
-// resources/js/Pages/Admin/Puroks/Show.tsx
 import AppLayout from '@/layouts/admin-app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -29,13 +22,26 @@ import {
     Home,
     Users,
     BarChart3,
-    Award,
     Hash,
     Loader2,
+    ArrowLeft,
+    Link as LinkIcon,
+    Printer,
+    Edit,
+    Trash2,
+    Check,
+    Download,
+    MapPin,
+    XCircle,
+    HelpCircle,
+    Sparkles,
 } from 'lucide-react';
+import { cn } from "@/lib/utils";
+
+// Import Admin Tabs Component
+import { AdminTabsWithContent, AdminTabPanel } from '@/components/adminui/admin-tabs';
 
 // Import components
-import { PurokHeader } from '@/components/admin/puroks/show/components/purok-header';
 import { StatsGrid } from '@/components/admin/puroks/show/components/stats-grid';
 import { PurokInformationCard } from '@/components/admin/puroks/show/components/purok-information-card';
 import { PurokLeaderCard } from '@/components/admin/puroks/show/components/purok-leader-card';
@@ -111,12 +117,43 @@ export default function PurokShow({
         a.click();
     };
 
+    // Tab definitions
     const tabs = [
-        { id: 'overview', label: 'Overview', icon: <Info className="h-4 w-4" /> },
-        { id: 'households', label: 'Households', icon: <Home className="h-4 w-4" />, count: households.total },
-        { id: 'residents', label: 'Residents', icon: <Users className="h-4 w-4" />, count: residents.total },
-        { id: 'demographics', label: 'Demographics', icon: <BarChart3 className="h-4 w-4" /> },
+        { 
+            id: 'overview', 
+            label: 'Overview', 
+            icon: <Info className="h-4 w-4" />,
+        },
+        { 
+            id: 'households', 
+            label: 'Households', 
+            icon: <Home className="h-4 w-4" />,
+            count: households.total 
+        },
+        { 
+            id: 'residents', 
+            label: 'Residents', 
+            icon: <Users className="h-4 w-4" />,
+            count: residents.total 
+        },
+        { 
+            id: 'demographics', 
+            label: 'Demographics', 
+            icon: <BarChart3 className="h-4 w-4" />,
+        },
     ];
+
+    // Get status badge variant
+    const getStatusVariant = (status: string) => {
+        switch (status) {
+            case 'active':
+                return 'default';
+            case 'inactive':
+                return 'secondary';
+            default:
+                return 'outline';
+        }
+    };
 
     return (
         <>
@@ -132,92 +169,173 @@ export default function PurokShow({
             >
                 <TooltipProvider>
                     <div className="space-y-6">
-                        {/* Header with Actions */}
-                        <PurokHeader
-                            purok={purok}
-                            isNew={isNew}
-                            onCopyLink={handleCopyLink}
-                            onPrint={handlePrint}
-                            onExport={handleExport}
-                            onDelete={() => setShowDeleteDialog(true)}
-                            getStatusColor={getStatusColor}
-                            getStatusIcon={getStatusIcon}
-                        />
+                        {/* Header Section */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <Link href="/admin/puroks">
+                                    <Button variant="ghost" size="sm" className="dark:text-gray-300 dark:hover:bg-gray-900">
+                                        <ArrowLeft className="h-4 w-4 mr-2" />
+                                        Back
+                                    </Button>
+                                </Link>
+                                <div>
+                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight line-clamp-2 dark:text-gray-100 uppercase">
+                                        Purok {purok.name}
+                                    </h1>
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        <Badge variant={getStatusVariant(purok.status)} className="flex items-center gap-1">
+                                            {purok.status === 'active' ? (
+                                                <Check className="h-3 w-3" />
+                                            ) : purok.status === 'inactive' ? (
+                                                <XCircle className="h-3 w-3" />
+                                            ) : (
+                                                <HelpCircle className="h-3 w-3" />
+                                            )}
+                                            {purok.status}
+                                        </Badge>
+                                        
+                                        {isNew && (
+                                            <Badge variant="default" className="bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-500 dark:to-pink-500 text-white border-none">
+                                                <Sparkles className="h-3 w-3 mr-1" />
+                                                New
+                                            </Badge>
+                                        )}
+                                        <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300 font-mono">
+                                            <Hash className="h-3 w-3 mr-1" />
+                                            {purok.id}
+                                        </Badge>
+                                        <div className="flex items-center gap-3 ml-1 text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-tighter">
+                                            <span className="flex items-center gap-1 leading-none">
+                                                <MapPin className="h-3 w-3" />
+                                                {purok.location || 'No location set'}
+                                            </span>
+                                            <span className="flex items-center gap-1 leading-none">
+                                                <Users className="h-3 w-3" />
+                                                {residents.total} RESIDENTS
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Top Action Buttons */}
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleCopyLink}
+                                    className="flex-1 sm:flex-none h-9 dark:border-gray-600 dark:text-gray-300"
+                                >
+                                    {copied ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <LinkIcon className="h-4 w-4 mr-2" />}
+                                    {copied ? 'Copied' : 'Link'}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handlePrint}
+                                    className="flex-1 sm:flex-none h-9 dark:border-gray-600 dark:text-gray-300"
+                                >
+                                    <Printer className="h-4 w-4 mr-2" />
+                                    Print
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleExport}
+                                    className="flex-1 sm:flex-none h-9 dark:border-gray-600 dark:text-gray-300"
+                                >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export
+                                </Button>
+                                <Link href={`/admin/puroks/${purok.id}/edit`} className="flex-1 sm:flex-none">
+                                    <Button variant="outline" size="sm" className="w-full h-9 dark:border-gray-600 dark:text-gray-300">
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
+                                    </Button>
+                                </Link>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setShowDeleteDialog(true)}
+                                    className="h-9 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
 
                         {/* Stats Grid */}
                         <StatsGrid stats={stats} />
 
-                        {/* Tabs Navigation */}
-                        <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
-                            <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-                                {tabs.map(tab => (
-                                    <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-2">
-                                        {tab.icon}
-                                        <span className="hidden sm:inline">{tab.label}</span>
-                                        {tab.count !== undefined && tab.count > 0 && (
-                                            <Badge variant="secondary" className="ml-1 text-xs">
-                                                {tab.count}
-                                            </Badge>
-                                        )}
-                                    </TabsTrigger>
-                                ))}
-                            </TabsList>
-
-                            <div className="mt-6">
-                                {/* Overview Tab */}
-                                <TabsContent value="overview" className="space-y-6">
-                                    <div className="grid gap-6 lg:grid-cols-3">
-                                        {/* Left Column - Purok Details */}
-                                        <div className="lg:col-span-2 space-y-6">
-                                            <PurokInformationCard purok={purok} />
-                                            <PurokLeaderCard purok={purok} />
-                                        </div>
-
-                                        {/* Right Column - Statistics & Quick Actions */}
-                                        <div className="space-y-6">
-                                            <PurokStatisticsCard purok={purok} getStatusColor={getStatusColor} getStatusIcon={getStatusIcon} />
-                                            <DemographicsCard demographics={demographics} />
-                                            <RecentActivitiesCard 
-                                                recentHouseholds={recentHouseholds}
-                                                recentResidents={recentResidents}
-                                                formatDate={formatDate}
-                                            />
-                                            <QuickActionsCard 
-                                                purok={purok}
-                                                onDelete={() => setShowDeleteDialog(true)}
-                                            />
-                                            <SystemInfoCard purok={purok} formatDate={formatDate} />
-                                        </div>
+                        {/* Admin Tabs Component */}
+                        <AdminTabsWithContent
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            variant="underlined"
+                            size="md"
+                            scrollable={true}
+                            showCountBadges={true}
+                            lazyLoad={true}
+                        >
+                            {/* Overview Tab */}
+                            <AdminTabPanel value="overview">
+                                <div className="grid gap-6 lg:grid-cols-3">
+                                    {/* Left Column - Purok Details */}
+                                    <div className="lg:col-span-2 space-y-6">
+                                        {/* Google Maps Section - Embedded Map */}
+                                        <PurokInformationCard purok={purok} />
+                                        <PurokLeaderCard purok={purok} />
                                     </div>
-                                </TabsContent>
 
-                                {/* Households Tab */}
-                                <TabsContent value="households">
-                                    <HouseholdsTable 
-                                        households={households} 
-                                        purokId={purok.id}
-                                        purokName={purok.name}
-                                    />
-                                </TabsContent>
-
-                                {/* Residents Tab */}
-                                <TabsContent value="residents">
-                                    <ResidentsTable 
-                                        residents={residents} 
-                                        purokId={purok.id}
-                                        purokName={purok.name}
-                                    />
-                                </TabsContent>
-
-                                {/* Demographics Tab */}
-                                <TabsContent value="demographics">
-                                    <div className="grid gap-6 md:grid-cols-2">
+                                    {/* Right Column - Statistics & Quick Actions */}
+                                    <div className="space-y-6">
+                                        <PurokStatisticsCard 
+                                            purok={purok} 
+                                            getStatusColor={getStatusColor} 
+                                            getStatusIcon={getStatusIcon} 
+                                        />
                                         <DemographicsCard demographics={demographics} />
-                                        <DemographicsDetailsCard demographics={demographics} />
+                                        <RecentActivitiesCard 
+                                            recentHouseholds={recentHouseholds}
+                                            recentResidents={recentResidents}
+                                            formatDate={formatDate}
+                                        />
+                                        <QuickActionsCard 
+                                            purok={purok}
+                                            onDelete={() => setShowDeleteDialog(true)}
+                                        />
+                                        <SystemInfoCard purok={purok} formatDate={formatDate} />
                                     </div>
-                                </TabsContent>
-                            </div>
-                        </Tabs>
+                                </div>
+                            </AdminTabPanel>
+
+                            {/* Households Tab */}
+                            <AdminTabPanel value="households">
+                                <HouseholdsTable 
+                                    households={households} 
+                                    purokId={purok.id}
+                                    purokName={purok.name}
+                                />
+                            </AdminTabPanel>
+
+                            {/* Residents Tab */}
+                            <AdminTabPanel value="residents">
+                                <ResidentsTable 
+                                    residents={residents} 
+                                    purokId={purok.id}
+                                    purokName={purok.name}
+                                />
+                            </AdminTabPanel>
+
+                            {/* Demographics Tab */}
+                            <AdminTabPanel value="demographics">
+                                <div className="grid gap-6 md:grid-cols-2">
+                                    <DemographicsCard demographics={demographics} />
+                                    <DemographicsDetailsCard demographics={demographics} />
+                                </div>
+                            </AdminTabPanel>
+                        </AdminTabsWithContent>
                     </div>
                 </TooltipProvider>
 

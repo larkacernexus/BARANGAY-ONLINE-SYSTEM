@@ -38,7 +38,11 @@ import {
     Trash2, 
     Clock, 
     Check,
-    ChevronRight
+    ChevronRight,
+    Receipt,
+    CreditCard,
+    History,
+    FileCheck
 } from 'lucide-react';
 
 // Components
@@ -53,9 +57,21 @@ import { SystemInfo } from '@/components/admin/residents/show/components/SystemI
 import { DangerZone } from '@/components/admin/residents/show/components/DangerZone';
 import { DeleteConfirmationDialog } from '@/components/admin/residents/show/components/DeleteConfirmationDialog';
 
-// Extend the PageProps interface to include available_privileges
+// New Tab Components
+import { FeesTab } from '@/components/admin/residents/show/components/tabs/FeesTab';
+import { PaymentsTab } from '@/components/admin/residents/show/components/tabs/PaymentsTab';
+import { ClearancesTab } from '@/components/admin/residents/show/components/tabs/ClearancesTab';
+import { DocumentsTab } from '@/components/admin/residents/show/components/tabs/DocumentsTab';
+import { ActivityLogTab } from '@/components/admin/residents/show/components/tabs/ActivityLogTab';
+
+// Extend the PageProps interface
 interface ExtendedPageProps extends PageProps {
-    available_privileges?: any[]; // Add this line
+    available_privileges?: any[];
+    fees?: any[];
+    payments?: any[];
+    clearances?: any[];
+    documents?: any[];
+    activities?: any[];
 }
 
 export default function ShowResident({ 
@@ -65,7 +81,12 @@ export default function ShowResident({
     related_household_members = [],
     households = [],
     puroks = [],
-    available_privileges = [] // Add this line to receive from controller
+    available_privileges = [],
+    fees = [],
+    payments = [],
+    clearances = [],
+    documents = [],
+    activities = []
 }: ExtendedPageProps) {
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -95,6 +116,25 @@ export default function ShowResident({
     const expiringSoonPrivileges = residentPrivileges.filter(p => p.status === 'expiring_soon');
     const pendingPrivileges = residentPrivileges.filter(p => p.status === 'pending');
     const expiredPrivileges = residentPrivileges.filter(p => p.status === 'expired');
+    
+    // Fee statistics
+    const totalFees = fees.length;
+    const pendingFees = fees.filter(f => f.status === 'pending' || f.status === 'issued').length;
+    const paidFees = fees.filter(f => f.status === 'paid').length;
+    const overdueFees = fees.filter(f => f.status === 'overdue').length;
+    const totalFeeAmount = fees.reduce((sum, f) => sum + (f.total_amount || 0), 0);
+    
+    // Payment statistics
+    const totalPayments = payments.length;
+    const totalPaymentAmount = payments.reduce((sum, p) => sum + (p.total_amount || 0), 0);
+    
+    // Clearance statistics
+    const totalClearances = clearances.length;
+    const pendingClearances = clearances.filter(c => c.status === 'pending').length;
+    
+    // Document statistics
+    const totalDocuments = documents.length;
+    const activeDocuments = documents.filter(d => d.status === 'active').length;
     
     const maxDiscount = Math.max(...residentPrivileges.map(p => getDiscountPercentage(p) || 0), 0);
     const fullName = `${resident.first_name} ${resident.middle_name ? resident.middle_name + ' ' : ''}${resident.last_name}${resident.suffix ? ' ' + resident.suffix : ''}`;
@@ -132,10 +172,15 @@ export default function ShowResident({
     };
 
     const tabs = [
-        { id: 'overview', label: 'Overview', icon: <User className="h-4 w-4" /> },
-        { id: 'details', label: 'Personal Details', icon: <FileText className="h-4 w-4" /> },
-        { id: 'privileges', label: `Benefits (${residentPrivileges.length})`, icon: <Award className="h-4 w-4" /> },
-        { id: 'household', label: 'Household', icon: <Home className="h-4 w-4" /> },
+        { id: 'overview', label: 'Overview', icon: <User className="h-4 w-4" />, count: null },
+        { id: 'details', label: 'Personal Details', icon: <FileText className="h-4 w-4" />, count: null },
+        { id: 'privileges', label: 'Benefits', icon: <Award className="h-4 w-4" />, count: residentPrivileges.length },
+        { id: 'fees', label: 'Fees', icon: <Receipt className="h-4 w-4" />, count: pendingFees },
+        { id: 'payments', label: 'Payments', icon: <CreditCard className="h-4 w-4" />, count: totalPayments },
+        { id: 'clearances', label: 'Clearances', icon: <FileCheck className="h-4 w-4" />, count: pendingClearances },
+        { id: 'documents', label: 'Documents', icon: <FileText className="h-4 w-4" />, count: totalDocuments },
+        { id: 'household', label: 'Household', icon: <Home className="h-4 w-4" />, count: null },
+        { id: 'history', label: 'Activity Log', icon: <History className="h-4 w-4" />, count: activities.length },
     ];
 
     return (
@@ -252,6 +297,16 @@ export default function ShowResident({
                             >
                                 {tab.icon}
                                 {tab.label}
+                                {tab.count !== null && tab.count > 0 && (
+                                    <span className={cn(
+                                        "ml-1 px-1.5 py-0.5 text-xs rounded-full",
+                                        activeTab === tab.id
+                                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
+                                            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                    )}>
+                                        {tab.count}
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </div>
@@ -269,7 +324,42 @@ export default function ShowResident({
                                     expiringSoonPrivileges={expiringSoonPrivileges}
                                     pendingPrivileges={pendingPrivileges}
                                     expiredPrivileges={expiredPrivileges}
-                                    availablePrivileges={available_privileges} // Add this line
+                                    availablePrivileges={available_privileges}
+                                />
+                            )}
+                            {activeTab === 'fees' && (
+                                <FeesTab
+                                    residentId={resident.id}
+                                    fees={fees}
+                                    totalFees={totalFees}
+                                    paidFees={paidFees}
+                                    pendingFees={pendingFees}
+                                    overdueFees={overdueFees}
+                                    totalAmount={totalFeeAmount}
+                                />
+                            )}
+                            {activeTab === 'payments' && (
+                                <PaymentsTab
+                                    residentId={resident.id}
+                                    payments={payments}
+                                    totalPayments={totalPayments}
+                                    totalAmount={totalPaymentAmount}
+                                />
+                            )}
+                            {activeTab === 'clearances' && (
+                                <ClearancesTab
+                                    residentId={resident.id}
+                                    clearances={clearances}
+                                    totalClearances={totalClearances}
+                                    pendingClearances={pendingClearances}
+                                />
+                            )}
+                            {activeTab === 'documents' && (
+                                <DocumentsTab
+                                    residentId={resident.id}
+                                    documents={documents}
+                                    totalDocuments={totalDocuments}
+                                    activeDocuments={activeDocuments}
                                 />
                             )}
                             {activeTab === 'household' && (
@@ -280,6 +370,13 @@ export default function ShowResident({
                                     relatedMembers={actualRelatedMembers}
                                     households={households}
                                     puroks={puroks}
+                                />
+                            )}
+                            {activeTab === 'history' && (
+                                <ActivityLogTab
+                                    residentId={resident.id}
+                                    activities={activities}
+                                    totalActivities={activities.length}
                                 />
                             )}
                         </div>

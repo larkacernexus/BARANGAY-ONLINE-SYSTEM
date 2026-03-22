@@ -15,21 +15,14 @@ import { cn } from '@/lib/utils';
 import { NavResident } from './nav-resident';
 import { 
   LayoutDashboard, 
-  CreditCard, 
-  FileText, 
-  MessageSquare,
   User,
   Bell,
   Calendar,
-  Download,
   Home,
   History,
   Settings,
-  Shield,
-  Phone,
   MapPin,
   Building,
-  FileCheck,
   Receipt,
   AlertCircle,
   Zap,
@@ -42,12 +35,17 @@ import {
   Wallet,
   Clock,
   ShieldCheck,
-  Newspaper
+  Newspaper,
+  ChevronDown,
+  ChevronUp,
+  QrCode,
+  Lock,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
 
-// Resident navigation with fixed widths for text
+// Resident navigation with working routes
 const residentNav = [
   { title: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard, shortTitle: 'Dashboard' },
   { title: 'Profile', href: '/residentsettings/profile', icon: User, shortTitle: 'Profile' },
@@ -55,17 +53,11 @@ const residentNav = [
   { title: 'Payment History', href: '/portal/payments', icon: Wallet, shortTitle: 'Payments' },
   { title: 'Clearances', href: '/portal/my-clearances', icon: ShieldCheck, shortTitle: 'Clearances' },
   { title: 'Community Reports', href: '/portal/community-reports', icon: BarChart3, shortTitle: 'Reports' },
-  { title: 'Documents', href: '/portal/my-records', icon: FolderOpen, shortTitle: 'Documents' },
+  { title: 'My Records', href: '/portal/my-records', icon: FolderOpen, shortTitle: 'Records' },
 ];
 
-const residentQuickActions = [
-  { 
-    title: 'Make Payment', 
-    shortTitle: 'Pay',
-    href: '/portal/payments/pay', 
-    icon: DollarSign, 
-    description: 'Pay fees online'
-  },
+// Quick actions - only include routes that exist in your web.php
+const allQuickActions = [
   { 
     title: 'Request Clearance', 
     shortTitle: 'Clearance',
@@ -80,23 +72,77 @@ const residentQuickActions = [
     icon: AlertCircle, 
     description: 'Report issue'
   },
+  { 
+    title: 'Pay Fees', 
+    shortTitle: 'Pay',
+    href: '/portal/fees/pay', 
+    icon: DollarSign, 
+    description: 'Settle payments'
+  },
+  { 
+    title: 'View Announcements', 
+    shortTitle: 'News',
+    href: '/portal/announcements', 
+    icon: Newspaper, 
+    description: 'Latest updates'
+  },
+  { 
+    title: 'QR Code Login', 
+    shortTitle: 'QR',
+    href: '/residentsettings/profile?tab=qr', 
+    icon: QrCode, 
+    description: 'Generate QR code for login'
+  },
+  { 
+    title: 'Two-Factor Auth', 
+    shortTitle: '2FA',
+    href: '/residentsettings/security/two-factor', 
+    icon: Lock, 
+    description: 'Secure your account'
+  },
+  { 
+    title: 'Security Settings', 
+    shortTitle: 'Security',
+    href: '/residentsettings/security/password', 
+    icon: ShieldCheck, 
+    description: 'Password & security'
+  },
+  { 
+    title: 'Notification Settings', 
+    shortTitle: 'Notif',
+    href: '/residentsettings/preferences/notifications', 
+    icon: Bell, 
+    description: 'Manage notifications'
+  },
 ];
 
+// Display only 4 quick actions initially
+const initialQuickActions = allQuickActions.slice(0, 4);
+const additionalQuickActions = allQuickActions.slice(4);
+
 const residentResources = [
-  { title: 'Announcements', href: '/portal/announcements', icon: Newspaper, badge: '2', shortTitle: 'News' },
-  { title: 'Forms & Templates', href: '/portal/forms', icon: FileText, shortTitle: 'Forms' },
-  { title: 'Support Center', href: '/portal/support', icon: HelpCircle, shortTitle: 'Support' },
-  { title: 'Settings', href: '/residentsettings/profile', icon: Settings, shortTitle: 'Settings' },
+  { title: 'Announcements', href: '/portal/announcements', icon: Newspaper, badge: null, shortTitle: 'News' },
+  { title: 'Forms & Templates', href: '/portal/forms', icon: ScrollText, badge: null, shortTitle: 'Forms' },
+  { title: 'Support Center', href: '/portal/support', icon: HelpCircle, badge: null, shortTitle: 'Support' },
+  { title: 'Settings', href: '/residentsettings/profile', icon: Settings, badge: null, shortTitle: 'Settings' },
 ];
 
 export function ResidentSidebar({ className }: { className?: string }) {
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const { url } = usePage();
+  const [showAllActions, setShowAllActions] = useState(false);
   
   const isActive = (href: string) => {
     return url === href || url.startsWith(href + '/');
   };
+  
+  const toggleAllActions = () => {
+    setShowAllActions(!showAllActions);
+  };
+  
+  // Determine which actions to show
+  const displayedActions = showAllActions ? allQuickActions : initialQuickActions;
   
   return (
     <TooltipProvider delayDuration={300}>
@@ -148,47 +194,14 @@ export function ResidentSidebar({ className }: { className?: string }) {
           </SidebarMenu>
         </SidebarHeader>
 
-        {/* Content - Fixed overflow and spacing with native scrollbar styling */}
+        {/* Content */}
         <SidebarContent 
           className={cn(
             "flex-1 overflow-y-auto overflow-x-hidden px-3 py-5",
-            // Custom scrollbar styles using global CSS classes
             "custom-scrollbar"
           )}
         >
-          {/* Emergency Contact - Fixed positioning and visibility */}
-          {!isCollapsed && (
-            <div className="relative mb-4 w-full block">
-              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-500/5 via-red-400/5 to-orange-400/5 dark:from-red-500/10 dark:via-red-400/10 dark:to-orange-400/10 p-4 border border-red-200/50 dark:border-red-800/30 w-full">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full blur-2xl" />
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="p-1.5 rounded-lg bg-red-500/10 dark:bg-red-500/20 flex-shrink-0">
-                    <Shield className="h-4 w-4 text-red-600 dark:text-red-400" />
-                  </div>
-                  <span className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wider truncate">
-                    Emergency
-                  </span>
-                </div>
-                <div className="space-y-2.5 w-full">
-                  <div className="flex items-center justify-between w-full gap-2">
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">Emergency Hotline</span>
-                    <span className="text-sm font-bold text-red-600 dark:text-red-400 flex-shrink-0 whitespace-nowrap">911</span>
-                  </div>
-                  <div className="flex items-center justify-between w-full gap-2">
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">Barangay Hall</span>
-                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100 flex-shrink-0 whitespace-nowrap">(082) 123-4567</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-red-200/30 dark:border-red-800/30 w-full">
-                    <Phone className="h-3 w-3 text-red-500 flex-shrink-0" />
-                    <span className="text-xs text-red-600 dark:text-red-400 font-medium truncate">
-                      24/7 Hotline Available
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
+      
           {/* Quick Actions Section */}
           <SidebarGroup className="w-full mb-6">
             {!isCollapsed && (
@@ -196,36 +209,36 @@ export function ResidentSidebar({ className }: { className?: string }) {
                 Quick Actions
               </SidebarGroupLabel>
             )}
-            <SidebarMenu className="w-full">
-              {residentQuickActions.map((item) => (
+            <div className="grid grid-cols-1 gap-1 w-full">
+              {/* Display quick actions */}
+              {displayedActions.map((item) => (
                 <SidebarMenuItem key={item.title} className="w-full">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <SidebarMenuButton asChild className="w-full">
+                      <SidebarMenuButton asChild className="w-full p-0">
                         <Link 
                           href={item.href} 
                           className={cn(
                             "group flex items-center gap-3 transition-all duration-200 rounded-lg w-full",
-                            isCollapsed ? "justify-center p-2" : "px-3 py-2"
+                            isCollapsed ? "justify-center p-2" : "px-3 py-2",
+                            !isCollapsed && "hover:bg-gray-100 dark:hover:bg-gray-900"
                           )}
                         >
                           <div className={cn(
                             "flex items-center justify-center rounded-lg transition-all duration-200 flex-shrink-0",
                             isCollapsed 
-                              ? "h-10 w-10 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200/50 dark:border-blue-800/30" 
-                              : "h-8 w-8 bg-gray-100 dark:bg-gray-900 rounded-md group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
+                              ? "h-10 w-10 bg-gray-100 dark:bg-gray-900" 
+                              : "h-8 w-8 bg-gray-100 dark:bg-gray-900 group-hover:bg-gray-200 dark:group-hover:bg-gray-700"
                           )}>
                             <item.icon className={cn(
-                              "transition-colors",
-                              isCollapsed 
-                                ? "h-4 w-4 text-blue-600 dark:text-blue-400" 
-                                : "h-3.5 w-3.5 text-gray-600 dark:text-gray-400"
+                              "transition-all text-gray-600 dark:text-gray-400",
+                              isCollapsed ? "h-4 w-4" : "h-3.5 w-3.5"
                             )} />
                           </div>
                           {!isCollapsed && (
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between w-full">
-                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-[120px]">
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate max-w-[120px]">
                                   {item.title}
                                 </span>
                                 <Zap className="h-3.5 w-3.5 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-1" />
@@ -239,12 +252,66 @@ export function ResidentSidebar({ className }: { className?: string }) {
                       </SidebarMenuButton>
                     </TooltipTrigger>
                     <TooltipContent side="right" className="font-medium">
-                      {item.title}
+                      <div className="flex flex-col gap-1">
+                        <span>{item.title}</span>
+                        <span className="text-xs text-gray-500">{item.description}</span>
+                      </div>
                     </TooltipContent>
                   </Tooltip>
                 </SidebarMenuItem>
               ))}
-            </SidebarMenu>
+
+              {/* See All / See Less button - only show in expanded state */}
+              {!isCollapsed && allQuickActions.length > initialQuickActions.length && (
+                <SidebarMenuItem className="w-full mt-1">
+                  <button
+                    onClick={toggleAllActions}
+                    className={cn(
+                      "group flex items-center gap-3 transition-all duration-200 rounded-lg w-full px-3 py-2",
+                      "hover:bg-gray-100 dark:hover:bg-gray-900"
+                    )}
+                  >
+                    <div className="h-8 w-8 bg-gray-100 dark:bg-gray-900 rounded-lg flex items-center justify-center group-hover:bg-gray-200 dark:group-hover:bg-gray-700">
+                      {showAllActions ? (
+                        <ChevronUp className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {showAllActions ? 'See Less' : 'See All'}
+                      </span>
+                    </div>
+                  </button>
+                </SidebarMenuItem>
+              )}
+
+              {/* For collapsed state, show tooltip with all actions */}
+              {isCollapsed && allQuickActions.length > initialQuickActions.length && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <SidebarMenuItem className="w-full">
+                      <div 
+                        className="group flex items-center justify-center transition-all duration-200 rounded-lg w-full p-2 hover:bg-gray-100 dark:hover:bg-gray-900 cursor-pointer"
+                        onClick={toggleAllActions}
+                      >
+                        <div className="h-10 w-10 bg-gray-100 dark:bg-gray-900 rounded-lg flex items-center justify-center">
+                          {showAllActions ? (
+                            <ChevronUp className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+                    </SidebarMenuItem>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="font-medium">
+                    {showAllActions ? 'See Less' : 'See All Actions'}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           </SidebarGroup>
 
           {/* Main Navigation */}

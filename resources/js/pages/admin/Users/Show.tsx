@@ -1,3 +1,4 @@
+// resources/js/Pages/Admin/Users/Show.tsx
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -9,12 +10,20 @@ import {
     Lock,
 } from 'lucide-react';
 
+// Import Admin Tabs Component
+import { AdminTabsWithContent, AdminTabPanel } from '@/components/adminui/admin-tabs';
+
 // Import components
 import { UserHeader } from '@/components/admin/users/show/components/user-header';
 import { ProfileHeader } from '@/components/admin/users/show/components/profile-header';
 import { StatusBanner } from '@/components/admin/users/show/components/status-banner';
-import { UserTabs } from '@/components/admin/users/show/components/user-tabs';
 import { DeleteConfirmationDialog } from '@/components/admin/users/show/components/delete-confirmation-dialog';
+
+// Import tab components
+import { OverviewTab } from '@/components/admin/users/show/components/tabs/overview-tab';
+import { PermissionsTab } from '@/components/admin/users/show/components/tabs/permissions-tab';
+import { ActivityTab } from '@/components/admin/users/show/components/tabs/activity-tab';
+import { SecurityTab } from '@/components/admin/users/show/components/tabs/security-tab';
 
 // Import types and utilities
 import { UserShowProps } from '@/components/admin/users/show/types';
@@ -122,11 +131,30 @@ export default function UserShow({ user, activityLogs = [], stats = {} }: UserSh
         }
     };
 
+    // Tab definitions
     const tabs = [
-        { id: 'overview', label: 'Overview', icon: UserIcon, count: undefined },
-        { id: 'permissions', label: 'Permissions', icon: Shield, count: (user.permissions?.length || 0) + (user.role?.permissions?.length || 0) },
-        { id: 'activity', label: 'Activity', icon: History, count: activityLogs.length },
-        { id: 'security', label: 'Security', icon: Lock, count: undefined },
+        { 
+            id: 'overview', 
+            label: 'Overview', 
+            icon: <UserIcon className="h-4 w-4" />,
+        },
+        { 
+            id: 'permissions', 
+            label: 'Permissions', 
+            icon: <Shield className="h-4 w-4" />,
+            count: (user.permissions?.length || 0) + (user.role?.permissions?.length || 0)
+        },
+        { 
+            id: 'activity', 
+            label: 'Activity', 
+            icon: <History className="h-4 w-4" />,
+            count: activityLogs.length
+        },
+        { 
+            id: 'security', 
+            label: 'Security', 
+            icon: <Lock className="h-4 w-4" />,
+        },
     ];
 
     return (
@@ -172,26 +200,61 @@ export default function UserShow({ user, activityLogs = [], stats = {} }: UserSh
                         getStatusIcon={getStatusIcon}
                     />
 
-                    {/* Tabs Navigation and Content */}
-                    <UserTabs
-                        activeTab={activeTab}
-                        setActiveTab={setActiveTab}
+                    {/* Admin Tabs Component */}
+                    <AdminTabsWithContent
                         tabs={tabs}
-                        // Content props
-                        user={user}
-                        activityLogs={activityLogs}
-                        stats={stats}
-                        emailCopied={emailCopied}
-                        onCopyEmail={handleCopyEmail}
-                        onResetPassword={handleResetPassword}
-                        onToggleStatus={handleToggleStatus}
-                        onLogoutAll={handleLogoutAllSessions}
-                        onDelete={() => setShowDeleteDialog(true)}
-                        onToggle2FA={handleToggle2FA}
-                        isResettingPassword={isResettingPassword}
-                        isLoggingOutAll={isLoggingOutAll}
-                        formatDate={formatDate}
-                    />
+                        activeTab={activeTab}
+                        onTabChange={setActiveTab}
+                        variant="underlined"
+                        size="md"
+                        scrollable={true}
+                        showCountBadges={true}
+                        lazyLoad={true}
+                    >
+                        <AdminTabPanel value="overview">
+                            <OverviewTab
+                                user={user}
+                                stats={stats}
+                                emailCopied={emailCopied}
+                                onCopyEmail={handleCopyEmail}
+                                onResetPassword={handleResetPassword}
+                                onToggleStatus={handleToggleStatus}
+                                onLogoutAll={handleLogoutAllSessions}
+                                onDelete={() => setShowDeleteDialog(true)}
+                                formatDate={formatDate}
+                                isResettingPassword={isResettingPassword}
+                                isLoggingOutAll={isLoggingOutAll}
+                            />
+                        </AdminTabPanel>
+
+                        <AdminTabPanel value="permissions">
+                            <PermissionsTab
+                                user={user}
+                            />
+                        </AdminTabPanel>
+
+                        <AdminTabPanel value="activity">
+                            <ActivityTab
+                                user={user}
+                                activityLogs={activityLogs}
+                                stats={stats}
+                                onLogoutAll={handleLogoutAllSessions}
+                                isLoggingOutAll={isLoggingOutAll}
+                                formatDate={formatDate}
+                            />
+                        </AdminTabPanel>
+
+                        <AdminTabPanel value="security">
+                            <SecurityTab
+                                user={user}
+                                onResetPassword={handleResetPassword}
+                                onToggle2FA={handleToggle2FA}
+                                onDelete={() => setShowDeleteDialog(true)}
+                                isResettingPassword={isResettingPassword}
+                                formatDate={formatDate}
+                            />
+                        </AdminTabPanel>
+                    </AdminTabsWithContent>
 
                     {/* Delete Confirmation Dialog */}
                     <DeleteConfirmationDialog

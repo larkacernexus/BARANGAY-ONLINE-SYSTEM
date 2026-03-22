@@ -50,6 +50,8 @@ export interface Resident {
 }
 
 export interface HouseholdMember {
+    created_at: any;
+    updated_at: any;
     id: number;
     resident_id: number;
     relationship_to_head: string;
@@ -65,11 +67,15 @@ export interface HouseholdStatistics {
 }
 
 export interface Household {
+    google_maps_url: any;
+    full_address: string;
+    latitude: number | null | undefined;
+    longitude: number | null | undefined;
     id: number;
     household_number: string;
     contact_number: string;
     email?: string;
-    address: string;
+    address: string ;
     purok: string;
     purok_id?: number;
     member_count: number;

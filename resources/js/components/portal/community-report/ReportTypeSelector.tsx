@@ -68,13 +68,13 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
             {activeReportTypes.length > 8 && (
                 <div className="mb-4">
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                             type="text"
                             placeholder="Search report types..."
                             value={searchQuery}
                             onChange={(e) => onSearchChange(e.target.value)}
-                            className="pl-10 pr-10 h-11 rounded-lg"
+                            className="pl-10 pr-10 h-11 rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
                         />
                         {searchQuery && (
                             <button
@@ -82,12 +82,12 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                 onClick={() => onSearchChange('')}
                                 className="absolute right-3 top-1/2 transform -translate-y-1/2"
                             >
-                                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                                <X className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300" />
                             </button>
                         )}
                     </div>
                     {filteredTypes.issues.length === 0 && filteredTypes.complaints.length === 0 && (
-                        <div className="text-center py-6 text-gray-500">
+                        <div className="text-center py-6 text-gray-500 dark:text-gray-400">
                             No report types found matching "{searchQuery}"
                         </div>
                     )}
@@ -112,7 +112,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                 <span>Issues</span>
                                 <Badge 
                                     variant="secondary" 
-                                    className="h-5 min-w-5 flex items-center justify-center px-1 text-xs"
+                                    className="h-5 min-w-5 flex items-center justify-center px-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
                                 >
                                     {filteredTypes.issues.length}
                                 </Badge>
@@ -132,7 +132,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                 <span>Complaints</span>
                                 <Badge 
                                     variant="secondary" 
-                                    className="h-5 min-w-5 flex items-center justify-center px-1 text-xs"
+                                    className="h-5 min-w-5 flex items-center justify-center px-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
                                 >
                                     {filteredTypes.complaints.length}
                                 </Badge>
@@ -166,10 +166,10 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                     isSelected
                                                         ? `border-blue-500 bg-gradient-to-r ${
                                                             activeTab === 'issues' 
-                                                                ? 'from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20' 
-                                                                : 'from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20'
+                                                                ? 'from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30' 
+                                                                : 'from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/30'
                                                         } ring-2 ring-blue-500/20`
-                                                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50'
+                                                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50 bg-white dark:bg-gray-900'
                                                 }`}
                                                 onClick={() => onTypeSelect(type.id)}
                                             >
@@ -178,7 +178,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                         <div className={`p-2.5 rounded-lg flex-shrink-0 mt-0.5 ${
                                                             isSelected 
                                                                 ? (activeTab === 'issues' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-purple-100 dark:bg-purple-900/30')
-                                                                : 'bg-gray-100 dark:bg-gray-900'
+                                                                : 'bg-gray-100 dark:bg-gray-800'
                                                         }`}>
                                                             <Icon className={`h-5 w-5 ${
                                                                 isSelected 
@@ -188,12 +188,12 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                         </div>
                                                         <div className="min-w-0 flex-1">
                                                             <div className="flex items-center gap-2 mb-2">
-                                                                <h3 className="font-semibold text-sm truncate">
+                                                                <h3 className="font-semibold text-sm truncate text-gray-900 dark:text-white">
                                                                     {type.name}
                                                                 </h3>
                                                                 <Badge 
                                                                     style={{ backgroundColor: type.priority_color }}
-                                                                    className="text-xs flex-shrink-0 h-5 px-1.5"
+                                                                    className="text-xs flex-shrink-0 h-5 px-1.5 text-white"
                                                                 >
                                                                     {type.priority_label}
                                                                 </Badge>
@@ -208,17 +208,17 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                                 </div>
                                                                 <div className="flex items-center gap-1">
                                                                     {type.requires_evidence ? (
-                                                                        <Camera className="h-3 w-3 text-amber-600" />
+                                                                        <Camera className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                                                                     ) : (
-                                                                        <FileText className="h-3 w-3 text-gray-400" />
+                                                                        <FileText className="h-3 w-3 text-gray-400 dark:text-gray-500" />
                                                                     )}
                                                                     <span>{type.requires_evidence ? 'Evidence' : 'Optional'}</span>
                                                                 </div>
                                                                 <div className="flex items-center gap-1">
                                                                     {type.allows_anonymous ? (
-                                                                        <Shield className="h-3 w-3 text-green-600" />
+                                                                        <Shield className="h-3 w-3 text-green-600 dark:text-green-400" />
                                                                     ) : (
-                                                                        <UserX className="h-3 w-3 text-gray-400" />
+                                                                        <UserX className="h-3 w-3 text-gray-400 dark:text-gray-500" />
                                                                     )}
                                                                     <span>{type.allows_anonymous ? 'Anon' : 'ID'}</span>
                                                                 </div>
@@ -233,7 +233,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                                 <Check className="h-3.5 w-3.5 text-white" />
                                                             </div>
                                                         ) : (
-                                                            <ArrowRight className="h-4 w-4 text-gray-400" />
+                                                            <ArrowRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                         )}
                                                     </div>
                                                 </div>
@@ -257,7 +257,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                 <div key={`other-${pairIndex}`} className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-700">
                                     <div className="mb-2">
                                         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            <HelpCircle className="h-4 w-4 inline mr-2 text-gray-500" />
+                                            <HelpCircle className="h-4 w-4 inline mr-2 text-gray-500 dark:text-gray-400" />
                                             Can't find what you're looking for?
                                         </h3>
                                     </div>
@@ -274,8 +274,8 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                     type="button"
                                                     className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                                                         isSelected
-                                                            ? `border-amber-500 bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 ring-2 ring-amber-500/20`
-                                                            : 'border-gray-300 dark:border-gray-600 hover:border-amber-400 dark:hover:border-amber-600 hover:bg-amber-50/50 dark:hover:bg-amber-900/10'
+                                                            ? `border-amber-500 bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-950/30 dark:to-amber-900/30 ring-2 ring-amber-500/20`
+                                                            : 'border-gray-300 dark:border-gray-600 hover:border-amber-400 dark:hover:border-amber-600 hover:bg-amber-50/50 dark:hover:bg-amber-900/10 bg-white dark:bg-gray-900'
                                                     }`}
                                                     onClick={() => onTypeSelect(type.id)}
                                                 >
@@ -284,7 +284,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                             <div className={`p-2.5 rounded-lg flex-shrink-0 mt-0.5 ${
                                                                 isSelected 
                                                                     ? 'bg-amber-100 dark:bg-amber-900/30'
-                                                                    : 'bg-gray-100 dark:bg-gray-900'
+                                                                    : 'bg-gray-100 dark:bg-gray-800'
                                                             }`}>
                                                                 <Icon className={`h-5 w-5 ${
                                                                     isSelected 
@@ -294,12 +294,12 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                             </div>
                                                             <div className="min-w-0 flex-1">
                                                                 <div className="flex items-center gap-2 mb-2">
-                                                                    <h3 className="font-semibold text-sm truncate">
+                                                                    <h3 className="font-semibold text-sm truncate text-gray-900 dark:text-white">
                                                                         {type.name}
                                                                     </h3>
                                                                     <Badge 
                                                                         variant="outline"
-                                                                        className="text-xs flex-shrink-0 h-5 px-1.5 border-amber-300 text-amber-700 dark:text-amber-400"
+                                                                        className="text-xs flex-shrink-0 h-5 px-1.5 border-amber-300 text-amber-700 dark:text-amber-400 dark:border-amber-800"
                                                                     >
                                                                         Other
                                                                     </Badge>
@@ -314,17 +314,17 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                                     </div>
                                                                     <div className="flex items-center gap-1">
                                                                         {type.requires_evidence ? (
-                                                                            <Camera className="h-3 w-3 text-amber-600" />
+                                                                            <Camera className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                                                                         ) : (
-                                                                            <FileText className="h-3 w-3 text-gray-400" />
+                                                                            <FileText className="h-3 w-3 text-gray-400 dark:text-gray-500" />
                                                                         )}
                                                                         <span>{type.requires_evidence ? 'Evidence' : 'Optional'}</span>
                                                                     </div>
                                                                     <div className="flex items-center gap-1">
                                                                         {type.allows_anonymous ? (
-                                                                            <Shield className="h-3 w-3 text-green-600" />
+                                                                            <Shield className="h-3 w-3 text-green-600 dark:text-green-400" />
                                                                         ) : (
-                                                                            <UserX className="h-3 w-3 text-gray-400" />
+                                                                            <UserX className="h-3 w-3 text-gray-400 dark:text-gray-500" />
                                                                         )}
                                                                         <span>{type.allows_anonymous ? 'Anon' : 'ID'}</span>
                                                                     </div>
@@ -337,7 +337,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                                                     <Check className="h-3.5 w-3.5 text-white" />
                                                                 </div>
                                                             ) : (
-                                                                <ArrowRight className="h-4 w-4 text-gray-400" />
+                                                                <ArrowRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                             )}
                                                         </div>
                                                     </div>
@@ -356,11 +356,11 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                             ))}
                         </>
                     ) : (
-                        <div className="text-center py-8 px-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                        <div className="text-center py-8 px-4 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900">
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
                                 activeTab === 'issues' 
-                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-500' 
-                                    : 'bg-purple-100 dark:bg-purple-900/30 text-purple-500'
+                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400' 
+                                    : 'bg-purple-100 dark:bg-purple-900/30 text-purple-500 dark:text-purple-400'
                             }`}>
                                 {activeTab === 'issues' ? (
                                     <AlertCircle className="h-6 w-6" />
@@ -368,7 +368,7 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                     <Megaphone className="h-6 w-6" />
                                 )}
                             </div>
-                            <h4 className="font-medium mb-1">No {activeTab} found</h4>
+                            <h4 className="font-medium mb-1 text-gray-900 dark:text-white">No {activeTab} found</h4>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
                                 {searchQuery 
                                     ? `Try a different search term or clear the search`
@@ -385,11 +385,11 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                 <div className={`mt-4 p-4 rounded-lg border ${
                     selectedType.category === 'issue' 
                         ? isOtherType(selectedType)
-                            ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20'
-                            : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20'
+                            ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30'
+                            : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30'
                         : isOtherType(selectedType)
-                        ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20'
-                        : 'border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-900/20'
+                        ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30'
+                        : 'border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950/30'
                 }`}>
                     <div className="flex items-start justify-between">
                         <div className="flex items-start gap-3">
@@ -406,19 +406,19 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                                 })()}
                             </div>
                             <div>
-                                <h4 className="font-semibold flex items-center gap-2">
+                                <h4 className="font-semibold flex items-center gap-2 flex-wrap text-gray-900 dark:text-white">
                                     {selectedType.name}
                                     {isOtherType(selectedType) ? (
                                         <Badge 
                                             variant="outline"
-                                            className="text-xs border-amber-300 text-amber-700 dark:text-amber-400"
+                                            className="text-xs border-amber-300 text-amber-700 dark:text-amber-400 dark:border-amber-800"
                                         >
                                             Other
                                         </Badge>
                                     ) : (
                                         <Badge 
                                             style={{ backgroundColor: selectedType.priority_color }}
-                                            className="text-xs"
+                                            className="text-xs text-white"
                                         >
                                             {selectedType.priority_label}
                                         </Badge>
@@ -434,25 +434,25 @@ export const ReportTypeSelector: React.FC<ReportTypeSelectorProps> = ({
                             variant="ghost"
                             size="sm"
                             onClick={onTypeClear}
-                            className="h-8 w-8 p-0"
+                            className="h-8 w-8 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                         >
                             <X className="h-4 w-4" />
                         </Button>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-                        <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
-                            <div className="font-medium">Resolution Time</div>
+                        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded border border-gray-100 dark:border-gray-700">
+                            <div className="font-medium text-gray-900 dark:text-white">Resolution Time</div>
                             <div className="text-gray-600 dark:text-gray-400">{selectedType.resolution_days} days</div>
                         </div>
-                        <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
-                            <div className="font-medium">Evidence</div>
-                            <div className={selectedType.requires_evidence ? 'text-red-600' : 'text-green-600'}>
+                        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded border border-gray-100 dark:border-gray-700">
+                            <div className="font-medium text-gray-900 dark:text-white">Evidence</div>
+                            <div className={selectedType.requires_evidence ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>
                                 {selectedType.requires_evidence ? 'Required' : 'Optional'}
                             </div>
                         </div>
-                        <div className="text-center p-2 bg-white dark:bg-gray-900 rounded">
-                            <div className="font-medium">Anonymous</div>
-                            <div className={selectedType.allows_anonymous ? 'text-green-600' : 'text-gray-600'}>
+                        <div className="text-center p-2 bg-white dark:bg-gray-800 rounded border border-gray-100 dark:border-gray-700">
+                            <div className="font-medium text-gray-900 dark:text-white">Anonymous</div>
+                            <div className={selectedType.allows_anonymous ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}>
                                 {selectedType.allows_anonymous ? 'Allowed' : 'Not allowed'}
                             </div>
                         </div>

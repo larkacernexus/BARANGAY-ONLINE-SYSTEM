@@ -54,8 +54,8 @@ export const ModernClearanceGridCard = ({
   return (
     <div className="animate-fade-in-up">
       <Card className={cn(
-        "border-0 shadow-lg hover:shadow-xl transition-all duration-300 group",
-        selectMode && selectedClearances?.includes(clearance.id) && "ring-2 ring-blue-500 ring-offset-2",
+        "border-0 shadow-lg hover:shadow-xl transition-all duration-300 group bg-white dark:bg-gray-800",
+        selectMode && selectedClearances?.includes(clearance.id) && "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900",
         clearance.status === 'rejected' && "border-l-4 border-l-red-500",
         clearance.status === 'pending_payment' && "border-l-4 border-l-orange-500"
       )}>
@@ -70,7 +70,7 @@ export const ModernClearanceGridCard = ({
                     "mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
                     selectedClearances?.includes(clearance.id)
                       ? "bg-blue-500 border-blue-500"
-                      : "border-gray-300 dark:border-gray-600 group-hover:border-gray-400"
+                      : "border-gray-300 dark:border-gray-600 group-hover:border-gray-400 dark:group-hover:border-gray-500"
                   )}
                 >
                   {selectedClearances?.includes(clearance.id) && (
@@ -88,7 +88,7 @@ export const ModernClearanceGridCard = ({
                     #{clearance.reference_number}
                   </button>
                   {clearance.clearance_number && (
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
                       <FileCheck className="h-3 w-3 mr-1" />
                       #{clearance.clearance_number}
                     </Badge>
@@ -102,27 +102,43 @@ export const ModernClearanceGridCard = ({
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => onCopyReference?.(clearance.reference_number)}>
+              <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                <DropdownMenuItem 
+                  onClick={() => onCopyReference?.(clearance.reference_number)}
+                  className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
                   <Copy className="h-4 w-4 mr-2" />
                   Copy Reference No.
                 </DropdownMenuItem>
                 {clearance.clearance_number && (
-                  <DropdownMenuItem onClick={() => onCopyReference?.(clearance.clearance_number)}>
+                  <DropdownMenuItem 
+                    onClick={() => onCopyReference?.(clearance.clearance_number)}
+                    className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
                     <Copy className="h-4 w-4 mr-2" />
                     Copy Clearance No.
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onGenerateReport?.(clearance)}>
+                <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                <DropdownMenuItem 
+                  onClick={() => onGenerateReport?.(clearance)}
+                  className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
                   <FileText className="h-4 w-4 mr-2" />
                   Generate Report
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-red-600" onClick={() => onReportIssue?.(clearance)}>
+                <DropdownMenuItem 
+                  className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" 
+                  onClick={() => onReportIssue?.(clearance)}
+                >
                   <AlertCircle className="h-4 w-4 mr-2" />
                   Report Issue
                 </DropdownMenuItem>
@@ -155,16 +171,16 @@ export const ModernClearanceGridCard = ({
           </div>
 
           {/* Details Grid */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 mb-3 space-y-2">
+          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 mb-3 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500">Fee Amount</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">Fee Amount</span>
               <span className="text-lg font-bold text-gray-900 dark:text-white">
                 {formatCurrency(clearance.fee_amount)}
               </span>
             </div>
             
             <div className="flex items-center gap-2 text-xs">
-              <User className="h-3 w-3 text-gray-400" />
+              <User className="h-3 w-3 text-gray-400 dark:text-gray-500" />
               <span className="text-gray-600 dark:text-gray-400">
                 {clearance.resident?.first_name} {clearance.resident?.last_name}
                 {clearance.resident_id === currentResident?.id && ' (You)'}
@@ -173,19 +189,19 @@ export const ModernClearanceGridCard = ({
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3 text-gray-400" />
-                <span className="text-xs text-gray-500">Requested:</span>
-                <span className="text-xs font-medium">{formatDate(clearance.created_at)}</span>
+                <Calendar className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                <span className="text-xs text-gray-500 dark:text-gray-400">Requested:</span>
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{formatDate(clearance.created_at)}</span>
               </div>
               <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3 text-gray-400" />
-                <span className="text-xs text-gray-500">Needed:</span>
-                <span className="text-xs font-medium">{formatDate(clearance.needed_date)}</span>
+                <Clock className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                <span className="text-xs text-gray-500 dark:text-gray-400">Needed:</span>
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{formatDate(clearance.needed_date)}</span>
               </div>
             </div>
 
             {clearance.issue_date && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
                 Issued: {formatDate(clearance.issue_date)}
               </div>
             )}
@@ -196,7 +212,7 @@ export const ModernClearanceGridCard = ({
             <Button
               size="sm"
               variant="outline"
-              className="flex-1 gap-2"
+              className="flex-1 gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               onClick={() => onViewDetails?.(clearance.id)}
             >
               <Eye className="h-4 w-4" />
@@ -205,7 +221,7 @@ export const ModernClearanceGridCard = ({
             {clearance.status === 'pending_payment' && (
               <Button
                 size="sm"
-                className="flex-1 gap-2 bg-gradient-to-r from-orange-500 to-orange-600"
+                className="flex-1 gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
                 onClick={() => onMakePayment?.(clearance.id)}
               >
                 <DollarSign className="h-4 w-4" />
@@ -216,7 +232,7 @@ export const ModernClearanceGridCard = ({
               <Button
                 size="sm"
                 variant="outline"
-                className="flex-1 gap-2"
+                className="flex-1 gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={() => onDownloadClearance?.(clearance)}
               >
                 <Download className="h-4 w-4" />

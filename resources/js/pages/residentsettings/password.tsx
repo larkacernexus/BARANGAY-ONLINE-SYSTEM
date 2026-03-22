@@ -47,7 +47,7 @@ const checkPasswordStrength = (password: string): {
         return {
             score: 0,
             message: 'Enter a password',
-            color: 'bg-gray-200',
+            color: 'bg-gray-200 dark:bg-gray-700',
             criteria: {
                 length: false,
                 uppercase: false,
@@ -165,23 +165,23 @@ export default function ResidentPassword() {
                     {/* Header with icon */}
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-                                <Lock className="h-8 w-8 text-primary" />
+                            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2 text-gray-900 dark:text-white">
+                                <Lock className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                                 Password Settings
                             </h1>
-                            <p className="text-muted-foreground mt-2">
+                            <p className="text-gray-600 dark:text-gray-400 mt-2">
                                 Update your account password for enhanced security
                             </p>
                         </div>
                         <div className="hidden sm:block">
-                            <Key className="h-10 w-10 text-muted-foreground/50" />
+                            <Key className="h-10 w-10 text-gray-400 dark:text-gray-600" />
                         </div>
                     </div>
 
                     {/* Security Alert */}
-                    <Alert className="bg-blue-50 border-blue-200">
-                        <AlertCircle className="h-4 w-4 text-blue-600" />
-                        <AlertDescription className="text-blue-800">
+                    <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <AlertDescription className="text-blue-800 dark:text-blue-300">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <span className="font-medium">Security Recommendation:</span>
@@ -197,59 +197,59 @@ export default function ResidentPassword() {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Left Column - Guidelines */}
                         <div className="lg:col-span-1">
-                            <Card>
+                            <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
                                 <CardHeader>
-                                    <CardTitle className="text-lg">Password Guidelines</CardTitle>
-                                    <CardDescription>
+                                    <CardTitle className="text-lg text-gray-900 dark:text-white">Password Guidelines</CardTitle>
+                                    <CardDescription className="text-gray-600 dark:text-gray-400">
                                         Follow these tips for a secure password
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-3">
                                         <div className="flex items-start gap-3">
-                                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
                                             <div>
-                                                <p className="text-sm font-medium">At least 8 characters</p>
-                                                <p className="text-xs text-muted-foreground">Longer passwords are more secure</p>
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white">At least 8 characters</p>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400">Longer passwords are more secure</p>
                                             </div>
                                         </div>
                                         
                                         <div className="flex items-start gap-3">
-                                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
                                             <div>
-                                                <p className="text-sm font-medium">Mix uppercase & lowercase</p>
-                                                <p className="text-xs text-muted-foreground">Use both capital and small letters</p>
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white">Mix uppercase & lowercase</p>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400">Use both capital and small letters</p>
                                             </div>
                                         </div>
                                         
                                         <div className="flex items-start gap-3">
-                                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
                                             <div>
-                                                <p className="text-sm font-medium">Include numbers</p>
-                                                <p className="text-xs text-muted-foreground">Add digits for complexity</p>
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white">Include numbers</p>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400">Add digits for complexity</p>
                                             </div>
                                         </div>
                                         
                                         <div className="flex items-start gap-3">
-                                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+                                            <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
                                             <div>
-                                                <p className="text-sm font-medium">Special characters</p>
-                                                <p className="text-xs text-muted-foreground">Use !@#$%^&* etc.</p>
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white">Special characters</p>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400">Use !@#$%^&* etc.</p>
                                             </div>
                                         </div>
                                         
                                         <div className="flex items-start gap-3">
-                                            <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                                            <AlertCircle className="h-5 w-5 text-amber-500 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                                             <div>
-                                                <p className="text-sm font-medium">Avoid common patterns</p>
-                                                <p className="text-xs text-muted-foreground">Don't use "password123" or personal info</p>
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white">Avoid common patterns</p>
+                                                <p className="text-xs text-gray-600 dark:text-gray-400">Don't use "password123" or personal info</p>
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    <Separator />
+                                    <Separator className="bg-gray-200 dark:bg-gray-700" />
                                     
-                                    <div className="text-xs text-muted-foreground">
+                                    <div className="text-xs text-gray-600 dark:text-gray-400">
                                         <p className="font-medium mb-1">Note:</p>
                                         <p>After changing your password, you'll need to log in again on other devices.</p>
                                     </div>
@@ -259,10 +259,10 @@ export default function ResidentPassword() {
 
                         {/* Right Column - Form */}
                         <div className="lg:col-span-2">
-                            <Card>
+                            <Card className="border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
                                 <CardHeader>
-                                    <CardTitle>Change Password</CardTitle>
-                                    <CardDescription>
+                                    <CardTitle className="text-gray-900 dark:text-white">Change Password</CardTitle>
+                                    <CardDescription className="text-gray-600 dark:text-gray-400">
                                         Enter your current password and set a new one
                                     </CardDescription>
                                 </CardHeader>
@@ -270,7 +270,7 @@ export default function ResidentPassword() {
                                     <form onSubmit={handleSubmit} className="space-y-6">
                                         {/* Current Password */}
                                         <div className="space-y-2">
-                                            <Label htmlFor="current_password" className="flex items-center gap-2">
+                                            <Label htmlFor="current_password" className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                                                 <Lock className="h-4 w-4" />
                                                 Current Password
                                             </Label>
@@ -280,7 +280,7 @@ export default function ResidentPassword() {
                                                     ref={currentPasswordInput}
                                                     name="current_password"
                                                     type={showCurrentPassword ? "text" : "password"}
-                                                    className="pr-10"
+                                                    className="pr-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
                                                     value={data.current_password}
                                                     onChange={(e) => setData('current_password', e.target.value)}
                                                     autoComplete="current-password"
@@ -289,7 +289,7 @@ export default function ResidentPassword() {
                                                 />
                                                 <button
                                                     type="button"
-                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                                                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                                                     tabIndex={-1}
                                                 >
@@ -303,12 +303,12 @@ export default function ResidentPassword() {
                                             <InputError message={errors.current_password} />
                                         </div>
 
-                                        <Separator />
+                                        <Separator className="bg-gray-200 dark:bg-gray-700" />
 
                                         {/* New Password */}
                                         <div className="space-y-4">
                                             <div className="space-y-2">
-                                                <Label htmlFor="password" className="flex items-center gap-2">
+                                                <Label htmlFor="password" className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                                                     <Key className="h-4 w-4" />
                                                     New Password
                                                 </Label>
@@ -318,7 +318,7 @@ export default function ResidentPassword() {
                                                         ref={passwordInput}
                                                         name="password"
                                                         type={showNewPassword ? "text" : "password"}
-                                                        className="pr-10"
+                                                        className="pr-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
                                                         value={data.password}
                                                         onChange={(e) => setData('password', e.target.value)}
                                                         autoComplete="new-password"
@@ -327,7 +327,7 @@ export default function ResidentPassword() {
                                                     />
                                                     <button
                                                         type="button"
-                                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                                                         onClick={() => setShowNewPassword(!showNewPassword)}
                                                         tabIndex={-1}
                                                     >
@@ -345,20 +345,20 @@ export default function ResidentPassword() {
                                             {data.password && (
                                                 <div className="space-y-2">
                                                     <div className="flex items-center justify-between text-sm">
-                                                        <span className="text-muted-foreground">Password strength:</span>
+                                                        <span className="text-gray-600 dark:text-gray-400">Password strength:</span>
                                                         <span className={`font-medium ${
-                                                            passwordStrength.score < 40 ? 'text-red-600' :
-                                                            passwordStrength.score < 70 ? 'text-yellow-600' :
-                                                            passwordStrength.score < 90 ? 'text-blue-600' : 'text-green-600'
+                                                            passwordStrength.score < 40 ? 'text-red-600 dark:text-red-400' :
+                                                            passwordStrength.score < 70 ? 'text-yellow-600 dark:text-yellow-400' :
+                                                            passwordStrength.score < 90 ? 'text-blue-600 dark:text-blue-400' : 'text-green-600 dark:text-green-400'
                                                         }`}>
                                                             {passwordStrength.message}
                                                         </span>
                                                     </div>
-                                                    <Progress value={passwordStrength.score} className="h-2" />
+                                                    <Progress value={passwordStrength.score} className="h-2 bg-gray-200 dark:bg-gray-700" />
                                                     
                                                     {/* Password Criteria */}
                                                     <div className="grid grid-cols-2 gap-2 mt-3">
-                                                        <div className={`flex items-center gap-2 text-sm ${passwordStrength.criteria.length ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                                        <div className={`flex items-center gap-2 text-sm ${passwordStrength.criteria.length ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                                             {passwordStrength.criteria.length ? (
                                                                 <CheckCircle className="h-4 w-4" />
                                                             ) : (
@@ -366,7 +366,7 @@ export default function ResidentPassword() {
                                                             )}
                                                             <span>8+ characters</span>
                                                         </div>
-                                                        <div className={`flex items-center gap-2 text-sm ${passwordStrength.criteria.uppercase ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                                        <div className={`flex items-center gap-2 text-sm ${passwordStrength.criteria.uppercase ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                                             {passwordStrength.criteria.uppercase ? (
                                                                 <CheckCircle className="h-4 w-4" />
                                                             ) : (
@@ -374,7 +374,7 @@ export default function ResidentPassword() {
                                                             )}
                                                             <span>Uppercase letter</span>
                                                         </div>
-                                                        <div className={`flex items-center gap-2 text-sm ${passwordStrength.criteria.lowercase ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                                        <div className={`flex items-center gap-2 text-sm ${passwordStrength.criteria.lowercase ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                                             {passwordStrength.criteria.lowercase ? (
                                                                 <CheckCircle className="h-4 w-4" />
                                                             ) : (
@@ -382,7 +382,7 @@ export default function ResidentPassword() {
                                                             )}
                                                             <span>Lowercase letter</span>
                                                         </div>
-                                                        <div className={`flex items-center gap-2 text-sm ${passwordStrength.criteria.number ? 'text-green-600' : 'text-muted-foreground'}`}>
+                                                        <div className={`flex items-center gap-2 text-sm ${passwordStrength.criteria.number ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                                             {passwordStrength.criteria.number ? (
                                                                 <CheckCircle className="h-4 w-4" />
                                                             ) : (
@@ -395,11 +395,11 @@ export default function ResidentPassword() {
                                             )}
                                         </div>
 
-                                        <Separator />
+                                        <Separator className="bg-gray-200 dark:bg-gray-700" />
 
                                         {/* Confirm Password */}
                                         <div className="space-y-2">
-                                            <Label htmlFor="password_confirmation" className="flex items-center gap-2">
+                                            <Label htmlFor="password_confirmation" className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                                                 <Key className="h-4 w-4" />
                                                 Confirm New Password
                                             </Label>
@@ -409,7 +409,7 @@ export default function ResidentPassword() {
                                                     ref={confirmPasswordInput}
                                                     name="password_confirmation"
                                                     type={showConfirmPassword ? "text" : "password"}
-                                                    className="pr-10"
+                                                    className="pr-10 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
                                                     value={data.password_confirmation}
                                                     onChange={(e) => setData('password_confirmation', e.target.value)}
                                                     autoComplete="new-password"
@@ -418,7 +418,7 @@ export default function ResidentPassword() {
                                                 />
                                                 <button
                                                     type="button"
-                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                                                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                                                     tabIndex={-1}
                                                 >
@@ -431,17 +431,17 @@ export default function ResidentPassword() {
                                             </div>
                                             <InputError message={errors.password_confirmation} />
                                             {data.password_confirmation && data.password !== data.password_confirmation && (
-                                                <p className="text-sm text-red-600">Passwords do not match</p>
+                                                <p className="text-sm text-red-600 dark:text-red-400">Passwords do not match</p>
                                             )}
                                             {data.password_confirmation && data.password === data.password_confirmation && (
-                                                <p className="text-sm text-green-600 flex items-center gap-1">
+                                                <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                                                     <CheckCircle className="h-4 w-4" />
                                                     Passwords match
                                                 </p>
                                             )}
                                         </div>
 
-                                        <Separator />
+                                        <Separator className="bg-gray-200 dark:bg-gray-700" />
 
                                         {/* Submit Button */}
                                         <div className="flex items-center justify-between">
@@ -449,11 +449,11 @@ export default function ResidentPassword() {
                                                 <Button
                                                     type="submit"
                                                     disabled={processing || !isFormValid()}
-                                                    className="min-w-[140px]"
+                                                    className="min-w-[140px] bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white"
                                                 >
                                                     {processing ? (
                                                         <>
-                                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent mr-2" />
+                                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
                                                             Updating...
                                                         </>
                                                     ) : (
@@ -470,7 +470,7 @@ export default function ResidentPassword() {
                                                     leaveFrom="opacity-100"
                                                     leaveTo="opacity-0"
                                                 >
-                                                    <div className="flex items-center gap-2 text-green-600">
+                                                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                                                         <CheckCircle className="h-5 w-5" />
                                                         <span className="font-medium">Password updated successfully!</span>
                                                     </div>
@@ -487,6 +487,7 @@ export default function ResidentPassword() {
                                                     setShowConfirmPassword(false);
                                                 }}
                                                 disabled={processing}
+                                                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                                             >
                                                 Reset Form
                                             </Button>

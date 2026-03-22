@@ -36,8 +36,8 @@ export const ModernFeeGridCard = ({
     return (
         <div className="animate-fade-in-up">
             <Card className={cn(
-                "border-0 shadow-lg hover:shadow-xl transition-all duration-300 group",
-                selectMode && selectedFees?.includes(fee.id) && "ring-2 ring-blue-500 ring-offset-2",
+                "border-0 shadow-lg hover:shadow-xl transition-all duration-300 group bg-white dark:bg-gray-800",
+                selectMode && selectedFees?.includes(fee.id) && "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900",
                 fee.is_overdue && "border-l-4 border-l-red-500"
             )}>
                 <CardContent className="p-5">
@@ -51,7 +51,7 @@ export const ModernFeeGridCard = ({
                                         "mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
                                         selectedFees?.includes(fee.id)
                                             ? "bg-blue-500 border-blue-500"
-                                            : "border-gray-300 dark:border-gray-600 group-hover:border-gray-400"
+                                            : "border-gray-300 dark:border-gray-600 group-hover:border-gray-400 dark:group-hover:border-gray-500"
                                     )}
                                 >
                                     {selectedFees?.includes(fee.id) && (
@@ -81,27 +81,40 @@ export const ModernFeeGridCard = ({
                         
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-8 w-8 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                >
                                     <MoreVertical className="h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(fee.fee_code)}>
+                            <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                                <DropdownMenuItem 
+                                    onClick={() => navigator.clipboard.writeText(fee.fee_code)}
+                                    className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                >
                                     <Copy className="h-4 w-4 mr-2" />
                                     Copy Fee Code
                                 </DropdownMenuItem>
                                 {fee.or_number && (
-                                    <DropdownMenuItem onClick={() => navigator.clipboard.writeText(fee.or_number)}>
+                                    <DropdownMenuItem 
+                                        onClick={() => navigator.clipboard.writeText(fee.or_number)}
+                                        className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    >
                                         <Copy className="h-4 w-4 mr-2" />
                                         Copy OR Number
                                     </DropdownMenuItem>
                                 )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem>
+                                <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                                <DropdownMenuItem className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
                                     <FileText className="h-4 w-4 mr-2" />
                                     Generate Report
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onPrint?.(fee)}>
+                                <DropdownMenuItem 
+                                    onClick={() => onPrint?.(fee)}
+                                    className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                >
                                     <Printer className="h-4 w-4 mr-2" />
                                     Print Details
                                 </DropdownMenuItem>
@@ -131,7 +144,7 @@ export const ModernFeeGridCard = ({
                             )}>
                                 {formatDate(fee.due_date)}
                                 {fee.is_overdue && fee.days_overdue > 0 && (
-                                    <span className="ml-1 text-xs text-red-500">
+                                    <span className="ml-1 text-xs text-red-500 dark:text-red-400">
                                         ({fee.days_overdue}d)
                                     </span>
                                 )}
@@ -146,7 +159,7 @@ export const ModernFeeGridCard = ({
                     </div>
 
                     {/* Amount Section */}
-                    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 mb-3">
+                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 mb-3">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs text-gray-500 dark:text-gray-400">Total Amount</span>
                             <span className="text-lg font-bold text-gray-900 dark:text-white">
@@ -185,7 +198,11 @@ export const ModernFeeGridCard = ({
                     {/* Actions */}
                     <div className="flex gap-2">
                         <Link href={`/portal/fees/${fee.id}`} className="flex-1">
-                            <Button size="sm" variant="outline" className="w-full gap-2">
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="w-full gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                            >
                                 <Eye className="h-4 w-4" />
                                 View
                             </Button>

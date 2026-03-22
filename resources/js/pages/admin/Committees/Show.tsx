@@ -1,5 +1,4 @@
-// resources/js/Pages/admin/Committees/Show.tsx
-
+// resources/js/Pages/Admin/Committees/Show.tsx
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,12 +12,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
 import {
     Tooltip,
     TooltipContent,
@@ -63,7 +56,7 @@ import {
     Phone,
     Mail,
     CalendarDays,
-    Clock as ClockIcon,
+    ClockIcon,
     AlertCircle,
     AlertTriangle,
     Plus,
@@ -111,6 +104,9 @@ import { PageProps } from '@/types';
 import { useState, useMemo } from 'react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
+// Import Admin Tabs Component - FIXED IMPORT PATH
+import { AdminTabsWithContent, AdminTabPanel } from '@/components/adminui/admin-tabs';
+
 interface Position {
     id: number;
     code: string;
@@ -145,7 +141,7 @@ interface CommitteeShowProps extends PageProps {
 }
 
 // ========== HELPER FUNCTIONS ==========
-const formatDate = (dateString: string, includeTime: boolean = false) => {
+const formatDate = (dateString: string | null, includeTime: boolean = false) => {
     if (!dateString) return 'N/A';
     try {
         const date = parseISO(dateString);
@@ -260,11 +256,9 @@ const PositionsGrid = ({ positions, committeeId }: { positions: Position[]; comm
 
     const filteredPositions = useMemo(() => {
         return positions.filter(position => {
-            // Filter by status
             if (filter === 'active' && !position.is_active) return false;
             if (filter === 'inactive' && position.is_active) return false;
             
-            // Search by name or code
             if (search) {
                 const searchLower = search.toLowerCase();
                 return position.name.toLowerCase().includes(searchLower) ||
@@ -293,7 +287,6 @@ const PositionsGrid = ({ positions, committeeId }: { positions: Position[]; comm
                     </div>
                     
                     <div className="flex items-center gap-2">
-                        {/* View Mode Toggle */}
                         <div className="flex items-center border rounded-lg dark:border-gray-700">
                             <Button
                                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
@@ -322,7 +315,6 @@ const PositionsGrid = ({ positions, committeeId }: { positions: Position[]; comm
                     </div>
                 </div>
 
-                {/* Filters */}
                 <div className="flex flex-col sm:flex-row gap-4 mt-4">
                     <div className="flex-1">
                         <div className="relative">
@@ -596,7 +588,6 @@ const QuickActionsCard = ({
                     variant="ghost"
                     className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
                     onClick={onDelete}
-                    disabled={committee.positions_count && committee.positions_count > 0}
                 >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete Committee
@@ -836,10 +827,24 @@ export default function CommitteeShow({ committee }: CommitteeShowProps) {
     const activeCount = committee.positions?.filter(p => p.is_active).length || 0;
     const inactiveCount = committee.positions?.filter(p => !p.is_active).length || 0;
 
+    // Tab definitions
     const tabs = [
-        { id: 'overview', label: 'Overview', icon: <Info className="h-4 w-4" /> },
-        { id: 'positions', label: 'Positions', icon: <Users className="h-4 w-4" />, count: committee.positions_count },
-        { id: 'settings', label: 'Settings', icon: <Settings className="h-4 w-4" /> },
+        { 
+            id: 'overview', 
+            label: 'Overview', 
+            icon: <Info className="h-4 w-4" />,
+        },
+        { 
+            id: 'positions', 
+            label: 'Positions', 
+            icon: <Users className="h-4 w-4" />,
+            count: committee.positions_count 
+        },
+        { 
+            id: 'settings', 
+            label: 'Settings', 
+            icon: <Settings className="h-4 w-4" />,
+        },
     ];
 
     return (
@@ -973,7 +978,6 @@ export default function CommitteeShow({ committee }: CommitteeShowProps) {
                                         <DropdownMenuItem 
                                             onClick={() => setShowDeleteDialog(true)}
                                             className="text-red-600 dark:text-red-400"
-                                            disabled={committee.positions_count && committee.positions_count > 0}
                                         >
                                             <Trash2 className="h-4 w-4 mr-2" />
                                             Delete
@@ -1008,232 +1012,214 @@ export default function CommitteeShow({ committee }: CommitteeShowProps) {
                             </Card>
                         )}
 
-                        {/* Tabs Navigation */}
-                        <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
-                            <TabsList className="grid grid-cols-3 w-full max-w-md">
-                                {tabs.map(tab => (
-                                    <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-2">
-                                        {tab.icon}
-                                        <span className="hidden sm:inline">{tab.label}</span>
-                                        {tab.count !== undefined && tab.count > 0 && (
-                                            <Badge variant="secondary" className="ml-1 text-xs">
-                                                {tab.count}
-                                            </Badge>
-                                        )}
-                                    </TabsTrigger>
-                                ))}
-                            </TabsList>
-
-                            <div className="mt-6">
-                                {/* Overview Tab */}
-                                <TabsContent value="overview" className="space-y-6">
-                                    <div className="grid gap-6 lg:grid-cols-3">
-                                        {/* Left Column - Main Details */}
-                                        <div className="lg:col-span-2 space-y-6">
-                                            {/* Main Details Card */}
-                                            <Card className="dark:bg-gray-900">
-                                                <CardHeader>
-                                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                                        <Target className="h-5 w-5" />
-                                                        Committee Details
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-6">
-                                                    {/* Code Section */}
-                                                    <div className="space-y-2">
-                                                        <div className="flex items-center justify-between">
-                                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Committee Code</p>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={handleCopyCode}
-                                                                className="h-6 text-xs dark:text-gray-400 dark:hover:text-white"
-                                                            >
-                                                                {codeCopied ? (
-                                                                    <span className="flex items-center gap-1">
-                                                                        <Check className="h-3 w-3" />
-                                                                        Copied!
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="flex items-center gap-1">
-                                                                        <Copy className="h-3 w-3" />
-                                                                        Copy
-                                                                    </span>
-                                                                )}
-                                                            </Button>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                                                            <code className="font-mono text-sm flex-1 dark:text-gray-300">{committee.code}</code>
-                                                            <LinkIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                        </div>
-                                                    </div>
-
-                                                    <Separator className="dark:bg-gray-700" />
-
-                                                    {/* Description Section */}
-                                                    <div className="space-y-2">
-                                                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</p>
-                                                        {committee.description ? (
-                                                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                                                                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{committee.description}</p>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg text-gray-500 dark:text-gray-400 italic">
-                                                                No description provided
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-
-                                            {/* Recent Positions Preview */}
-                                            {hasPositions && (
-                                                <Card className="dark:bg-gray-900">
-                                                    <CardHeader className="flex flex-row items-center justify-between">
-                                                        <div>
-                                                            <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                                                <Users className="h-5 w-5" />
-                                                                Recent Positions
-                                                            </CardTitle>
-                                                            <CardDescription className="dark:text-gray-400">
-                                                                Latest positions added to this committee
-                                                            </CardDescription>
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => setActiveTab('positions')}
-                                                            className="dark:text-gray-400 dark:hover:text-white"
-                                                        >
-                                                            View All
-                                                            <ChevronRight className="h-4 w-4 ml-1" />
-                                                        </Button>
-                                                    </CardHeader>
-                                                    <CardContent>
-                                                        <div className="grid gap-3 md:grid-cols-2">
-                                                            {committee.positions?.slice(0, 4).map((position) => (
-                                                                <PositionCard key={position.id} position={position} committeeId={committee.id} />
-                                                            ))}
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            )}
-                                        </div>
-
-                                        {/* Right Column - Sidebar */}
-                                        <div className="space-y-6">
-                                            {/* Quick Stats Card */}
-                                            <QuickStatsCard 
-                                                committee={committee}
-                                                activeCount={activeCount}
-                                                inactiveCount={inactiveCount}
-                                            />
-
-                                            {/* Quick Actions Card */}
-                                            <QuickActionsCard 
-                                                committee={committee}
-                                                onCopyCode={handleCopyCode}
-                                                onToggleStatus={handleToggleStatus}
-                                                onDelete={() => setShowDeleteDialog(true)}
-                                            />
-
-                                            {/* Timeline Card */}
-                                            <TimelineCard committee={committee} />
-
-                                            {/* System Information Card */}
-                                            <SystemInfoCard committee={committee} />
-                                        </div>
-                                    </div>
-                                </TabsContent>
-
-                                {/* Positions Tab */}
-                                <TabsContent value="positions">
-                                    {hasPositions ? (
-                                        <PositionsGrid positions={committee.positions!} committeeId={committee.id} />
-                                    ) : (
+                        {/* Admin Tabs Component */}
+                        <AdminTabsWithContent
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            variant="underlined"
+                            size="md"
+                            scrollable={true}
+                            showCountBadges={true}
+                            lazyLoad={true}
+                        >
+                            <AdminTabPanel value="overview">
+                                <div className="grid gap-6 lg:grid-cols-3">
+                                    {/* Left Column - Main Details */}
+                                    <div className="lg:col-span-2 space-y-6">
+                                        {/* Main Details Card */}
                                         <Card className="dark:bg-gray-900">
                                             <CardHeader>
                                                 <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                                    <Users className="h-5 w-5" />
-                                                    No Positions Assigned
+                                                    <Target className="h-5 w-5" />
+                                                    Committee Details
                                                 </CardTitle>
-                                                <CardDescription className="dark:text-gray-400">
-                                                    This committee doesn't have any positions assigned yet
-                                                </CardDescription>
                                             </CardHeader>
-                                            <CardContent>
-                                                <div className="text-center py-12 space-y-4">
-                                                    <Target className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600" />
-                                                    <div>
-                                                        <h4 className="font-medium text-gray-700 dark:text-gray-300">No positions found</h4>
-                                                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                                                            Create a new position and assign it to this committee
-                                                        </p>
-                                                    </div>
-                                                    <Link href={`/admin/positions/create?committee_id=${committee.id}`}>
-                                                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                                                            <Plus className="h-4 w-4 mr-2" />
-                                                            Create First Position
+                                            <CardContent className="space-y-6">
+                                                {/* Code Section */}
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Committee Code</p>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={handleCopyCode}
+                                                            className="h-6 text-xs dark:text-gray-400 dark:hover:text-white"
+                                                        >
+                                                            {codeCopied ? (
+                                                                <span className="flex items-center gap-1">
+                                                                    <Check className="h-3 w-3" />
+                                                                    Copied!
+                                                                </span>
+                                                            ) : (
+                                                                <span className="flex items-center gap-1">
+                                                                    <Copy className="h-3 w-3" />
+                                                                    Copy
+                                                                </span>
+                                                            )}
                                                         </Button>
-                                                    </Link>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                                                        <code className="font-mono text-sm flex-1 dark:text-gray-300">{committee.code}</code>
+                                                        <LinkIcon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                                    </div>
+                                                </div>
+
+                                                <Separator className="dark:bg-gray-700" />
+
+                                                {/* Description Section */}
+                                                <div className="space-y-2">
+                                                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</p>
+                                                    {committee.description ? (
+                                                        <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                                                            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{committee.description}</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg text-gray-500 dark:text-gray-400 italic">
+                                                            No description provided
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </CardContent>
                                         </Card>
-                                    )}
-                                </TabsContent>
 
-                                {/* Settings Tab */}
-                                <TabsContent value="settings">
-                                    <div className="grid gap-6 md:grid-cols-2">
-                                        <Card className="dark:bg-gray-900">
-                                            <CardHeader>
-                                                <CardTitle className="dark:text-gray-100">General Settings</CardTitle>
-                                                <CardDescription className="dark:text-gray-400">
-                                                    Configure committee settings
-                                                </CardDescription>
-                                            </CardHeader>
-                                            <CardContent className="space-y-4">
-                                                <div className="flex items-center justify-between">
+                                        {/* Recent Positions Preview */}
+                                        {hasPositions && (
+                                            <Card className="dark:bg-gray-900">
+                                                <CardHeader className="flex flex-row items-center justify-between">
                                                     <div>
-                                                        <p className="font-medium dark:text-gray-200">Status</p>
-                                                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                            {committee.is_active ? 'Active' : 'Inactive'}
-                                                        </p>
+                                                        <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                                                            <Users className="h-5 w-5" />
+                                                            Recent Positions
+                                                        </CardTitle>
+                                                        <CardDescription className="dark:text-gray-400">
+                                                            Latest positions added to this committee
+                                                        </CardDescription>
                                                     </div>
                                                     <Button
-                                                        variant={committee.is_active ? 'outline' : 'default'}
+                                                        variant="ghost"
                                                         size="sm"
-                                                        onClick={handleToggleStatus}
+                                                        onClick={() => setActiveTab('positions')}
+                                                        className="dark:text-gray-400 dark:hover:text-white"
                                                     >
-                                                        {committee.is_active ? 'Deactivate' : 'Activate'}
+                                                        View All
+                                                        <ChevronRight className="h-4 w-4 ml-1" />
                                                     </Button>
-                                                </div>
-                                                
-                                                <Separator className="dark:bg-gray-700" />
-                                                
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <p className="font-medium dark:text-gray-200">Display Order</p>
-                                                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                            Current order: #{committee.order}
-                                                        </p>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="grid gap-3 md:grid-cols-2">
+                                                        {committee.positions?.slice(0, 4).map((position) => (
+                                                            <PositionCard key={position.id} position={position} committeeId={committee.id} />
+                                                        ))}
                                                     </div>
-                                                    <Link href={`/admin/committees/${committee.id}/edit`}>
-                                                        <Button variant="outline" size="sm">
-                                                            <Edit className="h-4 w-4 mr-2" />
-                                                            Change Order
-                                                        </Button>
-                                                    </Link>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-
-                                        {/* Danger Zone */}
-                                        <DangerZoneCard committee={committee} onDelete={() => setShowDeleteDialog(true)} />
+                                                </CardContent>
+                                            </Card>
+                                        )}
                                     </div>
-                                </TabsContent>
-                            </div>
-                        </Tabs>
+
+                                    {/* Right Column - Sidebar */}
+                                    <div className="space-y-6">
+                                        <QuickStatsCard 
+                                            committee={committee}
+                                            activeCount={activeCount}
+                                            inactiveCount={inactiveCount}
+                                        />
+                                        <QuickActionsCard 
+                                            committee={committee}
+                                            onCopyCode={handleCopyCode}
+                                            onToggleStatus={handleToggleStatus}
+                                            onDelete={() => setShowDeleteDialog(true)}
+                                        />
+                                        <TimelineCard committee={committee} />
+                                        <SystemInfoCard committee={committee} />
+                                    </div>
+                                </div>
+                            </AdminTabPanel>
+
+                            <AdminTabPanel value="positions">
+                                {hasPositions ? (
+                                    <PositionsGrid positions={committee.positions!} committeeId={committee.id} />
+                                ) : (
+                                    <Card className="dark:bg-gray-900">
+                                        <CardHeader>
+                                            <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                                                <Users className="h-5 w-5" />
+                                                No Positions Assigned
+                                            </CardTitle>
+                                            <CardDescription className="dark:text-gray-400">
+                                                This committee doesn't have any positions assigned yet
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="text-center py-12 space-y-4">
+                                                <Target className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600" />
+                                                <div>
+                                                    <h4 className="font-medium text-gray-700 dark:text-gray-300">No positions found</h4>
+                                                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                                                        Create a new position and assign it to this committee
+                                                    </p>
+                                                </div>
+                                                <Link href={`/admin/positions/create?committee_id=${committee.id}`}>
+                                                    <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                                                        <Plus className="h-4 w-4 mr-2" />
+                                                        Create First Position
+                                                    </Button>
+                                                </Link>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </AdminTabPanel>
+
+                            <AdminTabPanel value="settings">
+                                <div className="grid gap-6 md:grid-cols-2">
+                                    <Card className="dark:bg-gray-900">
+                                        <CardHeader>
+                                            <CardTitle className="dark:text-gray-100">General Settings</CardTitle>
+                                            <CardDescription className="dark:text-gray-400">
+                                                Configure committee settings
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="font-medium dark:text-gray-200">Status</p>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                        {committee.is_active ? 'Active' : 'Inactive'}
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    variant={committee.is_active ? 'outline' : 'default'}
+                                                    size="sm"
+                                                    onClick={handleToggleStatus}
+                                                >
+                                                    {committee.is_active ? 'Deactivate' : 'Activate'}
+                                                </Button>
+                                            </div>
+                                            
+                                            <Separator className="dark:bg-gray-700" />
+                                            
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="font-medium dark:text-gray-200">Display Order</p>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                        Current order: #{committee.order}
+                                                    </p>
+                                                </div>
+                                                <Link href={`/admin/committees/${committee.id}/edit`}>
+                                                    <Button variant="outline" size="sm">
+                                                        <Edit className="h-4 w-4 mr-2" />
+                                                        Change Order
+                                                    </Button>
+                                                </Link>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    <DangerZoneCard committee={committee} onDelete={() => setShowDeleteDialog(true)} />
+                                </div>
+                            </AdminTabPanel>
+                        </AdminTabsWithContent>
                     </div>
 
                     {/* Delete Confirmation Dialog */}

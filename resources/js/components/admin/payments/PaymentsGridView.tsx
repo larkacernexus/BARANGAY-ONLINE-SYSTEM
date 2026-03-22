@@ -3,6 +3,13 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
@@ -30,7 +37,10 @@ import {
     Home,
     Building,
     Hash,
-    Info
+    Info,
+    MoreVertical,
+    Square,
+    CheckSquare
 } from 'lucide-react';
 import { Payment } from '@/types/payments.types';
 
@@ -212,7 +222,7 @@ export default function PaymentsGridView({
             {payments.map((payment) => {
                 const isSelected = selectedPayments.includes(payment.id);
                 const isExpanded = expandedCards.has(payment.id);
-                const isMobile = window.innerWidth < 768;
+                const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
                 const isCompactView = isMobile;
                 
                 // Truncation lengths based on view
@@ -245,9 +255,106 @@ export default function PaymentsGridView({
                             </div>
                         )}
 
+                        {/* Dropdown Menu - 3 dots */}
+                        <div className="absolute top-2 right-2 z-20">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button 
+                                        variant="ghost" 
+                                        className="h-7 w-7 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        onViewDetails(payment);
+                                    }}>
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        View Details
+                                    </DropdownMenuItem>
+                                    
+                                    <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        onPrintReceipt(payment);
+                                    }}>
+                                        <Printer className="mr-2 h-4 w-4" />
+                                        Print Receipt
+                                    </DropdownMenuItem>
+                                    
+                                    <DropdownMenuSeparator />
+                                    
+                                    <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        onCopyToClipboard(payment.or_number, 'OR Number');
+                                    }}>
+                                        <Copy className="mr-2 h-4 w-4" />
+                                        Copy OR Number
+                                    </DropdownMenuItem>
+                                    
+                                    <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        onCopyToClipboard(payment.payer_name, 'Payer Name');
+                                    }}>
+                                        <Copy className="mr-2 h-4 w-4" />
+                                        Copy Payer Name
+                                    </DropdownMenuItem>
+
+                                    {payment.contact_number && (
+                                        <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            onCopyToClipboard(payment.contact_number!, 'Contact Number');
+                                        }}>
+                                            <Copy className="mr-2 h-4 w-4" />
+                                            Copy Contact
+                                        </DropdownMenuItem>
+                                    )}
+                                    
+                                    {isBulkMode && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                onItemSelect(payment.id);
+                                            }}>
+                                                {isSelected ? (
+                                                    <>
+                                                        <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
+                                                        <span className="text-green-600">Deselect</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Square className="mr-2 h-4 w-4" />
+                                                        Select for Bulk
+                                                    </>
+                                                )}
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                    
+                                    <DropdownMenuSeparator />
+                                    
+                                    {payment.status !== 'completed' && (
+                                        <DropdownMenuItem 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDelete(payment);
+                                            }}
+                                            className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                        >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete Payment
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+
                         <CardContent className={`p-3 ${isCompactView && !isExpanded ? 'pb-1' : ''} bg-white dark:bg-gray-900`}>
                             {/* Header row with icon and OR number */}
-                            <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-start justify-between mb-2 pr-6">
                                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                     <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex-shrink-0">
                                         <Receipt className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
@@ -280,7 +387,7 @@ export default function PaymentsGridView({
                             
                             {/* Payer Name - always visible */}
                             <h3 
-                                className="font-semibold text-sm mb-1.5 line-clamp-2 text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-200"
+                                className="font-semibold text-sm mb-1.5 line-clamp-2 text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-200 pr-6"
                                 title={payment.payer_name}
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -382,6 +489,25 @@ export default function PaymentsGridView({
                                         </div>
                                     )}
 
+                                    {/* Payment Items Summary */}
+                                    {payment.items && payment.items.length > 0 && (
+                                        <div className="space-y-1 pt-1">
+                                            <div className="text-xs font-medium text-gray-700 dark:text-gray-300">Payment Items:</div>
+                                            <div className="space-y-1 pl-2">
+                                                {payment.items.slice(0, 2).map((item) => (
+                                                    <div key={item.id} className="text-xs text-gray-600 dark:text-gray-400">
+                                                        • {item.fee_name}: {formatCurrency(item.total_amount)}
+                                                    </div>
+                                                ))}
+                                                {payment.items.length > 2 && (
+                                                    <div className="text-xs text-gray-500 dark:text-gray-500">
+                                                        + {payment.items.length - 2} more item(s)
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Payment Details */}
                                     <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                                         <div>
@@ -422,12 +548,49 @@ export default function PaymentsGridView({
                                         </div>
                                     </div>
 
+                                    {/* Reference Number */}
+                                    {payment.reference_number && (
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <Hash className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                            <span className="text-gray-600 dark:text-gray-400">Reference:</span>
+                                            <span className="text-gray-900 dark:text-white truncate">{payment.reference_number}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Period Covered */}
+                                    {payment.period_covered && (
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <Calendar className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                            <span className="text-gray-600 dark:text-gray-400">Period:</span>
+                                            <span className="text-gray-900 dark:text-white">{payment.period_covered}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Recorder */}
+                                    {payment.recorder?.name && (
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <User className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                            <span className="text-gray-600 dark:text-gray-400">Recorded by:</span>
+                                            <span className="text-gray-900 dark:text-white">{payment.recorder.name}</span>
+                                        </div>
+                                    )}
+
                                     {/* Notes if available */}
                                     {payment.notes && (
                                         <div className="text-xs text-gray-700 dark:text-gray-300">
                                             <p className="font-medium mb-1 text-gray-600 dark:text-gray-400">Notes:</p>
                                             <p className="text-gray-600 dark:text-gray-400 italic">
                                                 "{payment.notes}"
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Remarks if available */}
+                                    {payment.remarks && (
+                                        <div className="text-xs text-gray-700 dark:text-gray-300">
+                                            <p className="font-medium mb-1 text-gray-600 dark:text-gray-400">Remarks:</p>
+                                            <p className="text-gray-600 dark:text-gray-400">
+                                                {payment.remarks}
                                             </p>
                                         </div>
                                     )}

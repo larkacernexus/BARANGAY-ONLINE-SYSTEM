@@ -42,23 +42,30 @@ const TabsList = React.forwardRef<
     scrollable?: boolean;
     centered?: boolean;
     fullWidth?: boolean;
+    variant?: 'underlined' | 'pills' | 'segmented';
   }
->(({ className, scrollable = false, centered = false, fullWidth = false, ...props }, ref) => {
+>(({ className, scrollable = false, centered = false, fullWidth = false, variant = 'underlined', ...props }, ref) => {
   const containerClass = scrollable 
     ? "flex overflow-x-auto scrollbar-hide snap-x snap-mandatory touch-pan-x" 
     : "flex";
+  
+  // Remove background and border for underlined variant
+  const variantStyles = {
+    underlined: "bg-transparent border-none shadow-none",
+    pills: "bg-muted/30 p-1 rounded-xl border border-muted-foreground/10 shadow-sm shadow-black/5",
+    segmented: "bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-border/50 shadow-sm shadow-black/5"
+  };
   
   return (
     <div
       ref={ref}
       className={cn(
         containerClass,
-        "min-h-16 w-full bg-muted/30 p-1 rounded-xl",
-        "border border-muted-foreground/10",
+        "min-h-12 w-full",
         centered ? "justify-center" : "justify-start",
         fullWidth && !scrollable ? "grid grid-flow-col" : "",
         "touch-manipulation select-none",
-        "shadow-sm shadow-black/5",
+        variantStyles[variant],
         className
       )}
       role="tablist"
@@ -76,12 +83,13 @@ interface TabsTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement>
   touchPadding?: boolean;
   icon?: React.ReactNode;
   textSize?: 'sm' | 'base' | 'lg';
+  variant?: 'underlined' | 'pills' | 'segmented';
 }
 
 const TabsTrigger = React.forwardRef<
   HTMLButtonElement,
   TabsTriggerProps
->(({ className, value, onClick, touchPadding = true, icon, textSize = 'base', children, ...props }, ref) => {
+>(({ className, value, onClick, touchPadding = true, icon, textSize = 'base', variant = 'underlined', children, ...props }, ref) => {
   const context = React.useContext(TabsContext);
   const rippleRef = React.useRef<HTMLSpanElement>(null);
   
@@ -130,32 +138,77 @@ const TabsTrigger = React.forwardRef<
 
   const [isPressed, setIsPressed] = React.useState(false);
 
+  // Variant-specific styles
+  const variantStyles = {
+    underlined: {
+      base: cn(
+        "relative flex items-center justify-center gap-2",
+        "font-medium transition-all duration-200",
+        "disabled:pointer-events-none disabled:opacity-30",
+        "touch-manipulation select-none overflow-hidden",
+        // Remove focus ring
+        "focus:outline-none focus-visible:outline-none focus-visible:ring-0",
+        // Remove active scale effect
+        "active:scale-100 active:opacity-100"
+      ),
+      active: cn(
+        "text-blue-600 dark:text-blue-400",
+        "border-b-2 border-blue-500 pb-2"
+      ),
+      inactive: cn(
+        "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200",
+        "border-b-2 border-transparent pb-2"
+      ),
+      padding: touchPadding ? "px-4 py-3 min-h-12" : "px-4 py-2"
+    },
+    pills: {
+      base: cn(
+        "relative flex items-center justify-center gap-2",
+        "font-medium transition-all duration-200 rounded-full",
+        "disabled:pointer-events-none disabled:opacity-30",
+        "touch-manipulation select-none overflow-hidden",
+        "focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+      ),
+      active: cn(
+        "bg-blue-500 text-white shadow-md dark:bg-blue-600"
+      ),
+      inactive: cn(
+        "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+      ),
+      padding: touchPadding ? "px-5 py-2 min-h-10" : "px-4 py-2"
+    },
+    segmented: {
+      base: cn(
+        "relative flex items-center justify-center gap-2",
+        "font-medium transition-all duration-200 rounded-md",
+        "disabled:pointer-events-none disabled:opacity-30",
+        "touch-manipulation select-none overflow-hidden",
+        "focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+      ),
+      active: cn(
+        "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-gray-100"
+      ),
+      inactive: cn(
+        "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+      ),
+      padding: touchPadding ? "px-5 py-2 min-h-10" : "px-4 py-2"
+    }
+  };
+
+  const styles = variantStyles[variant];
+
   return (
     <button
       ref={ref}
       className={cn(
-        // Base styles
-        "relative flex items-center justify-center gap-2",
-        `flex-1 min-w-0 px-4 py-4 ${textSizeClass} font-medium transition-all duration-200`,
-        "ring-offset-background focus-visible:outline-none",
-        "disabled:pointer-events-none disabled:opacity-30",
-        "touch-manipulation select-none overflow-hidden",
-        "active:scale-[0.98] active:opacity-90",
-        
-        // Active state
-        isActive 
-          ? "bg-background text-foreground shadow-md rounded-lg border border-border/50" 
-          : "text-muted-foreground active:bg-muted/50",
-        
-        // Touch padding
-        touchPadding && "min-h-14 min-w-[5rem]",
-        
-        // Press feedback
-        isPressed && "scale-[0.98] opacity-90",
-        
+        styles.base,
+        styles.padding,
+        textSizeClass,
+        isActive ? styles.active : styles.inactive,
+        // Full width handling
+        "flex-1 min-w-0",
         // Snap for scrollable lists
         "snap-start",
-        
         className
       )}
       onClick={handleInteraction}
@@ -181,7 +234,7 @@ const TabsTrigger = React.forwardRef<
       
       {/* Icon */}
       {icon && (
-        <span className="flex-shrink-0 text-lg">
+        <span className="flex-shrink-0">
           {icon}
         </span>
       )}
@@ -191,9 +244,9 @@ const TabsTrigger = React.forwardRef<
         {children}
       </span>
       
-      {/* Active indicator */}
-      {isActive && (
-        <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-primary rounded-full" />
+      {/* Active indicator for underlined variant */}
+      {variant === 'underlined' && isActive && (
+        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500" />
       )}
     </button>
   );
@@ -306,8 +359,9 @@ const TabsScrollContainer = React.forwardRef<
   React.HTMLAttributes<HTMLDivElement> & {
     showScrollbar?: boolean;
     showNavButtons?: boolean;
+    variant?: 'underlined' | 'pills' | 'segmented';
   }
->(({ className, showScrollbar = false, showNavButtons = true, children, ...props }, ref) => {
+>(({ className, showScrollbar = false, showNavButtons = true, variant = 'underlined', children, ...props }, ref) => {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   
   const scroll = (direction: 'left' | 'right') => {
@@ -337,14 +391,14 @@ const TabsScrollContainer = React.forwardRef<
         <>
           <button
             onClick={() => scroll('left')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 hidden group-hover:flex md:flex items-center justify-center w-10 h-10 bg-background/80 backdrop-blur-sm rounded-full shadow-lg border border-border hover:bg-background active:scale-95 transition-all"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 hidden group-hover:flex md:flex items-center justify-center w-10 h-10 bg-background/80 backdrop-blur-sm rounded-full shadow-lg border border-border hover:bg-background active:scale-95 transition-all focus:outline-none focus-visible:outline-none focus-visible:ring-0"
             aria-label="Scroll left"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <button
             onClick={() => scroll('right')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 hidden group-hover:flex md:flex items-center justify-center w-10 h-10 bg-background/80 backdrop-blur-sm rounded-full shadow-lg border border-border hover:bg-background active:scale-95 transition-all"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 hidden group-hover:flex md:flex items-center justify-center w-10 h-10 bg-background/80 backdrop-blur-sm rounded-full shadow-lg border border-border hover:bg-background active:scale-95 transition-all focus:outline-none focus-visible:outline-none focus-visible:ring-0"
             aria-label="Scroll right"
           >
             <ChevronRight className="w-5 h-5" />
@@ -365,6 +419,7 @@ const TabsScrollContainer = React.forwardRef<
             !showScrollbar && "scrollbar-hide"
           )}
           scrollable={true}
+          variant={variant}
         >
           {children}
         </TabsList>
@@ -392,8 +447,10 @@ TabsScrollContainer.displayName = "TabsScrollContainer";
 
 const TabsBottomBar = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, children, ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement> & {
+    variant?: 'underlined' | 'pills' | 'segmented';
+  }
+>(({ className, variant = 'underlined', children, ...props }, ref) => {
   return (
     <div
       ref={ref}
@@ -410,6 +467,7 @@ const TabsBottomBar = React.forwardRef<
       <TabsList 
         className="bg-transparent border-none p-2 min-h-20"
         fullWidth={true}
+        variant={variant}
       >
         {children}
       </TabsList>
@@ -424,8 +482,9 @@ const TabsSegmented = React.forwardRef<
     defaultValue?: string;
     value?: string;
     onValueChange?: (value: string) => void;
+    variant?: 'underlined' | 'pills' | 'segmented';
   }
->(({ className, children, ...props }, ref) => {
+>(({ className, variant = 'segmented', children, ...props }, ref) => {
   return (
     <Tabs
       ref={ref}
@@ -435,7 +494,7 @@ const TabsSegmented = React.forwardRef<
       )}
       {...props}
     >
-      <TabsList className="bg-transparent border-none p-0" fullWidth>
+      <TabsList className="bg-transparent border-none p-0" fullWidth variant={variant}>
         {children}
       </TabsList>
     </Tabs>

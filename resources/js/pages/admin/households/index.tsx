@@ -1,14 +1,21 @@
 import { router, usePage } from '@inertiajs/react';
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { BulkOperation, SelectionMode } from '@/types';
+import { 
+    BulkAction, 
+    SelectionMode,
+    Household,
+    Purok,
+    HouseholdStats as IHouseholdStats,
+    HouseholdFilters,
+    FlashMessage,
+    SelectionStats
+} from '@/types';
 import { 
     filterHouseholds, 
     getSelectionStats, 
-    formatForClipboard,
-    getPurokName,
-    formatDate 
+    formatForClipboard
 } from '@/admin-utils/householdUtils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -21,29 +28,38 @@ import HouseholdsDialogs from '@/components/admin/households/HouseholdsDialogs';
 import { Button } from '@/components/ui/button';
 import { KeyRound } from 'lucide-react';
 
-interface HouseholdsProps {
-    households: any[];
-    stats: {
-        total: number;
-        active: number;
-        inactive: number;
-        totalMembers: number;
-        averageMembers: number;
-        purokCount: number;
-        [key: string]: any;
-    };
-    filters: any;
-    puroks: any[];
-    allHouseholds: any[];
+interface HouseholdsPageProps {
+    households: Household[];
+    stats: IHouseholdStats;
+    filters: HouseholdFilters;
+    puroks: Purok[];
+    allHouseholds: Household[];
 }
 
-export default function Households({ households, stats, filters, puroks, allHouseholds }: HouseholdsProps) {
-    const { flash } = usePage().props as any;
+interface FilterState {
+    status: string;
+    purok_id: string; // Changed from string | number to string
+    sort_by: string;
+    sort_order: 'asc' | 'desc';
+}
+
+// Define the filtered stats type to match what HouseholdsStats expects
+interface FilteredStats {
+    total: number;
+    active: number;
+    inactive: number;
+    totalMembers: number;
+    averageMembers: number;
+    purokCount: number;
+}
+
+export default function Households({ households, stats, filters, puroks, allHouseholds }: HouseholdsPageProps) {
+    const { flash } = usePage<{ flash: FlashMessage }>().props;
     
     // Initialize state with safe defaults
-    const safeFilters = filters || {};
-    const safePuroks = puroks || [];
-    const safeStats = stats || {
+    const safeFilters: HouseholdFilters = filters || {};
+    const safePuroks: Purok[] = puroks || [];
+    const safeStats: IHouseholdStats = stats || {
         total: 0,
         active: 0,
         inactive: 0,
@@ -52,13 +68,13 @@ export default function Households({ households, stats, filters, puroks, allHous
         purokCount: 0
     };
     
-    // Search and filter states
+    // Search and filter states - ensure purok_id is always string
     const [search, setSearch] = useState(safeFilters.search || '');
-    const [filtersState, setFiltersState] = useState({
+    const [filtersState, setFiltersState] = useState<FilterState>({
         status: safeFilters.status || 'all',
-        purok_id: safeFilters.purok_id || 'all',
+        purok_id: String(safeFilters.purok_id || 'all'), // Convert to string
         sort_by: safeFilters.sort_by || 'household_number',
-        sort_order: safeFilters.sort_order || 'asc'
+        sort_order: (safeFilters.sort_order as 'asc' | 'desc') || 'asc'
     });
     
     // View and pagination states
@@ -68,8 +84,8 @@ export default function Households({ households, stats, filters, puroks, allHous
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     
     // Mobile detection
-    const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-    const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+    const [isMobile, setIsMobile] = useState<boolean>(false);
+    const [windowWidth, setWindowWidth] = useState<number>(1024);
     
     // Bulk selection states
     const [selectedHouseholds, setSelectedHouseholds] = useState<number[]>([]);
@@ -177,16 +193,15 @@ export default function Households({ households, stats, filters, puroks, allHous
         const value = e.target.value;
         setSearch(value);
         
-        const params = {
+        const params: Record<string, any> = {
             ...filtersState,
             search: value
         };
         
         // Remove empty params
         Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
+            if (!params[key] || params[key] === 'all') {
+                delete params[key];
             }
         });
         
@@ -207,8 +222,8 @@ export default function Households({ households, stats, filters, puroks, allHous
         );
     }, [allHouseholds, search, filtersState, safePuroks]);
 
-    // Calculate filtered stats for display
-    const filteredStats = useMemo(() => {
+    // Calculate filtered stats for display - now properly typed as FilteredStats
+    const filteredStats = useMemo((): FilteredStats => {
         return {
             total: filteredHouseholds.length,
             active: filteredHouseholds.filter(h => h.status === 'active').length,
@@ -288,12 +303,12 @@ export default function Households({ households, stats, filters, puroks, allHous
     }, [selectedHouseholds, filteredHouseholds]);
 
     // Calculate selection stats
-    const selectionStats = useMemo(() => {
+    const selectionStats = useMemo((): SelectionStats => {
         return getSelectionStats(selectedHouseholdsData);
     }, [selectedHouseholdsData]);
 
     // Bulk operations
-    const handleBulkOperation = async (operation: BulkOperation) => {
+    const handleBulkOperation = async (operation: BulkAction) => {
         if (selectedHouseholds.length === 0) {
             toast.error('Please select at least one household');
             return;
@@ -353,6 +368,10 @@ export default function Households({ households, stats, filters, puroks, allHous
 
                 case 'change_purok':
                     setShowBulkPurokDialog(true);
+                    break;
+
+                default:
+                    toast.info(`Operation ${operation} to be implemented`);
                     break;
             }
         } catch (error) {
@@ -463,7 +482,7 @@ export default function Households({ households, stats, filters, puroks, allHous
     };
 
     // Individual household operations
-    const handleDelete = (household: any) => {
+    const handleDelete = (household: Household) => {
         if (confirm(`Are you sure you want to delete household "${household.household_number || 'Untitled'}"?`)) {
             router.delete(`/admin/households/${household.id}`, {
                 preserveScroll: true,
@@ -478,7 +497,7 @@ export default function Households({ households, stats, filters, puroks, allHous
         }
     };
 
-    const handleToggleStatus = (household: any) => {
+    const handleToggleStatus = (household: Household) => {
         const newStatus = household.status === 'active' ? 'inactive' : 'active';
         router.post(`/admin/households/${household.id}/update-status`, {
             status: newStatus
@@ -511,7 +530,7 @@ export default function Households({ households, stats, filters, puroks, allHous
         }));
         
         // Trigger server-side sort update
-        const params = {
+        const params: Record<string, any> = {
             ...filtersState,
             sort_by: column,
             sort_order: newOrder,
@@ -519,9 +538,8 @@ export default function Households({ households, stats, filters, puroks, allHous
         };
         
         Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
+            if (!params[key] || params[key] === 'all') {
+                delete params[key];
             }
         });
         
@@ -560,20 +578,19 @@ export default function Households({ households, stats, filters, puroks, allHous
         setIsSelectAll(false);
     };
 
-    const updateFilter = (key: keyof typeof filtersState, value: string) => {
+    const updateFilter = (key: keyof FilterState, value: string) => {
         setFiltersState(prev => ({ ...prev, [key]: value }));
         
         // Trigger server-side filter update
-        const params = {
+        const params: Record<string, any> = {
             ...filtersState,
             [key]: value,
             search: search
         };
         
         Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
+            if (!params[key] || params[key] === 'all') {
+                delete params[key];
             }
         });
         
@@ -585,7 +602,7 @@ export default function Households({ households, stats, filters, puroks, allHous
     };
 
     const hasActiveFilters = 
-        search || 
+        search !== '' || 
         filtersState.status !== 'all' || 
         filtersState.purok_id !== 'all';
 

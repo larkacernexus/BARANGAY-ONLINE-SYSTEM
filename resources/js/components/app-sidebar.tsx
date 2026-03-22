@@ -51,6 +51,7 @@ import {
     FileText,
     FileType,
     FolderOpen,
+    Gavel,
     History,
     Home,
     Key,
@@ -1111,7 +1112,7 @@ export function AppSidebar({ className }: { className?: string }) {
     const settingsCategories = useMemo(() => {
         const allCategories: SidebarCategory[] = [
             {
-                title: 'Personal', // KEPT Personal category
+                title: 'Personal',
                 icon: UserCog,
                 items: [
                     {
@@ -1124,7 +1125,6 @@ export function AppSidebar({ className }: { className?: string }) {
                             url === '/admin/settings/profile',
                         requiredPermission: undefined,
                     },
-                   
                 ],
             },
             {
@@ -1368,6 +1368,7 @@ export function AppSidebar({ className }: { className?: string }) {
                     color: 'red' as const,
                     requiredPermission: 'manage-blotters',
                     description: 'File new blotter case',
+                    isUpdated: true,
                 },
             ],
             residents: [
@@ -1478,7 +1479,7 @@ export function AppSidebar({ className }: { className?: string }) {
     // Grouped Quick Actions for Settings tab
     const settingsQuickActionGroups = useMemo(() => {
         const groups = {
-            personal: [ // KEPT Personal quick actions
+            personal: [
                 {
                     title: 'Edit Profile',
                     href: '/admin/settings/profile',
@@ -1649,7 +1650,7 @@ export function AppSidebar({ className }: { className?: string }) {
     // Flatten for main display in Operations tab (take 1 from each category, max 5)
     const mainOperationsQuickActions = useMemo(() => {
         const allActions = [
-            ...operationsQuickActionGroups.reports.slice(0, 1),
+            ...operationsQuickActionGroups.reports.slice(0, 2), // Show both New Report and New Blotter
             ...operationsQuickActionGroups.residents.slice(0, 1),
             ...operationsQuickActionGroups.services.slice(0, 2),
         ].slice(0, 5);

@@ -18,14 +18,52 @@ import { OverviewTab } from '@/components/admin/households/show/tabs/OverviewTab
 import { MembersTab } from '@/components/admin/households/show/tabs/MembersTab';
 import { PrivilegesTab } from '@/components/admin/households/show/tabs/PrivilegesTab';
 import { StatisticsTab } from '@/components/admin/households/show/tabs/StatisticsTab';
+import { FeesTab } from '@/components/admin/households/show/tabs/FeesTab';
+import { ClearancesTab } from '@/components/admin/households/show/tabs/ClearancesTab';
+import { PaymentsTab } from '@/components/admin/households/show/tabs/PaymentsTab';
+import { ActivityLogTab } from '@/components/admin/households/show/tabs/ActivityLogTab';
+import { ResidentDocumentsTab } from '@/components/admin/households/show/tabs/ResidentDocumentsTab';
+
 import { route } from 'ziggy-js';
-import { Home, Users, Award, BarChart3, Loader2, ArrowLeft } from 'lucide-react';
+import { 
+    Home, 
+    Users, 
+    Award, 
+    BarChart3, 
+    Loader2, 
+    ArrowLeft,
+    FileText,
+    Receipt,
+    CreditCard,
+    Calendar,
+    History,
+    AlertCircle,
+    Trash2
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle, Trash2 } from 'lucide-react';
-import { Ziggy } from '@/ziggy';
 
-export default function ShowHousehold({ household }: PageProps) {
+// Extend the PageProps interface to include availableResidents and headId
+interface ExtendedPageProps extends PageProps {
+    availableResidents?: any[];
+    headId?: number | null;
+    fees?: any[];
+    payments?: any[];
+    clearances?: any[];
+    activities?: any[];
+    residentDocuments?: any[];
+}
+
+export default function ShowHousehold({ 
+    household, 
+    availableResidents = [], 
+    headId = null,
+    fees = [],
+    payments = [],
+    clearances = [],
+    activities = [],
+    residentDocuments = []
+}: ExtendedPageProps) {
     // State
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -85,6 +123,31 @@ export default function ShowHousehold({ household }: PageProps) {
         return counts;
     }, [allPrivileges]);
 
+    // Calculate fee statistics
+    const totalFees = fees.length;
+    const paidFees = fees.filter(f => f.status === 'paid').length;
+    const pendingFees = fees.filter(f => f.status === 'pending' || f.status === 'issued').length;
+    const overdueFees = fees.filter(f => f.status === 'overdue').length;
+    const totalFeeAmount = fees.reduce((sum, f) => sum + (f.total_amount || 0), 0);
+    const totalPaidAmount = fees.reduce((sum, f) => sum + (f.amount_paid || 0), 0);
+
+    // Calculate payment statistics
+    const totalPayments = payments.length;
+    const totalPaymentAmount = payments.reduce((sum, p) => sum + (p.total_amount || 0), 0);
+    const cashPayments = payments.filter(p => p.payment_method === 'cash').length;
+    const onlinePayments = payments.filter(p => ['gcash', 'maya', 'online'].includes(p.payment_method)).length;
+
+    // Calculate clearance statistics
+    const totalClearances = clearances.length;
+    const pendingClearances = clearances.filter(c => c.status === 'pending').length;
+    const approvedClearances = clearances.filter(c => c.status === 'approved').length;
+    const releasedClearances = clearances.filter(c => c.status === 'released').length;
+
+    // Calculate document statistics
+    const totalDocuments = residentDocuments.length;
+    const activeDocuments = residentDocuments.filter(d => d.status === 'active').length;
+    const expiredDocuments = residentDocuments.filter(d => d.status === 'expired').length;
+
     // Handlers
     const handleCopyLink = () => {
         const link = window.location.href;
@@ -106,12 +169,17 @@ export default function ShowHousehold({ household }: PageProps) {
         window.print();
     };
 
-    // Tabs configuration
+    // Tabs configuration with counts
     const tabs = [
-        { id: 'overview', label: 'Overview', icon: <Home className="h-4 w-4" /> },
-        { id: 'members', label: `Members (${household.member_count})`, icon: <Users className="h-4 w-4" /> },
-        { id: 'privileges', label: `Privileges (${activePrivileges})`, icon: <Award className="h-4 w-4" /> },
-        { id: 'statistics', label: 'Statistics', icon: <BarChart3 className="h-4 w-4" /> },
+        { id: 'overview', label: 'Overview', icon: <Home className="h-4 w-4" />, count: null },
+        { id: 'members', label: 'Members', icon: <Users className="h-4 w-4" />, count: household.member_count },
+        { id: 'privileges', label: 'Privileges', icon: <Award className="h-4 w-4" />, count: activePrivileges },
+        { id: 'fees', label: 'Fees', icon: <Receipt className="h-4 w-4" />, count: pendingFees },
+        { id: 'payments', label: 'Payments', icon: <CreditCard className="h-4 w-4" />, count: totalPayments },
+        { id: 'clearances', label: 'Clearances', icon: <Calendar className="h-4 w-4" />, count: pendingClearances },
+        { id: 'documents', label: 'Documents', icon: <FileText className="h-4 w-4" />, count: totalDocuments },
+        { id: 'statistics', label: 'Statistics', icon: <BarChart3 className="h-4 w-4" />, count: null },
+        { id: 'history', label: 'Activity Log', icon: <History className="h-4 w-4" />, count: activities.length },
     ];
 
     return (
@@ -148,14 +216,14 @@ export default function ShowHousehold({ household }: PageProps) {
                     />
 
                     {/* Tabs */}
-                    <div className="border-b dark:border-gray-700">
-                        <nav className="flex space-x-4" aria-label="Tabs">
+                    <div className="border-b dark:border-gray-700 overflow-x-auto">
+                        <nav className="flex space-x-2 sm:space-x-4" aria-label="Tabs">
                             {tabs.map((tab) => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`
-                                        inline-flex items-center px-3 py-2 text-sm font-medium border-b-2
+                                        inline-flex items-center px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap
                                         ${activeTab === tab.id
                                             ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600'
@@ -164,6 +232,17 @@ export default function ShowHousehold({ household }: PageProps) {
                                 >
                                     {tab.icon}
                                     <span className="ml-2">{tab.label}</span>
+                                    {tab.count !== null && tab.count > 0 && (
+                                        <span className={`
+                                            ml-2 px-1.5 py-0.5 text-xs rounded-full
+                                            ${activeTab === tab.id
+                                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                                            }
+                                        `}>
+                                            {tab.count}
+                                        </span>
+                                    )}
                                 </button>
                             ))}
                         </nav>
@@ -174,7 +253,13 @@ export default function ShowHousehold({ household }: PageProps) {
                         {/* Left Column - Main Content */}
                         <div className="lg:col-span-2 space-y-6">
                             {activeTab === 'overview' && <OverviewTab household={household} />}
-                            {activeTab === 'members' && <MembersTab household={household} />}
+                            {activeTab === 'members' && (
+                                <MembersTab 
+                                    household={household} 
+                                    availableResidents={availableResidents}
+                                    headId={headId}
+                                />
+                            )}
                             {activeTab === 'privileges' && (
                                 <PrivilegesTab 
                                     household={household}
@@ -186,12 +271,60 @@ export default function ShowHousehold({ household }: PageProps) {
                                     privilegeCounts={privilegeCounts}
                                 />
                             )}
+                            {activeTab === 'fees' && (
+                                <FeesTab 
+                                    householdId={household.id}
+                                    fees={fees}
+                                    totalFees={totalFees}
+                                    paidFees={paidFees}
+                                    pendingFees={pendingFees}
+                                    overdueFees={overdueFees}
+                                    totalAmount={totalFeeAmount}
+                                    totalPaid={totalPaidAmount}
+                                />
+                            )}
+                            {activeTab === 'payments' && (
+                                <PaymentsTab 
+                                    householdId={household.id}
+                                    payments={payments}
+                                    totalPayments={totalPayments}
+                                    totalAmount={totalPaymentAmount}
+                                    cashPayments={cashPayments}
+                                    onlinePayments={onlinePayments}
+                                />
+                            )}
+                            {activeTab === 'clearances' && (
+                                <ClearancesTab 
+                                    householdId={household.id}
+                                    clearances={clearances}
+                                    totalClearances={totalClearances}
+                                    pendingClearances={pendingClearances}
+                                    approvedClearances={approvedClearances}
+                                    releasedClearances={releasedClearances}
+                                />
+                            )}
+                            {activeTab === 'documents' && (
+                                <ResidentDocumentsTab 
+                                    householdId={household.id}
+                                    documents={residentDocuments}
+                                    totalDocuments={totalDocuments}
+                                    activeDocuments={activeDocuments}
+                                    expiredDocuments={expiredDocuments}
+                                />
+                            )}
                             {activeTab === 'statistics' && (
                                 <StatisticsTab 
                                     household={household}
                                     membersWithPrivileges={membersWithPrivileges}
                                     onShowMore={() => setShowMoreDetails(!showMoreDetails)}
                                     showMore={showMoreDetails}
+                                />
+                            )}
+                            {activeTab === 'history' && (
+                                <ActivityLogTab 
+                                    householdId={household.id}
+                                    activities={activities}
+                                    totalActivities={activities.length}
                                 />
                             )}
                         </div>

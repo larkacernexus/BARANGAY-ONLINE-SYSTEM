@@ -31,6 +31,7 @@ class PaymentShowController extends BasePaymentController
             'items.clearanceRequest.processedBy',
             'discounts.rule',
             'discounts.verifier',
+            'activities' // Load activity logs
         ]);
 
         $clearanceRequests = $this->getClearanceRequestsForPayment($payment);
@@ -39,6 +40,7 @@ class PaymentShowController extends BasePaymentController
         $relatedPayments = $this->getRelatedPayments($payment);
         $paymentBreakdown = $this->calculatePaymentBreakdown($payment);
         $discountDetails = $this->getDiscountDetails($payment);
+        $history = $this->getPaymentHistory($payment); // Add history
 
         $this->enrichPaymentWithFormattedData($payment);
 
@@ -50,11 +52,200 @@ class PaymentShowController extends BasePaymentController
             'relatedPayments' => $relatedPayments,
             'paymentBreakdown' => $paymentBreakdown,
             'discountDetails' => $discountDetails,
+            'history' => $history, // Add history to props
             'isClearancePayment' => $payment->items()->whereNotNull('clearance_request_id')->exists(),
             'isFeePayment' => $payment->items()->whereNotNull('fee_id')->exists(),
             'hasClearanceRequests' => $clearanceRequests->isNotEmpty(),
             'hasFees' => $fees->isNotEmpty(),
         ]);
+    }
+
+    /**
+     * Get payment history/activity logs
+     */
+    private function getPaymentHistory(Payment $payment): array
+    {
+        $history = [];
+
+        // Add creation event
+        $history[] = [
+            'id' => $payment->id . '_created',
+            'payment_id' => $payment->id,
+            'action' => 'created',
+            'status' => $payment->status,
+            'description' => "Payment #{$payment->or_number} was created",
+            'user' => $payment->recorder ? [
+                'id' => $payment->recorder->id,
+                'name' => $payment->recorder->name ?? $payment->recorder->first_name . ' ' . $payment->recorder->last_name,
+                'email' => $payment->recorder->email ?? null,
+            ] : null,
+            'created_at' => $payment->created_at,
+            'formatted_created_at' => $payment->formatted_created_at ?? $payment->created_at->format('F j, Y g:i A'),
+        ];
+
+        // Add status change events from activities
+        if ($payment->relationLoaded('activities') && $payment->activities->count() > 0) {
+            foreach ($payment->activities as $activity) {
+                $action = $this->mapActivityToAction($activity);
+                $changes = $this->extractChangesFromActivity($activity);
+                
+                $history[] = [
+                    'id' => $activity->id,
+                    'payment_id' => $payment->id,
+                    'action' => $action,
+                    'status' => $this->extractStatusFromActivity($activity),
+                    'description' => $activity->description ?? $this->getActivityDescription($activity),
+                    'changes' => $changes,
+                    'metadata' => $this->extractMetadataFromActivity($activity),
+                    'user' => $activity->causer ? [
+                        'id' => $activity->causer->id,
+                        'name' => $activity->causer->name ?? $activity->causer->first_name . ' ' . $activity->causer->last_name,
+                        'email' => $activity->causer->email ?? null,
+                    ] : null,
+                    'created_at' => $activity->created_at,
+                    'formatted_created_at' => $activity->created_at->format('F j, Y g:i A'),
+                ];
+            }
+        }
+
+        // Add void event if payment is voided
+        if ($payment->status === 'voided') {
+            $history[] = [
+                'id' => $payment->id . '_voided',
+                'payment_id' => $payment->id,
+                'action' => 'voided',
+                'status' => 'voided',
+                'description' => "Payment #{$payment->or_number} was voided",
+                'metadata' => [
+                    'reason' => $payment->remarks ?? 'No reason provided',
+                ],
+                'user' => auth()->user() ? [
+                    'id' => auth()->user()->id,
+                    'name' => auth()->user()->name ?? auth()->user()->first_name . ' ' . auth()->user()->last_name,
+                    'email' => auth()->user()->email ?? null,
+                ] : null,
+                'created_at' => $payment->updated_at,
+                'formatted_created_at' => $payment->formatted_updated_at ?? $payment->updated_at->format('F j, Y g:i A'),
+            ];
+        }
+
+        // Sort by created_at descending (most recent first)
+        usort($history, function ($a, $b) {
+            return strtotime($b['created_at']) - strtotime($a['created_at']);
+        });
+
+        return $history;
+    }
+
+    /**
+     * Map activity log event to action type
+     */
+    private function mapActivityToAction($activity): string
+    {
+        $event = $activity->event ?? $activity->log_name ?? 'updated';
+        
+        switch ($event) {
+            case 'created':
+                return 'created';
+            case 'updated':
+                return 'updated';
+            case 'status_changed':
+                return 'status_changed';
+            case 'voided':
+                return 'voided';
+            case 'refunded':
+                return 'refunded';
+            default:
+                return 'updated';
+        }
+    }
+
+    /**
+     * Extract status from activity if available
+     */
+    private function extractStatusFromActivity($activity): ?string
+    {
+        $properties = $activity->properties ?? [];
+        $newValues = $properties['new'] ?? $properties['attributes'] ?? [];
+        
+        if (isset($newValues['status'])) {
+            return $newValues['status'];
+        }
+        
+        return null;
+    }
+
+    /**
+     * Extract changes from activity
+     */
+    private function extractChangesFromActivity($activity): ?array
+    {
+        $properties = $activity->properties ?? [];
+        $oldValues = $properties['old'] ?? [];
+        $newValues = $properties['new'] ?? $properties['attributes'] ?? [];
+        
+        $changes = [];
+        $trackedFields = ['status', 'total_amount', 'discount', 'payment_method', 'reference_number'];
+        
+        foreach ($trackedFields as $field) {
+            if (isset($oldValues[$field]) && isset($newValues[$field]) && $oldValues[$field] != $newValues[$field]) {
+                $changes[$field] = [
+                    'old' => $oldValues[$field],
+                    'new' => $newValues[$field],
+                ];
+            }
+        }
+        
+        return !empty($changes) ? $changes : null;
+    }
+
+    /**
+     * Extract metadata from activity
+     */
+    private function extractMetadataFromActivity($activity): ?array
+    {
+        $properties = $activity->properties ?? [];
+        $metadata = [];
+        
+        if (isset($properties['reference_number'])) {
+            $metadata['reference_number'] = $properties['reference_number'];
+        }
+        
+        if (isset($properties['payment_method'])) {
+            $metadata['payment_method'] = $properties['payment_method'];
+        }
+        
+        if (isset($properties['reason'])) {
+            $metadata['reason'] = $properties['reason'];
+        }
+        
+        if (isset($properties['ip_address'])) {
+            $metadata['ip_address'] = $properties['ip_address'];
+        }
+        
+        return !empty($metadata) ? $metadata : null;
+    }
+
+    /**
+     * Get activity description
+     */
+    private function getActivityDescription($activity): string
+    {
+        $properties = $activity->properties ?? [];
+        $oldValues = $properties['old'] ?? [];
+        $newValues = $properties['new'] ?? $properties['attributes'] ?? [];
+        
+        if (isset($oldValues['status']) && isset($newValues['status'])) {
+            return "Status changed from {$oldValues['status']} to {$newValues['status']}";
+        }
+        
+        if (isset($oldValues['total_amount']) && isset($newValues['total_amount'])) {
+            $oldAmount = '₱' . number_format($oldValues['total_amount'], 2);
+            $newAmount = '₱' . number_format($newValues['total_amount'], 2);
+            return "Amount updated from {$oldAmount} to {$newAmount}";
+        }
+        
+        return $activity->description ?? 'Payment updated';
     }
 
     /**

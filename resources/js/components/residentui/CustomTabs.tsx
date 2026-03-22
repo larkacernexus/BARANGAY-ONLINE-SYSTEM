@@ -30,8 +30,20 @@ export function CustomTabs({
     getStatusCount,
     tabsConfig = DEFAULT_TABS
 }: CustomTabsProps) {
+    // Filter out any tabs without an id to prevent undefined keys
+    const validTabs = tabsConfig.filter(tab => tab.id && typeof tab.id === 'string');
+    
+    // If no valid tabs, return null
+    if (validTabs.length === 0) {
+        console.warn('CustomTabs: No valid tabs with id found');
+        return null;
+    }
+    
+    // Ensure statusFilter is valid (exists in valid tabs)
+    const activeTab = validTabs.some(tab => tab.id === statusFilter) ? statusFilter : validTabs[0]?.id || 'all';
+    
     // Calculate total count for "all" tab
-    const totalCount = tabsConfig.reduce((total, tab) => {
+    const totalCount = validTabs.reduce((total, tab) => {
         if (tab.id !== 'all') {
             return total + (getStatusCount(tab.id) || 0);
         }
@@ -41,14 +53,15 @@ export function CustomTabs({
     return (
         <div className="overflow-x-auto scrollbar-hide">
             <div className="flex min-w-max space-x-1 pb-2">
-                {tabsConfig.map((tab) => {
+                {validTabs.map((tab) => {
                     const Icon = tab.icon;
-                    const count = tab.id === 'all' ? totalCount : getStatusCount(tab.id);
-                    const isActive = statusFilter === tab.id;
+                    // Ensure count is a number
+                    const count = tab.id === 'all' ? totalCount : (getStatusCount(tab.id) || 0);
+                    const isActive = activeTab === tab.id;
                     
                     return (
                         <button
-                            key={`tab-${tab.id}`} // ✅ Unique key with prefix
+                            key={tab.id} // ✅ Use tab.id directly as key (already validated)
                             onClick={() => handleTabChange(tab.id)}
                             className={`
                                 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap
@@ -59,7 +72,7 @@ export function CustomTabs({
                                 min-w-[70px]
                             `}
                         >
-                            <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                            {Icon && <Icon className="h-3.5 w-3.5 flex-shrink-0" />}
                             <span>{tab.label}</span>
                             <span className={`
                                 px-1.5 py-0.5 rounded-full text-[10px] font-medium min-w-[20px] text-center
@@ -68,7 +81,7 @@ export function CustomTabs({
                                     : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                                 }
                             `}>
-                                {count || 0}
+                                {count}
                             </span>
                         </button>
                     );

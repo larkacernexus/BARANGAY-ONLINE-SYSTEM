@@ -85,9 +85,9 @@ export default function Profile({ mustVerifyEmail, status }: ProfileProps) {
         <Head title="Profile" />
         <SettingsLayout>
           <div className="space-y-4">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-8 w-48 bg-gray-200 dark:bg-gray-700" />
+            <Skeleton className="h-32 w-full bg-gray-200 dark:bg-gray-700" />
+            <Skeleton className="h-64 w-full bg-gray-200 dark:bg-gray-700" />
           </div>
         </SettingsLayout>
       </AppLayout>
@@ -167,8 +167,8 @@ export default function Profile({ mustVerifyEmail, status }: ProfileProps) {
         </div>
 
         {/* Footer Note */}
-        <div className="mt-6 flex items-center justify-between text-xs text-muted-foreground pt-4 border-t">
-          <div className="flex items-center gap-2">
+        <div className="mt-6 flex items-center justify-between text-xs pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
             <Shield className="h-3 w-3" />
             <span>Information is managed by the administration</span>
           </div>

@@ -1,5 +1,3 @@
-// pages/admin/puroks/create.tsx
-
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +26,9 @@ export default function CreatePurok() {
         leader_name: '',
         leader_contact: '',
         status: 'active',
-        google_maps_url: '', // Changed from boundaries to google_maps_url
+        google_maps_url: '',
+        latitude: '',
+        longitude: '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -181,7 +181,7 @@ export default function CreatePurok() {
                             </Card>
                         </div>
 
-                        {/* Right Column - Leader Information */}
+                        {/* Right Column - Leader & Location */}
                         <div className="space-y-6">
                             <Card className="dark:bg-gray-900">
                                 <CardHeader>
@@ -226,7 +226,22 @@ export default function CreatePurok() {
                                             <p className="text-sm text-red-600 dark:text-red-400">{errors.leader_contact}</p>
                                         )}
                                     </div>
+                                </CardContent>
+                            </Card>
 
+                            <Card className="dark:bg-gray-900">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-orange-600 to-red-600 dark:from-orange-700 dark:to-red-700 flex items-center justify-center">
+                                            <Globe className="h-3 w-3 text-white" />
+                                        </div>
+                                        Google Maps Location
+                                    </CardTitle>
+                                    <CardDescription className="dark:text-gray-400">
+                                        Paste a Google Maps link - coordinates will be extracted automatically
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="google_maps_url" className="dark:text-gray-300">Google Maps Link</Label>
                                         <div className="flex gap-2">
@@ -234,7 +249,7 @@ export default function CreatePurok() {
                                                 <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                 <Input 
                                                     id="google_maps_url" 
-                                                    placeholder="https://www.google.com/maps?q=14.5995,120.9842"
+                                                    placeholder="https://maps.app.goo.gl/..."
                                                     value={data.google_maps_url}
                                                     onChange={(e) => setData('google_maps_url', e.target.value)}
                                                     className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
@@ -258,23 +273,35 @@ export default function CreatePurok() {
                                             )}
                                         </div>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Go to Google Maps, pin the purok location, click "Share" and copy the link here
+                                            Paste any Google Maps link (short or long). Coordinates will be extracted automatically when you save.
                                         </p>
                                         {errors.google_maps_url && (
                                             <p className="text-sm text-red-600 dark:text-red-400">{errors.google_maps_url}</p>
                                         )}
                                     </div>
+
+                                    {/* Hidden fields for coordinates - automatically populated by the model on save */}
+                                    <input type="hidden" name="latitude" value={data.latitude} />
+                                    <input type="hidden" name="longitude" value={data.longitude} />
+                                    
+                                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                                        <p>💡 <strong>How it works:</strong></p>
+                                        <p>1. Paste any Google Maps share link</p>
+                                        <p>2. Click Save</p>
+                                        <p>3. The system automatically extracts coordinates</p>
+                                        <p>4. The map will show the exact pinned location</p>
+                                    </div>
                                 </CardContent>
                             </Card>
 
-                            {/* Form Preview Card */}
+                            {/* Form Preview */}
                             <Card className="dark:bg-gray-900">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 dark:text-gray-100">
                                         <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
                                             <Save className="h-3 w-3 text-white" />
                                         </div>
-                                        Form Preview
+                                        Preview
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
@@ -301,15 +328,7 @@ export default function CreatePurok() {
                                             <span className="text-gray-500 dark:text-gray-400">Google Maps:</span>
                                             <span className="font-medium">
                                                 {data.google_maps_url ? (
-                                                    <a 
-                                                        href={data.google_maps_url} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline inline-flex items-center gap-1"
-                                                    >
-                                                        View Map
-                                                        <ExternalLink className="h-3 w-3" />
-                                                    </a>
+                                                    <span className="text-green-600 dark:text-green-400">✓ Will be processed</span>
                                                 ) : (
                                                     <span className="text-gray-400 dark:text-gray-500">Not set</span>
                                                 )}

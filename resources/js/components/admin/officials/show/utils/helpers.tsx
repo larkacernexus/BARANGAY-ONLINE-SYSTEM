@@ -61,34 +61,37 @@ import {
     EyeIcon,
 } from 'lucide-react';
 
-export const formatDate = (dateString: string, includeTime: boolean = false) => {
-    if (!dateString) return 'N/A';
+// Updated formatDate to accept string | null
+export const formatDate = (date: string | null, includeTime: boolean = false): string => {
+    if (!date) return 'N/A';
     try {
-        const date = parseISO(dateString);
-        return format(date, includeTime ? 'MMM dd, yyyy hh:mm a' : 'MMM dd, yyyy');
+        const parsedDate = parseISO(date);
+        return format(parsedDate, includeTime ? 'MMM dd, yyyy hh:mm a' : 'MMM dd, yyyy');
     } catch (error) {
         return 'Invalid date';
     }
 };
 
-export const getStatusColor = (status: string, isCurrent: boolean) => {
-    if (isCurrent) return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
-    
+// Updated getStatusColor to accept only status (no isCurrent parameter)
+export const getStatusColor = (status: string): string => {
     switch (status) {
         case 'active':
-            return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
+            return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
         case 'inactive':
             return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
         case 'former':
             return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800';
+        case 'pending':
+            return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800';
+        case 'expired':
+            return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
         default:
             return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800';
     }
 };
 
-export const getStatusIcon = (status: string, isCurrent: boolean) => {
-    if (isCurrent) return <CheckCircle className="h-3 w-3" />;
-    
+// Updated getStatusIcon to accept only status (no isCurrent parameter)
+export const getStatusIcon = (status: string): React.ReactNode => {
     switch (status) {
         case 'active':
             return <CheckCircle className="h-3 w-3" />;
@@ -96,12 +99,17 @@ export const getStatusIcon = (status: string, isCurrent: boolean) => {
             return <XCircle className="h-3 w-3" />;
         case 'former':
             return <Clock className="h-3 w-3" />;
+        case 'pending':
+            return <Clock className="h-3 w-3" />;
+        case 'expired':
+            return <AlertTriangle className="h-3 w-3" />;
         default:
             return <Shield className="h-3 w-3" />;
     }
 };
 
-export const getPositionIcon = (position: string) => {
+// Keep getPositionIcon as is
+export const getPositionIcon = (position: string): React.ReactNode => {
     switch (position) {
         case 'captain':
             return <Crown className="h-5 w-5 text-amber-600 dark:text-amber-500" />;
@@ -122,7 +130,8 @@ export const getPositionIcon = (position: string) => {
     }
 };
 
-export const getPositionColor = (position: string) => {
+// Keep getPositionColor as is
+export const getPositionColor = (position: string): string => {
     switch (position) {
         case 'captain':
             return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
@@ -139,11 +148,32 @@ export const getPositionColor = (position: string) => {
     }
 };
 
-export const getInitials = (name: string) => {
+// Keep getInitials as is
+export const getInitials = (name: string): string => {
+    if (!name) return '?';
     return name
         .split(' ')
         .map(word => word[0])
         .join('')
         .toUpperCase()
         .slice(0, 2);
+};
+
+// Optional: Add a helper for isCurrent status if needed
+export const getCurrentStatusColor = (status: string, isCurrent: boolean): string => {
+    if (isCurrent) return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
+    return getStatusColor(status);
+};
+
+export const getCurrentStatusIcon = (status: string, isCurrent: boolean): React.ReactNode => {
+    if (isCurrent) return <CheckCircle className="h-3 w-3" />;
+    return getStatusIcon(status);
+};
+
+// Add a helper to check if official is current
+export const isCurrentOfficial = (endDate: string | null): boolean => {
+    if (!endDate) return true;
+    const today = new Date();
+    const end = parseISO(endDate);
+    return end > today;
 };

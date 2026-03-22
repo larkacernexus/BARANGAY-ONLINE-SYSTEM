@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin\CommunityReport;
 
 use App\Models\ReportType;
 use App\Models\Purok;
-use App\Models\User;
+use App\Models\Resident;
 use Inertia\Inertia;
 
 class CommunityReportCreateController extends BaseCommunityReportController
@@ -25,17 +25,29 @@ class CommunityReportCreateController extends BaseCommunityReportController
             ->pluck('purok')
             ->toArray();
         
-        $users = User::whereHas('currentResident')
-            ->with(['currentResident:id,first_name,middle_name,last_name,address'])
+        // Fetch residents directly
+        $residents = Resident::select(
+                'id',
+                'first_name',
+                'middle_name',
+                'last_name',
+                'email',
+                'contact_number',
+                'address',
+                'purok_id'
+            )
+            ->with('purok') // Load the purok relationship to get the purok name
+            ->orderBy('first_name')
+            ->orderBy('last_name')
             ->get()
-            ->map(fn($user) => [
-                'id' => $user->id,
-                'name' => trim(($user->currentResident->first_name ?? '') . ' ' . 
-                               ($user->currentResident->middle_name ?? '') . ' ' . 
-                               ($user->currentResident->last_name ?? '')) ?: $user->email,
-                'email' => $user->email,
-                'phone' => $user->contact_number,
-                'address' => $user->currentResident->address ?? null,
+            ->map(fn($resident) => [
+                'id' => $resident->id,
+                'name' => $resident->full_name, // Use the accessor from the model
+                'email' => $resident->email,
+                'phone' => $resident->contact_number,
+                'address' => $resident->address,
+                'purok' => $resident->purok?->name, // Get purok name from relationship
+                'purok_id' => $resident->purok_id,
             ])
             ->sortBy('name')
             ->values();
@@ -44,7 +56,7 @@ class CommunityReportCreateController extends BaseCommunityReportController
             'report_types' => $reportTypes,
             'categories' => $categories,
             'puroks' => $puroks,
-            'users' => $users,
+            'users' => $residents, // Keep as 'users' for frontend compatibility
             'statuses' => [
                 ['value' => 'pending', 'label' => 'Pending'],
                 ['value' => 'under_review', 'label' => 'Under Review'],

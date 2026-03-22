@@ -1,387 +1,712 @@
-// import React, { useState } from 'react';
-// import Layout from '@/Layouts/Layout';
-// import { Link, usePage, router } from '@inertiajs/react';
-// import { PaginatedData } from '@/types/pagination';
-// import { Incident } from '@/types/incident';
+// resources/js/Pages/admin/Blotters/Index.tsx
 
-// interface Props {
-//     blotters: PaginatedData<Incident>;
-//     filters: {
-//         search?: string;
-//     };
-// }
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { router, usePage } from '@inertiajs/react';
+import { toast } from 'sonner';
+import debounce from 'lodash/debounce';
+import AppLayout from '@/layouts/admin-app-layout';
+import { Blotter, BlotterFilters, BlotterStats } from '@/components/admin/blotters/blotter';
+import { blotterUtils } from '@/admin-utils/blotter-utils';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
-// const AdminBlottersIndex: React.FC<Props> = ({ blotters, filters }) => {
-//     const [search, setSearch] = useState(filters.search || '');
+// Import components
+import BlottersHeader from '@/components/admin/blotters/BlottersHeader';
+import BlottersStats from '@/components/admin/blotters/BlottersStats';
+import BlottersFilters from '@/components/admin/blotters/BlottersFilters';
+import BlottersContent from '@/components/admin/blotters/BlottersContent';
+import BlottersDialogs from '@/components/admin/blotters/BlottersDialogs';
+import { Button } from '@/components/ui/button';
+import { KeyRound } from 'lucide-react';
 
-//     const handleSearch = (e: React.FormEvent) => {
-//         e.preventDefault();
-//         router.get(route('admin.blotters.index'), { search });
-//     };
+interface PaginationData {
+    data: Blotter[];
+    total: number;
+    per_page: number;
+    current_page: number;
+    last_page: number;
+    from: number;
+    to: number;
+}
 
-//     const statusColors = {
-//         pending: 'bg-yellow-100 text-yellow-800',
-//         under_investigation: 'bg-blue-100 text-blue-800',
-//         resolved: 'bg-green-100 text-green-800',
-//         dismissed: 'bg-red-100 text-red-800',
-//     };
+interface BlottersPageProps {
+    blotters: PaginationData;
+    filters: BlotterFilters;
+    stats: BlotterStats;
+    barangays: string[];
+}
 
-//     return (
-//         <Layout>
-//             <div className="py-6">
-//                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-//                     {/* Header */}
-//                     <div className="md:flex md:items-center md:justify-between mb-6">
-//                         <div>
-//                             <h1 className="text-2xl font-bold text-gray-900">Blotter Cases Management</h1>
-//                             <p className="mt-1 text-sm text-gray-600">
-//                                 Manage mediation cases and legal disputes
-//                             </p>
-//                         </div>
-//                         <div className="mt-4 md:mt-0 flex space-x-3">
-//                             <Link
-//                                 href={route('admin.dashboard')}
-//                                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-//                             >
-//                                 ← Dashboard
-//                             </Link>
-//                             <Link
-//                                 href={route('admin.incidents.index')}
-//                                 className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
-//                             >
-//                                 View All Incidents
-//                             </Link>
-//                         </div>
-//                     </div>
+const defaultStats: BlotterStats = {
+    total: 0,
+    pending: 0,
+    investigating: 0,
+    resolved: 0,
+    archived: 0,
+    urgent: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+};
 
-//                     {/* Stats */}
-//                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-//                         <div className="bg-white rounded-lg shadow p-4">
-//                             <div className="flex items-center">
-//                                 <div className="flex-shrink-0">
-//                                     <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-//                                         <span className="text-orange-600">⚖️</span>
-//                                     </div>
-//                                 </div>
-//                                 <div className="ml-4">
-//                                     <p className="text-sm font-medium text-gray-600">Total Blotters</p>
-//                                     <p className="text-xl font-semibold text-gray-900">{blotters.total}</p>
-//                                 </div>
-//                             </div>
-//                         </div>
+export default function BlottersIndex({ 
+    blotters, 
+    filters, 
+    stats = defaultStats,
+    barangays = []
+}: BlottersPageProps) {
+    const { flash } = usePage().props as any;
+    
+    // State management
+    const [search, setSearch] = useState(filters.search || '');
+    const [filtersState, setFiltersState] = useState<BlotterFilters>({
+        status: filters.status || 'all',
+        priority: filters.priority || 'all',
+        incident_type: filters.incident_type || 'all',
+        barangay: filters.barangay || 'all',
+        date_from: filters.date_from || '',
+        date_to: filters.date_to || '',
+        sort_by: filters.sort_by || 'incident_datetime',
+        sort_order: filters.sort_order || 'desc'
+    });
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [currentPage, setCurrentPage] = useState(blotters.current_page || 1);
+    const [itemsPerPage] = useState(10);
+    const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+    const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+    
+    // Bulk selection states
+    const [selectedBlotters, setSelectedBlotters] = useState<number[]>([]);
+    const [isBulkMode, setIsBulkMode] = useState(false);
+    const [isSelectAll, setIsSelectAll] = useState(false);
+    const [selectionMode, setSelectionMode] = useState<'page' | 'filtered' | 'all'>('page');
+    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+    const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
+    const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [bulkEditValue, setBulkEditValue] = useState<string>('');
 
-//                         <div className="bg-white rounded-lg shadow p-4">
-//                             <div className="flex items-center">
-//                                 <div className="flex-shrink-0">
-//                                     <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-//                                         <span className="text-yellow-600">⏳</span>
-//                                     </div>
-//                                 </div>
-//                                 <div className="ml-4">
-//                                     <p className="text-sm font-medium text-gray-600">Scheduled Hearings</p>
-//                                     <p className="text-xl font-semibold text-gray-900">
-//                                         {blotters.data.filter(b => b.blotter_details?.hearing_date).length}
-//                                     </p>
-//                                 </div>
-//                             </div>
-//                         </div>
+    // Fixed: Changed from useRef<HTMLInputElement | null>(null) to useRef<HTMLInputElement>(null)
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
-//                         <div className="bg-white rounded-lg shadow p-4">
-//                             <div className="flex items-center">
-//                                 <div className="flex-shrink-0">
-//                                     <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-//                                         <span className="text-blue-600">🤝</span>
-//                                     </div>
-//                                 </div>
-//                                 <div className="ml-4">
-//                                     <p className="text-sm font-medium text-gray-600">Mediation Active</p>
-//                                     <p className="text-xl font-semibold text-gray-900">
-//                                         {blotters.data.filter(b => b.status === 'under_investigation').length}
-//                                     </p>
-//                                 </div>
-//                             </div>
-//                         </div>
+    // Handle window resize
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
 
-//                         <div className="bg-white rounded-lg shadow p-4">
-//                             <div className="flex items-center">
-//                                 <div className="flex-shrink-0">
-//                                     <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-//                                         <span className="text-green-600">✅</span>
-//                                     </div>
-//                                 </div>
-//                                 <div className="ml-4">
-//                                     <p className="text-sm font-medium text-gray-600">Settled</p>
-//                                     <p className="text-xl font-semibold text-gray-900">
-//                                         {blotters.data.filter(b => b.status === 'resolved').length}
-//                                     </p>
-//                                 </div>
-//                             </div>
-//                         </div>
-//                     </div>
+        const handleResize = () => {
+            const width = window.innerWidth;
+            setWindowWidth(width);
+            setIsMobile(width < 768);
+            if (width < 768 && viewMode === 'table') {
+                setViewMode('grid');
+            }
+        };
 
-//                     {/* Search */}
-//                     <div className="bg-white rounded-lg shadow p-4 mb-6">
-//                         <form onSubmit={handleSearch} className="flex space-x-3">
-//                             <div className="flex-1">
-//                                 <input
-//                                     type="text"
-//                                     value={search}
-//                                     onChange={(e) => setSearch(e.target.value)}
-//                                     placeholder="Search blotters by title, respondent, or reporter..."
-//                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-//                                 />
-//                             </div>
-//                             <button
-//                                 type="submit"
-//                                 className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
-//                             >
-//                                 Search
-//                             </button>
-//                             {search && (
-//                                 <button
-//                                     type="button"
-//                                     onClick={() => {
-//                                         setSearch('');
-//                                         router.get(route('admin.blotters.index'));
-//                                     }}
-//                                     className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-//                                 >
-//                                     Clear
-//                                 </button>
-//                             )}
-//                         </form>
-//                     </div>
+        window.addEventListener('resize', handleResize);
+        handleResize();
+        return () => window.removeEventListener('resize', handleResize);
+    }, [viewMode]);
 
-//                     {/* Blotters Table */}
-//                     <div className="bg-white shadow-md rounded-lg overflow-hidden">
-//                         <div className="overflow-x-auto">
-//                             <table className="min-w-full divide-y divide-gray-200">
-//                                 <thead className="bg-gray-50">
-//                                     <tr>
-//                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-//                                             Case #
-//                                         </th>
-//                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-//                                             Title & Parties
-//                                         </th>
-//                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-//                                             Hearing Schedule
-//                                         </th>
-//                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-//                                             Status
-//                                         </th>
-//                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-//                                             Last Updated
-//                                         </th>
-//                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-//                                             Actions
-//                                         </th>
-//                                     </tr>
-//                                 </thead>
-//                                 <tbody className="bg-white divide-y divide-gray-200">
-//                                     {blotters.data.map((blotter) => (
-//                                         <tr key={blotter.id} className="hover:bg-gray-50">
-//                                             <td className="px-6 py-4 whitespace-nowrap">
-//                                                 <div className="text-sm font-medium text-gray-900">
-//                                                     BLT-{blotter.id.toString().padStart(6, '0')}
-//                                                 </div>
-//                                             </td>
-//                                             <td className="px-6 py-4">
-//                                                 <div className="text-sm font-medium text-gray-900">
-//                                                     {blotter.title}
-//                                                 </div>
-//                                                 <div className="text-sm text-gray-500">
-//                                                     <div className="mt-1">
-//                                                         <span className="font-medium">Complainant:</span>{' '}
-//                                                         {blotter.is_anonymous ? 'Anonymous' : blotter.reported_as_name}
-//                                                     </div>
-//                                                     {blotter.blotter_details && (
-//                                                         <div>
-//                                                             <span className="font-medium">Respondent:</span>{' '}
-//                                                             {blotter.blotter_details.respondent_name}
-//                                                         </div>
-//                                                     )}
-//                                                 </div>
-//                                             </td>
-//                                             <td className="px-6 py-4 whitespace-nowrap">
-//                                                 {blotter.blotter_details?.hearing_date ? (
-//                                                     <div>
-//                                                         <div className="text-sm font-medium text-gray-900">
-//                                                             {new Date(blotter.blotter_details.hearing_date).toLocaleDateString()}
-//                                                         </div>
-//                                                         <div className="text-xs text-gray-500">
-//                                                             {new Date(blotter.blotter_details.hearing_date).toLocaleTimeString([], { 
-//                                                                 hour: '2-digit', 
-//                                                                 minute: '2-digit' 
-//                                                             })}
-//                                                         </div>
-//                                                     </div>
-//                                                 ) : (
-//                                                     <span className="text-sm text-gray-500">Not scheduled</span>
-//                                                 )}
-//                                             </td>
-//                                             <td className="px-6 py-4 whitespace-nowrap">
-//                                                 <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColors[blotter.status]}`}>
-//                                                     {blotter.status.replace('_', ' ').toUpperCase()}
-//                                                 </span>
-//                                             </td>
-//                                             <td className="px-6 py-4 whitespace-nowrap">
-//                                                 <div className="text-sm text-gray-900">
-//                                                     {new Date(blotter.updated_at).toLocaleDateString()}
-//                                                 </div>
-//                                             </td>
-//                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-//                                                 <Link
-//                                                     href={route('admin.incidents.show', blotter.id)}
-//                                                     className="text-orange-600 hover:text-orange-900 mr-3"
-//                                                 >
-//                                                     View
-//                                                 </Link>
-//                                                 <Link
-//                                                     href={`${route('admin.incidents.show', blotter.id)}?edit=blotter`}
-//                                                     className="text-blue-600 hover:text-blue-900"
-//                                                 >
-//                                                     Manage
-//                                                 </Link>
-//                                             </td>
-//                                         </tr>
-//                                     ))}
-//                                 </tbody>
-//                             </table>
-//                         </div>
+    // Auto switch to grid view on mobile
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.innerWidth < 768 && viewMode === 'table') {
+            setViewMode('grid');
+        }
+    }, []);
 
-//                         {/* Empty State */}
-//                         {blotters.data.length === 0 && (
-//                             <div className="px-6 py-12 text-center">
-//                                 <div className="text-gray-400 text-5xl mb-4">⚖️</div>
-//                                 <h3 className="text-lg font-medium text-gray-900 mb-2">No Blotter Cases Found</h3>
-//                                 <p className="text-gray-600">
-//                                     {search ? 'No blotter cases match your search.' : 'No blotter cases have been filed yet.'}
-//                                 </p>
-//                             </div>
-//                         )}
+    // Flash messages
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash]);
 
-//                         {/* Pagination */}
-//                         {blotters.links && blotters.links.length > 3 && (
-//                             <div className="px-6 py-4 border-t border-gray-200">
-//                                 <nav className="flex items-center justify-between">
-//                                     <div className="flex-1 flex justify-between sm:hidden">
-//                                         <Link
-//                                             href={blotters.prev_page_url || '#'}
-//                                             className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md 
-//                                                 ${!blotters.prev_page_url ? 'bg-gray-100 text-gray-400' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-//                                         >
-//                                             Previous
-//                                         </Link>
-//                                         <Link
-//                                             href={blotters.next_page_url || '#'}
-//                                             className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md 
-//                                                 ${!blotters.next_page_url ? 'bg-gray-100 text-gray-400' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-//                                         >
-//                                             Next
-//                                         </Link>
-//                                     </div>
-//                                     <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-//                                         <div>
-//                                             <p className="text-sm text-gray-700">
-//                                                 Showing <span className="font-medium">{blotters.from}</span> to{' '}
-//                                                 <span className="font-medium">{blotters.to}</span> of{' '}
-//                                                 <span className="font-medium">{blotters.total}</span> blotter cases
-//                                             </p>
-//                                         </div>
-//                                         <div>
-//                                             <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-//                                                 {blotters.links.map((link, index) => (
-//                                                     <Link
-//                                                         key={index}
-//                                                         href={link.url || '#'}
-//                                                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium
-//                                                             ${index === 0 ? 'rounded-l-md' : ''}
-//                                                             ${index === blotters.links.length - 1 ? 'rounded-r-md' : ''}
-//                                                             ${link.active
-//                                                                 ? 'z-10 bg-orange-50 border-orange-500 text-orange-600'
-//                                                                 : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-//                                                             }
-//                                                             ${!link.url ? 'cursor-not-allowed bg-gray-100' : ''}`}
-//                                                         dangerouslySetInnerHTML={{ __html: link.label }}
-//                                                     />
-//                                                 ))}
-//                                             </nav>
-//                                         </div>
-//                                     </div>
-//                                 </nav>
-//                             </div>
-//                         )}
-//                     </div>
+    // Filter blotters
+    const filteredBlotters = useMemo(() => {
+        return blotterUtils.filterBlotters({
+            blotters: blotters.data,
+            search,
+            filters: filtersState
+        });
+    }, [blotters.data, search, filtersState]);
 
-//                     {/* Upcoming Hearings */}
-//                     <div className="mt-8">
-//                         <h2 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Hearings</h2>
-//                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-//                             {blotters.data
-//                                 .filter(b => b.blotter_details?.hearing_date)
-//                                 .sort((a, b) => new Date(a.blotter_details!.hearing_date!).getTime() - new Date(b.blotter_details!.hearing_date!).getTime())
-//                                 .slice(0, 3)
-//                                 .map((blotter) => (
-//                                     <div key={blotter.id} className="bg-white rounded-lg shadow p-4">
-//                                         <div className="flex justify-between items-start mb-3">
-//                                             <div>
-//                                                 <h3 className="font-medium text-gray-900">{blotter.title}</h3>
-//                                                 <p className="text-sm text-gray-600 mt-1">
-//                                                     Case: BLT-{blotter.id.toString().padStart(6, '0')}
-//                                                 </p>
-//                                             </div>
-//                                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColors[blotter.status]}`}>
-//                                                 {blotter.status.replace('_', ' ').toUpperCase()}
-//                                             </span>
-//                                         </div>
-//                                         <div className="space-y-2">
-//                                             <div className="flex items-center text-sm text-gray-600">
-//                                                 <span className="mr-2">📅</span>
-//                                                 <span>
-//                                                     {new Date(blotter.blotter_details!.hearing_date!).toLocaleDateString('en-PH', {
-//                                                         weekday: 'long',
-//                                                         year: 'numeric',
-//                                                         month: 'long',
-//                                                         day: 'numeric'
-//                                                     })}
-//                                                 </span>
-//                                             </div>
-//                                             <div className="flex items-center text-sm text-gray-600">
-//                                                 <span className="mr-2">⏰</span>
-//                                                 <span>
-//                                                     {new Date(blotter.blotter_details!.hearing_date!).toLocaleTimeString([], {
-//                                                         hour: '2-digit',
-//                                                         minute: '2-digit'
-//                                                     })}
-//                                                 </span>
-//                                             </div>
-//                                             <div className="flex items-center text-sm text-gray-600">
-//                                                 <span className="mr-2">🤝</span>
-//                                                 <span>Mediation Session</span>
-//                                             </div>
-//                                         </div>
-//                                         <div className="mt-4">
-//                                             <Link
-//                                                 href={route('admin.incidents.show', blotter.id)}
-//                                                 className="text-sm text-orange-600 hover:text-orange-800 font-medium"
-//                                             >
-//                                                 View Case Details →
-//                                             </Link>
-//                                         </div>
-//                                     </div>
-//                                 ))}
-//                             {blotters.data.filter(b => b.blotter_details?.hearing_date).length === 0 && (
-//                                 <div className="col-span-3 text-center py-8 text-gray-500">
-//                                     No upcoming hearings scheduled
-//                                 </div>
-//                             )}
-//                         </div>
-//                     </div>
-//                 </div>
-//             </div>
-//         </Layout>
-//     );
-// };
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        return {
+            total: filteredBlotters.length,
+            pending: filteredBlotters.filter(b => b.status === 'pending').length,
+            investigating: filteredBlotters.filter(b => b.status === 'investigating').length,
+            resolved: filteredBlotters.filter(b => b.status === 'resolved').length,
+            archived: filteredBlotters.filter(b => b.status === 'archived').length,
+            urgent: filteredBlotters.filter(b => b.priority === 'urgent').length,
+            high: filteredBlotters.filter(b => b.priority === 'high').length,
+            medium: filteredBlotters.filter(b => b.priority === 'medium').length,
+            low: filteredBlotters.filter(b => b.priority === 'low').length,
+        };
+    }, [filteredBlotters]);
 
-// export default AdminBlottersIndex;
+    // Pagination
+    const totalItems = filteredBlotters.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedBlotters = filteredBlotters.slice(startIndex, endIndex);
+
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, filtersState]);
+
+    // Reset selection when exiting bulk mode
+    useEffect(() => {
+        if (!isBulkMode) {
+            setSelectedBlotters([]);
+            setIsSelectAll(false);
+        }
+    }, [isBulkMode]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ctrl/Cmd + A to select all
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            // Escape key
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedBlotters.length > 0) {
+                        setSelectedBlotters([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            // Ctrl/Cmd + Shift + B to toggle bulk mode
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            // Ctrl/Cmd + F to focus search
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            // Delete key for bulk delete
+            if (e.key === 'Delete' && isBulkMode && selectedBlotters.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedBlotters, isMobile]);
+
+    // Selection handlers
+    const handleSelectAllOnPage = () => {
+        const pageIds = paginatedBlotters.map(blotter => blotter.id);
+        if (isSelectAll) {
+            setSelectedBlotters(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            const newSelected = [...new Set([...selectedBlotters, ...pageIds])];
+            setSelectedBlotters(newSelected);
+        }
+        setIsSelectAll(!isSelectAll);
+        setSelectionMode('page');
+    };
+
+    const handleSelectAllFiltered = () => {
+        const allIds = filteredBlotters.map(blotter => blotter.id);
+        if (selectedBlotters.length === allIds.length && allIds.every(id => selectedBlotters.includes(id))) {
+            setSelectedBlotters(prev => prev.filter(id => !allIds.includes(id)));
+        } else {
+            const newSelected = [...new Set([...selectedBlotters, ...allIds])];
+            setSelectedBlotters(newSelected);
+            setSelectionMode('filtered');
+        }
+    };
+
+    const handleSelectAll = () => {
+        if (confirm(`This will select ALL ${blotters.total || 0} blotters. This action may take a moment.`)) {
+            const allIds = blotters.data.map(b => b.id);
+            setSelectedBlotters(allIds);
+            setSelectionMode('all');
+        }
+    };
+
+    const handleItemSelect = (id: number) => {
+        setSelectedBlotters(prev => {
+            if (prev.includes(id)) {
+                return prev.filter(itemId => itemId !== id);
+            } else {
+                return [...prev, id];
+            }
+        });
+    };
+
+    // Check if all items on current page are selected
+    useEffect(() => {
+        const allPageIds = paginatedBlotters.map(blotter => blotter.id);
+        const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedBlotters.includes(id));
+        setIsSelectAll(allSelected);
+    }, [selectedBlotters, paginatedBlotters]);
+
+    // Get selected blotters data
+    const selectedBlottersData = useMemo(() => {
+        return filteredBlotters.filter(blotter => selectedBlotters.includes(blotter.id));
+    }, [selectedBlotters, filteredBlotters]);
+
+    // Calculate selection stats
+    const selectionStats = useMemo(() => {
+        return blotterUtils.getSelectionStats(selectedBlottersData);
+    }, [selectedBlottersData]);
+
+    // Bulk operations
+    const handleBulkOperation = async (operation: string) => {
+        if (selectedBlotters.length === 0) {
+            toast.error('Please select at least one blotter');
+            return;
+        }
+
+        setIsPerformingBulkAction(true);
+
+        try {
+            switch (operation) {
+                case 'delete':
+                    setShowBulkDeleteDialog(true);
+                    break;
+
+                case 'update_status':
+                    setShowBulkStatusDialog(true);
+                    break;
+
+                case 'export':
+                case 'export_csv':
+                    // Export to CSV
+                    const exportData = selectedBlottersData.map(blotter => ({
+                        'Blotter Number': blotter.blotter_number,
+                        'Incident Type': blotter.incident_type,
+                        'Date & Time': blotter.formatted_datetime,
+                        'Location': blotter.location,
+                        'Barangay': blotter.barangay,
+                        'Reporter': blotter.reporter_name,
+                        'Respondent': blotter.respondent_name || 'N/A',
+                        'Status': blotter.status,
+                        'Priority': blotter.priority,
+                        'Created At': blotter.created_at,
+                    }));
+                    
+                    const headers = Object.keys(exportData[0]);
+                    const csv = [
+                        headers.join(','),
+                        ...exportData.map(row => 
+                            headers.map(header => {
+                                const value = row[header as keyof typeof row];
+                                return typeof value === 'string' && value.includes(',') 
+                                    ? `"${value}"` 
+                                    : value;
+                            }).join(',')
+                        )
+                    ].join('\n');
+                    
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `blotters-export-${new Date().toISOString().split('T')[0]}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    toast.success(`${selectedBlotters.length} blotters exported successfully`);
+                    setSelectedBlotters([]);
+                    break;
+
+                case 'print':
+                    // Open print preview for each selected blotter
+                    selectedBlotters.forEach(id => {
+                        window.open(`/admin/blotters/${id}/print`, '_blank');
+                    });
+                    toast.success(`${selectedBlotters.length} blotter(s) opened for printing`);
+                    setSelectedBlotters([]);
+                    break;
+
+                case 'generate_report':
+                    // Generate report for selected blotters
+                    const idsParam = selectedBlotters.join(',');
+                    window.open(`/admin/blotters/report?ids=${idsParam}`, '_blank');
+                    toast.success(`Generating report for ${selectedBlotters.length} blotter(s)`);
+                    setSelectedBlotters([]);
+                    break;
+
+                case 'copy_data':
+                    handleCopySelectedData();
+                    break;
+
+                default:
+                    toast.info('Functionality to be implemented');
+                    break;
+            }
+        } catch (error) {
+            console.error('Bulk operation error:', error);
+            toast.error('An error occurred during the bulk operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkStatusUpdate = async () => {
+        if (!bulkEditValue) {
+            toast.error('Please select a status');
+            return;
+        }
+        
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/blotters/bulk-action', {
+                action: 'update_status',
+                blotter_ids: selectedBlotters,
+                status: bulkEditValue
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedBlotters([]);
+                    setBulkEditValue('');
+                    setShowBulkStatusDialog(false);
+                    toast.success(`${selectedBlotters.length} blotter statuses updated successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to update blotter status');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk status update error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/blotters/bulk-action', {
+                action: 'delete',
+                blotter_ids: selectedBlotters,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedBlotters([]);
+                    setShowBulkDeleteDialog(false);
+                    toast.success(`${selectedBlotters.length} blotters deleted successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to delete blotters');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    // Individual blotter operations
+    const handleDelete = (blotter: Blotter) => {
+        if (confirm(`Are you sure you want to delete blotter #${blotter.blotter_number || blotter.id}?`)) {
+            router.delete(`/admin/blotters/${blotter.id}`, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedBlotters(selectedBlotters.filter(id => id !== blotter.id));
+                    toast.success('Blotter deleted successfully');
+                },
+                onError: () => {
+                    toast.error('Failed to delete blotter');
+                }
+            });
+        }
+    };
+
+    const handleSort = (column: string) => {
+        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
+        
+        setFiltersState(prev => ({
+            ...prev,
+            sort_by: column as any,
+            sort_order: newOrder
+        }));
+        
+        // Trigger server-side sort update
+        const params = {
+            ...filtersState,
+            sort_by: column,
+            sort_order: newOrder,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/blotters', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
+
+    const handleClearFilters = () => {
+        setSearch('');
+        setFiltersState({
+            status: 'all',
+            priority: 'all',
+            incident_type: 'all',
+            barangay: 'all',
+            date_from: '',
+            date_to: '',
+            sort_by: 'incident_datetime',
+            sort_order: 'desc'
+        });
+        
+        // Trigger server-side filter clear
+        router.get('/admin/blotters', {
+            search: '',
+            status: 'all',
+            priority: 'all',
+            incident_type: 'all',
+            barangay: 'all',
+            date_from: '',
+            date_to: '',
+            sort_by: 'incident_datetime',
+            sort_order: 'desc'
+        }, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
+
+    const handleClearSelection = () => {
+        setSelectedBlotters([]);
+        setIsSelectAll(false);
+    };
+
+    const handleCopySelectedData = () => {
+        if (selectedBlottersData.length === 0) {
+            toast.error('No data to copy');
+            return;
+        }
+        
+        const data = selectedBlottersData.map(blotter => ({
+            'Blotter #': blotter.blotter_number,
+            'Incident Type': blotter.incident_type,
+            'Date & Time': blotter.formatted_datetime,
+            'Location': blotter.location,
+            'Reporter': blotter.reporter_name,
+            'Respondent': blotter.respondent_name || 'N/A',
+            'Status': blotter.status,
+            'Priority': blotter.priority,
+        }));
+        
+        const csvData = [
+            Object.keys(data[0]).join(','),
+            ...data.map(row => Object.values(row).join(','))
+        ].join('\n');
+        
+        navigator.clipboard.writeText(csvData).then(() => {
+            toast.success(`${selectedBlottersData.length} records copied to clipboard`);
+        }).catch(() => {
+            toast.error('Failed to copy to clipboard');
+        });
+    };
+
+    const updateFilter = (key: keyof BlotterFilters, value: string) => {
+        setFiltersState(prev => ({ ...prev, [key]: value }));
+        
+        // Trigger server-side filter update
+        const params = {
+            ...filtersState,
+            [key]: value,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/blotters', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
+
+    // Fixed: Wrap the condition in Boolean() and explicitly type as boolean
+    const hasActiveFilters: boolean = Boolean(
+        search || 
+        filtersState.status !== 'all' ||
+        filtersState.priority !== 'all' ||
+        filtersState.incident_type !== 'all' ||
+        filtersState.barangay !== 'all' ||
+        filtersState.date_from ||
+        filtersState.date_to
+    );
+
+    return (
+        <AppLayout
+            title="Blotter Records"
+            breadcrumbs={[
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Blotters', href: '/admin/blotters' }
+            ]}
+        >
+            <TooltipProvider>
+                <div className="space-y-4 sm:space-y-6">
+                    <BlottersHeader 
+                        isBulkMode={isBulkMode}
+                        setIsBulkMode={setIsBulkMode}
+                        isMobile={isMobile}
+                    />
+
+                    {/* Separate Stats Component */}
+                    <BlottersStats 
+                        globalStats={stats}
+                        filteredStats={filteredStats}
+                        isLoading={isPerformingBulkAction}
+                    />
+
+                    {/* Fixed: Added type assertion for searchInputRef */}
+                    <BlottersFilters
+                        search={search}
+                        setSearch={setSearch}
+                        filtersState={filtersState}
+                        updateFilter={updateFilter}
+                        showAdvancedFilters={showAdvancedFilters}
+                        setShowAdvancedFilters={setShowAdvancedFilters}
+                        handleClearFilters={handleClearFilters}
+                        hasActiveFilters={hasActiveFilters}
+                        isMobile={isMobile}
+                        totalItems={totalItems}
+                        startIndex={startIndex}
+                        endIndex={endIndex}
+                        searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+                        isLoading={isPerformingBulkAction}
+                        barangays={barangays}
+                    />
+
+                    <BlottersContent
+                        blotters={paginatedBlotters}
+                        isBulkMode={isBulkMode}
+                        setIsBulkMode={setIsBulkMode}
+                        isSelectAll={isSelectAll}
+                        selectedBlotters={selectedBlotters}
+                        viewMode={viewMode}
+                        setViewMode={setViewMode}
+                        isMobile={isMobile}
+                        hasActiveFilters={hasActiveFilters}
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={totalItems}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                        onSelectAllOnPage={handleSelectAllOnPage}
+                        onSelectAllFiltered={handleSelectAllFiltered}
+                        onSelectAll={handleSelectAll}
+                        onItemSelect={handleItemSelect}
+                        onClearFilters={handleClearFilters}
+                        onClearSelection={handleClearSelection}
+                        onDelete={handleDelete}
+                        onSort={handleSort}
+                        onBulkOperation={handleBulkOperation}
+                        onCopySelectedData={handleCopySelectedData}
+                        setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                        setShowBulkStatusDialog={setShowBulkStatusDialog}
+                        filtersState={filtersState}
+                        isPerformingBulkAction={isPerformingBulkAction}
+                        selectionMode={selectionMode}
+                        selectionStats={selectionStats}
+                    />
+
+                    {/* Keyboard Shortcuts Help */}
+                    {isBulkMode && !isMobile && (
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <KeyRound className="h-4 w-4 text-gray-500" />
+                                    <span className="text-sm font-medium">Keyboard Shortcuts</span>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsBulkMode(false)}
+                                    className="h-7 text-xs"
+                                    disabled={isPerformingBulkAction}
+                                >
+                                    Exit Bulk Mode
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+A</kbd>
+                                    <span>Select page</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Shift+Ctrl+A</kbd>
+                                    <span>Select filtered</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Delete</kbd>
+                                    <span>Delete selected</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
+                                    <span>Exit/clear</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+F</kbd>
+                                    <span>Focus search</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </TooltipProvider>
+
+            <BlottersDialogs
+                showBulkDeleteDialog={showBulkDeleteDialog}
+                setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                showBulkStatusDialog={showBulkStatusDialog}
+                setShowBulkStatusDialog={setShowBulkStatusDialog}
+                isPerformingBulkAction={isPerformingBulkAction}
+                selectedBlotters={selectedBlotters}
+                handleBulkOperation={handleBulkDelete}
+                handleBulkStatusUpdate={handleBulkStatusUpdate}
+                selectionStats={selectionStats}
+                bulkEditValue={bulkEditValue}
+                setBulkEditValue={setBulkEditValue}
+            />
+        </AppLayout>
+    );
+}

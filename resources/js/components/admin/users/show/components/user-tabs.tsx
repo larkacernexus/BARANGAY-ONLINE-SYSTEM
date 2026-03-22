@@ -4,9 +4,9 @@ import { User, Shield, History, Lock } from 'lucide-react';
 
 // Import tab content components
 import { OverviewTab } from './overview-tab';
-import { PermissionsTab } from './permissions-tab';
+import { PermissionsTab } from './tabs/permissions-tab';
 import { ActivityTab } from './activity-tab';
-import { SecurityTab } from './security-tab';
+import { SecurityTab } from './tabs/security-tab';
 
 interface Tab {
     id: string;

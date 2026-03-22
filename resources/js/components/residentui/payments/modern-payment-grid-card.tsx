@@ -51,8 +51,8 @@ export const ModernPaymentGridCard = ({
   return (
     <div className="animate-fade-in-up">
       <Card className={cn(
-        "border-0 shadow-lg hover:shadow-xl transition-all duration-300 group",
-        selectMode && selectedPayments?.includes(payment.id) && "ring-2 ring-blue-500 ring-offset-2",
+        "border-0 shadow-lg hover:shadow-xl transition-all duration-300 group bg-white dark:bg-gray-800",
+        selectMode && selectedPayments?.includes(payment.id) && "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900",
         payment.status === 'overdue' && "border-l-4 border-l-red-500"
       )}>
         <CardContent className="p-5">
@@ -66,7 +66,7 @@ export const ModernPaymentGridCard = ({
                     "mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
                     selectedPayments?.includes(payment.id)
                       ? "bg-blue-500 border-blue-500"
-                      : "border-gray-300 dark:border-gray-600 group-hover:border-gray-400"
+                      : "border-gray-300 dark:border-gray-600 group-hover:border-gray-400 dark:group-hover:border-gray-500"
                   )}
                 >
                   {selectedPayments?.includes(payment.id) && (
@@ -84,7 +84,10 @@ export const ModernPaymentGridCard = ({
                     OR #{payment.or_number}
                   </button>
                   {payment.reference_number && (
-                    <Badge variant="outline" className="text-xs">
+                    <Badge 
+                      variant="outline" 
+                      className="text-xs border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
+                    >
                       Ref
                     </Badge>
                   )}
@@ -97,23 +100,36 @@ export const ModernPaymentGridCard = ({
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => onCopyOrNumber?.(payment.or_number)}>
+              <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                <DropdownMenuItem 
+                  onClick={() => onCopyOrNumber?.(payment.or_number)}
+                  className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
                   <Copy className="h-4 w-4 mr-2" />
                   Copy OR Number
                 </DropdownMenuItem>
                 {payment.reference_number && (
-                  <DropdownMenuItem onClick={() => onCopyReference?.(payment.reference_number!)}>
+                  <DropdownMenuItem 
+                    onClick={() => onCopyReference?.(payment.reference_number!)}
+                    className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
                     <Copy className="h-4 w-4 mr-2" />
                     Copy Reference
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onGenerateReceipt?.(payment)}>
+                <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                <DropdownMenuItem 
+                  onClick={() => onGenerateReceipt?.(payment)}
+                  className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
                   <FileText className="h-4 w-4 mr-2" />
                   Generate Receipt
                 </DropdownMenuItem>
@@ -126,7 +142,7 @@ export const ModernPaymentGridCard = ({
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Method</p>
               <div className="flex items-center gap-1 mt-1">
-                {MethodIcon && <MethodIcon className="h-3 w-3 text-gray-500" />}
+                {MethodIcon && <MethodIcon className="h-3 w-3 text-gray-500 dark:text-gray-400" />}
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                   {methodConfig?.label || payment.payment_method}
                 </p>
@@ -142,7 +158,7 @@ export const ModernPaymentGridCard = ({
               <div className="col-span-2">
                 <p className={cn(
                   "text-xs",
-                  payment.status === 'overdue' ? "text-red-500" : "text-gray-500 dark:text-gray-400"
+                  payment.status === 'overdue' ? "text-red-500 dark:text-red-400" : "text-gray-500 dark:text-gray-400"
                 )}>
                   Due Date
                 </p>
@@ -157,7 +173,7 @@ export const ModernPaymentGridCard = ({
           </div>
 
           {/* Status and Amount */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 mb-3">
+          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 mb-3">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 {StatusIcon && (
@@ -184,7 +200,7 @@ export const ModernPaymentGridCard = ({
             <Button
               size="sm"
               variant="outline"
-              className="flex-1 gap-2"
+              className="flex-1 gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               onClick={() => onViewDetails?.(payment.id)}
             >
               <Eye className="h-4 w-4" />
@@ -193,7 +209,7 @@ export const ModernPaymentGridCard = ({
             {(payment.status === 'pending' || payment.status === 'overdue') && (
               <Button
                 size="sm"
-                className="flex-1 gap-2 bg-gradient-to-r from-blue-500 to-blue-600"
+                className="flex-1 gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
                 onClick={() => onMakePayment?.(payment.id)}
               >
                 <CreditCard className="h-4 w-4" />
@@ -204,7 +220,7 @@ export const ModernPaymentGridCard = ({
               <Button
                 size="sm"
                 variant="outline"
-                className="flex-1 gap-2"
+                className="flex-1 gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={() => onDownloadReceipt?.(payment)}
               >
                 <Download className="h-4 w-4" />

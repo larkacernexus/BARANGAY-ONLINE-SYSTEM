@@ -5,8 +5,13 @@ export interface Household {
     head_of_family: string;
     member_count: number;
     address: string;
-    contact_number: string;
+    contact_number?: string;
     created_at: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    head_of_household?: {
+        full_name: string;
+    };
 }
 
 export interface Resident {
@@ -50,6 +55,7 @@ export interface PaginatedData<T> {
 }
 
 export interface Purok {
+    location: string;
     id: number;
     name: string;
     slug: string;

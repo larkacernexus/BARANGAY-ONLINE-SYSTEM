@@ -5,12 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { route } from 'ziggy-js'
 import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
-import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -48,11 +42,15 @@ import {
     FileBarChart,
     Check,
     Loader2,
+    History,
 } from 'lucide-react';
 import { Link, usePage, Head, router } from '@inertiajs/react';
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import PrintableReceipt from '@/components/admin/receipts/PrintableReceipt';
+
+// Import Admin Tabs Component
+import { AdminTabsWithContent, AdminTabPanel } from '@/components/adminui/admin-tabs';
 
 // Import components
 import { PaymentHeader } from '@/components/admin/payments/show/components/payment-header';
@@ -65,6 +63,7 @@ import { RelatedPaymentsCard } from '@/components/admin/payments/show/components
 import { PaymentItemsTable } from '@/components/admin/payments/show/components/payment-items-table';
 import { ClearanceRequestsCard } from '@/components/admin/payments/show/components/clearance-requests-card';
 import { FeeDetailsCard } from '@/components/admin/payments/show/components/fee-details-card';
+import { PaymentHistoryTab } from '@/components/admin/payments/show/components/payment-history-tab';
 
 // Import types and utilities
 import { Payment, PageProps } from '@/components/admin/payments/show/types';
@@ -73,12 +72,13 @@ import { formatDate, formatCurrency, getRoute, getStatusIcon, getStatusColor, ge
 export default function PaymentShow() {
     const { 
         payment, 
-        clearanceRequests, 
-        fees, 
+        clearanceRequests = [], 
+        fees = [], 
         payer, 
-        relatedPayments, 
+        relatedPayments = [], 
         paymentBreakdown,
         discountDetails = [],
+        history = [], // Add history prop
     } = usePage<PageProps>().props;
     
     const [copied, setCopied] = useState(false);
@@ -121,7 +121,7 @@ export default function PaymentShow() {
         });
     };
 
-    // Prepare receipt data for printing
+    // Prepare receipt data for printing - FIX: Add safe check for payment.items
     const receiptData = useMemo(() => ({
         id: payment.id,
         receipt_number: payment.or_number,
@@ -150,18 +150,52 @@ export default function PaymentShow() {
         formatted_payment_date: payment.formatted_date,
         formatted_issued_date: payment.formatted_date,
         issued_by: payment.recorder?.name || 'System',
-        fee_breakdown: payment.items.map(item => ({
+        fee_breakdown: payment.items && Array.isArray(payment.items) ? payment.items.map(item => ({
             fee_name: item.fee_name,
             fee_code: item.fee_code,
             base_amount: item.base_amount,
             total_amount: item.total_amount
-        })),
+        })) : [],
         notes: payment.remarks || null
     }), [payment]);
 
-    const hasItems = payment.items?.length > 0;
-    const hasClearances = clearanceRequests.length > 0;
-    const hasFees = fees.length > 0;
+    const hasItems = payment.items && Array.isArray(payment.items) && payment.items.length > 0;
+    const hasClearances = clearanceRequests && Array.isArray(clearanceRequests) && clearanceRequests.length > 0;
+    const hasFees = fees && Array.isArray(fees) && fees.length > 0;
+    const hasHistory = history && Array.isArray(history) && history.length > 0;
+
+    // Tab definitions
+    const tabs = [
+        { 
+            id: 'details', 
+            label: 'Payment Details', 
+            icon: <Receipt className="h-4 w-4" />,
+        },
+        { 
+            id: 'items', 
+            label: 'Items', 
+            icon: <FileText className="h-4 w-4" />,
+            count: hasItems ? payment.items.length : null
+        },
+        { 
+            id: 'clearance', 
+            label: 'Clearances', 
+            icon: <FileCheck className="h-4 w-4" />,
+            count: hasClearances ? clearanceRequests.length : null
+        },
+        { 
+            id: 'fees', 
+            label: 'Fees', 
+            icon: <FileBarChart className="h-4 w-4" />,
+            count: hasFees ? fees.length : null
+        },
+        { 
+            id: 'history', 
+            label: 'History', 
+            icon: <History className="h-4 w-4" />,
+            count: hasHistory ? history.length : null
+        },
+    ];
 
     return (
         <>
@@ -191,153 +225,138 @@ export default function PaymentShow() {
                         {/* Header with Actions */}
                         <PaymentHeader
                             payment={payment}
-                            copied={copied}
                             onCopy={copyToClipboard}
                             onPrint={handlePrintReceipt}
                             onVoid={() => setShowVoidDialog(true)}
                             getStatusColor={getStatusColor}
                             getStatusIcon={getStatusIcon}
-                            getMethodIcon={getMethodIcon}
+                            getMethodIcon={getMethodIcon} 
+                            onEmailReceipt={() => {
+                                // TODO: Implement email receipt
+                                console.log('Email receipt');
+                            }} 
+                            onExportPDF={() => {
+                                // TODO: Implement export PDF
+                                console.log('Export PDF');
+                            }}                        
                         />
 
-                        {/* Tabs Navigation */}
-                        <Tabs defaultValue="details" value={activeTab} onValueChange={setActiveTab} className="w-full">
-                            <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-                                <TabsTrigger value="details" className="flex items-center gap-2">
-                                    <Receipt className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Payment Details</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="items" className="flex items-center gap-2">
-                                    <FileText className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Items</span>
-                                    {hasItems && (
-                                        <Badge variant="secondary" className="ml-1 text-xs">
-                                            {payment.items.length}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
-                                <TabsTrigger value="clearance" className="flex items-center gap-2">
-                                    <FileCheck className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Clearances</span>
-                                    {hasClearances && (
-                                        <Badge variant="secondary" className="ml-1 text-xs">
-                                            {clearanceRequests.length}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
-                                <TabsTrigger value="fees" className="flex items-center gap-2">
-                                    <FileBarChart className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Fees</span>
-                                    {hasFees && (
-                                        <Badge variant="secondary" className="ml-1 text-xs">
-                                            {fees.length}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
-                            </TabsList>
-
-                            <div className="mt-6">
-                                {/* Details Tab */}
-                                <TabsContent value="details" className="space-y-6">
-                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                        {/* Left Column - Payment Details */}
-                                        <div className="lg:col-span-2 space-y-6">
-                                            <PaymentInformationCard
-                                                payment={payment}
-                                                paymentBreakdown={paymentBreakdown}
-                                                formatDate={formatDate}
-                                                getMethodIcon={getMethodIcon}
-                                                getCertificateIcon={getCertificateIcon}
-                                            />
-                                        </div>
-
-                                        {/* Right Column - Payer & Related Info */}
-                                        <div className="space-y-6">
-                                            <PayerInformationCard
-                                                payment={payment}
-                                                payer={payer}
-                                                getPayerIcon={getPayerIcon}
-                                            />
-
-                                            <DiscountSummaryCard
-                                                discountDetails={discountDetails}
-                                                paymentDiscount={payment.discount}
-                                                formattedDiscount={paymentBreakdown.formatted_discount}
-                                                discountType={payment.discount_type}
-                                                formatDate={formatDate}
-                                            />
-
-                                            <RecordingInformationCard
-                                                payment={payment}
-                                                formatDate={formatDate}
-                                            />
-
-                                            <PaymentStatusCard payment={payment} />
-
-                                            <RelatedPaymentsCard
-                                                payments={relatedPayments}
-                                                payerId={payment.payer_id}
-                                                payerType={payment.payer_type}
-                                            />
-                                        </div>
+                        {/* Admin Tabs Component */}
+                        <AdminTabsWithContent
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            variant="underlined"
+                            size="md"
+                            scrollable={true}
+                            showCountBadges={true}
+                            lazyLoad={false}
+                        >
+                            {/* Details Tab */}
+                            <AdminTabPanel value="details">
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    {/* Left Column - Payment Details */}
+                                    <div className="lg:col-span-2 space-y-6">
+                                        <PaymentInformationCard
+                                            payment={payment}
+                                            paymentBreakdown={paymentBreakdown}
+                                            formatDate={formatDate}
+                                            getMethodIcon={getMethodIcon}
+                                            getCertificateIcon={getCertificateIcon}
+                                        />
                                     </div>
-                                </TabsContent>
 
-                                {/* Items Tab */}
-                                <TabsContent value="items">
-                                    <PaymentItemsTable items={payment.items} />
-                                    {!hasItems && (
-                                        <Card className="dark:bg-gray-900">
-                                            <CardContent className="py-12">
-                                                <div className="text-center">
-                                                    <FileText className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-                                                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Items</h3>
-                                                    <p className="text-gray-500 dark:text-gray-400">
-                                                        This payment has no associated items.
-                                                    </p>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    )}
-                                </TabsContent>
+                                    {/* Right Column - Payer & Related Info */}
+                                    <div className="space-y-6">
+                                        <PayerInformationCard
+                                            payment={payment}
+                                            payer={payer}
+                                            getPayerIcon={getPayerIcon}
+                                        />
 
-                                {/* Clearance Requests Tab */}
-                                <TabsContent value="clearance">
-                                    <ClearanceRequestsCard requests={clearanceRequests} />
-                                    {!hasClearances && (
-                                        <Card className="dark:bg-gray-900">
-                                            <CardContent className="py-12">
-                                                <div className="text-center">
-                                                    <FileCheck className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-                                                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Clearance Requests</h3>
-                                                    <p className="text-gray-500 dark:text-gray-400">
-                                                        This payment is not associated with any clearance requests.
-                                                    </p>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    )}
-                                </TabsContent>
+                                        <DiscountSummaryCard
+                                            discountDetails={discountDetails}
+                                            paymentDiscount={payment.discount}
+                                            formattedDiscount={paymentBreakdown?.formatted_discount}
+                                            discountType={payment.discount_type}
+                                            formatDate={formatDate}
+                                        />
 
-                                {/* Fees Tab */}
-                                <TabsContent value="fees">
-                                    <FeeDetailsCard fees={fees} />
-                                    {!hasFees && (
-                                        <Card className="dark:bg-gray-900">
-                                            <CardContent className="py-12">
-                                                <div className="text-center">
-                                                    <FileBarChart className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-                                                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Fees</h3>
-                                                    <p className="text-gray-500 dark:text-gray-400">
-                                                        This payment is not associated with any fees.
-                                                    </p>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    )}
-                                </TabsContent>
-                            </div>
-                        </Tabs>
+                                        <RecordingInformationCard
+                                            payment={payment}
+                                            formatDate={formatDate}
+                                        />
+
+                                        <PaymentStatusCard payment={payment} />
+
+                                        <RelatedPaymentsCard
+                                            payments={relatedPayments}
+                                            payerId={payment.payer_id}
+                                            payerType={payment.payer_type}
+                                        />
+                                    </div>
+                                </div>
+                            </AdminTabPanel>
+
+                            {/* Items Tab */}
+                            <AdminTabPanel value="items">
+                                <PaymentItemsTable items={payment.items || []} />
+                                {!hasItems && (
+                                    <Card className="dark:bg-gray-900">
+                                        <CardContent className="py-12">
+                                            <div className="text-center">
+                                                <FileText className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Items</h3>
+                                                <p className="text-gray-500 dark:text-gray-400">
+                                                    This payment has no associated items.
+                                                </p>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </AdminTabPanel>
+
+                            {/* Clearance Requests Tab */}
+                            <AdminTabPanel value="clearance">
+                                <ClearanceRequestsCard requests={clearanceRequests || []} />
+                                {!hasClearances && (
+                                    <Card className="dark:bg-gray-900">
+                                        <CardContent className="py-12">
+                                            <div className="text-center">
+                                                <FileCheck className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Clearance Requests</h3>
+                                                <p className="text-gray-500 dark:text-gray-400">
+                                                    This payment is not associated with any clearance requests.
+                                                </p>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </AdminTabPanel>
+
+                            {/* Fees Tab */}
+                            <AdminTabPanel value="fees">
+                                <FeeDetailsCard fees={fees || []} />
+                                {!hasFees && (
+                                    <Card className="dark:bg-gray-900">
+                                        <CardContent className="py-12">
+                                            <div className="text-center">
+                                                <FileBarChart className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Fees</h3>
+                                                <p className="text-gray-500 dark:text-gray-400">
+                                                    This payment is not associated with any fees.
+                                                </p>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </AdminTabPanel>
+
+                            {/* History Tab */}
+                            <AdminTabPanel value="history">
+                                <PaymentHistoryTab history={history} paymentId={payment.id} />
+                            </AdminTabPanel>
+                        </AdminTabsWithContent>
                     </div>
                 </TooltipProvider>
 

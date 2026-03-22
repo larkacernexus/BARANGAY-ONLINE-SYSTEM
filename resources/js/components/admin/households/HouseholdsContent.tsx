@@ -26,10 +26,18 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import HouseholdsTableView from '@/components/admin/households/HouseholdsTableView';
 import HouseholdsGridView from '@/components/admin/households/HouseholdsGridView';
 import HouseholdBulkActions from './HouseholdsBulkActions';
+import { Household, Purok, SelectionStats, SelectionMode, BulkAction } from '@/types';
 
 interface HouseholdsContentProps {
-    households: any[];
-    stats: any;
+    households: Household[];
+    stats: {
+        total: number;
+        active: number;
+        inactive: number;
+        totalMembers: number;
+        averageMembers: number;
+        purokCount: number;
+    };
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
@@ -46,22 +54,22 @@ interface HouseholdsContentProps {
     onSelectAllOnPage: () => void;
     onItemSelect: (id: number) => void;
     onClearFilters: () => void;
-    onDelete: (household: any) => void;
-    onToggleStatus?: (household: any) => void;
+    onDelete: (household: Household) => void;
+    onToggleStatus?: (household: Household) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     onSort: (column: string) => void;
-    puroks: any[];
+    puroks: Purok[];
     sortBy: string;
     sortOrder: string;
-    selectionStats: any;
+    selectionStats: SelectionStats;
     isPerformingBulkAction: boolean;
-    onBulkOperation: (operation: any) => void;
+    onBulkOperation: (operation: BulkAction) => void;
     onClearSelection: () => void;
     onCopySelectedData: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
-    selectionMode: 'page' | 'filtered' | 'all';
+    selectionMode: SelectionMode;
 }
 
 export default function HouseholdsContent({

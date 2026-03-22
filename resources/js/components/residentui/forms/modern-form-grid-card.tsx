@@ -57,8 +57,8 @@ export const ModernFormGridCard = ({
   return (
     <div className="animate-fade-in-up h-full">
       <Card className={cn(
-        "border-0 shadow-lg hover:shadow-xl transition-all duration-300 group h-full",
-        selectMode && selectedForms?.includes(form.id) && "ring-2 ring-blue-500 ring-offset-2"
+        "border-0 shadow-lg hover:shadow-xl transition-all duration-300 group h-full bg-white dark:bg-gray-800",
+        selectMode && selectedForms?.includes(form.id) && "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900"
       )}>
         <CardContent className="p-5 h-full flex flex-col">
           {/* Header with Select */}
@@ -71,7 +71,7 @@ export const ModernFormGridCard = ({
                     "mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
                     selectedForms?.includes(form.id)
                       ? "bg-blue-500 border-blue-500"
-                      : "border-gray-300 dark:border-gray-600 group-hover:border-gray-400"
+                      : "border-gray-300 dark:border-gray-600 group-hover:border-gray-400 dark:group-hover:border-gray-500"
                   )}
                 >
                   {selectedForms?.includes(form.id) && (
@@ -92,25 +92,41 @@ export const ModernFormGridCard = ({
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => onCopyLink?.(form)}>
+              <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                <DropdownMenuItem 
+                  onClick={() => onCopyLink?.(form)}
+                  className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
                   <Copy className="h-4 w-4 mr-2" />
                   Copy Link
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onCopyTitle?.(form.title)}>
+                <DropdownMenuItem 
+                  onClick={() => onCopyTitle?.(form.title)}
+                  className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
                   <Copy className="h-4 w-4 mr-2" />
                   Copy Title
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onGenerateReport?.(form)}>
+                <DropdownMenuSeparator className="bg-gray-200 dark:bg-gray-700" />
+                <DropdownMenuItem 
+                  onClick={() => onGenerateReport?.(form)}
+                  className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
                   <FileText className="h-4 w-4 mr-2" />
                   Generate Report
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-red-600" onClick={() => onReportIssue?.(form)}>
+                <DropdownMenuItem 
+                  className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" 
+                  onClick={() => onReportIssue?.(form)}
+                >
                   <AlertCircle className="h-4 w-4 mr-2" />
                   Report Issue
                 </DropdownMenuItem>
@@ -131,7 +147,7 @@ export const ModernFormGridCard = ({
               <Tag className="h-3 w-3 mr-1" />
               {truncateText(form.category, 15)}
             </Badge>
-            <Badge variant="outline" className="bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border-0">
+            <Badge variant="outline" className="bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 border-0">
               <AgencyIcon className="h-3 w-3 mr-1" />
               <span className="truncate max-w-[100px]" title={form.issuing_agency}>
                 {truncateText(form.issuing_agency, 15)}
@@ -140,9 +156,9 @@ export const ModernFormGridCard = ({
           </div>
 
           {/* Details Card */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 mb-3 space-y-2">
+          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 mb-3 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500">Downloads</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">Downloads</span>
               <span className="text-lg font-bold text-gray-900 dark:text-white">
                 {form.download_count.toLocaleString()}
               </span>
@@ -150,18 +166,18 @@ export const ModernFormGridCard = ({
             
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <span className="text-gray-500">File Size</span>
-                <p className="font-medium">{formatFileSize(form.file_size)}</p>
+                <span className="text-gray-500 dark:text-gray-400">File Size</span>
+                <p className="font-medium text-gray-900 dark:text-white">{formatFileSize(form.file_size)}</p>
               </div>
               <div>
-                <span className="text-gray-500">File Type</span>
-                <p className="font-medium">{form.file_type}</p>
+                <span className="text-gray-500 dark:text-gray-400">File Type</span>
+                <p className="font-medium text-gray-900 dark:text-white">{form.file_type}</p>
               </div>
             </div>
 
             <div className="pt-1">
-              <span className="text-gray-500 text-xs">Uploaded</span>
-              <p className="text-sm font-medium">{formatDate(form.created_at)}</p>
+              <span className="text-gray-500 dark:text-gray-400 text-xs">Uploaded</span>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">{formatDate(form.created_at)}</p>
             </div>
           </div>
 
@@ -170,7 +186,7 @@ export const ModernFormGridCard = ({
             <Button
               size="sm"
               variant="outline"
-              className="flex-1 gap-2"
+              className="flex-1 gap-2 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               onClick={() => onViewDetails?.(form.id)}
             >
               <Eye className="h-4 w-4" />
@@ -178,7 +194,7 @@ export const ModernFormGridCard = ({
             </Button>
             <Button
               size="sm"
-              className="flex-1 gap-2 bg-gradient-to-r from-blue-500 to-blue-600"
+              className="flex-1 gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
               onClick={() => onDownload?.(form)}
             >
               <Download className="h-4 w-4" />

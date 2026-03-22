@@ -239,15 +239,15 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 bg-black/50 dark:bg-black/70 backdrop-blur-sm">
       <div 
         ref={modalRef}
         className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl"
       >
-        <div className="bg-card rounded-lg border shadow-lg overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
           {/* Search Input */}
-          <div className="flex items-center border-b px-3">
-            <Search className="h-5 w-5 text-muted-foreground" />
+          <div className="flex items-center border-b border-gray-200 dark:border-gray-700 px-3">
+            <Search className="h-5 w-5 text-gray-500 dark:text-gray-400" />
             <Input
               ref={searchInputRef}
               type="text"
@@ -255,14 +255,14 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-3 py-6 text-base"
+              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-3 py-6 text-base bg-transparent text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
             />
             {searchQuery && (
-              <Button variant="ghost" size="icon" onClick={() => setSearchQuery('')}>
+              <Button variant="ghost" size="icon" onClick={() => setSearchQuery('')} className="text-gray-500 dark:text-gray-400">
                 <X className="h-4 w-4" />
               </Button>
             )}
-            <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground ml-2">
+            <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 px-1.5 font-mono text-[10px] font-medium text-gray-600 dark:text-gray-400 ml-2">
               <Command className="h-3 w-3" />K
             </kbd>
           </div>
@@ -280,21 +280,25 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
                         onClick={() => handleSelectResult(result)}
                         className={cn(
                           'w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors',
-                          index === selectedIndex ? 'bg-primary/10' : 'hover:bg-muted'
+                          index === selectedIndex 
+                            ? 'bg-blue-50 dark:bg-blue-950/30' 
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                         )}
                       >
                         <div className={cn(
                           'p-2 rounded-md',
-                          index === selectedIndex ? 'bg-primary/20' : 'bg-muted'
+                          index === selectedIndex 
+                            ? 'bg-blue-100 dark:bg-blue-900/30' 
+                            : 'bg-gray-100 dark:bg-gray-800'
                         )}>
-                          <Icon className="h-4 w-4" />
+                          <Icon className="h-4 w-4 text-gray-700 dark:text-gray-300" />
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium">{result.title}</div>
+                          <div className="font-medium text-gray-900 dark:text-white">{result.title}</div>
                           {result.description && (
-                            <p className="text-sm text-muted-foreground">{result.description}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{result.description}</p>
                           )}
-                          <Badge variant="outline" className="mt-1 text-xs">
+                          <Badge variant="outline" className="mt-1 text-xs border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
                             {result.category}
                           </Badge>
                         </div>
@@ -304,9 +308,9 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
                 </div>
               ) : (
                 <div className="py-8 text-center">
-                  <Search className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                  <p className="text-muted-foreground">No results found for "{searchQuery}"</p>
-                  <p className="text-sm text-muted-foreground/70">Try different keywords</p>
+                  <Search className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600 mb-3" />
+                  <p className="text-gray-500 dark:text-gray-400">No results found for "{searchQuery}"</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500">Try different keywords</p>
                 </div>
               )
             ) : (
@@ -314,8 +318,8 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
                 {recentSearches.length > 0 && (
                   <>
                     <div className="flex items-center justify-between px-2">
-                      <span className="text-xs font-medium text-muted-foreground">RECENT SEARCHES</span>
-                      <Button variant="ghost" size="sm" onClick={clearRecentSearches}>
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">RECENT SEARCHES</span>
+                      <Button variant="ghost" size="sm" onClick={clearRecentSearches} className="text-gray-500 dark:text-gray-400">
                         Clear
                       </Button>
                     </div>
@@ -324,10 +328,10 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
                         <button
                           key={index}
                           onClick={() => setSearchQuery(search)}
-                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted text-left"
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-left"
                         >
-                          <History className="h-4 w-4 text-muted-foreground" />
-                          <span>{search}</span>
+                          <History className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                          <span className="text-gray-700 dark:text-gray-300">{search}</span>
                         </button>
                       ))}
                     </div>
@@ -335,32 +339,32 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
                 )}
                 
                 <div>
-                  <span className="text-xs font-medium text-muted-foreground px-2">SUGGESTIONS</span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2">SUGGESTIONS</span>
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     <button 
                       onClick={() => window.location.href = '/residentsettings/profile'}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted"
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
                     >
                       <User className="h-4 w-4" />
                       <span>Profile</span>
                     </button>
                     <button 
                       onClick={() => window.location.href = '/residentsettings/security/password'}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted"
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
                     >
                       <Lock className="h-4 w-4" />
                       <span>Password</span>
                     </button>
                     <button 
                       onClick={() => window.location.href = '/residentsettings/preferences/notifications'}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted"
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
                     >
                       <Bell className="h-4 w-4" />
                       <span>Notifications</span>
                     </button>
                     <button 
                       onClick={() => window.location.href = '/portal/instructions'}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted"
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
                     >
                       <HelpCircle className="h-4 w-4" />
                       <span>Help</span>
@@ -372,8 +376,8 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
           </div>
 
           {/* Footer */}
-          <div className="border-t px-3 py-2 bg-muted/50">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="border-t border-gray-200 dark:border-gray-700 px-3 py-2 bg-gray-50 dark:bg-gray-800/50">
+            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
               <div className="flex items-center gap-3">
                 <span>↑↓ to navigate</span>
                 <span>↵ to select</span>
@@ -421,8 +425,8 @@ const DropdownMenu = ({
         className={cn(
           'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
           (isActive || isChildActive || isOpen)
-            ? 'bg-primary/10 text-primary' 
-            : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400' 
+            : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
         )}
       >
         {Icon && <Icon className="h-4 w-4" />}
@@ -439,10 +443,10 @@ const DropdownMenu = ({
       </button>
 
       {isOpen && item.children && (
-        <div className="absolute top-full left-0 mt-2 w-64 rounded-lg border bg-popover shadow-lg py-2 z-50 animate-in fade-in-0 zoom-in-95">
-          <div className="px-3 py-2 border-b">
-            <p className="text-xs font-medium text-muted-foreground">{item.title}</p>
-            <p className="text-xs text-muted-foreground/70 mt-0.5">{item.description}</p>
+        <div className="absolute top-full left-0 mt-2 w-64 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg py-2 z-50 animate-in fade-in-0 zoom-in-95">
+          <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+            <p className="text-xs font-medium text-gray-900 dark:text-white">{item.title}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.description}</p>
           </div>
           <div className="p-2">
             {item.children.map((child) => {
@@ -457,8 +461,8 @@ const DropdownMenu = ({
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors',
                     childActive
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-medium'
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                   )}
                 >
                   {ChildIcon && <ChildIcon className="h-4 w-4" />}
@@ -466,7 +470,7 @@ const DropdownMenu = ({
                     <div className="font-medium">{child.title}</div>
                   </div>
                   {childActive && (
-                    <div className="h-2 w-2 rounded-full bg-primary" />
+                    <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400" />
                   )}
                 </Link>
               );
@@ -508,7 +512,7 @@ const MobileNavigation = ({
   };
 
   return (
-    <div className="lg:hidden border rounded-lg mt-2 mb-4">
+    <div className="lg:hidden border border-gray-200 dark:border-gray-700 rounded-lg mt-2 mb-4 bg-white dark:bg-gray-900">
       <nav className="p-2 space-y-1">
         {settingsNavItems.map((item) => {
           const isActive = isActivePath(currentPath, item.href, item.exact);
@@ -526,8 +530,8 @@ const MobileNavigation = ({
                     className={cn(
                       'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors',
                       (isActive || isChildActive) 
-                        ? 'bg-primary/10 text-primary font-medium' 
-                        : 'hover:bg-muted text-muted-foreground'
+                        ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-medium' 
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -546,7 +550,7 @@ const MobileNavigation = ({
                   </button>
 
                   {isExpanded && item.children && (
-                    <div className="ml-4 pl-4 space-y-1 border-l">
+                    <div className="ml-4 pl-4 space-y-1 border-l border-gray-200 dark:border-gray-700">
                       {item.children.map((child) => {
                         const childActive = isActivePath(currentPath, child.href, true);
                         const ChildIcon = child.icon;
@@ -559,14 +563,14 @@ const MobileNavigation = ({
                             className={cn(
                               'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
                               childActive
-                                ? 'bg-primary/10 text-primary font-medium'
-                                : 'hover:bg-muted text-muted-foreground'
+                                ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-medium'
+                                : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
                             )}
                           >
                             {ChildIcon && <ChildIcon className="h-4 w-4" />}
                             <span className="flex-1">{child.title}</span>
                             {childActive && (
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                              <div className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />
                             )}
                           </Link>
                         );
@@ -581,8 +585,8 @@ const MobileNavigation = ({
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
                     isActive
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'hover:bg-muted text-muted-foreground'
+                      ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-medium'
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'
                   )}
                 >
                   {Icon && <Icon className="h-4 w-4" />}
@@ -593,7 +597,7 @@ const MobileNavigation = ({
                     </Badge>
                   )}
                   {isActive && (
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                    <div className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />
                   )}
                 </Link>
               )}
@@ -602,11 +606,11 @@ const MobileNavigation = ({
         })}
 
         {/* Help Link - Updated to /portal/instructions */}
-        <div className="pt-4 mt-4 border-t">
+        <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
           <Link
             href="/portal/instructions"
             onClick={onLinkClick}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-muted transition-colors text-muted-foreground"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
           >
             <HelpCircle className="h-4 w-4" />
             <span>Help & Instructions</span>
@@ -646,7 +650,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
   }, [showSearchModal]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="px-4 py-4 sm:px-6 lg:px-8">
         {/* Search Modal */}
         <SearchModal isOpen={showSearchModal} onClose={() => setShowSearchModal(false)} />
@@ -654,12 +658,12 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         {/* Header with Settings Icon and Title */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-xl">
-              <SettingsIcon className="h-6 w-6 text-primary" />
+            <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded-xl">
+              <SettingsIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Settings</h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Manage your account preferences
               </p>
             </div>
@@ -669,12 +673,12 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             {/* Search Button */}
             <Button
               variant="outline"
-              className="hidden sm:flex items-center gap-2"
+              className="hidden sm:flex items-center gap-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               onClick={() => setShowSearchModal(true)}
             >
               <Search className="h-4 w-4" />
               <span>Search settings...</span>
-              <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground ml-2">
+              <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 px-1.5 font-mono text-[10px] font-medium text-gray-600 dark:text-gray-400 ml-2">
                 <Command className="h-3 w-3" />K
               </kbd>
             </Button>
@@ -683,7 +687,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             <Button
               variant="outline"
               size="icon"
-              className="sm:hidden"
+              className="sm:hidden border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300"
               onClick={() => setShowSearchModal(true)}
             >
               <Search className="h-4 w-4" />
@@ -693,7 +697,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             <Button
               variant="outline"
               size="icon"
-              className="lg:hidden"
+              className="lg:hidden border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300"
               onClick={() => setShowMobileNav(!showMobileNav)}
             >
               <ChevronDown className={cn(
@@ -704,7 +708,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
           </div>
         </div>
 
-        <Separator className="my-4" />
+        <Separator className="my-4 bg-gray-200 dark:bg-gray-700" />
 
         {/* Desktop Navigation - Horizontal Tabs */}
         <nav className="hidden lg:flex items-center gap-1 flex-wrap">
@@ -733,8 +737,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                 className={cn(
                   'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
                   isActive
-                    ? 'bg-primary/10 text-primary' 
-                    : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                    ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                 )}
               >
                 {Icon && <Icon className="h-4 w-4" />}
@@ -746,7 +750,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
           {/* Help Link - Now points to /portal/instructions */}
           <Link
             href="/portal/instructions"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium hover:bg-muted text-muted-foreground hover:text-foreground whitespace-nowrap ml-auto"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 whitespace-nowrap ml-auto"
           >
             <HelpCircle className="h-4 w-4" />
             <span>Help</span>
@@ -763,25 +767,25 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
         {/* Breadcrumb for mobile */}
         <div className="lg:hidden flex items-center gap-2 text-sm mb-4">
-          <span className="text-muted-foreground">Settings</span>
+          <span className="text-gray-500 dark:text-gray-400">Settings</span>
           {currentSection && (
             <>
-              <span className="text-muted-foreground">/</span>
-              <span className="font-medium text-foreground">{currentSection.title}</span>
+              <span className="text-gray-500 dark:text-gray-400">/</span>
+              <span className="font-medium text-gray-900 dark:text-white">{currentSection.title}</span>
             </>
           )}
         </div>
 
         {/* Main Content - Just render children */}
         <main className="mt-6">
-          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
             <div className="p-6">
               {children}
             </div>
           </div>
 
           {/* Footer */}
-          <div className="mt-4 text-xs text-muted-foreground flex items-center justify-between">
+          <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-3 w-3" />
               <span>Changes are saved automatically</span>
@@ -791,7 +795,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-6 px-2 text-xs"
+                className="h-6 px-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 onClick={() => setShowSearchModal(true)}
               >
                 <Search className="h-3 w-3 mr-1" />

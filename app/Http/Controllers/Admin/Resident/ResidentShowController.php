@@ -5,7 +5,12 @@ namespace App\Http\Controllers\Admin\Resident;
 use App\Models\Resident;
 use App\Models\Household;
 use App\Models\Purok;
-use App\Models\Privilege; // Add this import
+use App\Models\Privilege;
+use App\Models\Fee;
+use App\Models\Payment;
+use App\Models\ClearanceRequest;
+use App\Models\ResidentDocument;
+use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
@@ -66,6 +71,30 @@ class ResidentShowController extends BaseResidentController
                     ] : null,
                 ];
             });
+        
+        // Get fees for this resident
+        $fees = $this->getResidentFees($resident);
+        
+        // Get payments for this resident
+        $payments = $this->getResidentPayments($resident);
+        
+        // Get clearances for this resident
+        $clearances = $this->getResidentClearances($resident);
+        
+        // Get documents for this resident
+        $documents = $this->getResidentDocuments($resident);
+        
+        // Get activity logs for this resident
+        $activities = $this->getResidentActivities($resident);
+
+        Log::info('Resident data summary', [
+            'resident_id' => $resident->id,
+            'fees_count' => count($fees),
+            'payments_count' => count($payments),
+            'clearances_count' => count($clearances),
+            'documents_count' => count($documents),
+            'activities_count' => count($activities),
+        ]);
 
         return Inertia::render('admin/Residents/Show', [
             'resident' => $residentData,
@@ -74,8 +103,234 @@ class ResidentShowController extends BaseResidentController
             'related_household_members' => $relatedHouseholdMembers,
             'households' => $households,
             'puroks' => $puroks,
-            'available_privileges' => $availablePrivileges, // Add this line
+            'available_privileges' => $availablePrivileges,
+            'fees' => $fees,
+            'payments' => $payments,
+            'clearances' => $clearances,
+            'documents' => $documents,
+            'activities' => $activities,
         ]);
+    }
+
+    /**
+     * Get fees for this resident
+     */
+    private function getResidentFees(Resident $resident): array
+    {
+        // Try both possible payer_type values
+        $fees = Fee::where(function($query) use ($resident) {
+                $query->where('payer_type', 'resident')
+                      ->orWhere('payer_type', 'App\Models\Resident');
+            })
+            ->where('payer_id', $resident->id)
+            ->with(['feeType', 'paymentItems.payment'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        Log::info('Resident fees query', [
+            'resident_id' => $resident->id,
+            'resident_name' => $resident->full_name,
+            'fees_found' => $fees->count(),
+            'fee_ids' => $fees->pluck('id')->toArray()
+        ]);
+        
+        return $fees->map(function($fee) {
+            $totalAmount = floatval($fee->total_amount ?? 0);
+            $amountPaid = floatval($fee->amount_paid ?? 0);
+            $balance = floatval($fee->balance ?? 0);
+            
+            return [
+                'id' => $fee->id,
+                'fee_code' => $fee->fee_code,
+                'or_number' => $fee->or_number,
+                'fee_type' => $fee->feeType ? [
+                    'id' => $fee->feeType->id,
+                    'name' => $fee->feeType->name,
+                    'code' => $fee->feeType->code,
+                ] : null,
+                'total_amount' => $totalAmount,
+                'amount_paid' => $amountPaid,
+                'balance' => $balance,
+                'status' => $fee->status,
+                'issue_date' => $fee->issue_date?->toISOString(),
+                'due_date' => $fee->due_date?->toISOString(),
+                'description' => $fee->metadata['description'] ?? null,
+                'formatted_total' => '₱' . number_format($totalAmount, 2),
+                'formatted_paid' => '₱' . number_format($amountPaid, 2),
+                'formatted_balance' => '₱' . number_format($balance, 2),
+            ];
+        })
+        ->values()
+        ->toArray();
+    }
+
+    /**
+     * Get payments for this resident
+     */
+    private function getResidentPayments(Resident $resident): array
+    {
+        // Try both possible payer_type values
+        $payments = Payment::where(function($query) use ($resident) {
+                $query->where('payer_type', 'resident')
+                      ->orWhere('payer_type', 'App\Models\Resident');
+            })
+            ->where('payer_id', $resident->id)
+            ->with(['recorder'])
+            ->orderBy('payment_date', 'desc')
+            ->get();
+        
+        Log::info('Resident payments query', [
+            'resident_id' => $resident->id,
+            'resident_name' => $resident->full_name,
+            'payments_found' => $payments->count(),
+            'payment_ids' => $payments->pluck('id')->toArray(),
+            'payment_or_numbers' => $payments->pluck('or_number')->toArray()
+        ]);
+        
+        return $payments->map(function($payment) {
+            $totalAmount = floatval($payment->total_amount ?? 0);
+            $amountPaid = floatval($payment->amount_paid ?? 0);
+            $subtotal = floatval($payment->subtotal ?? 0);
+            $surcharge = floatval($payment->surcharge ?? 0);
+            $penalty = floatval($payment->penalty ?? 0);
+            $discount = floatval($payment->discount ?? 0);
+            
+            return [
+                'id' => $payment->id,
+                'or_number' => $payment->or_number,
+                'total_amount' => $totalAmount,
+                'amount_paid' => $amountPaid,
+                'payment_method' => $payment->payment_method,
+                'payment_date' => $payment->payment_date?->toISOString(),
+                'status' => $payment->status,
+                'payer_name' => $payment->payer_name,
+                'purpose' => $payment->purpose ?? 'N/A',
+                'subtotal' => $subtotal,
+                'surcharge' => $surcharge,
+                'penalty' => $penalty,
+                'discount' => $discount,
+                'formatted_total' => '₱' . number_format($totalAmount, 2),
+                'formatted_amount_paid' => '₱' . number_format($amountPaid, 2),
+                'formatted_subtotal' => '₱' . number_format($subtotal, 2),
+                'formatted_surcharge' => $surcharge > 0 ? 'Surcharge: ₱' . number_format($surcharge, 2) : null,
+                'formatted_penalty' => $penalty > 0 ? 'Penalty: ₱' . number_format($penalty, 2) : null,
+                'formatted_discount' => $discount > 0 ? 'Discount: ₱' . number_format($discount, 2) : null,
+            ];
+        })
+        ->values()
+        ->toArray();
+    }
+
+    /**
+     * Get clearances for this resident
+     */
+    private function getResidentClearances(Resident $resident): array
+    {
+        $clearances = ClearanceRequest::where('resident_id', $resident->id)
+            ->with(['clearanceType'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        Log::info('Resident clearances query', [
+            'resident_id' => $resident->id,
+            'clearances_found' => $clearances->count(),
+            'clearance_ids' => $clearances->pluck('id')->toArray()
+        ]);
+        
+        return $clearances->map(function($clearance) {
+            return [
+                'id' => $clearance->id,
+                'clearance_number' => $clearance->clearance_number,
+                'clearance_type' => $clearance->clearanceType ? [
+                    'id' => $clearance->clearanceType->id,
+                    'name' => $clearance->clearanceType->name,
+                    'code' => $clearance->clearanceType->code,
+                ] : null,
+                'status' => $clearance->status,
+                'purpose' => $clearance->purpose,
+                'request_date' => $clearance->created_at?->toISOString(),
+                'release_date' => $clearance->released_at?->toISOString(),
+                'expiry_date' => $clearance->expires_at?->toISOString(),
+            ];
+        })
+        ->values()
+        ->toArray();
+    }
+
+    /**
+     * Get documents for this resident
+     */
+    private function getResidentDocuments(Resident $resident): array
+    {
+        $documents = ResidentDocument::where('resident_id', $resident->id)
+            ->with(['category', 'documentType', 'uploadedBy'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+        
+        Log::info('Resident documents query', [
+            'resident_id' => $resident->id,
+            'documents_found' => $documents->count(),
+            'document_ids' => $documents->pluck('id')->toArray()
+        ]);
+        
+        return $documents->map(function($doc) {
+            return [
+                'id' => $doc->id,
+                'name' => $doc->name,
+                'file_name' => $doc->file_name,
+                'file_extension' => $doc->file_extension,
+                'file_size_human' => $doc->file_size_human,
+                'description' => $doc->description,
+                'reference_number' => $doc->reference_number,
+                'issue_date' => $doc->issue_date?->toISOString(),
+                'expiry_date' => $doc->expiry_date?->toISOString(),
+                'tags' => $doc->tags,
+                'status' => $doc->status,
+                'uploaded_at' => $doc->uploaded_at?->toISOString(),
+                'view_count' => $doc->view_count,
+                'download_count' => $doc->download_count,
+            ];
+        })
+        ->values()
+        ->toArray();
+    }
+
+    /**
+     * Get activity logs for this resident
+     */
+    private function getResidentActivities(Resident $resident): array
+    {
+        $activities = Activity::where('subject_type', Resident::class)
+            ->where('subject_id', $resident->id)
+            ->orWhere(function($query) use ($resident) {
+                $query->where('causer_type', Resident::class)
+                      ->where('causer_id', $resident->id);
+            })
+            ->orderBy('created_at', 'desc')
+            ->take(100)
+            ->get();
+        
+        Log::info('Resident activities query', [
+            'resident_id' => $resident->id,
+            'activities_found' => $activities->count()
+        ]);
+        
+        return $activities->map(function($activity) {
+            return [
+                'id' => $activity->id,
+                'description' => $activity->description,
+                'event' => $activity->event,
+                'causer' => $activity->causer ? [
+                    'id' => $activity->causer->id,
+                    'name' => $activity->causer->name,
+                ] : null,
+                'properties' => $activity->properties,
+                'created_at' => $activity->created_at->toISOString(),
+                'subject_type' => class_basename($activity->subject_type),
+            ];
+        })
+        ->values()
+        ->toArray();
     }
 
     private function formatResidentData($resident): array
@@ -122,17 +377,14 @@ class ResidentShowController extends BaseResidentController
      */
     private function formatPrivilegeForFrontend($residentPrivilege): array
     {
-        // Use the base formatter first
         $baseData = $this->formatPrivilege($residentPrivilege);
         $privilege = $residentPrivilege->privilege;
         
-        // Transform to match frontend expectations
         return [
             'id' => $baseData['id'],
             'resident_id' => $residentPrivilege->resident_id,
             'privilege_id' => $baseData['privilege_id'],
             'id_number' => $baseData['id_number'],
-            // Use created_at as issued_date since there's no issued_date field
             'issued_date' => $residentPrivilege->created_at?->toISOString(),
             'expiry_date' => $residentPrivilege->expires_at?->toISOString(),
             'verified_at' => $baseData['verified_at'],
@@ -142,7 +394,6 @@ class ResidentShowController extends BaseResidentController
             'created_at' => $residentPrivilege->created_at->toISOString(),
             'updated_at' => $residentPrivilege->updated_at->toISOString(),
             
-            // Nested privilege object as expected by frontend
             'privilege' => [
                 'id' => $privilege->id,
                 'name' => $privilege->name,
@@ -161,7 +412,6 @@ class ResidentShowController extends BaseResidentController
                 ] : null,
             ],
             
-            // Computed fields for easy access
             'discount_percentage' => $baseData['discount_percentage'],
             'discount_type_name' => $privilege->discount_type?->name ?? 'Discount',
             'discount_code' => $privilege->discount_type?->code ?? $privilege->code,

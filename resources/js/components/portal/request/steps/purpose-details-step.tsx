@@ -38,11 +38,13 @@ export function PurposeDetailsStep({
 }: PurposeDetailsStepProps) {
     return (
         <div className="space-y-6">
-            <Card className="rounded-xl">
+            <Card className="rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
                 <CardContent className="p-4 lg:p-6 pt-6 space-y-6">
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="purpose" className="text-sm font-medium">Purpose of Clearance *</Label>
+                            <Label htmlFor="purpose" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Purpose of Clearance *
+                            </Label>
                             <PurposeDropdown
                                 value={data.purpose}
                                 purposeCustom={data.purpose_custom}
@@ -57,15 +59,15 @@ export function PurposeDetailsStep({
                                 onToggleDropdown={setShowPurposeDropdown}
                             />
                             {errors.purpose && (
-                                <p className="text-sm text-red-600">{errors.purpose}</p>
+                                <p className="text-sm text-red-600 dark:text-red-400">{errors.purpose}</p>
                             )}
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="specific_purpose" className="text-sm font-medium flex items-center gap-2">
-                                <FileText className="h-4 w-4" />
+                            <Label htmlFor="specific_purpose" className="text-sm font-medium flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                 Specific Details 
-                                <span className="text-gray-400 ml-1 font-normal">(Optional)</span>
+                                <span className="text-gray-500 dark:text-gray-500 ml-1 font-normal">(Optional)</span>
                             </Label>
                             <Textarea
                                 id="specific_purpose"
@@ -74,10 +76,10 @@ export function PurposeDetailsStep({
                                 placeholder={getPurposeSuggestions()}
                                 rows={3}
                                 disabled={!data.purpose && !isCustomPurpose}
-                                className="text-sm min-h-[80px] rounded-lg"
+                                className="text-sm min-h-[80px] rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 disabled:bg-gray-50 dark:disabled:bg-gray-800/50 disabled:text-gray-500 dark:disabled:text-gray-500"
                             />
                             <div className="flex justify-between items-center">
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
                                     Be specific about where and why
                                 </p>
                                 <Button
@@ -90,21 +92,21 @@ export function PurposeDetailsStep({
                                             setData('specific_purpose', suggestion);
                                         }
                                     }}
-                                    className="text-xs h-7 px-3"
+                                    className="text-xs h-7 px-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 disabled:text-gray-400 dark:disabled:text-gray-600"
                                     disabled={!data.purpose && !isCustomPurpose}
                                 >
                                     Auto-fill
                                 </Button>
                             </div>
                             {errors.specific_purpose && (
-                                <p className="text-sm text-red-600">{errors.specific_purpose}</p>
+                                <p className="text-sm text-red-600 dark:text-red-400">{errors.specific_purpose}</p>
                             )}
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="needed_date" className="text-sm font-medium flex items-center gap-2">
-                                    <Calendar className="h-4 w-4" />
+                                <Label htmlFor="needed_date" className="text-sm font-medium flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                    <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                     Date Needed *
                                 </Label>
                                 <Input
@@ -114,15 +116,15 @@ export function PurposeDetailsStep({
                                     onChange={e => setData('needed_date', e.target.value)}
                                     min={new Date().toISOString().split('T')[0]}
                                     required
-                                    className="h-11 text-sm rounded-lg"
+                                    className="h-11 text-sm rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 disabled:bg-gray-50 dark:disabled:bg-gray-800/50"
                                 />
                                 {errors.needed_date && (
-                                    <p className="text-sm text-red-600">{errors.needed_date}</p>
+                                    <p className="text-sm text-red-600 dark:text-red-400">{errors.needed_date}</p>
                                 )}
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="additional_notes" className="text-sm font-medium flex items-center gap-2">
-                                    <Info className="h-4 w-4" />
+                                <Label htmlFor="additional_notes" className="text-sm font-medium flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                                    <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                     Additional Notes
                                 </Label>
                                 <Input
@@ -130,7 +132,7 @@ export function PurposeDetailsStep({
                                     value={data.additional_notes}
                                     onChange={e => setData('additional_notes', e.target.value)}
                                     placeholder="Special requirements..."
-                                    className="h-11 text-sm rounded-lg"
+                                    className="h-11 text-sm rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
                                 />
                             </div>
                         </div>

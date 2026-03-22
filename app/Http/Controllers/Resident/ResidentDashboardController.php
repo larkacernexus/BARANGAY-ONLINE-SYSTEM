@@ -9,7 +9,6 @@ use App\Models\Household;
 use App\Models\Payment;
 use App\Models\ClearanceRequest;
 use App\Models\Announcement;
-use App\Models\Complaint;
 use App\Models\Privilege;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -122,7 +121,6 @@ class ResidentDashboardController extends Controller
             'recentActivities' => $this->getRecentActivities($resident, $householdResidentIds, $allPrivileges),
             'recentPayments' => $this->getRecentPayments($resident, $householdResidentIds, $allPrivileges),
             'pendingClearances' => $this->getPendingClearances($resident, $householdResidentIds, $allPrivileges),
-            'activeComplaints' => $this->getActiveComplaints($resident, $householdResidentIds, $allPrivileges),
             'announcements' => $this->getAnnouncements($allPrivileges),
             'paymentSummary' => $this->getPaymentSummary($resident, $householdResidentIds, $allPrivileges),
             'resident' => $this->getResidentData($resident, $household, $isHouseholdHead, $allPrivileges),
@@ -135,9 +133,7 @@ class ResidentDashboardController extends Controller
             'stats' => [
                 'total_payments' => 0,
                 'total_clearances' => 0,
-                'total_complaints' => 0,
                 'pending_clearances' => 0,
-                'active_complaints' => 0,
                 'pending_requests' => 0,
                 'household_members' => 0,
                 'privileges_count' => 0,
@@ -146,7 +142,6 @@ class ResidentDashboardController extends Controller
             'recentActivities' => [],
             'recentPayments' => [],
             'pendingClearances' => [],
-            'activeComplaints' => [],
             'announcements' => [],
             'paymentSummary' => [],
             'resident' => [
@@ -186,19 +181,13 @@ class ResidentDashboardController extends Controller
                 ->whereIn('status', ['pending', 'processing', 'under_review', 'pending_payment'])
                 ->count();
             
-            $totalComplaints = Complaint::whereHas('user.resident', fn($q) => $q->whereIn('id', $householdResidentIds))->count();
-            $activeComplaints = Complaint::whereHas('user.resident', fn($q) => $q->whereIn('id', $householdResidentIds))
-                ->whereIn('status', ['pending', 'processing', 'investigating'])->count();
-            
-            $pendingRequests = $pendingClearances + $activeComplaints;
+            $pendingRequests = $pendingClearances;
             $activePrivileges = $this->getResidentPrivileges($resident);
             
             return [
                 'total_payments' => $totalPayments,
                 'total_clearances' => $totalClearances,
-                'total_complaints' => $totalComplaints,
                 'pending_clearances' => $pendingClearances,
-                'active_complaints' => $activeComplaints,
                 'pending_requests' => $pendingRequests,
                 'household_members' => $householdMemberCount,
                 'privileges_count' => count($activePrivileges),
@@ -210,9 +199,7 @@ class ResidentDashboardController extends Controller
             return [
                 'total_payments' => 0,
                 'total_clearances' => 0,
-                'total_complaints' => 0,
                 'pending_clearances' => 0,
-                'active_complaints' => 0,
                 'pending_requests' => 0,
                 'household_members' => 0,
                 'privileges_count' => 0,
@@ -270,30 +257,8 @@ class ResidentDashboardController extends Controller
                     ];
                 });
 
-            // Complaints
-            $recentComplaints = Complaint::whereHas('user.resident', fn($q) => $q->whereIn('id', $householdResidentIds))
-                ->orderBy('created_at', 'desc')
-                ->take(5)
-                ->get()
-                ->map(function ($complaint) use ($allPrivileges) {
-                    $complainantUser = $complaint->user;
-                    $complainantResident = $complainantUser?->resident;
-                    
-                    return [
-                        'id' => 'complaint-' . $complaint->id,
-                        'type' => 'complaint',
-                        'description' => ($complainantUser?->name ?? 'Household Member') . ' filed: ' . ($complaint->subject ?? 'Complaint'),
-                        'status' => $complaint->status,
-                        'date' => $complaint->created_at->toISOString(),
-                        'originalId' => $complaint->id,
-                        'complainant_name' => $complainantUser?->name ?? 'Household Member',
-                        'privileges' => $complainantResident ? $this->getResidentPrivileges($complainantResident) : [],
-                    ];
-                });
-
             return $activities->concat($recentPayments)
                 ->concat($recentClearances)
-                ->concat($recentComplaints)
                 ->sortByDesc('date')
                 ->take(8)
                 ->values()
@@ -389,41 +354,6 @@ class ResidentDashboardController extends Controller
                 ->toArray();
         } catch (\Exception $e) {
             \Log::error('Error getting pending clearances: ' . $e->getMessage());
-            return [];
-        }
-    }
-
-    private function getActiveComplaints(Resident $resident, array $householdResidentIds, array $allPrivileges): array
-    {
-        try {
-            return Complaint::whereHas('user.resident', fn($q) => $q->whereIn('id', $householdResidentIds))
-                ->with(['type', 'updates', 'user.resident.residentPrivileges.privilege'])
-                ->whereIn('status', ['pending', 'processing', 'investigating', 'action_taken'])
-                ->orderBy('created_at', 'desc')
-                ->take(8)
-                ->get()
-                ->map(function ($complaint) use ($allPrivileges) {
-                    $complainantUser = $complaint->user;
-                    $complainantResident = $complainantUser?->resident;
-                    
-                    return [
-                        'id' => $complaint->id,
-                        'subject' => $complaint->subject ?? 'No subject',
-                        'complaint_type' => $complaint->type?->name ?? 'General Complaint',
-                        'status' => $complaint->status,
-                        'created_at' => $complaint->created_at->toISOString(),
-                        'priority' => $complaint->priority,
-                        'complaint_number' => $complaint->complaint_number,
-                        'complainant_name' => $complainantUser?->name ?? 'Anonymous',
-                        'user_id' => $complaint->user_id,
-                        'is_current_user' => $complainantUser && $complainantUser->id === Auth::id(),
-                        'privileges' => $complainantResident ? $this->getResidentPrivileges($complainantResident) : [],
-                        'has_privileges' => $complainantResident && $complainantResident->residentPrivileges->filter(fn($rp) => $rp->isActive())->count() > 0,
-                    ];
-                })
-                ->toArray();
-        } catch (\Exception $e) {
-            \Log::error('Error getting active complaints: ' . $e->getMessage());
             return [];
         }
     }

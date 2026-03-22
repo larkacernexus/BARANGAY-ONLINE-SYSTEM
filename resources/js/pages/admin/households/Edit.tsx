@@ -23,7 +23,8 @@ import {
     X,
     Trash2,
     Camera,
-    Image
+    Image,
+    Globe
 } from 'lucide-react';
 import { Link, useForm, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
@@ -78,6 +79,9 @@ interface HouseholdFormData {
     vehicle: boolean;
     remarks?: string;
     members: HouseholdMember[];
+    google_maps_url?: string;
+    latitude?: number | null;
+    longitude?: number | null;
 }
 
 interface EditHouseholdProps extends PageProps {
@@ -98,6 +102,9 @@ interface EditHouseholdProps extends PageProps {
         internet: boolean;
         vehicle: boolean;
         remarks?: string;
+        google_maps_url?: string;
+        latitude?: number | null;
+        longitude?: number | null;
     };
     heads: Resident[];
     puroks: Purok[];
@@ -136,7 +143,17 @@ export default function EditHousehold({
     available_residents = [],
     current_members 
 }: EditHouseholdProps) {
-    const [members, setMembers] = useState<HouseholdMember[]>(current_members || []);
+    // FIX: Initialize members with proper head relationship
+    const initialMembers = (current_members || []).map(member => {
+        const isHead = member.is_head === true || member.relationship === 'Head';
+        return {
+            ...member,
+            relationship: isHead ? 'Head' : (member.relationship || 'Other Relative'),
+            is_head: isHead,
+        };
+    });
+    
+    const [members, setMembers] = useState<HouseholdMember[]>(initialMembers);
     const [showMemberSearch, setShowMemberSearch] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Resident[]>(available_residents);
@@ -156,7 +173,10 @@ export default function EditHousehold({
         internet: household.internet,
         vehicle: household.vehicle,
         remarks: household.remarks || '',
-        members: current_members || [],
+        members: initialMembers,
+        google_maps_url: household.google_maps_url || '',
+        latitude: household.latitude || null,
+        longitude: household.longitude || null,
     });
 
     const incomeRanges = [
@@ -218,21 +238,24 @@ export default function EditHousehold({
         ? heads.find(h => h.id === headMember.resident_id)
         : null;
 
-    // Update form data when members change
+    // FIX: Update form data when members change - FORCE HEAD RELATIONSHIP
     useEffect(() => {
         setData('total_members', members.length);
-        setData('members', members.map(member => ({
-            id: member.id,
-            name: member.name,
-            relationship: member.relationship,
-            age: member.age,
-            resident_id: member.resident_id,
-            household_member_id: member.household_member_id,
-            purok_id: member.purok_id,
-            photo_path: member.photo_path,
-            photo_url: member.photo_url,
-            is_head: member.relationship === 'Head' || member.is_head,
-        })));
+        setData('members', members.map(member => {
+            const isHead = member.relationship === 'Head' || member.is_head;
+            return {
+                id: member.id,
+                name: member.name,
+                relationship: isHead ? 'Head' : member.relationship,
+                age: member.age,
+                resident_id: member.resident_id,
+                household_member_id: member.household_member_id,
+                purok_id: member.purok_id,
+                photo_path: member.photo_path,
+                photo_url: member.photo_url,
+                is_head: isHead,
+            };
+        }));
     }, [members]);
 
     // Filter search results based on query
@@ -301,6 +324,7 @@ export default function EditHousehold({
         setSearchQuery('');
     };
 
+    // FIX: handleHeadChange - ALWAYS set relationship to "Head"
     const handleHeadChange = (value: string) => {
         if (!value) {
             // Clear head selection by removing any head member
@@ -362,10 +386,19 @@ export default function EditHousehold({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         
+        // DEBUG: Log all members and their relationships
+        console.log('=== DEBUG MEMBERS ===');
+        members.forEach(m => {
+            console.log(`Name: ${m.name}, Relationship: "${m.relationship}", is_head: ${m.is_head}`);
+        });
+        console.log('====================');
+        
         // Validate that we have exactly one head member
         const headMembers = members.filter(m => m.relationship === 'Head' || m.is_head);
+        console.log('Head members found:', headMembers.length);
+        
         if (headMembers.length !== 1) {
-            alert('Household must have exactly one head member. Please select a head of family.');
+            alert(`Household must have exactly one head member. Found ${headMembers.length} head(s).`);
             return;
         }
         
@@ -596,13 +629,16 @@ export default function EditHousehold({
                                 </CardContent>
                             </Card>
 
-                            {/* Address Information */}
+                            {/* Address Information with Google Maps */}
                             <Card className="dark:bg-gray-900 dark:border-gray-700">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 dark:text-white">
                                         <MapPin className="h-5 w-5" />
                                         Address Information
                                     </CardTitle>
+                                    <CardDescription className="dark:text-gray-400">
+                                        Edit the household's address
+                                    </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-2">
@@ -656,6 +692,63 @@ export default function EditHousehold({
                                             />
                                         </div>
                                     </div>
+
+                                    {/* GOOGLE MAPS URL FIELD */}
+                                    <div className="space-y-2 pt-2">
+                                        <Label htmlFor="google_maps_url" className="flex items-center gap-2 dark:text-gray-300">
+                                            <Globe className="h-4 w-4" />
+                                            Google Maps Link
+                                        </Label>
+                                        <Input 
+                                            id="google_maps_url" 
+                                            placeholder="https://maps.app.goo.gl/..." 
+                                            value={data.google_maps_url || ''}
+                                            onChange={(e) => setData('google_maps_url', e.target.value)}
+                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-white font-mono text-sm"
+                                        />
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            Paste any Google Maps share link. Coordinates will be extracted automatically when you save.
+                                        </p>
+                                    </div>
+
+                                    {/* Coordinates Display */}
+                                    {(data.latitude || data.longitude) && (
+                                        <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                            <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">📍 Current Coordinates</p>
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div>
+                                                    <span className="text-green-600 dark:text-green-400">Latitude:</span>
+                                                    <code className="ml-2 text-green-800 dark:text-green-300 font-mono">
+                                                        {data.latitude?.toFixed(6)}
+                                                    </code>
+                                                </div>
+                                                <div>
+                                                    <span className="text-green-600 dark:text-green-400">Longitude:</span>
+                                                    <code className="ml-2 text-green-800 dark:text-green-300 font-mono">
+                                                        {data.longitude?.toFixed(6)}
+                                                    </code>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                                These coordinates will update automatically if you change the Google Maps link.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Location Preview */}
+                                    {data.purok_id && data.address && (
+                                        <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                                            <div className="flex items-start gap-2">
+                                                <Home className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
+                                                <div>
+                                                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Location Preview</p>
+                                                    <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
+                                                        {data.address}, {puroks.find(p => p.id === data.purok_id)?.name || 'Selected Purok'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
 
@@ -1284,6 +1377,12 @@ export default function EditHousehold({
                                                 ) : 'Not set'}
                                             </span>
                                         </div>
+                                        {(data.latitude || data.longitude) && (
+                                            <div className="border-t dark:border-gray-700 pt-3">
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">📍 Coordinates</p>
+                                                <p className="text-xs font-mono dark:text-gray-300">{data.latitude?.toFixed(6)}, {data.longitude?.toFixed(6)}</p>
+                                            </div>
+                                        )}
                                         <div className="border-t dark:border-gray-700 pt-4">
                                             <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Members with Photos:</div>
                                             <div className="flex items-center justify-between mb-2">
@@ -1341,6 +1440,13 @@ export default function EditHousehold({
                                                 <div className={`h-2 w-2 rounded-full ${members.length > 1 ? 'bg-green-600 dark:bg-green-400' : 'bg-amber-600 dark:bg-amber-400'}`}></div>
                                             </div>
                                             <span className="text-sm">Household members ({members.length})</span>
+                                        </div>
+                                        {/* GOOGLE MAPS CHECKLIST ITEM */}
+                                        <div className={`flex items-center space-x-2 ${data.google_maps_url ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-600'}`}>
+                                            <div className={`h-5 w-5 rounded-full ${data.google_maps_url ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-700'} flex items-center justify-center`}>
+                                                <div className={`h-2 w-2 rounded-full ${data.google_maps_url ? 'bg-green-600 dark:bg-green-400' : 'bg-gray-400 dark:bg-gray-500'}`}></div>
+                                            </div>
+                                            <span className="text-sm">Google Maps location {data.google_maps_url ? '(coordinates will extract)' : ''}</span>
                                         </div>
                                     </div>
                                 </CardContent>
@@ -1408,6 +1514,15 @@ export default function EditHousehold({
                                 type="button"
                                 onClick={() => {
                                     // Reset form to original values
+                                    const resetMembers = (current_members || []).map(member => {
+                                        const isHead = member.is_head === true || member.relationship === 'Head';
+                                        return {
+                                            ...member,
+                                            relationship: isHead ? 'Head' : (member.relationship || 'Other Relative'),
+                                            is_head: isHead,
+                                        };
+                                    });
+                                    setMembers(resetMembers);
                                     setData({
                                         household_number: household.household_number,
                                         contact_number: household.contact_number,
@@ -1423,9 +1538,11 @@ export default function EditHousehold({
                                         internet: household.internet,
                                         vehicle: household.vehicle,
                                         remarks: household.remarks || '',
-                                        members: current_members || [],
+                                        members: resetMembers,
+                                        google_maps_url: household.google_maps_url || '',
+                                        latitude: household.latitude || null,
+                                        longitude: household.longitude || null,
                                     });
-                                    setMembers(current_members || []);
                                 }}
                                 className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                             >

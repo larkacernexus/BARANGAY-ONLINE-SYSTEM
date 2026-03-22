@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Http;
 
 class Purok extends Model
 {
@@ -20,7 +21,9 @@ class Purok extends Model
         'total_households',
         'total_residents',
         'status',
-        'google_maps_url', 
+        'google_maps_url',
+        'latitude',
+        'longitude',
     ];
 
     protected $casts = [
@@ -42,23 +45,26 @@ class Purok extends Model
             $purok->slug = Str::slug($purok->name);
         });
         
-        // Automatically extract coordinates from Google Maps URL if provided
         static::saving(function ($purok) {
-            if ($purok->google_maps_url) {
+            if ($purok->google_maps_url && !$purok->latitude && !$purok->longitude) {
                 $purok->extractCoordinatesFromUrl();
             }
         });
     }
 
-    // FIXED: Updated relationships to use purok_id
     public function households()
     {
-        return $this->hasMany(Household::class, 'purok_id'); // Changed to purok_id
+        return $this->hasMany(Household::class, 'purok_id');
     }
 
     public function residents()
     {
-        return $this->hasMany(Resident::class, 'purok_id'); // Changed to purok_id
+        return $this->hasMany(Resident::class, 'purok_id');
+    }
+
+    public function businesses(): HasMany
+    {
+        return $this->hasMany(Business::class, 'purok_id');
     }
 
     public function scopeActive($query)
@@ -71,19 +77,13 @@ class Purok extends Model
         return $query->where('status', 'inactive');
     }
 
-// Add to updateStatistics method
     public function updateStatistics()
     {
         $this->total_households = $this->households()->count();
         $this->total_residents = $this->residents()->count();
-        $this->total_businesses = $this->businesses()->count(); // Add this line
         $this->save();
     }
 
-
-    /**
-     * Extract latitude and longitude from Google Maps URL
-     */
     public function extractCoordinatesFromUrl()
     {
         if (!$this->google_maps_url) {
@@ -93,120 +93,111 @@ class Purok extends Model
         try {
             $url = $this->google_maps_url;
             
-            // Try to parse coordinates from URL
-            if (strpos($url, '@') !== false) {
-                // Format: https://www.google.com/maps/@14.5995,120.9842,15z
-                $parts = explode('@', $url);
-                if (count($parts) > 1) {
-                    $coordsPart = explode(',', $parts[1]);
-                    if (count($coordsPart) >= 2) {
-                        $this->latitude = (float) $coordsPart[0];
-                        $this->longitude = (float) $coordsPart[1];
-                        return;
-                    }
-                }
-            } elseif (strpos($url, '?q=') !== false) {
-                // Format: https://www.google.com/maps?q=14.5995,120.9842
-                $parsed = parse_url($url);
-                if (isset($parsed['query'])) {
-                    parse_str($parsed['query'], $query);
-                    if (isset($query['q'])) {
-                        $coords = explode(',', $query['q']);
-                        if (count($coords) >= 2) {
-                            $this->latitude = (float) $coords[0];
-                            $this->longitude = (float) $coords[1];
-                            return;
-                        }
-                    }
-                }
-            } elseif (strpos($url, 'place/') !== false) {
-                // Format: https://www.google.com/maps/place/14°35'58.2"N+120°59'03.1"E
-                // This is more complex to parse - we'll skip for now
+            if (strpos($url, 'maps.app.goo.gl') !== false) {
+                $this->extractFromShortUrl($url);
+                return;
             }
             
-            // If coordinates couldn't be extracted, try using Google Maps Geocoding API
-            // Note: This requires a Google Maps API key with Geocoding enabled
-            $this->geocodeAddress();
+            if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches)) {
+                $this->latitude = (float) $matches[1];
+                $this->longitude = (float) $matches[2];
+                return;
+            }
+            
+            if (preg_match('/\/search\/(\d+\.\d+),[\+ ]*(\d+\.\d+)/', $url, $matches)) {
+                $this->latitude = (float) $matches[1];
+                $this->longitude = (float) $matches[2];
+                return;
+            }
+            
+            if (preg_match('/[?&]q=([^&]+)/', $url, $matches)) {
+                $query = urldecode($matches[1]);
+                if (preg_match('/(-?\d+\.\d+),(-?\d+\.\d+)/', $query, $coordMatches)) {
+                    $this->latitude = (float) $coordMatches[1];
+                    $this->longitude = (float) $coordMatches[2];
+                    return;
+                }
+            }
             
         } catch (\Exception $e) {
-            // Silently fail - coordinates are optional
             \Log::warning("Failed to extract coordinates from URL: {$this->google_maps_url}", [
                 'error' => $e->getMessage(),
-                'purok_id' => $this->id,
             ]);
         }
     }
 
-    /**
-     * Geocode address to get coordinates
-     */
-    private function geocodeAddress()
+    private function extractFromShortUrl($shortUrl)
     {
-        // This method requires Google Maps Geocoding API
-        // You'll need to enable it and add your API key to .env
-        
-        $apiKey = env('GOOGLE_MAPS_API_KEY');
-        if (!$apiKey) {
-            return;
-        }
-
-        // Use purok name as address
-        $address = urlencode($this->name);
-        $url = "https://maps.googleapis.com/maps/api/geocode/json?address={$address}&key={$apiKey}";
-        
         try {
-            $response = file_get_contents($url);
-            $data = json_decode($response, true);
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $shortUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
+            curl_setopt($ch, CURLOPT_HEADER, true);
+            curl_setopt($ch, CURLOPT_NOBODY, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
             
-            if ($data['status'] === 'OK' && isset($data['results'][0]['geometry']['location'])) {
-                $location = $data['results'][0]['geometry']['location'];
-                $this->latitude = $location['lat'];
-                $this->longitude = $location['lng'];
+            $response = curl_exec($ch);
+            $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+            curl_close($ch);
+            
+            if (!$finalUrl) {
+                return;
             }
+            
+            if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $finalUrl, $matches)) {
+                $this->latitude = (float) $matches[1];
+                $this->longitude = (float) $matches[2];
+                return;
+            }
+            
+            if (preg_match('%\/search\/(\d+\.\d+),[\+ ]*(\d+\.\d+)%', $finalUrl, $matches)) {
+                $this->latitude = (float) $matches[1];
+                $this->longitude = (float) $matches[2];
+                return;
+            }
+            
+            if (preg_match('/(\d+\.\d+),(\d+\.\d+)/', $finalUrl, $matches)) {
+                $this->latitude = (float) $matches[1];
+                $this->longitude = (float) $matches[2];
+                return;
+            }
+            
         } catch (\Exception $e) {
-            // Silently fail
+            \Log::warning("Failed to resolve short URL: {$shortUrl}", [
+                'error' => $e->getMessage()
+            ]);
         }
     }
 
-    /**
-     * Generate Google Maps embed URL
-     */
-    public function getGoogleMapsEmbedUrlAttribute()
+    public function getEmbedUrlAttribute()
     {
-        if (!$this->google_maps_url) {
+        $apiKey = env('VITE_GOOGLE_MAPS_API_KEY');
+        
+        if (!$apiKey) {
             return null;
         }
-
-        // Convert regular Google Maps URL to embed URL
-        $url = $this->google_maps_url;
-        $url = str_replace('https://www.google.com/maps/', '', $url);
         
-        // Handle different URL formats
-        if (strpos($url, '@') !== false) {
-            // Format with @ coordinates
-            $parts = explode('@', $url);
-            $coords = explode(',', $parts[1])[0] . ',' . explode(',', $parts[1])[1];
-            return "https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d{zoom}!2d{$coords}!3d{$coords}";
-        } elseif (strpos($url, 'place/') !== false) {
-            // Place format
-            $place = substr($url, strpos($url, 'place/') + 6);
-            return "https://www.google.com/maps/embed/v1/place?key=" . env('GOOGLE_MAPS_API_KEY') . "&q=" . urlencode($place);
+        if ($this->latitude && $this->longitude) {
+            return "https://www.google.com/maps/embed/v1/place?key={$apiKey}&q={$this->latitude},{$this->longitude}&zoom=16";
+        }
+        
+        if ($this->google_maps_url) {
+            return "https://www.google.com/maps/embed/v1/place?key={$apiKey}&q=" . urlencode($this->google_maps_url);
         }
         
         return null;
     }
 
-    /**
-     * Check if purok has Google Maps location
-     */
     public function hasLocation()
     {
         return !empty($this->google_maps_url) || ($this->latitude && $this->longitude);
     }
 
-    /**
-     * Get coordinates as array
-     */
     public function getCoordinatesAttribute()
     {
         if ($this->latitude && $this->longitude) {
@@ -218,18 +209,12 @@ class Purok extends Model
         return null;
     }
 
-        public function businesses(): HasMany
-    {
-        return $this->hasMany(Business::class, 'purok_id');
-    }
-
     public function getShortGoogleMapsUrlAttribute()
     {
         if (!$this->google_maps_url) {
             return null;
         }
         
-        // Truncate long URLs for display
         if (strlen($this->google_maps_url) > 50) {
             return substr($this->google_maps_url, 0, 47) . '...';
         }

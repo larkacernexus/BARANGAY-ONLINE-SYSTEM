@@ -2,7 +2,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ActionDropdown, ActionDropdownItem, ActionDropdownSeparator } from '@/components/adminui/action-dropdown';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { Link } from '@inertiajs/react';
@@ -17,9 +23,15 @@ import {
     ExternalLink,
     Phone,
     Calendar,
-    Users as UsersIcon
+    UsersIcon,
+    MoreVertical,
+    Printer,
+    Map,
+    CheckSquare,
+    Square
 } from 'lucide-react';
 import { Purok } from '@/types';
+import { JSX } from 'react';
 
 interface PuroksGridViewProps {
     puroks: Purok[];
@@ -32,6 +44,7 @@ interface PuroksGridViewProps {
     onClearFilters: () => void;
     selectionStats: any;
     onCopyToClipboard: (text: string, label: string) => void;
+    onViewOnMap?: (purok: Purok) => void;
 }
 
 export default function PuroksGridView({
@@ -44,7 +57,8 @@ export default function PuroksGridView({
     hasActiveFilters,
     onClearFilters,
     selectionStats,
-    onCopyToClipboard
+    onCopyToClipboard,
+    onViewOnMap
 }: PuroksGridViewProps) {
     const truncateText = (text: string, maxLength: number = 30): string => {
         if (!text) return '';
@@ -79,6 +93,14 @@ export default function PuroksGridView({
             month: 'short',
             day: 'numeric'
         });
+    };
+
+    const handleViewOnMap = (purok: Purok) => {
+        if (onViewOnMap) {
+            onViewOnMap(purok);
+        } else if (purok.google_maps_url) {
+            window.open(purok.google_maps_url, '_blank', 'noopener,noreferrer');
+        }
     };
 
     const emptyState = (
@@ -124,7 +146,7 @@ export default function PuroksGridView({
                         }}
                     >
                         <CardContent className="p-4">
-                            {/* Header with Checkbox and ActionDropdown */}
+                            {/* Header with Checkbox and Dropdown Menu */}
                             <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-2">
                                     <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
@@ -152,49 +174,126 @@ export default function PuroksGridView({
                                             className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-gray-300 dark:border-gray-600"
                                         />
                                     )}
-                                    <ActionDropdown>
-                                        <ActionDropdownItem
-                                            icon={<Eye className="h-4 w-4" />}
-                                            href={`/admin/puroks/${purok.id}`}
-                                        >
-                                            View Details
-                                        </ActionDropdownItem>
-                                        
-                                        <ActionDropdownItem
-                                            icon={<Edit className="h-4 w-4" />}
-                                            href={`/admin/puroks/${purok.id}/edit`}
-                                        >
-                                            Edit Purok
-                                        </ActionDropdownItem>
-                                        
-                                        <ActionDropdownSeparator />
-                                        
-                                        <ActionDropdownItem
-                                            icon={<Copy className="h-4 w-4" />}
-                                            onClick={() => onCopyToClipboard(purok.name, 'Purok Name')}
-                                        >
-                                            Copy Name
-                                        </ActionDropdownItem>
-                                        
-                                        {purok.google_maps_url && (
-                                            <ActionDropdownItem
-                                                icon={<ExternalLink className="h-4 w-4" />}
-                                                onClick={() => window.open(purok.google_maps_url, '_blank')}
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button 
+                                                variant="ghost" 
+                                                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                onClick={(e) => e.stopPropagation()}
                                             >
-                                                View on Map
-                                            </ActionDropdownItem>
-                                        )}
-                                        
-                                        <ActionDropdownSeparator />
-                                        
-                                        <ActionDropdownItem
-                                            icon={<Trash2 className="h-4 w-4" />}
-                                            onClick={() => onDelete(purok)}
-                                            dangerous
-                                        >
-                                            Delete Purok
-                                        </ActionDropdownItem>
-                                    </ActionDropdown>
+                                                <span className="sr-only">Open menu</span>
+                                                <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-48">
+                                            <DropdownMenuItem asChild>
+                                                <Link href={`/admin/puroks/${purok.id}`} className="flex items-center cursor-pointer">
+                                                    <Eye className="mr-2 h-4 w-4" />
+                                                    <span>View Details</span>
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuItem asChild>
+                                                <Link href={`/admin/puroks/${purok.id}/edit`} className="flex items-center cursor-pointer">
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    <span>Edit Purok</span>
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            
+                                            {purok.google_maps_url && (
+                                                <DropdownMenuItem 
+                                                    onClick={() => handleViewOnMap(purok)}
+                                                    className="flex items-center cursor-pointer"
+                                                >
+                                                    <Map className="mr-2 h-4 w-4" />
+                                                    <span>View on Map</span>
+                                                </DropdownMenuItem>
+                                            )}
+                                            
+                                            <DropdownMenuItem asChild>
+                                                <Link href={`/residents?purok_id=${purok.id}`} className="flex items-center cursor-pointer">
+                                                    <Users className="mr-2 h-4 w-4" />
+                                                    <span>View Residents</span>
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuItem asChild>
+                                                <Link href={`/households?purok_id=${purok.id}`} className="flex items-center cursor-pointer">
+                                                    <Home className="mr-2 h-4 w-4" />
+                                                    <span>View Households</span>
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuSeparator />
+                                            
+                                            <DropdownMenuItem 
+                                                onClick={() => onCopyToClipboard(purok.name, 'Purok Name')}
+                                                className="flex items-center cursor-pointer"
+                                            >
+                                                <Copy className="mr-2 h-4 w-4" />
+                                                <span>Copy Name</span>
+                                            </DropdownMenuItem>
+                                            
+                                            {purok.leader_name && (
+                                                <DropdownMenuItem 
+                                                    onClick={() => onCopyToClipboard(purok.leader_name, 'Leader Name')}
+                                                    className="flex items-center cursor-pointer"
+                                                >
+                                                    <Copy className="mr-2 h-4 w-4" />
+                                                    <span>Copy Leader</span>
+                                                </DropdownMenuItem>
+                                            )}
+                                            
+                                            {purok.google_maps_url && (
+                                                <DropdownMenuItem 
+                                                    onClick={() => onCopyToClipboard(purok.google_maps_url, 'Map Link')}
+                                                    className="flex items-center cursor-pointer"
+                                                >
+                                                    <Copy className="mr-2 h-4 w-4" />
+                                                    <span>Copy Map Link</span>
+                                                </DropdownMenuItem>
+                                            )}
+
+                                            {isBulkMode && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem 
+                                                        onClick={() => onItemSelect(purok.id)}
+                                                        className="flex items-center cursor-pointer"
+                                                    >
+                                                        {isSelected ? (
+                                                            <>
+                                                                <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
+                                                                <span className="text-green-600">Deselect</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Square className="mr-2 h-4 w-4" />
+                                                                <span>Select for Bulk</span>
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                            
+                                            <DropdownMenuItem asChild>
+                                                <Link href={`/admin/puroks/${purok.id}/print`} className="flex items-center cursor-pointer">
+                                                    <Printer className="mr-2 h-4 w-4" />
+                                                    <span>Print Details</span>
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuSeparator />
+                                            
+                                            <DropdownMenuItem 
+                                                className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                                onClick={() => onDelete(purok)}
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                <span>Delete Purok</span>
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
                             </div>
 

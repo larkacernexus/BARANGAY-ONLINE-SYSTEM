@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\Resident\ResidentImportController;
 use App\Http\Controllers\Admin\Resident\ResidentExportController;
 use App\Http\Controllers\Admin\Resident\ResidentBulkController;
 use App\Http\Controllers\Admin\AdminIncidentController;
+use App\Http\Controllers\Admin\BlotterController;
 use App\Http\Controllers\Admin\OfficialController;
 use App\Http\Controllers\Admin\PositionController;
 use App\Http\Controllers\Admin\RolePermissionController;
@@ -86,6 +87,7 @@ use App\Http\Controllers\Admin\CommunityReport\CommunityReportPrintController;
 use App\Http\Controllers\Admin\CommunityReport\CommunityReportStatsController;
 use App\Http\Controllers\Admin\CommunityReport\CommunityReportResponseController;
 use App\Http\Controllers\Admin\CommunityReport\CommunityReportRelatedController;
+use App\Http\Controllers\Admin\GoogleMapsController;
 use App\Http\Controllers\Admin\PrivilegeController;
 use Inertia\Inertia;
 
@@ -110,6 +112,92 @@ Route::get('/search', function () {
 
     Route::get('/instructions/download', [InstructionController::class, 'download'])
         ->name('instructions.download');
+
+
+            Route::post('/resolve-google-maps-url', [GoogleMapsController::class, 'resolveUrl'])
+        ->name('admin.resolve-google-maps-url');
+
+ // Index - List all blotters
+    Route::get('/blotters', [BlotterController::class, 'index'])
+        ->name('blotters.index')
+        ->middleware('permission:view-blotters');
+    
+    // Create - Show create form
+    Route::get('/blotters/create', [BlotterController::class, 'create'])
+        ->name('blotters.create')
+        ->middleware('permission:create-blotters');
+    
+    // Store - Save new blotter
+    Route::post('/blotters', [BlotterController::class, 'store'])
+        ->name('blotters.store')
+        ->middleware('permission:create-blotters');
+    
+    // Show - View single blotter
+    Route::get('/blotters/{blotter}', [BlotterController::class, 'show'])
+        ->name('blotters.show')
+        ->middleware('permission:view-blotters');
+    
+    // Edit - Show edit form
+    Route::get('/blotters/{blotter}/edit', [BlotterController::class, 'edit'])
+        ->name('blotters.edit')
+        ->middleware('permission:edit-blotters');
+    
+    // Update - Save edited blotter
+    Route::put('/blotters/{blotter}', [BlotterController::class, 'update'])
+        ->name('blotters.update')
+        ->middleware('permission:edit-blotters');
+    
+    // Update with PATCH (alternative)
+    Route::patch('/blotters/{blotter}', [BlotterController::class, 'update'])
+        ->name('blotters.patch')
+        ->middleware('permission:edit-blotters');
+    
+    // Destroy - Delete blotter
+    Route::delete('/blotters/{blotter}', [BlotterController::class, 'destroy'])
+        ->name('blotters.destroy')
+        ->middleware('permission:delete-blotters');
+    
+    // Custom routes
+    Route::post('/blotters/{blotter}/update-status', [BlotterController::class, 'updateStatus'])
+        ->name('blotters.update-status')
+        ->middleware('permission:edit-blotters');
+    
+    Route::get('/blotters/{blotter}/download-attachment/{index}', [BlotterController::class, 'downloadAttachment'])
+        ->name('blotters.download-attachment')
+        ->middleware('permission:view-blotters');
+    
+    // Optional: Bulk operations
+    Route::post('/blotters/bulk/delete', [BlotterController::class, 'bulkDelete'])
+        ->name('blotters.bulk.delete')
+        ->middleware('permission:delete-blotters');
+    
+    Route::post('/blotters/bulk/status', [BlotterController::class, 'bulkUpdateStatus'])
+        ->name('blotters.bulk.status')
+        ->middleware('permission:edit-blotters');
+    
+    // Optional: Export/Import
+    Route::get('/blotters/export/csv', [BlotterController::class, 'exportCsv'])
+        ->name('blotters.export.csv')
+        ->middleware('permission:view-blotters');
+    
+    Route::get('/blotters/export/pdf', [BlotterController::class, 'exportPdf'])
+        ->name('blotters.export.pdf')
+        ->middleware('permission:view-blotters');
+    
+    Route::post('/blotters/import', [BlotterController::class, 'import'])
+        ->name('blotters.import')
+        ->middleware('permission:create-blotters');
+    
+    // Optional: Print
+    Route::get('/blotters/{blotter}/print', [BlotterController::class, 'print'])
+        ->name('blotters.print')
+        ->middleware('permission:view-blotters');
+    
+    // Optional: Statistics
+    Route::get('/blotters/stats/overview', [BlotterController::class, 'statistics'])
+        ->name('blotters.stats')
+        ->middleware('permission:view-blotters');
+
 
 // ====================
 // USER MANAGEMENT
@@ -659,6 +747,8 @@ Route::middleware('permission:manage-puroks')->prefix('puroks')->name('puroks.')
     Route::delete('/{purok}', [PurokController::class, 'destroy'])->name('destroy');
     Route::post('/update-statistics', [PurokController::class, 'updateStatistics'])->name('update-statistics');
     Route::get('/api/all', [PurokController::class, 'getAll'])->name('api.all');
+    Route::patch('/admin/puroks/{purok}/update-coordinates', [PurokController::class, 'updateCoordinates'])
+    ->name('admin.puroks.update-coordinates');
 });
 
 // ====================

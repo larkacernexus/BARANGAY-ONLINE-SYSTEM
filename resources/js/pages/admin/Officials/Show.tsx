@@ -1,3 +1,4 @@
+// resources/js/Pages/Admin/Officials/Show.tsx
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -7,10 +8,15 @@ import {
     History,
 } from 'lucide-react';
 
+// Import Admin Tabs Component
+import { AdminTabsWithContent, AdminTabPanel } from '@/components/adminui/admin-tabs';
+
 // Import components
 import { OfficialHeader } from '@/components/admin/officials/show/components/official-header';
 import { ProfileHeader } from '@/components/admin/officials/show/components/profile-header';
-import { OfficialTabs } from '@/components/admin/officials/show/components/official-tabs';
+import { OverviewTab } from '@/components/admin/officials/show/components/tabs/overview-tab';
+import { DetailsTab } from '@/components/admin/officials/show/components/tabs/details-tab';
+import { ActivityTab } from '@/components/admin/officials/show/components/tabs/activity-tab';
 import { DeleteConfirmationDialog } from '@/components/admin/officials/show/components/delete-confirmation-dialog';
 
 // Import types and utilities
@@ -60,6 +66,14 @@ export default function ShowOfficial({ official }: ShowOfficialProps) {
                     contact_number: official.resident.contact_number,
                     email: official.resident.email,
                     address: official.resident.address
+                } : null,
+                user: official.user ? {
+                    id: official.user.id,
+                    name: official.user.name,
+                    email: official.user.email,
+                    role: official.user.role,
+                    created_at: official.user.created_at,
+                    last_login_at: official.user.last_login_at
                 } : null
             }
         };
@@ -70,6 +84,26 @@ export default function ShowOfficial({ official }: ShowOfficialProps) {
         a.download = `official-${official.id}-data.json`;
         a.click();
     };
+
+    // Tab definitions
+    const tabs = [
+        { 
+            id: 'overview', 
+            label: 'Overview', 
+            icon: <Info className="h-4 w-4" />,
+        },
+        { 
+            id: 'details', 
+            label: 'Details', 
+            icon: <FileText className="h-4 w-4" />,
+        },
+        { 
+            id: 'activity', 
+            label: 'Activity', 
+            icon: <History className="h-4 w-4" />,
+            count: official.user?.activities?.length || 0
+        },
+    ];
 
     return (
         <>
@@ -102,15 +136,42 @@ export default function ShowOfficial({ official }: ShowOfficialProps) {
                         getStatusIcon={getStatusIcon}
                     />
 
-                    {/* Tabs Navigation and Content */}
-                    <OfficialTabs
+                    {/* Admin Tabs Component */}
+                    <AdminTabsWithContent
+                        tabs={tabs}
                         activeTab={activeTab}
-                        setActiveTab={setActiveTab}
-                        official={official}
-                        formatDate={formatDate}
-                        getStatusColor={getStatusColor}
-                        getStatusIcon={getStatusIcon}
-                    />
+                        onTabChange={setActiveTab}
+                        variant="underlined"
+                        size="md"
+                        scrollable={true}
+                        showCountBadges={true}
+                        lazyLoad={true}
+                    >
+                        <AdminTabPanel value="overview">
+                            <OverviewTab
+                                official={official}
+                                formatDate={formatDate}
+                                getStatusColor={getStatusColor}
+                                getStatusIcon={getStatusIcon}
+                            />
+                        </AdminTabPanel>
+
+                        <AdminTabPanel value="details">
+                            <DetailsTab
+                                official={official}
+                                formatDate={formatDate}
+                                getStatusColor={getStatusColor}
+                                getStatusIcon={getStatusIcon}
+                            />
+                        </AdminTabPanel>
+
+                        <AdminTabPanel value="activity">
+                            <ActivityTab
+                                official={official}
+                                formatDate={formatDate}
+                            />
+                        </AdminTabPanel>
+                    </AdminTabsWithContent>
 
                     {/* Delete Confirmation Dialog */}
                     <DeleteConfirmationDialog
