@@ -187,35 +187,118 @@ public function store(Request $request)
         return back()->withErrors(['server' => 'An error occurred. Please try again.'])->withInput();
     }
 }
-    /**
-     * Display the specified report.
-     */
-    public function show(CommunityReport $communityReport)
-    {
-        if ($communityReport->user_id !== Auth::id()) {
-            abort(403);
-        }
-
-        $communityReport->load(['reportType', 'evidences']);
-
-        $communityReport->evidences->transform(function ($evidence) {
-            $evidence->file_url = Storage::url($evidence->file_path);
-            $evidence->is_image = str_starts_with($evidence->file_type, 'image/');
-            $evidence->is_video = str_starts_with($evidence->file_type, 'video/');
-            $evidence->is_pdf = $evidence->file_type === 'application/pdf';
-            $evidence->formatted_size = $this->formatBytes($evidence->file_size);
-            return $evidence;
-        });
-
-        return Inertia::render('resident/CommunityReports/Show', [
-            'report' => $communityReport,
-            'canEdit' => $communityReport->user_id === Auth::id() && 
-                        $communityReport->status === 'pending' &&
-                        $communityReport->created_at->diffInHours(now()) <= 24,
-            'canAddEvidence' => $communityReport->user_id === Auth::id() && 
-                              in_array($communityReport->status, ['pending', 'under_review']),
-        ]);
+/**
+ * Display the specified report.
+ */
+public function show(CommunityReport $communityReport)
+{
+    if ($communityReport->user_id !== Auth::id()) {
+        abort(403);
     }
+
+    // Load relationships including assigned staff and their resident data
+    $communityReport->load([
+        'reportType',
+        'evidences',
+        'assignedTo', // Load the assigned user
+        'assignedTo.currentResident', // Load the resident data for assigned staff
+        'assignedTo.role', // Load role for the assigned staff
+    ]);
+
+    // Format assigned staff data with resident information
+    $assignedToUser = null;
+    if ($communityReport->assignedTo) {
+        $resident = $communityReport->assignedTo->currentResident;
+        
+        if ($resident) {
+            // Build full name from resident data
+            $fullName = trim(implode(' ', array_filter([
+                $resident->first_name,
+                $resident->middle_name,
+                $resident->last_name,
+                $resident->suffix
+            ])));
+            
+            $assignedToUser = [
+                'id' => $communityReport->assignedTo->id,
+                'name' => $fullName,
+                'first_name' => $resident->first_name,
+                'last_name' => $resident->last_name,
+                'email' => $resident->email ?: $communityReport->assignedTo->email,
+                'phone' => $resident->contact_number ?: $communityReport->assignedTo->contact_number,
+                'position' => $communityReport->assignedTo->position,
+                'role' => $communityReport->assignedTo->role ? $communityReport->assignedTo->role->name : null,
+                'address' => $resident->address,
+                'purok' => $resident->purok ? $resident->purok->name : null,
+            ];
+        } else {
+            // Fallback for staff without resident record (shouldn't happen but just in case)
+            $assignedToUser = [
+                'id' => $communityReport->assignedTo->id,
+                'name' => $communityReport->assignedTo->position ?? $communityReport->assignedTo->username ?? $communityReport->assignedTo->email,
+                'first_name' => null,
+                'last_name' => null,
+                'email' => $communityReport->assignedTo->email,
+                'phone' => $communityReport->assignedTo->contact_number,
+                'position' => $communityReport->assignedTo->position,
+                'role' => $communityReport->assignedTo->role ? $communityReport->assignedTo->role->name : null,
+                'address' => null,
+                'purok' => null,
+            ];
+        }
+    }
+
+    // Format evidences
+    $communityReport->evidences->transform(function ($evidence) {
+        $evidence->file_url = Storage::url($evidence->file_path);
+        $evidence->is_image = str_starts_with($evidence->file_type, 'image/');
+        $evidence->is_video = str_starts_with($evidence->file_type, 'video/');
+        $evidence->is_pdf = $evidence->file_type === 'application/pdf';
+        $evidence->formatted_size = $this->formatBytes($evidence->file_size);
+        return $evidence;
+    });
+
+    // Format reporter data (from resident if available)
+    $reporterName = $communityReport->is_anonymous ? $communityReport->reporter_name : null;
+    $reporterContact = $communityReport->is_anonymous ? $communityReport->reporter_contact : null;
+    $reporterAddress = $communityReport->is_anonymous ? $communityReport->reporter_address : null;
+    
+    // If not anonymous and user has resident record, get resident data
+    if (!$communityReport->is_anonymous && $communityReport->user) {
+        $communityReport->load('user.currentResident');
+        $resident = $communityReport->user->currentResident;
+        
+        if ($resident) {
+            $reporterName = trim(implode(' ', array_filter([
+                $resident->first_name,
+                $resident->middle_name,
+                $resident->last_name,
+                $resident->suffix
+            ])));
+            $reporterContact = $resident->contact_number;
+            $reporterAddress = $resident->address;
+        } else {
+            $reporterName = trim(($communityReport->user->first_name ?? '') . ' ' . ($communityReport->user->last_name ?? ''));
+            $reporterContact = $communityReport->user->contact_number;
+            $reporterAddress = null;
+        }
+    }
+
+    return Inertia::render('resident/CommunityReports/Show', [
+        'report' => [
+            ...$communityReport->toArray(),
+            'assigned_to_user' => $assignedToUser,
+            'reporter_name' => $reporterName,
+            'reporter_contact' => $reporterContact,
+            'reporter_address' => $reporterAddress,
+        ],
+        'canEdit' => $communityReport->user_id === Auth::id() && 
+                    $communityReport->status === 'pending' &&
+                    $communityReport->created_at->diffInHours(now()) <= 24,
+        'canAddEvidence' => $communityReport->user_id === Auth::id() && 
+                          in_array($communityReport->status, ['pending', 'under_review']),
+    ]);
+}
 
     /**
      * Update the specified report.

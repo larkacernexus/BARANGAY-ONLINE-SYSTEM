@@ -1,4 +1,4 @@
-// pages/resident/records/create.tsx (refactored - COMPLETE FIXED VERSION)
+// pages/resident/records/create.tsx (refactored - COMPLETE FIXED VERSION WITH DARK MODE)
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -380,13 +380,13 @@ export default function DocumentCreate({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <Link href="/portal/my-records" className="sm:hidden">
-              <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0">
+              <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0 text-gray-400 hover:text-gray-200 hover:bg-gray-800">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">Upload Document</h1>
-              <p className="text-xs sm:text-sm text-gray-500 truncate">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate text-white">Upload Document</h1>
+              <p className="text-xs sm:text-sm text-gray-400 truncate">
                 Upload and manage your personal documents
               </p>
             </div>
@@ -397,13 +397,13 @@ export default function DocumentCreate({
             type="button"
             variant="ghost"
             size="sm"
-            className="lg:hidden h-9 w-9 p-0"
+            className="lg:hidden h-9 w-9 p-0 text-gray-400 hover:text-gray-200 hover:bg-gray-800"
             onClick={() => setMobileNavOpen(true)}
           >
             <Menu className="h-5 w-5" />
           </Button>
           
-          <Badge variant="outline" className="hidden sm:inline-flex gap-1">
+          <Badge variant="outline" className="hidden sm:inline-flex gap-1 border-gray-700 text-gray-300">
             <Sparkles className="h-3 w-3" />
             AI
           </Badge>
@@ -412,13 +412,13 @@ export default function DocumentCreate({
         {/* Mobile Step Indicator */}
         <div className="lg:hidden">
           <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-sm font-medium">Step {currentStepNumber} of 3</span>
-            <span className="text-xs text-gray-500">
+            <span className="text-sm font-medium text-gray-300">Step {currentStepNumber} of 3</span>
+            <span className="text-xs text-gray-400">
               {uploadStep === 'type-selection' ? 'Select Type' : 
                uploadStep === 'file-upload' ? 'Upload File' : 'Details'}
             </span>
           </div>
-          <Progress value={(currentStepNumber / 3) * 100} className="h-2" />
+          <Progress value={(currentStepNumber / 3) * 100} className="h-2 bg-gray-800" />
         </div>
 
         {/* Desktop Progress Steps */}
@@ -439,12 +439,12 @@ export default function DocumentCreate({
                       ? 'bg-blue-600 border-blue-600 text-white scale-110' 
                       : isCompleted
                       ? 'bg-green-600 border-green-600 text-white'
-                      : 'border-gray-300 text-gray-500'
+                      : 'border-gray-600 text-gray-400'
                     }
                   `}>
                     {isCompleted ? '✓' : stepNumber}
                   </div>
-                  {index < 2 && <div className="w-16 h-0.5 bg-gray-300"></div>}
+                  {index < 2 && <div className="w-16 h-0.5 bg-gray-700"></div>}
                 </div>
               );
             })}
@@ -453,10 +453,10 @@ export default function DocumentCreate({
 
         {/* Error Alert */}
         {uploadError && (
-          <Alert variant="destructive" className="text-sm">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle className="text-sm">Upload Failed</AlertTitle>
-            <AlertDescription className="text-xs">{uploadError}</AlertDescription>
+          <Alert variant="destructive" className="text-sm bg-red-950/50 border-red-800 text-red-200">
+            <AlertCircle className="h-4 w-4 text-red-400" />
+            <AlertTitle className="text-sm text-red-200">Upload Failed</AlertTitle>
+            <AlertDescription className="text-xs text-red-300">{uploadError}</AlertDescription>
           </Alert>
         )}
 
@@ -513,7 +513,7 @@ export default function DocumentCreate({
             {uploadStep === 'details' && (
               <>
                 {/* Mobile Tabs */}
-                <div className="border-b">
+                <div className="border-b border-gray-800">
                   <div className="flex">
                     {mobileTabs.map((tab) => {
                       const Icon = tab.icon;
@@ -522,8 +522,8 @@ export default function DocumentCreate({
                           key={tab.id}
                           className={`flex-1 py-3 text-center border-b-2 transition-colors text-sm font-medium
                             ${activeTab === tab.id 
-                              ? 'border-blue-600 text-blue-600' 
-                              : 'border-transparent text-gray-500 hover:text-gray-700'
+                              ? 'border-blue-600 text-blue-400' 
+                              : 'border-transparent text-gray-400 hover:text-gray-300'
                             }`}
                           onClick={() => setActiveTab(tab.id as any)}
                         >
@@ -544,22 +544,22 @@ export default function DocumentCreate({
                     <>
                       {/* File Preview Card */}
                       {selectedFile && (
-                        <Card>
+                        <Card className="bg-gray-900/50 border-gray-800">
                           <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg">
+                            <CardTitle className="flex items-center gap-2 text-lg text-white">
                               <Eye className="h-5 w-5" />
                               File Preview
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="p-4">
-                            <div className="border rounded-lg p-3 bg-gray-50">
+                            <div className="border border-gray-800 rounded-lg p-3 bg-gray-800">
                               <div className="flex items-center gap-3 mb-3">
-                                <div className="p-2 bg-white rounded-lg border">
-                                  <FileText className="h-8 w-8 text-gray-600" />
+                                <div className="p-2 bg-gray-800 rounded-lg border border-gray-700">
+                                  <FileText className="h-8 w-8 text-gray-400" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium text-sm truncate">{selectedFile.name}</h4>
-                                  <p className="text-xs text-gray-500">
+                                  <h4 className="font-medium text-sm text-white truncate">{selectedFile.name}</h4>
+                                  <p className="text-xs text-gray-400">
                                     {(selectedFile.size / 1024).toFixed(2)} KB • {selectedFile.type.split('/')[1]?.toUpperCase() || 'Unknown'}
                                   </p>
                                 </div>
@@ -570,7 +570,7 @@ export default function DocumentCreate({
                                   variant="outline"
                                   size="sm"
                                   onClick={handleBackToFileUpload}
-                                  className="text-sm"
+                                  className="text-sm border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                                 >
                                   Change File
                                 </Button>
@@ -579,7 +579,7 @@ export default function DocumentCreate({
                                   variant="outline"
                                   size="sm"
                                   onClick={() => fileInputRef.current?.click()}
-                                  className="text-sm"
+                                  className="text-sm border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                                 >
                                   Replace
                                 </Button>
@@ -706,14 +706,14 @@ export default function DocumentCreate({
               {uploadStep === 'details' && (
                 <>
                   {selectedFile && (
-                    <Card>
+                    <Card className="bg-gray-800/50 border-gray-800">
                       <CardHeader>
                         <div className="flex items-center justify-between">
-                          <CardTitle className="flex items-center gap-2">
+                          <CardTitle className="flex items-center gap-2 text-white">
                             <Eye className="h-5 w-5" />
                             File Preview
                             {isScanning && (
-                              <span className="ml-2 flex items-center text-sm text-blue-600">
+                              <span className="ml-2 flex items-center text-sm text-blue-400">
                                 Scanning...
                               </span>
                             )}
@@ -723,7 +723,7 @@ export default function DocumentCreate({
                             variant="ghost"
                             size="sm"
                             onClick={handleBackToFileUpload}
-                            className="gap-2"
+                            className="gap-2 text-gray-400 hover:text-gray-200 hover:bg-gray-800"
                           >
                             Change File
                           </Button>
@@ -782,23 +782,23 @@ export default function DocumentCreate({
               />
 
               {selectedDocumentType && (
-                <Card>
+                <Card className="bg-gray-900 border-gray-800">
                   <CardHeader>
-                    <CardTitle>Selected Document Type</CardTitle>
+                    <CardTitle className="text-white">Selected Document Type</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="p-3 bg-gray-50 rounded-lg border">
+                    <div className="p-3 bg-gray-800 rounded-lg border border-gray-800">
                       <div className="flex items-start gap-3">
                         <div>
-                          <h4 className="font-medium">{selectedDocumentType.name}</h4>
-                          <p className="text-sm text-gray-600 mb-2">{selectedDocumentType.description}</p>
+                          <h4 className="font-medium text-white">{selectedDocumentType.name}</h4>
+                          <p className="text-sm text-gray-400 mb-2">{selectedDocumentType.description}</p>
                         </div>
                       </div>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="w-full mt-3"
+                        className="w-full mt-3 border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
                         onClick={handleBackToTypeSelection}
                         disabled={processing}
                       >
@@ -835,23 +835,23 @@ export default function DocumentCreate({
 
         {/* Desktop Submit Section */}
         {!isMobile && uploadStep === 'details' && (
-          <Card>
+          <Card className="bg-gray-900/50 border-gray-800">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-400">
                     Ready to upload your document?
                   </p>
                   {uploadError && (
-                    <Alert variant="destructive" className="mt-2">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>{uploadError}</AlertDescription>
+                    <Alert variant="destructive" className="mt-2 bg-red-950/50 border-red-800">
+                      <AlertCircle className="h-4 w-4 text-red-400" />
+                      <AlertDescription className="text-red-300">{uploadError}</AlertDescription>
                     </Alert>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
                   <Link href="/portal/my-records">
-                    <Button type="button" variant="outline">
+                    <Button type="button" variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white">
                       Cancel
                     </Button>
                   </Link>
@@ -859,6 +859,7 @@ export default function DocumentCreate({
                     type="button"
                     disabled={processing || !selectedFile || !data.document_type_id || !data.resident_id}
                     onClick={() => handleSubmit()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     {processing ? 'Uploading...' : 'Upload Document'}
                   </Button>

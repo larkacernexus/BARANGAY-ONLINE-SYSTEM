@@ -30,7 +30,7 @@ interface ModernRecordTableProps {
     onDownload: (doc: any) => void;
     onDelete: (doc: any) => void;
     onCopyReference?: (ref: string) => void;
-    getResidentName: (id: number) => string;
+    getResidentName: (residentId: number, document?: any) => string; // Updated to accept document
 }
 
 export const ModernRecordTable = ({
@@ -64,6 +64,9 @@ export const ModernRecordTable = ({
                         const fileColor = getFileColor(doc.file_extension);
                         const categoryColor = category ? (COLOR_MAP[category.color] || 'text-gray-600 dark:text-gray-400') : 'text-gray-600 dark:text-gray-400';
                         const isExpired = isDocumentExpired(doc);
+                        
+                        // Get resident name with the document object
+                        const residentName = getResidentName(doc.resident_id, doc);
 
                         return (
                             <TableRow key={doc.id} className="group hover:bg-gray-50/50 dark:hover:bg-gray-900/50 transition-colors">
@@ -94,9 +97,9 @@ export const ModernRecordTable = ({
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-1">
-                                        <User className="h-3 w-3 text-gray-400" />
+                                        <User className="h-3 w-3 text-gray-400 flex-shrink-0" />
                                         <span className="text-sm truncate max-w-[120px]">
-                                            {getResidentName(doc.resident_id)}
+                                            {residentName}
                                         </span>
                                     </div>
                                 </TableCell>

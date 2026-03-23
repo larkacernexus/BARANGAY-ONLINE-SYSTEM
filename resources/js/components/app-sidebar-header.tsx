@@ -9,7 +9,6 @@ import {
   LogOut, 
   Moon, 
   Sun,
-  Settings,
   ChevronDown,
   Award,
   BadgeCheck,
@@ -164,12 +163,10 @@ const UserMenu = ({
   user, 
   onLogout,
   onProfile,
-  onSettings
 }: { 
   user?: UserType;
   onLogout: () => void;
   onProfile: () => void;
-  onSettings: () => void;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -314,14 +311,6 @@ const UserMenu = ({
           </div>
         </DropdownMenuItem>
 
-        <DropdownMenuItem onClick={onSettings} className="rounded-lg py-2 cursor-pointer hover:scale-[1.02] transition-transform">
-          <Settings className="mr-3 h-4 w-4 text-gray-500 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="font-medium truncate">Settings</p>
-            <p className="text-xs text-gray-500 truncate">Preferences and privacy</p>
-          </div>
-        </DropdownMenuItem>
-
         <DropdownMenuSeparator />
 
         <DropdownMenuItem onClick={onLogout} className="rounded-lg py-2 cursor-pointer text-red-600 focus:text-red-600 hover:scale-[1.02] transition-transform">
@@ -436,12 +425,7 @@ export function AppSidebarHeader({
   };
 
   const goToProfile = () => {
-    router.visit(route('profile.edit'));
-    setIsNotificationsOpen(false);
-  };
-
-  const goToSettings = () => {
-    router.visit(route('settings'));
+    router.visit(route('admin.profile.edit'));
     setIsNotificationsOpen(false);
   };
 
@@ -639,7 +623,6 @@ export function AppSidebarHeader({
               user={user}
               onLogout={handleLogout}
               onProfile={goToProfile}
-              onSettings={goToSettings}
             />
           )}
 

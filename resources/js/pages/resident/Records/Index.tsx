@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { Head, Link, router } from '@inertiajs/react';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -281,12 +281,96 @@ export default function MyRecords({
     const itemsPerPage = 10;
     const [isModalMode, setIsModalMode] = useState(false);
 
+    // Create a resident map for quick lookups
+    const residentMap = useMemo(() => {
+        const map = new Map<number, string>();
+        
+        // Add from householdResidents
+        householdResidents?.forEach(resident => {
+            const name = resident.full_name || `${resident.first_name} ${resident.last_name}`;
+            if (name.trim()) {
+                map.set(resident.id, name);
+            }
+        });
+        
+        // Add from documents that have resident data
+        initialDocuments.data?.forEach(doc => {
+            if (doc.resident && doc.resident.id) {
+                const name = doc.resident.full_name || 
+                            `${doc.resident.first_name || ''} ${doc.resident.last_name || ''}`.trim();
+                if (name && !map.has(doc.resident.id)) {
+                    map.set(doc.resident.id, name);
+                }
+            }
+        });
+        
+        return map;
+    }, [householdResidents, initialDocuments.data]);
+
+    // Custom getResidentName function that uses the map and householdResidents
+    const customGetResidentName = useCallback((residentId?: number, doc?: Document): string => {
+        // Try from document resident object first
+        if (doc?.resident) {
+            if (doc.resident.full_name) {
+                return doc.resident.full_name;
+            }
+            if (doc.resident.first_name || doc.resident.last_name) {
+                const firstName = doc.resident.first_name || '';
+                const lastName = doc.resident.last_name || '';
+                const fullName = `${firstName} ${lastName}`.trim();
+                if (fullName) return fullName;
+            }
+        }
+        
+        // Try from resident map
+        if (residentId && residentMap.has(residentId)) {
+            return residentMap.get(residentId)!;
+        }
+        
+        // Try from householdResidents list directly
+        if (residentId && householdResidents) {
+            const resident = householdResidents.find(r => r.id === residentId);
+            if (resident) {
+                return resident.full_name || `${resident.first_name} ${resident.last_name}`;
+            }
+        }
+        
+        // Debug logging
+        if (residentId) {
+            console.warn(`Resident not found for ID: ${residentId}`, { 
+                residentId, 
+                householdResidentsCount: householdResidents?.length || 0,
+                hasDocumentResident: !!doc?.resident
+            });
+        }
+        
+        return 'Unknown Resident';
+    }, [residentMap, householdResidents]);
+
     // Set mounted to true after hydration
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    // Check if mobile on mount and resize - ONLY ON CLIENT
+    // Debug: Log document data
+    useEffect(() => {
+        if (initialDocuments.data?.length > 0) {
+            console.log('Documents loaded:', initialDocuments.data.length);
+            console.log('Sample document:', initialDocuments.data[0]);
+            console.log('Household residents:', householdResidents);
+            
+            // Check each document's resident data
+            initialDocuments.data.forEach(doc => {
+                if (!doc.resident) {
+                    console.warn(`Document ${doc.id} (${doc.name}) has no resident data. resident_id: ${doc.resident_id}`);
+                } else if (!doc.resident.full_name && (!doc.resident.first_name || !doc.resident.last_name)) {
+                    console.warn(`Document ${doc.id} has incomplete resident data:`, doc.resident);
+                }
+            });
+        }
+    }, [initialDocuments.data, householdResidents]);
+
+    // Check if mobile on mount and resize
     useEffect(() => {
         if (!mounted) return;
         
@@ -305,7 +389,7 @@ export default function MyRecords({
         setFilteredDocuments(initialDocuments.data || []);
     }, [initialDocuments.data]);
     
-    // CLIENT-SIDE FILTERING LOGIC - REMOVED DEBOUNCE, USING search DIRECTLY
+    // CLIENT-SIDE FILTERING LOGIC
     useEffect(() => {
         if (isModalMode) return;
         
@@ -397,7 +481,6 @@ export default function MyRecords({
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         
-        // Update URL filters
         updateFilters({ category: categoryId === 'all' ? '' : categoryId });
     };
 
@@ -478,7 +561,6 @@ export default function MyRecords({
     };
 
     const handleDocumentAction = (doc: Document, action: 'view' | 'download', e?: React.MouseEvent) => {
-        // CRITICAL: Prevent event from bubbling up
         if (e) {
             e.preventDefault();
             e.stopPropagation();
@@ -758,10 +840,10 @@ export default function MyRecords({
             />
             
             <div className="space-y-4 sm:space-y-6 pb-4 sm:pb-6">
-                {/* Header with Mobile Menu - Only one hamburger button */}
+                {/* Header with Mobile Menu */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-0">
                     <div className="flex items-center justify-between sm:justify-start gap-3">
-                        {/* Mobile Sidebar - Single instance */}
+                        {/* Mobile Sidebar */}
                         <div className="sm:hidden">
                             <MobileSidebar
                                 isOpen={isMobileMenuOpen}
@@ -884,7 +966,7 @@ export default function MyRecords({
                             {residentFilter !== 'all' && householdResidents && (
                                 <Badge variant="secondary" className="flex items-center gap-1 text-sm px-3 py-1.5 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">
                                     <span className="truncate max-w-[100px]">
-                                        {getResidentName(parseInt(residentFilter), householdResidents)}
+                                        {customGetResidentName(parseInt(residentFilter))}
                                     </span>
                                     <button 
                                         type="button"
@@ -954,7 +1036,7 @@ export default function MyRecords({
                                             onView={(doc) => handleDocumentAction(doc, 'view')}
                                             onDownload={(doc) => handleDocumentAction(doc, 'download')}
                                             onDelete={handleDelete}
-                                            getResidentName={getResidentName}
+                                            getResidentName={(doc) => customGetResidentName(doc.resident_id, doc)}
                                         />
                                     ))}
                                 </div>
@@ -972,7 +1054,7 @@ export default function MyRecords({
                                                     onView={(doc) => handleDocumentAction(doc, 'view')}
                                                     onDownload={(doc) => handleDocumentAction(doc, 'download')}
                                                     onDelete={handleDelete}
-                                                    getResidentName={getResidentName}
+                                                    getResidentName={(doc) => customGetResidentName(doc.resident_id, doc)}
                                                 />
                                             ))}
                                         </div>
@@ -987,7 +1069,7 @@ export default function MyRecords({
                                             onDownload={(doc) => handleDocumentAction(doc, 'download')}
                                             onDelete={handleDelete}
                                             onCopyReference={handleCopyReference}
-                                            getResidentName={getResidentName}
+                                            getResidentName={(doc) => customGetResidentName(doc.resident_id, doc)}
                                         />
                                     )}
                                 </>
