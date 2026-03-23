@@ -3,10 +3,10 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\URL;
 use App\Http\Responses\LoginResponse;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
-
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +24,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        // Force HTTPS in production
+        if (env('APP_ENV') === 'production') {
+            URL::forceScheme('https');
+        }
+
         // Add morph map for polymorphic relationships
         Relation::morphMap([
             'App\Models\Resident' => 'App\Models\Resident',
