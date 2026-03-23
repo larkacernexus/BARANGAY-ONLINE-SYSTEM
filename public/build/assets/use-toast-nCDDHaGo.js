@@ -1,0 +1,1 @@
+import{t as o}from"./index-BG5lK7-p.js";const i=o,n=()=>({success:(s,r)=>{o.success(s,{description:r})},error:(s,r)=>{o.error(s,{description:r})},warning:(s,r)=>{o.warning(s,{description:r})},info:(s,r)=>{o.info(s,{description:r})},custom:(s,r)=>{o(s,r)},promise:(s,r)=>o.promise(s,r),loading:s=>o.loading(s),dismiss:s=>{o.dismiss(s)}});export{i as t,n as u};
