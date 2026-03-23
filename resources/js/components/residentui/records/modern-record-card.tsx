@@ -1,160 +1,201 @@
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { 
-    Eye, Download, Lock, Calendar, User, MoreVertical, 
-    FileText, ChevronDown, Trash2
-} from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Check, ChevronDown, Eye, Download, Copy, Trash2, Lock, FileText } from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { getFileIcon, getFileColor, getIconComponent, isDocumentExpired, formatDate } from './record-utils';
-import { COLOR_MAP, BG_COLOR_MAP } from './constants';
-import { useState } from 'react';
+import { formatDate, getFileIcon, getFileColor, getDocumentStatus } from './record-utils';
 
 interface ModernRecordCardProps {
     document: any;
-    categories?: any[];
-    onView?: (doc: any) => void;
-    onDownload?: (doc: any) => void;
+    selectMode?: boolean;
+    selectedRecords?: number[];
+    toggleSelectRecord?: (id: number) => void;
+    getResidentName: (residentId: number, doc?: any) => string;
+    onView: (doc: any) => void;
+    onDownload: (doc: any) => void;
     onDelete?: (doc: any) => void;
-    getResidentName: (id: number) => string;
+    onCopyReference?: (ref: string) => void;
+    isMobile?: boolean;
 }
 
-export const ModernRecordCard = ({
-    document,
-    categories,
+export const ModernRecordCard = ({ 
+    document: doc, 
+    selectMode, 
+    selectedRecords, 
+    toggleSelectRecord,
+    getResidentName,
     onView,
     onDownload,
     onDelete,
-    getResidentName,
+    onCopyReference,
+    isMobile = true
 }: ModernRecordCardProps) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    
-    const category = categories?.find(c => c.id === document.document_category_id);
-    const DocIconComponent = category ? getIconComponent(category.icon) : FileText;
-    const FileIconComponent = getFileIcon(document.file_extension, document.mime_type);
-    const fileColor = getFileColor(document.file_extension);
-    const categoryColor = category ? (COLOR_MAP[category.color] || 'text-gray-600 dark:text-gray-400') : 'text-gray-600 dark:text-gray-400';
-    const isExpired = isDocumentExpired(document);
+    const FileIcon = getFileIcon(doc.file_extension, doc.mime_type);
+    const fileColor = getFileColor(doc.file_extension);
+    const status = getDocumentStatus(doc);
 
     return (
-        <div className="border rounded-lg p-3 hover:shadow-sm transition-shadow bg-white dark:bg-gray-900">
-            <div className="flex items-start gap-3">
-                <div className={cn(
-                    "p-2 rounded-full flex-shrink-0",
-                    category?.color ? BG_COLOR_MAP[category.color] : 'bg-gray-100 dark:bg-gray-900'
-                )}>
-                    <DocIconComponent className={`h-4 w-4 ${categoryColor}`} />
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-sm truncate dark:text-white">{document.name}</div>
-                            <div className="flex items-center gap-2 mt-1">
-                                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                                    <User className="h-3 w-3" />
-                                    <span className="truncate">{getResidentName(document.resident_id)}</span>
-                                </div>
-                                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                                    <FileIconComponent className={`h-3 w-3 ${fileColor}`} />
-                                    <span>{document.file_extension?.toUpperCase()}</span>
-                                </div>
-                                {document.requires_password && (
-                                    <Lock className="h-3 w-3 text-amber-500 flex-shrink-0" />
-                                )}
-                                {isExpired && (
-                                    <Badge variant="destructive" className="text-xs px-1.5 py-0 h-5">
-                                        Expired
-                                    </Badge>
-                                )}
-                            </div>
-                        </div>
-                        
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" type="button" className="h-8 w-8">
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem 
-                                    onClick={() => onView?.(document)}
-                                    disabled={isExpired}
-                                    className="cursor-pointer"
+        <div className="mb-3 last:mb-0 animate-fade-in">
+            <Card className={cn(
+                "border-0 shadow-lg overflow-hidden transition-all duration-300",
+                selectMode && selectedRecords?.includes(doc.id) && "ring-2 ring-blue-500 ring-offset-2",
+                status.label === 'Expired' && "border-l-4 border-l-red-500"
+            )}>
+                <CardContent className="p-4">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-3 flex-1">
+                            {selectMode && (
+                                <button
+                                    onClick={() => toggleSelectRecord?.(doc.id)}
+                                    className={cn(
+                                        "mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
+                                        selectedRecords?.includes(doc.id)
+                                            ? "bg-blue-500 border-blue-500"
+                                            : "border-gray-300 dark:border-gray-600"
+                                    )}
                                 >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    {document.requires_password ? 'Unlock & View' : 'View'}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                    onClick={() => onDownload?.(document)}
-                                    disabled={isExpired}
-                                    className="cursor-pointer"
-                                >
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                    className="text-red-600 cursor-pointer"
-                                    onClick={() => onDelete?.(document)}
-                                >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                    
-                    {document.description && (
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-2 line-clamp-1">
-                            {document.description}
-                        </p>
-                    )}
-                    
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                            <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {formatDate(document.created_at, true)}
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <span>{document.file_size_human}</span>
-                            </div>
-                        </div>
-                        
-                        <div className="flex gap-1">
-                            <Button
-                                size="sm"
-                                type="button"
-                                variant={document.requires_password ? "outline" : "default"}
-                                className="h-7 px-2 text-xs"
-                                onClick={() => onView?.(document)}
-                                disabled={isExpired}
-                            >
-                                {document.requires_password ? 'Unlock' : 'View'}
-                            </Button>
+                                    {selectedRecords?.includes(doc.id) && (
+                                        <Check className="h-3 w-3 text-white" />
+                                    )}
+                                </button>
+                            )}
                             
-                            <Button
-                                size="sm"
-                                type="button"
-                                variant="outline"
-                                className="h-7 px-2 text-xs"
-                                onClick={() => onDownload?.(document)}
-                                disabled={isExpired}
-                            >
-                                <Download className="h-3 w-3" />
-                            </Button>
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <button
+                                        onClick={() => onCopyReference?.(doc.reference_number || '')}
+                                        className="font-mono text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                    >
+                                        {doc.reference_number || 'N/A'}
+                                    </button>
+                                    <span className={cn(
+                                        "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full",
+                                        status.color
+                                    )}>
+                                        {status.icon}
+                                        {status.label}
+                                    </span>
+                                </div>
+                                <p className="font-medium text-sm text-gray-900 dark:text-white line-clamp-2">
+                                    {doc.name}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <button
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        >
+                            <ChevronDown className={cn(
+                                "h-4 w-4 text-gray-500 transition-transform duration-200",
+                                isExpanded && "transform rotate-180"
+                            )} />
+                        </button>
+                    </div>
+
+                    {/* File Info Summary */}
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <FileIcon className={cn("h-4 w-4", fileColor)} />
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {doc.file_extension?.toUpperCase()} • {doc.file_size_human}
+                            </span>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Uploaded</p>
+                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                {formatDate(doc.created_at, true)}
+                            </p>
                         </div>
                     </div>
-                </div>
-            </div>
+
+                    {/* Resident Info */}
+                    <div className="flex items-center gap-2 mb-2 text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">Resident:</span>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">
+                            {getResidentName(doc.resident_id, doc)}
+                        </span>
+                    </div>
+
+                    {/* Expandable Details */}
+                    {isExpanded && (
+                        <div className="pt-3 border-t border-gray-100 dark:border-gray-700 space-y-2 animate-slide-down">
+                            {/* Description */}
+                            {doc.description && (
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Description</p>
+                                    <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-3">
+                                        {doc.description}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Category */}
+                            {doc.category && (
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Category</p>
+                                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                        {doc.category.name}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Expiry Date if exists */}
+                            {doc.expiry_date && (
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Expiry Date</p>
+                                    <p className={cn(
+                                        "text-xs font-medium",
+                                        new Date(doc.expiry_date) < new Date() 
+                                            ? "text-red-600 dark:text-red-400" 
+                                            : "text-gray-700 dark:text-gray-300"
+                                    )}>
+                                        {formatDate(doc.expiry_date)}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 pt-2">
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => onView(doc)}
+                                    className="flex-1 gap-2"
+                                >
+                                    <Eye className="h-3 w-3" />
+                                    View Details
+                                </Button>
+                                <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => onDownload(doc)}
+                                    className="flex-1 gap-2"
+                                >
+                                    <Download className="h-3 w-3" />
+                                    Download
+                                </Button>
+                                {onDelete && (
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        onClick={() => onDelete(doc)}
+                                        className="gap-2 text-red-600 hover:text-red-700"
+                                    >
+                                        <Trash2 className="h-3 w-3" />
+                                        Delete
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
     );
 };

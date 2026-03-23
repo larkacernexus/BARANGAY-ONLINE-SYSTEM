@@ -1,12 +1,12 @@
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
-import { Head, Link, router } from '@inertiajs/react';
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Import icons
 import { 
@@ -46,16 +46,27 @@ import {
   Trash2 as TrashIcon,
   Info as InfoIcon,
   Clock as ClockIcon,
+  HardDrive,
+  Database
 } from 'lucide-react';
 
-// Reusable Components
-import { ModernSelect } from '@/components/residentui/modern-select';
-import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
+// Reusable UI Components
+import { ModernCardHeader } from '@/components/residentui/modern/card-header';
+import { ViewToggle } from '@/components/residentui/modern/view-toggle';
+import { SortDropdown } from '@/components/residentui/modern/sort-dropdown';
+import { SelectModeButton } from '@/components/residentui/modern/select-mode-button';
+import { ActionButtons } from '@/components/residentui/modern/action-buttons';
+import { MobileHeader } from '@/components/residentui/modern/mobile-header';
+import { DesktopHeader } from '@/components/residentui/modern/desktop-header';
+import { ErrorState } from '@/components/residentui/modern/error-state';
 import { ModernStatsCards } from '@/components/residentui/modern-stats-cards';
 import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
 import { ModernPagination } from '@/components/residentui/modern-pagination';
 import { ModernLoadingOverlay } from '@/components/residentui/modern-loading-overlay';
 import { ModernSelectionBanner } from '@/components/residentui/modern-selection-banner';
+import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
+import { ModernSelect } from '@/components/residentui/modern-select';
+import { CustomTabs } from '@/components/residentui/CustomTabs';
 
 // Record-specific components
 import {
@@ -71,43 +82,21 @@ import {
     getFileColor,
     getIconComponent,
     isDocumentExpired,
-    getResidentName,
+    getResidentName as getResidentNameUtil,
     copyToClipboard,
-    getCsrfToken
+    getCsrfToken,
+    getDocumentStatus
 } from '@/components/residentui/records/record-utils';
-import { ModernRecordCard } from '@/components/residentui/records/modern-record-card';
-import { ModernRecordGridCard } from '@/components/residentui/records/modern-record-grid-card';
+import { ModernRecordGridView } from '@/components/residentui/records/modern-record-grid-view';
+import { ModernRecordListView } from '@/components/residentui/records/modern-record-list-view';
 import { ModernRecordFilters } from '@/components/residentui/records/modern-record-filters';
-import { ModernRecordTable } from '@/components/residentui/records/modern-record-table';
 import { PasswordModal } from '@/components/residentui/records/password-modal';
 import { StorageCard } from '@/components/residentui/records/storage-card';
 
-// Mobile responsive components
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Label } from '@/components/ui/label';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-// Import the new mobile sidebar component
-import { MobileSidebar } from '@/components/residentui/records/mobile-sidebar';
+// Hooks
+import { useFilters } from '@/components/residentui/hooks/use-filters';
+import { useMobile } from '@/components/residentui/hooks/use-mobile';
+import { useSelection } from '@/components/residentui/hooks/use-selection';
 
 interface Document {
     id: number;
@@ -240,20 +229,20 @@ export default function MyRecords({
     documents: initialDocuments, 
     categories, 
     storageStats,
-    filters,
+    filters: initialFilters,
     householdResidents,
     currentResident,
     household,
     error 
 }: PageProps) {
-    const [search, setSearch] = useState(filters.search || '');
-    const [activeTab, setActiveTab] = useState(filters.category || 'all');
-    const [residentFilter, setResidentFilter] = useState(filters.resident || 'all');
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
-    const [loading, setLoading] = useState(false);
-    const [isMobile, setIsMobile] = useState(false);
+    const isMobile = useMobile();
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [showStats, setShowStats] = useState(true);
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [sortBy, setSortBy] = useState<'date' | 'name' | 'size'>('date');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [categoryFilter, setCategoryFilter] = useState('all');
     
     // Password modal state
     const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -262,11 +251,6 @@ export default function MyRecords({
     const [verifyingPassword, setVerifyingPassword] = useState(false);
     const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
     const [actionType, setActionType] = useState<'view' | 'download' | null>(null);
-    
-    // Selection state
-    const [selectedRecords, setSelectedRecords] = useState<number[]>([]);
-    const [selectMode, setSelectMode] = useState(false);
-    const [isExporting, setIsExporting] = useState(false);
     
     // Action feedback state
     const [actionStatus, setActionStatus] = useState<{
@@ -280,20 +264,37 @@ export default function MyRecords({
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
     const [isModalMode, setIsModalMode] = useState(false);
+    
+    // Use our custom hooks
+    const { filters, updateFilters, loading, hasActiveFilters, clearFilters } = useFilters({
+        initialFilters: initialFilters || {},
+        route: '/portal/my-records'
+    });
+    
+    const { selectedItems, selectMode, toggleSelect, selectAll, clearSelection, toggleSelectMode, setSelectMode } = useSelection(
+        filteredDocuments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+        (doc) => doc.id
+    );
+    
+    const [isExporting, setIsExporting] = useState(false);
+
+    // Convert selectedItems to number[] for components that expect number[]
+    const selectedRecordIds = useMemo(() => 
+        selectedItems.filter((id): id is number => typeof id === 'number'), 
+        [selectedItems]
+    );
 
     // Create a resident map for quick lookups
     const residentMap = useMemo(() => {
         const map = new Map<number, string>();
         
-        // Add from householdResidents
         householdResidents?.forEach(resident => {
-            const name = resident.full_name || `${resident.first_name} ${resident.last_name}`;
-            if (name.trim()) {
+            const name = resident.full_name || `${resident.first_name} ${resident.last_name}`.trim();
+            if (name) {
                 map.set(resident.id, name);
             }
         });
         
-        // Add from documents that have resident data
         initialDocuments.data?.forEach(doc => {
             if (doc.resident && doc.resident.id) {
                 const name = doc.resident.full_name || 
@@ -307,12 +308,11 @@ export default function MyRecords({
         return map;
     }, [householdResidents, initialDocuments.data]);
 
-    // Custom getResidentName function that uses the map and householdResidents
+    // Enhanced custom getResidentName function
     const customGetResidentName = useCallback((residentId?: number, doc?: Document): string => {
-        // Try from document resident object first
         if (doc?.resident) {
-            if (doc.resident.full_name) {
-                return doc.resident.full_name;
+            if (doc.resident.full_name && doc.resident.full_name.trim()) {
+                return doc.resident.full_name.trim();
             }
             if (doc.resident.first_name || doc.resident.last_name) {
                 const firstName = doc.resident.first_name || '';
@@ -322,67 +322,62 @@ export default function MyRecords({
             }
         }
         
-        // Try from resident map
         if (residentId && residentMap.has(residentId)) {
             return residentMap.get(residentId)!;
         }
         
-        // Try from householdResidents list directly
         if (residentId && householdResidents) {
             const resident = householdResidents.find(r => r.id === residentId);
             if (resident) {
-                return resident.full_name || `${resident.first_name} ${resident.last_name}`;
+                const name = resident.full_name || `${resident.first_name} ${resident.last_name}`.trim();
+                if (name) return name;
             }
-        }
-        
-        // Debug logging
-        if (residentId) {
-            console.warn(`Resident not found for ID: ${residentId}`, { 
-                residentId, 
-                householdResidentsCount: householdResidents?.length || 0,
-                hasDocumentResident: !!doc?.resident
-            });
         }
         
         return 'Unknown Resident';
     }, [residentMap, householdResidents]);
+
+    // Process categories for tabs
+    const { allCategories, currentCategory } = useMemo(() => {
+        const sortedCategories = [...categories].sort((a, b) => {
+            if (a.order !== undefined && b.order !== undefined) {
+                return a.order - b.order;
+            }
+            return a.name.localeCompare(b.name);
+        });
+        
+        const processed = sortedCategories.map(cat => ({
+            id: cat.id.toString(),
+            name: cat.name,
+            count: cat.count || 0,
+            icon: cat.icon,
+            color: cat.color
+        }));
+        
+        const totalDocumentsCount = storageStats?.document_count || 0;
+        
+        const allCategory = {
+            id: 'all',
+            name: 'All Documents',
+            count: totalDocumentsCount,
+            icon: 'folder-open',
+            color: 'blue'
+        };
+        
+        const allCats = [allCategory, ...processed];
+        const currentCat = allCats.find(c => c.id === (filters.category || 'all'));
+        
+        return {
+            allCategories: allCats,
+            currentCategory: currentCat
+        };
+    }, [categories, storageStats?.document_count, filters.category]);
 
     // Set mounted to true after hydration
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    // Debug: Log document data
-    useEffect(() => {
-        if (initialDocuments.data?.length > 0) {
-            console.log('Documents loaded:', initialDocuments.data.length);
-            console.log('Sample document:', initialDocuments.data[0]);
-            console.log('Household residents:', householdResidents);
-            
-            // Check each document's resident data
-            initialDocuments.data.forEach(doc => {
-                if (!doc.resident) {
-                    console.warn(`Document ${doc.id} (${doc.name}) has no resident data. resident_id: ${doc.resident_id}`);
-                } else if (!doc.resident.full_name && (!doc.resident.first_name || !doc.resident.last_name)) {
-                    console.warn(`Document ${doc.id} has incomplete resident data:`, doc.resident);
-                }
-            });
-        }
-    }, [initialDocuments.data, householdResidents]);
-
-    // Check if mobile on mount and resize
-    useEffect(() => {
-        if (!mounted) return;
-        
-        const checkMobile = () => {
-            setIsMobile(window.innerWidth < 768);
-        };
-        
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, [mounted]);
-    
     // Initialize all documents on first load
     useEffect(() => {
         setAllDocuments(initialDocuments.data || []);
@@ -400,8 +395,9 @@ export default function MyRecords({
         
         let result = [...allDocuments];
         
-        if (search) {
-            const searchLower = search.toLowerCase();
+        // Apply search filter
+        if (filters.search) {
+            const searchLower = filters.search.toLowerCase();
             result = result.filter(doc => 
                 doc.name?.toLowerCase().includes(searchLower) ||
                 doc.description?.toLowerCase().includes(searchLower) ||
@@ -410,154 +406,64 @@ export default function MyRecords({
             );
         }
         
-        if (activeTab !== 'all') {
-            const categoryId = parseInt(activeTab);
+        // Apply category filter
+        if (filters.category && filters.category !== 'all') {
+            const categoryId = parseInt(filters.category);
             result = result.filter(doc => 
                 doc.document_category_id === categoryId || 
                 doc.category?.id === categoryId
             );
         }
         
-        if (residentFilter !== 'all') {
-            const residentId = parseInt(residentFilter);
+        // Apply resident filter
+        if (filters.resident && filters.resident !== 'all') {
+            const residentId = parseInt(filters.resident);
             result = result.filter(doc => doc.resident_id === residentId);
         }
         
-        // Reset to page 1 when filters change
-        if (search || activeTab !== 'all' || residentFilter !== 'all') {
-            setCurrentPage(1);
-        }
-        
-        setFilteredDocuments(result);
-        
-    }, [allDocuments, search, activeTab, residentFilter, isModalMode]); 
-    
-    // Process categories with memoization
-    const { processedCategories, allCategories, currentCategory } = useMemo(() => {
-        const sortedCategories = [...categories].sort((a, b) => {
-            if (a.order !== undefined && b.order !== undefined) {
-                return a.order - b.order;
+        // Apply sorting
+        result.sort((a, b) => {
+            if (sortBy === 'date') {
+                const dateA = new Date(a.created_at).getTime();
+                const dateB = new Date(b.created_at).getTime();
+                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            } else if (sortBy === 'name') {
+                const nameA = a.name.toLowerCase();
+                const nameB = b.name.toLowerCase();
+                return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+            } else if (sortBy === 'size') {
+                const sizeA = a.file_size || 0;
+                const sizeB = b.file_size || 0;
+                return sortOrder === 'asc' ? sizeA - sizeB : sizeB - sizeA;
             }
-            return a.name.localeCompare(b.name);
+            return 0;
         });
         
-        const processed = sortedCategories.map(cat => ({
-            id: cat.id.toString(),
-            slug: cat.slug,
-            name: cat.name,
-            iconName: cat.icon,
-            count: cat.count || 0,
-            color: COLOR_MAP[cat.color] || 'text-gray-600 dark:text-gray-400',
-            bgColor: BG_COLOR_MAP[cat.color] || 'bg-gray-50 dark:bg-gray-900',
-            ...cat
-        }));
+        setCurrentPage(1);
+        setFilteredDocuments(result);
         
-        const totalDocumentsCount = storageStats?.document_count || 0;
-        
-        const allCategory = {
-            id: 'all',
-            slug: 'all',
-            name: 'All Documents',
-            iconName: 'folder-open',
-            count: totalDocumentsCount,
-            color: 'text-blue-600 dark:text-blue-400',
-            bgColor: 'bg-blue-50 dark:bg-blue-900/20'
-        };
-        
-        const allCats = [allCategory, ...processed];
-        const currentCat = allCats.find(c => c.id === activeTab);
-        
-        return {
-            processedCategories: processed,
-            allCategories: allCats,
-            currentCategory: currentCat
-        };
-    }, [categories, storageStats?.document_count, activeTab]);
+    }, [allDocuments, filters.search, filters.category, filters.resident, isModalMode, sortBy, sortOrder]);
 
     const handleTabChange = (categoryId: string) => {
-        setActiveTab(categoryId);
-        setIsMobileMenuOpen(false);
+        setCategoryFilter(categoryId);
+        updateFilters({ category: categoryId === 'all' ? '' : categoryId });
         if (mounted) {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-        
-        updateFilters({ category: categoryId === 'all' ? '' : categoryId });
     };
 
     const handleResidentChange = (value: string) => {
-        setResidentFilter(value);
         updateFilters({ resident: value === 'all' ? '' : value });
-    };
-
-    const clearFilters = () => {
-        setSearch('');
-        setActiveTab('all');
-        setResidentFilter('all');
-        
-        updateFilters({ search: '', category: '', resident: '' });
-        
-        setActionStatus({
-            type: 'success',
-            message: 'All filters cleared'
-        });
-        
-        setTimeout(() => {
-            setActionStatus({ type: null, message: '' });
-        }, 3000);
-    };
-
-    const updateFilters = (newFilters: Record<string, string>) => {
-        setLoading(true);
-        
-        const currentFilters = {
-            ...filters,
-            ...newFilters,
-        };
-        
-        const cleanFilters: Record<string, string> = {};
-        
-        Object.entries(currentFilters).forEach(([key, value]) => {
-            if (value && value !== '' && value !== 'all') {
-                cleanFilters[key] = value;
-            }
-        });
-        
-        router.get('/portal/my-records', cleanFilters, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onFinish: () => setLoading(false),
-        });
+        if (isMobile) setShowMobileFilters(false);
     };
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        updateFilters({ search: search.trim() });
+        updateFilters({ search: filters.search?.trim() || '' });
     };
 
     const handleSearchClear = () => {
-        setSearch('');
         updateFilters({ search: '' });
-    };
-
-    const hasActiveFilters = useMemo(() => {
-        return Object.entries(filters).some(([key, value]) => 
-            value && value !== '' && value !== 'all'
-        );
-    }, [filters]);
-
-    const totalPages = Math.ceil(filteredDocuments.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
-    const from = filteredDocuments.length > 0 ? startIndex + 1 : 0;
-    const to = Math.min(endIndex, filteredDocuments.length);
-    
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page);
-        if (mounted) {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
     };
 
     const handleDocumentAction = (doc: Document, action: 'view' | 'download', e?: React.MouseEvent) => {
@@ -565,8 +471,6 @@ export default function MyRecords({
             e.preventDefault();
             e.stopPropagation();
         }
-        
-        console.log(`Document action: ${action} for document:`, doc.id);
         
         setIsModalMode(true);
         setSelectedDocument(doc);
@@ -723,43 +627,48 @@ export default function MyRecords({
         copyToClipboard(ref, `Copied: ${ref}`);
     };
 
-    // Selection mode functions
-    const toggleSelectRecord = (id: number) => {
-        setSelectedRecords(prev =>
-            prev.includes(id) ? prev.filter(recordId => recordId !== id) : [...prev, id]
-        );
-    };
-
-    const selectAllRecords = () => {
-        if (selectedRecords.length === paginatedDocuments.length && paginatedDocuments.length > 0) {
-            setSelectedRecords([]);
-        } else {
-            setSelectedRecords(paginatedDocuments.map(d => d.id));
-        }
-    };
-
-    const toggleSelectMode = () => {
-        if (selectMode) {
-            setSelectMode(false);
-            setSelectedRecords([]);
-        } else {
-            setSelectMode(true);
-        }
-    };
-
     const handleDeleteSelected = () => {
-        if (confirm(`Are you sure you want to delete ${selectedRecords.length} selected documents?`)) {
-            toast.success(`Deleted ${selectedRecords.length} documents`);
-            setSelectedRecords([]);
-            setSelectMode(false);
+        if (confirm(`Are you sure you want to delete ${selectedItems.length} selected documents?`)) {
+            toast.success(`Deleted ${selectedItems.length} documents`);
+            clearSelection();
         }
+    };
+
+    const handlePrintRecords = () => {
+        toast.info('Print feature coming soon');
+    };
+
+    const handleExportCSV = () => {
+        toast.info('Export feature coming soon');
+    };
+
+    const totalPages = Math.ceil(filteredDocuments.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
+    const from = filteredDocuments.length > 0 ? startIndex + 1 : 0;
+    const to = Math.min(endIndex, filteredDocuments.length);
+    
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        if (mounted) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+    
+    // Get category counts for tabs
+    const getCategoryCount = (categoryId: string) => {
+        if (categoryId === 'all') {
+            return filteredDocuments.length;
+        }
+        const category = allCategories.find(c => c.id === categoryId);
+        return category?.count || 0;
     };
     
     // Don't render until after hydration to prevent mismatch
     if (!mounted) {
         return (
             <ResidentLayout
-                title="My Records"
                 breadcrumbs={[
                     { title: 'Dashboard', href: '/portal/dashboard' },
                     { title: 'My Records', href: '#' }
@@ -779,37 +688,27 @@ export default function MyRecords({
     if (error) {
         return (
             <ResidentLayout
-                title="My Records"
                 breadcrumbs={[
                     { title: 'Dashboard', href: '/portal/dashboard' },
                     { title: 'My Records', href: '#' }
                 ]}
             >
                 <Head title="My Records" />
-                <div className="min-h-[50vh] flex items-center justify-center px-4">
-                    <Card className="w-full max-w-md border-0 shadow-xl">
-                        <CardContent className="pt-6 text-center">
-                            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl flex items-center justify-center mb-4">
-                                <AlertCircleIcon className="h-8 w-8 text-red-600 dark:text-red-400" />
-                            </div>
-                            <h3 className="text-lg font-semibold mb-2">Error</h3>
-                            <p className="text-gray-500 dark:text-gray-400 mb-4">{error}</p>
-                            <Button 
-                                onClick={() => window.location.href = '/portal/dashboard'}
-                                className="bg-gradient-to-r from-blue-500 to-blue-600"
-                            >
-                                Go to Dashboard
-                            </Button>
-                        </CardContent>
-                    </Card>
+                <div className="space-y-6">
+                    <DesktopHeader title="My Records" description="View and manage your household documents" />
+                    <ErrorState 
+                        message={error} 
+                        onGoHome={() => window.location.href = '/portal/dashboard'} 
+                    />
                 </div>
             </ResidentLayout>
         );
     }
 
+    const tabHasData = paginatedDocuments.length > 0;
+
     return (
         <ResidentLayout
-            title="My Records"
             breadcrumbs={[
                 { title: 'Dashboard', href: '/portal/dashboard' },
                 { title: 'My Records', href: '#' }
@@ -839,245 +738,211 @@ export default function MyRecords({
                 onVerify={verifyPasswordAndPerformAction}
             />
             
-            <div className="space-y-4 sm:space-y-6 pb-4 sm:pb-6">
-                {/* Header with Mobile Menu */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-0">
-                    <div className="flex items-center justify-between sm:justify-start gap-3">
-                        {/* Mobile Sidebar */}
-                        <div className="sm:hidden">
-                            <MobileSidebar
-                                isOpen={isMobileMenuOpen}
-                                onOpenChange={setIsMobileMenuOpen}
-                                allCategories={allCategories}
-                                activeTab={activeTab}
-                                onTabChange={handleTabChange}
-                                residentFilter={residentFilter}
-                                onResidentChange={handleResidentChange}
-                                viewMode={viewMode}
-                                onViewModeChange={setViewMode}
-                                householdResidents={householdResidents}
-                                onClearFilters={clearFilters}
-                                getIconComponent={getIconComponent}
-                                hasActiveFilters={hasActiveFilters}
-                                search={search}
-                                onSearchChange={setSearch}
-                                onSearchSubmit={handleSearchSubmit}
-                                onSearchClear={handleSearchClear}
-                            />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate dark:text-white">My Records</h1>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                Household: {household?.household_number || 'N/A'}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 justify-end">
-                        {/* Mobile View Toggle */}
-                        <div className="sm:hidden">
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                type="button"
-                                onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                                className="h-9 w-9 p-0 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
-                            >
-                                {viewMode === 'grid' ? (
-                                    <GridIcon className="h-4 w-4" />
-                                ) : (
-                                    <ListIcon className="h-4 w-4" />
-                                )}
-                            </Button>
-                        </div>
-                        
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            type="button"
-                            onClick={() => router.visit('/portal/my-records/export')} 
-                            className="hidden sm:inline-flex dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
-                        >
-                            <DownloadIcon className="h-4 w-4 mr-2" />
-                            Export All
-                        </Button>
-                        <Link href="/portal/my-records/create" className="flex-1 sm:flex-none">
-                            <Button size="sm" type="button" className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600">
-                                <PlusIcon className="h-4 w-4 mr-2" />
-                                <span>Upload</span>
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
-
-                {/* Desktop Filters */}
-                {!isMobile && (
-                    <ModernRecordFilters
-                        search={search}
-                        setSearch={setSearch}
-                        handleSearchSubmit={handleSearchSubmit}
-                        handleSearchClear={handleSearchClear}
-                        activeTab={activeTab}
-                        handleTabChange={handleTabChange}
-                        residentFilter={residentFilter}
-                        handleResidentChange={handleResidentChange}
-                        viewMode={viewMode}
-                        setViewMode={setViewMode}
-                        loading={loading}
-                        allCategories={allCategories}
-                        householdResidents={householdResidents}
+            <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
+                {/* Mobile Header */}
+                {isMobile ? (
+                    <MobileHeader
+                        title="My Records"
+                        subtitle={`Household: ${household?.household_number || 'N/A'}`}
+                        showStats={showStats}
+                        onToggleStats={() => setShowStats(!showStats)}
+                        onOpenFilters={() => setShowMobileFilters(true)}
                         hasActiveFilters={hasActiveFilters}
-                        handleClearFilters={clearFilters}
-                        getIconComponent={getIconComponent}
+                    />
+                ) : (
+                    <DesktopHeader
+                        title="My Records"
+                        description={`Household: ${household?.household_number || 'N/A'}`}
+                        actions={
+                            <ActionButtons
+                                onPrint={handlePrintRecords}
+                                onExport={handleExportCSV}
+                                isExporting={isExporting}
+                            />
+                        }
                     />
                 )}
-
-                {/* Active filters indicator - Desktop only */}
-                {hasActiveFilters && !isMobile && (
-                    <div className="px-4 sm:px-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm text-gray-500 dark:text-gray-400">Active filters:</span>
-                            
-                            {search && (
-                                <Badge variant="secondary" className="flex items-center gap-1 text-sm px-3 py-1.5 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">
-                                    <span className="truncate max-w-[120px]">Search: "{search}"</span>
-                                    <button 
-                                        type="button"
-                                        onClick={() => setSearch('')}
-                                        className="ml-1"
-                                    >
-                                        <XIcon className="h-3 w-3 flex-shrink-0" />
-                                    </button>
-                                </Badge>
-                            )}
-                            
-                            {activeTab !== 'all' && currentCategory && (
-                                <Badge variant="secondary" className="flex items-center gap-1 text-sm px-3 py-1.5 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">
-                                    <span className="truncate max-w-[100px]">{currentCategory.name}</span>
-                                    <button 
-                                        type="button"
-                                        onClick={() => handleTabChange('all')}
-                                        className="ml-1"
-                                    >
-                                        <XIcon className="h-3 w-3 flex-shrink-0" />
-                                    </button>
-                                </Badge>
-                            )}
-                            
-                            {residentFilter !== 'all' && householdResidents && (
-                                <Badge variant="secondary" className="flex items-center gap-1 text-sm px-3 py-1.5 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700">
-                                    <span className="truncate max-w-[100px]">
-                                        {customGetResidentName(parseInt(residentFilter))}
-                                    </span>
-                                    <button 
-                                        type="button"
-                                        onClick={() => handleResidentChange('all')}
-                                        className="ml-1"
-                                    >
-                                        <XIcon className="h-3 w-3 flex-shrink-0" />
-                                    </button>
-                                </Badge>
-                            )}
-                            
-                            <Button 
-                                variant="ghost" 
-                                size="sm"
-                                type="button"
-                                onClick={clearFilters}
-                                className="text-sm h-8 px-3 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-900"
-                            >
-                                Clear All
-                            </Button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Results Summary */}
-                <div className="px-4 sm:px-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="text-sm text-gray-600 dark:text-gray-300">
-                            <span className="font-medium dark:text-white">{filteredDocuments.length}</span> document{filteredDocuments.length !== 1 ? 's' : ''} found
-                            {currentCategory && currentCategory.id !== 'all' && (
-                                <span> in <span className="font-medium dark:text-white">{currentCategory.name}</span></span>
-                            )}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Showing {from} to {to} of {filteredDocuments.length}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Selection Mode Banner */}
-                {selectMode && paginatedDocuments.length > 0 && (
-                    <div className="px-4 sm:px-0">
-                        <ModernSelectionBanner
-                            selectedCount={selectedRecords.length}
-                            totalCount={paginatedDocuments.length}
-                            onSelectAll={selectAllRecords}
-                            onDeselectAll={() => setSelectedRecords([])}
-                            onCancel={toggleSelectMode}
-                            onDelete={handleDeleteSelected}
-                            deleteLabel="Delete Selected"
+                
+                {/* Stats Section */}
+                {showStats && storageStats && (
+                    <div className="animate-slide-down">
+                        <ModernStatsCards 
+                            cards={[
+                                {
+                                    title: 'Total Documents',
+                                    value: storageStats.document_count?.toString() || '0',
+                                    icon: FileIcon,
+                                    iconColor: 'text-blue-600 dark:text-blue-400',
+                                    iconBgColor: 'bg-blue-100 dark:bg-blue-900/20',
+                                    trend: { value: 0, positive: true }
+                                },
+                                {
+                                    title: 'Storage Used',
+                                    value: storageStats.used,
+                                    icon: HardDrive,
+                                    iconColor: 'text-green-600 dark:text-green-400',
+                                    iconBgColor: 'bg-green-100 dark:bg-green-900/20',
+                                    trend: { 
+                                        value: storageStats.percentage, 
+                                        positive: storageStats.percentage < 80 
+                                    }
+                                },
+                                {
+                                    title: 'Available',
+                                    value: storageStats.available,
+                                    icon: Database,
+                                    iconColor: 'text-purple-600 dark:text-purple-400',
+                                    iconBgColor: 'bg-purple-100 dark:bg-purple-900/20',
+                                    trend: { 
+                                        value: 100 - storageStats.percentage, 
+                                        positive: (100 - storageStats.percentage) > 20 
+                                    }
+                                }
+                            ]} 
+                            loading={loading} 
                         />
                     </div>
                 )}
-
-                {/* Documents Grid/List */}
-                <div className="px-4 sm:px-0">
-                    {paginatedDocuments.length > 0 ? (
-                        <>
-                            {/* GRID VIEW */}
-                            {viewMode === 'grid' ? (
-                                <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                                    {paginatedDocuments.map((doc) => (
-                                        <ModernRecordGridCard
-                                            key={doc.id}
-                                            document={doc}
-                                            categories={categories}
-                                            onView={(doc) => handleDocumentAction(doc, 'view')}
-                                            onDownload={(doc) => handleDocumentAction(doc, 'download')}
-                                            onDelete={handleDelete}
-                                            getResidentName={(doc) => customGetResidentName(doc.resident_id, doc)}
+                
+                {/* Desktop Filters */}
+                {!isMobile && (
+                    <ModernRecordFilters
+                        search={filters.search || ''}
+                        setSearch={(value) => updateFilters({ search: value, page: '1' })}
+                        handleSearchSubmit={handleSearchSubmit}
+                        handleSearchClear={handleSearchClear}
+                        activeTab={filters.category || 'all'}
+                        handleTabChange={handleTabChange}
+                        residentFilter={filters.resident || 'all'}
+                        handleResidentChange={handleResidentChange}
+                        loading={loading}
+                        allCategories={allCategories}
+                        householdResidents={householdResidents || []}
+                        printRecords={handlePrintRecords}
+                        exportToCSV={handleExportCSV}
+                        isExporting={isExporting}
+                        hasActiveFilters={hasActiveFilters}
+                        handleClearFilters={clearFilters}
+                        onCopySummary={() => {
+                            const summary = `Records Summary:\nTotal: ${filteredDocuments.length}\nCategories: ${allCategories.length}`;
+                            navigator.clipboard.writeText(summary);
+                            toast.success('Summary copied');
+                        }}
+                    />
+                )}
+                
+                <div className="mt-4">
+                    {/* Custom Tabs */}
+                    <CustomTabs 
+                        statusFilter={filters.category || 'all'}
+                        handleTabChange={handleTabChange}
+                        getStatusCount={getCategoryCount}
+                    />
+                    
+                    <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
+                        <CardContent className="p-4 md:p-6">
+                            {/* Selection Mode Banner */}
+                            {selectMode && tabHasData && (
+                                <ModernSelectionBanner
+                                    selectedCount={selectedItems.length}
+                                    totalCount={paginatedDocuments.length}
+                                    onSelectAll={selectAll}
+                                    onDeselectAll={clearSelection}
+                                    onCancel={toggleSelectMode}
+                                    onDelete={handleDeleteSelected}
+                                    deleteLabel="Delete Selected"
+                                />
+                            )}
+                            
+                            {/* Header with Sort and View Toggle */}
+                            <ModernCardHeader
+                                title={`${currentCategory?.name || 'All'} Documents`}
+                                description={tabHasData 
+                                    ? `Showing ${paginatedDocuments.length} document${paginatedDocuments.length !== 1 ? 's' : ''}`
+                                    : `No documents found`
+                                }
+                                action={
+                                    <div className="flex items-center gap-2">
+                                        <SortDropdown
+                                            sortBy={sortBy}
+                                            sortOrder={sortOrder}
+                                            onSort={(by, order) => {
+                                                setSortBy(by as any);
+                                                setSortOrder(order);
+                                            }}
+                                            options={[
+                                                { value: 'date', label: 'Date', icon: CalendarIcon },
+                                                { value: 'name', label: 'Name', icon: FileTextIcon },
+                                                { value: 'size', label: 'Size', icon: HardDrive }
+                                            ]}
                                         />
-                                    ))}
-                                </div>
+                                        {!selectMode && tabHasData && (
+                                            <ViewToggle
+                                                viewMode={viewMode}
+                                                onViewChange={setViewMode}
+                                                disabled={isMobile}
+                                            />
+                                        )}
+                                        {tabHasData && (
+                                            <SelectModeButton
+                                                isActive={selectMode}
+                                                onToggle={toggleSelectMode}
+                                            />
+                                        )}
+                                    </div>
+                                }
+                            />
+                            
+                            {/* Content */}
+                            {!tabHasData ? (
+                                <ModernEmptyState 
+                                    status={filters.category === 'all' ? 'all' : 'filtered'}
+                                    hasFilters={hasActiveFilters}
+                                    onClearFilters={clearFilters}
+                                    icon={FolderIcon}
+                                    title={filters.search 
+                                        ? `No documents match your search "${filters.search}"` 
+                                        : filters.category !== 'all' && filters.category !== undefined
+                                            ? `No documents found in ${currentCategory?.name || 'this category'}`
+                                            : 'No documents found'}
+                                    message={filters.search || (filters.category !== 'all' && filters.category !== undefined) || filters.resident !== 'all'
+                                        ? 'Try adjusting your filters or clear them to see all documents'
+                                        : 'Upload your first document to get started'}
+                                    actionLabel="Upload Document"
+                                    onAction={() => router.visit('/portal/my-records/create')}
+                                />
+                            ) : viewMode === 'grid' ? (
+                                <ModernRecordGridView
+                                    records={paginatedDocuments}
+                                    selectMode={selectMode}
+                                    selectedRecords={selectedRecordIds}
+                                    onSelectRecord={toggleSelect}
+                                    getResidentName={customGetResidentName}
+                                    onView={(doc) => handleDocumentAction(doc, 'view')}
+                                    onDownload={(doc) => handleDocumentAction(doc, 'download')}
+                                    onDelete={handleDelete}
+                                    onCopyReference={handleCopyReference}
+                                    isMobile={isMobile}
+                                />
                             ) : (
-                                /* LIST VIEW */
-                                <>
-                                    {/* Mobile List View */}
-                                    {isMobile && (
-                                        <div className="space-y-3">
-                                            {paginatedDocuments.map((doc) => (
-                                                <ModernRecordCard
-                                                    key={doc.id}
-                                                    document={doc}
-                                                    categories={categories}
-                                                    onView={(doc) => handleDocumentAction(doc, 'view')}
-                                                    onDownload={(doc) => handleDocumentAction(doc, 'download')}
-                                                    onDelete={handleDelete}
-                                                    getResidentName={(doc) => customGetResidentName(doc.resident_id, doc)}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                    
-                                    {/* Desktop Table View */}
-                                    {!isMobile && (
-                                        <ModernRecordTable
-                                            records={paginatedDocuments}
-                                            categories={categories}
-                                            onView={(doc) => handleDocumentAction(doc, 'view')}
-                                            onDownload={(doc) => handleDocumentAction(doc, 'download')}
-                                            onDelete={handleDelete}
-                                            onCopyReference={handleCopyReference}
-                                            getResidentName={(doc) => customGetResidentName(doc.resident_id, doc)}
-                                        />
-                                    )}
-                                </>
+                                <ModernRecordListView
+                                    records={paginatedDocuments}
+                                    selectMode={selectMode}
+                                    selectedRecords={selectedRecordIds}
+                                    onSelectRecord={toggleSelect}
+                                    onSelectAll={selectAll}
+                                    getResidentName={customGetResidentName}
+                                    onView={(doc) => handleDocumentAction(doc, 'view')}
+                                    onDownload={(doc) => handleDocumentAction(doc, 'download')}
+                                    onDelete={handleDelete}
+                                    onCopyReference={handleCopyReference}
+                                    onPrint={handlePrintRecords}
+                                />
                             )}
                             
                             {/* Pagination */}
                             {totalPages > 1 && (
-                                <div className="mt-6 pt-6 border-t dark:border-gray-800">
+                                <div className="mt-6">
                                     <ModernPagination
                                         currentPage={currentPage}
                                         lastPage={totalPages}
@@ -1086,33 +951,72 @@ export default function MyRecords({
                                     />
                                 </div>
                             )}
-                        </>
-                    ) : (
-                        <ModernEmptyState
-                            status={activeTab === 'all' ? 'all' : 'filtered'}
-                            hasFilters={hasActiveFilters}
-                            onClearFilters={clearFilters}
-                            icon={FolderIcon}
-                            title={search 
-                                ? `No documents match your search "${search}"` 
-                                : activeTab !== 'all' 
-                                    ? `No documents found in ${currentCategory?.name || 'this category'}`
-                                    : 'No documents found'}
-                            message={search || activeTab !== 'all' || residentFilter !== 'all'
-                                ? 'Try adjusting your filters or clear them to see all documents'
-                                : 'Upload your first document to get started'}
-                            actionLabel="Upload Document"
-                            onAction={() => router.visit('/portal/my-records/create')}
-                        />
-                    )}
+                        </CardContent>
+                    </Card>
                 </div>
 
-                {/* Storage Usage */}
+                {/* Storage Card */}
                 <div className="px-4 sm:px-0">
                     <StorageCard stats={storageStats} />
                 </div>
             </div>
+            
+            {/* Mobile Filter Modal */}
+            <ModernFilterModal
+                isOpen={showMobileFilters}
+                onClose={() => setShowMobileFilters(false)}
+                title="Filter Records"
+                description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
+                search={filters.search || ''}
+                onSearchChange={(value) => updateFilters({ search: value, page: '1' })}
+                onSearchSubmit={handleSearchSubmit}
+                onSearchClear={handleSearchClear}
+                loading={loading}
+                hasActiveFilters={hasActiveFilters}
+                onClearFilters={clearFilters}
+            >
+                {/* Category Filter */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Category
+                    </label>
+                    <ModernSelect
+                        value={filters.category || 'all'}
+                        onValueChange={handleTabChange}
+                        placeholder="All categories"
+                        options={allCategories.map(cat => ({
+                            value: cat.id,
+                            label: cat.name
+                        }))}
+                        disabled={loading}
+                        icon={FolderIcon}
+                    />
+                </div>
 
+                {/* Resident Filter */}
+                {householdResidents && householdResidents.length > 0 && (
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Resident
+                        </label>
+                        <ModernSelect
+                            value={filters.resident || 'all'}
+                            onValueChange={handleResidentChange}
+                            placeholder="All residents"
+                            options={[
+                                { value: 'all', label: 'All residents' },
+                                ...householdResidents.map(resident => ({
+                                    value: resident.id.toString(),
+                                    label: resident.full_name || `${resident.first_name} ${resident.last_name}`.trim()
+                                }))
+                            ]}
+                            disabled={loading}
+                            icon={UserIcon}
+                        />
+                    </div>
+                )}
+            </ModernFilterModal>
+            
             {/* Loading Overlay */}
             <ModernLoadingOverlay loading={loading} message="Loading documents..." />
         </ResidentLayout>

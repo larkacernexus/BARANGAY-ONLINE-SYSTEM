@@ -1,13 +1,17 @@
-export const formatCurrency = (amount: any): string => {
+// components/residentui/lib/resident-ui-utils.ts
+
+export const formatCurrency = (amount: number | string | null | undefined): string => {
     if (amount == null) return '₱0.00';
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
     return isNaN(num) ? '₱0.00' : `₱${num.toFixed(2)}`;
 };
 
-export const formatDate = (dateString: string | null | undefined): string => {
+export const formatDate = (dateString: string | null | undefined, format?: string): string => {
     if (!dateString) return 'Not set';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return 'Invalid date';
+    
+    // You can use the format parameter for different date formats if needed
     return date.toLocaleDateString('en-PH', {
         year: 'numeric',
         month: 'short',
@@ -31,12 +35,20 @@ export const formatDateTime = (dateString: string | null | undefined): string =>
 export const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'] as const;
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-export const getFileType = (document: any): 'image' | 'pdf' | 'other' => {
+export type FileType = 'image' | 'pdf' | 'other';
+
+export interface DocumentFile {
+    mime_type?: string;
+    file_name?: string;
+    file_type?: string;
+}
+
+export const getFileType = (document: DocumentFile): FileType => {
     const { mime_type, file_name, file_type } = document;
     
     const imageMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
@@ -69,7 +81,7 @@ export const getFileType = (document: any): 'image' | 'pdf' | 'other' => {
     return 'other';
 };
 
-export const downloadFile = async (url: string, filename: string) => {
+export const downloadFile = async (url: string, filename: string): Promise<void> => {
     try {
         const response = await fetch(url, {
             method: 'GET',

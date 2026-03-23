@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use App\Console\Commands\GenerateMigrationsFromSQL; // Add this line
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -11,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withCommands([
+        GenerateMigrationsFromSQL::class, // Register the command here
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         
         // Cookie encryption exceptions
@@ -22,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Web middleware stack (GLOBAL)
         $middleware->web(append: [
             \App\Http\Middleware\HandleAppearance::class,
-            \App\Http\Middleware\HandleInertiaRequests::class, // Global search for admins/staff
+            \App\Http\Middleware\HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
         

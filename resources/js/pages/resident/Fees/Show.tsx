@@ -1,3 +1,4 @@
+// pages/resident/Fees/Show.tsx (or wherever this file is)
 import { useEffect, useState, useMemo } from 'react';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Button } from '@/components/ui/button';
@@ -224,15 +225,6 @@ export default function FeeDetails() {
                     
                     <div className="flex flex-wrap gap-2">
                         <ModernStatusBadge status={getStatusKey()} config={FEE_STATUS_CONFIG} />
-{/*                         
-                        {fee.balance > 0 && canPayOnline && (
-                            <Link href={`/portal/payments/create?fee_id=${fee.id}`}>
-                                <Button className="gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600">
-                                    <CreditCard className="h-4 w-4" />
-                                    Pay Now
-                                </Button>
-                            </Link>
-                        )} */}
                         
                         {fee.balance === 0 && fee.or_number && (
                             <Button variant="outline" onClick={handleDownloadReceipt} className="gap-2 rounded-xl">
@@ -485,13 +477,14 @@ export default function FeeDetails() {
                         iconColor="from-indigo-500 to-indigo-600"
                     >
                         {paymentHistory.length === 0 ? (
-                            <ModernEmptyState
-                                status="empty"
-                                title="No payment history"
-                                description="No payments have been made for this fee yet."
-                                icon={Inbox}
-                                className="py-12"
-                            />
+                            <div className="py-12">
+                                <ModernEmptyState
+                                    status="empty"
+                                    title="No payment history"
+                                    message="No payments have been made for this fee yet."  // Changed from 'description' to 'message'
+                                    icon={Inbox}
+                                />
+                            </div>
                         ) : (
                             <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                                 <div className="overflow-x-auto">

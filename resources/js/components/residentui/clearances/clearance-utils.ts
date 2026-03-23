@@ -1,6 +1,10 @@
+// components/residentui/clearances/clearance-utils.ts
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { STATUS_CONFIG } from '@/components/residentui/constants/resident-ui';
+import { ClearanceStatus, PaymentItem, ClearanceRequest } from '@/types/portal/clearances/clearance.types';
 
+// Existing functions
 export const formatDate = (dateString: string, isMobile: boolean) => {
   if (!dateString) return 'N/A';
   try {
@@ -64,6 +68,56 @@ export const getStatusCount = (stats: any, status: string) => {
   }
 };
 
+// NEW FUNCTIONS - Add these
+
+export const getStatusConfig = (status: ClearanceStatus | string) => {
+  return STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.pending;
+};
+
+export const calculateTotalPaid = (paymentItems: PaymentItem[]): number => {
+  let total = 0;
+  paymentItems.forEach(item => {
+    const amount = typeof item.total_amount === 'string' 
+      ? parseFloat(item.total_amount) 
+      : item.total_amount;
+    if (!isNaN(amount)) {
+      total += amount;
+    }
+  });
+  return total;
+};
+
+export const calculateBalance = (feeAmount: number | string, totalPaid: number): number => {
+  const fee = typeof feeAmount === 'string' ? parseFloat(feeAmount) : feeAmount;
+  return fee - totalPaid;
+};
+
+export const isPaymentRequired = (clearance: ClearanceRequest): boolean => {
+  if (!clearance.clearance_type?.requires_payment) return false;
+  const balance = calculateBalance(clearance.fee_amount, calculateTotalPaid(clearance.payment_items || []));
+  return balance > 0;
+};
+
+export const canProcessPayment = (clearance: ClearanceRequest): boolean => {
+  return clearance.status === 'ready_for_payment' && isPaymentRequired(clearance);
+};
+
+export const formatDateWithFormat = (dateString: string | null | undefined, formatString: string = 'MMM D, YYYY'): string => {
+  if (!dateString) return 'N/A';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  } catch {
+    return 'Invalid date';
+  }
+};
+
+// Existing functions continue...
 export const copyToClipboard = async (text: string, successMessage: string) => {
   try {
     await navigator.clipboard.writeText(text);

@@ -8,9 +8,10 @@ interface AppLayoutProps {
     children: ReactNode;
     breadcrumbs?: BreadcrumbItem[];
     className?: string;
+    hideMobileFooter?: boolean; // Add this prop
 }
 
-export default ({ children, breadcrumbs = [], className = '', ...props }: AppLayoutProps) => {
+export default ({ children, breadcrumbs = [], className = '', hideMobileFooter = false, ...props }: AppLayoutProps) => {
     return (
         <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-gray-900">
             {/* Use a flex container for sidebar + main content */}
@@ -41,8 +42,8 @@ export default ({ children, breadcrumbs = [], className = '', ...props }: AppLay
                 </AppLayoutTemplate>
             </div>
             
-            {/* Mobile sticky footer - always at the bottom on mobile */}
-            <ResidentMobileFooter />
+            {/* Mobile sticky footer - conditionally render based on hideMobileFooter prop */}
+            {!hideMobileFooter && <ResidentMobileFooter />}
         </div>
     );
 };

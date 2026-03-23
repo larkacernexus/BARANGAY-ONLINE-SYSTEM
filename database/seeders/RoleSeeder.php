@@ -109,7 +109,7 @@ class RoleSeeder extends Seeder
         $this->command->info("   - Total: " . Role::count() . " roles in database");
         
         // Display table of roles
-        $roles = Role::all(['id', 'name', 'description', 'is_system_role'])->map(function($role) {
+        $rolesList = Role::all(['id', 'name', 'description', 'is_system_role'])->map(function($role) {
             return [
                 'id' => $role->id,
                 'name' => $role->name,
@@ -120,7 +120,7 @@ class RoleSeeder extends Seeder
         
         $this->command->table(
             ['ID', 'Name', 'Description', 'Type'],
-            $roles
+            $rolesList
         );
     }
 }

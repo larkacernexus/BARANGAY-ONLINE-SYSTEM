@@ -260,6 +260,23 @@ export interface Auth {
     roles?: string[];
 }
 
+// ==================== SHARED DATA TYPE ====================
+// This is the main type that extends Auth and includes flash messages
+export interface SharedData {
+    auth: Auth;
+    flash?: FlashMessage;
+    errors?: Record<string, string>;
+    [key: string]: any;
+}
+
+// ==================== BREADCRUMB TYPES ====================
+export interface BreadcrumbItem {
+    title: string;
+    href: string;
+    icon?: React.ReactNode;
+    active?: boolean;
+}
+
 // ==================== FEE TYPES ====================
 
 export interface Fee {
