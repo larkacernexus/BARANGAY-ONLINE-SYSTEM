@@ -14,7 +14,15 @@ import {
   Circle,
   Activity,
   Plus,
-  CreditCard
+  CreditCard,
+  X,
+  ScrollText,
+  AlertCircle,
+  DollarSign,
+  Newspaper,
+  QrCode,
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -36,26 +44,26 @@ const residentNavItems: NavItem[] = [
     { 
         icon: 'home', 
         label: 'Home', 
-        href: '/resident/dashboard',
-        activePaths: ['/portal/resident/dashboard', '/portal/resident']
+        href: '/portal/dashboard',
+        activePaths: ['/portal/resident']
     },
     { 
         icon: 'file-text', 
         label: 'Docs', 
-        href: '/resident/clearances',
-        activePaths: ['/portal/resident/clearances', '/resident/clearances/create', '/resident/clearances/view']
+        href: '/portal/my-clearances',
+        activePaths: ['/portal/clearances', '/resident/clearances/create', '/resident/clearances/view']
     },
     { 
         icon: 'message-square', 
         label: 'Help', 
-        href: '/portal/complaints',
-        activePaths: ['/portal/complaints', '/portal/complaints/create', '/portal/complaints/view']
+        href: '/portal/community-reports',
+        activePaths: ['/portal/community-reports', '/portal/community-reports/create', '/portal/community-reports/view']
     },
     { 
         icon: 'user', 
         label: 'Profile', 
-        href: '/resident/profile',
-        activePaths: ['/portal/resident/profile', '/resident/profile/edit', '/resident/settings']
+        href: '/residentsettings/profile',
+        activePaths: ['/residentsettings/profile', '/residentsettings/profile/edit', '/residentsettings/settings']
     },
 ];
 
@@ -71,6 +79,13 @@ const iconMap = {
     circle: Circle,
     activity: Activity,
     'credit-card': CreditCard,
+    'scroll-text': ScrollText,
+    'alert-circle': AlertCircle,
+    'dollar-sign': DollarSign,
+    'newspaper': Newspaper,
+    'qr-code': QrCode,
+    'lock': Lock,
+    'shield-check': ShieldCheck,
 };
 
 // Floating Action Button Component (as a nav item)
@@ -97,10 +112,11 @@ const FloatingActionNavItem = ({ onClick, isOpen }: { onClick: () => void; isOpe
                             "h-5 w-5 mb-1 transition-all duration-300 group-hover:scale-110",
                             isOpen ? "rotate-45" : "rotate-0"
                         )}>
-                            <Plus className={cn(
-                                "h-5 w-5",
-                                isOpen && "text-blue-600 dark:text-blue-400"
-                            )} />
+                            {isOpen ? (
+                                <X className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            ) : (
+                                <Plus className="h-5 w-5" />
+                            )}
                         </div>
                     </div>
                     
@@ -126,27 +142,64 @@ const FloatingActionNavItem = ({ onClick, isOpen }: { onClick: () => void; isOpe
     );
 };
 
-// Quick Action Menu Component
+// Quick Action Menu Component - attached to footer
 const QuickActionMenu = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
     const quickActions = [
-        { icon: CreditCard, label: 'Quick Pay', href: '/portal/resident/payments/quick', color: 'from-emerald-500 to-teal-500' },
-        { icon: FileText, label: 'New Clearance', href: '/portal/resident/clearances/create', color: 'from-blue-500 to-indigo-500' },
-        { icon: MessageSquare, label: 'File Complaint', href: '/portal/resident/complaints/create', color: 'from-amber-500 to-orange-500' },
-        { icon: Calendar, label: 'Schedule', href: '/portal/resident/calendar', color: 'from-purple-500 to-pink-500' },
+        { 
+            icon: ScrollText, 
+            label: 'New Clearance', 
+            href: '/portal/my-clearances/request', 
+            color: 'from-blue-500 to-indigo-500' 
+        },
+        { 
+            icon: AlertCircle, 
+            label: 'File Report', 
+            href: '/portal/community-reports/create', 
+            color: 'from-amber-500 to-orange-500' 
+        },
+        { 
+            icon: DollarSign, 
+            label: 'Pay Fees', 
+            href: '/portal/fees/pay', 
+            color: 'from-emerald-500 to-teal-500' 
+        },
+        { 
+            icon: Newspaper, 
+            label: 'Announcements', 
+            href: '/portal/announcements', 
+            color: 'from-purple-500 to-pink-500' 
+        },
+        { 
+            icon: QrCode, 
+            label: 'QR Code', 
+            href: '/residentsettings/profile?tab=qr', 
+            color: 'from-indigo-500 to-purple-500' 
+        },
+        { 
+            icon: Lock, 
+            label: '2FA Setup', 
+            href: '/residentsettings/security/two-factor', 
+            color: 'from-red-500 to-orange-500' 
+        },
+        { 
+            icon: ShieldCheck, 
+            label: 'Security', 
+            href: '/residentsettings/security/password', 
+            color: 'from-cyan-500 to-blue-500' 
+        },
+        { 
+            icon: Bell, 
+            label: 'Notifications', 
+            href: '/residentsettings/preferences/notifications', 
+            color: 'from-rose-500 to-pink-500' 
+        },
     ];
 
     if (!isOpen) return null;
 
     return (
-        <>
-            {/* Backdrop */}
-            <div 
-                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity duration-300"
-                onClick={onClose}
-            />
-            
-            {/* Menu Items */}
-            <div className="absolute bottom-24 left-4 right-4 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
+        <div className="absolute bottom-full left-0 right-0 mb-2 animate-in slide-in-from-bottom-2 duration-200">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden mx-4">
                 <div className="p-2">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -175,7 +228,7 @@ const QuickActionMenu = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                     </div>
                 </div>
             </div>
-        </>
+        </div>
     );
 };
 
@@ -263,11 +316,22 @@ export default function ResidentMobileFooter() {
         updateBodyPadding();
         window.addEventListener('resize', updateBodyPadding);
         
+        // Close quick menu when clicking outside
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (showQuickMenu && !target.closest('.quick-menu-container')) {
+                setShowQuickMenu(false);
+            }
+        };
+        
+        document.addEventListener('click', handleClickOutside);
+        
         return () => {
             window.removeEventListener('resize', updateBodyPadding);
+            document.removeEventListener('click', handleClickOutside);
             document.body.style.paddingBottom = '0';
         };
-    }, []);
+    }, [showQuickMenu]);
 
     const isActive = (item: NavItem) => {
         return item.activePaths.some(path => 
@@ -280,10 +344,10 @@ export default function ResidentMobileFooter() {
 
     return (
         <>
-            {/* Footer - always visible at the bottom */}
+            {/* Footer - always visible at the bottom, sticky */}
             <footer className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
                 {/* Main Footer Container */}
-                <div className="relative">
+                <div className="relative quick-menu-container">
                     {/* Background with glass effect */}
                     <div className="absolute inset-0 bg-gradient-to-t from-white via-white/95 to-white/90 dark:from-gray-900 dark:via-gray-900/95 dark:to-gray-900/90 backdrop-blur-xl" />
                     
@@ -292,6 +356,12 @@ export default function ResidentMobileFooter() {
                     
                     {/* Shadow for depth */}
                     <div className="absolute inset-0 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_10px_rgba(0,0,0,0.2)] pointer-events-none" />
+
+                    {/* Quick Action Menu - positioned relative to footer */}
+                    <QuickActionMenu 
+                        isOpen={showQuickMenu} 
+                        onClose={() => setShowQuickMenu(false)} 
+                    />
 
                     {/* Navigation Items - 5 items total (4 regular + 1 FAB) */}
                     <nav className="flex items-center justify-between h-16 relative px-4">
@@ -331,18 +401,25 @@ export default function ResidentMobileFooter() {
                 </div>
             </footer>
 
-            {/* Quick Action Menu */}
-            {showQuickMenu && (
-                <QuickActionMenu 
-                    isOpen={showQuickMenu} 
-                    onClose={() => setShowQuickMenu(false)} 
-                />
-            )}
-
             {/* Hidden on desktop - inject CSS for safe area */}
             <style>{`
                 .h-safe-bottom {
                     height: env(safe-area-inset-bottom, 0);
+                }
+                
+                @keyframes slideInFromBottom {
+                    from {
+                        opacity: 0;
+                        transform: translateY(10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                
+                .animate-in {
+                    animation: slideInFromBottom 0.2s ease-out;
                 }
             `}</style>
         </>

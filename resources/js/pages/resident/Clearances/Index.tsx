@@ -544,9 +544,6 @@ export default function MyClearances() {
         router.visit(`/portal/my-clearances/${id}`);
     };
     
-    const handleMakePayment = (id: number) => {
-        router.visit(`/portal/payments/create?clearance_id=${id}`);
-    };
     
     const handleDownloadClearance = (clearance: any) => {
         toast.info('Download functionality would be implemented here');
@@ -804,7 +801,6 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                                                     currentResident={currentResident}
                                                     onCopyReference={handleCopyReference}
                                                     onViewDetails={handleViewDetails}
-                                                    onMakePayment={handleMakePayment}
                                                     onDownloadClearance={handleDownloadClearance}
                                                     onGenerateReport={handleGenerateReport}
                                                     onReportIssue={handleReportIssue}
@@ -829,7 +825,6 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                                                     currentResident={currentResident}
                                                     onCopyReference={handleCopyReference}
                                                     onViewDetails={handleViewDetails}
-                                                    onMakePayment={handleMakePayment}
                                                     onDownloadClearance={handleDownloadClearance}
                                                     onGenerateReport={handleGenerateReport}
                                                     onReportIssue={handleReportIssue}
@@ -853,7 +848,6 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                                     currentResident={currentResident}
                                     onCopyReference={handleCopyReference}
                                     onViewDetails={handleViewDetails}
-                                    onMakePayment={handleMakePayment}
                                     onDownloadClearance={handleDownloadClearance}
                                     onGenerateReport={handleGenerateReport}
                                     onReportIssue={handleReportIssue}
@@ -919,7 +913,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                     { title: 'My Clearances', href: '/portal/my-clearances' }
                 ]}
             >
-                <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
+                <div className="space-y-4 md:space-y-6 pb-28 md:pb-6">
                     {/* Mobile Header */}
                     {isMobile && (
                         <div className="flex items-center justify-between sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-10 py-3 px-4 -mx-4">
@@ -1004,7 +998,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                                     <Download className="h-4 w-4" />
                                     {isExporting ? 'Exporting...' : 'Export'}
                                 </Button>
-                                <Link href="/portal/my-clearances/create">
+                                <Link href="/portal/my-clearances/request">
                                     <Button className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl">
                                         <Plus className="h-4 w-4" />
                                         <span>New Request</span>
@@ -1166,10 +1160,10 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                     </div>
                 </div>
                 
-                {/* Mobile FAB */}
+                {/* Mobile FAB - repositioned to avoid footer */}
                 {isMobile && !showMobileFilters && (
-                    <div className="fixed bottom-6 right-6 z-50 safe-bottom animate-scale-in">
-                        <Link href="/portal/my-clearances/create">
+                    <div className="fixed bottom-20 right-6 z-50 animate-scale-in">
+                        <Link href="/portal/my-clearances/request">
                             <Button 
                                 size="lg" 
                                 className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"

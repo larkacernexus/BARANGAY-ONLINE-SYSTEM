@@ -180,28 +180,60 @@ const TIME_FILTERS = [
 // HELPER FUNCTIONS
 // =============================================
 
-const getNotificationIcon = (notification: Notification): { icon: any; color: string } => {
+const getNotificationIcon = (notification: Notification): { icon: any; color: string; bgColor: string } => {
   if (notification.is_fee_notification) {
-    return { icon: DollarSign, color: 'text-emerald-500' };
+    return { 
+      icon: DollarSign, 
+      color: 'text-emerald-500 dark:text-emerald-400',
+      bgColor: 'bg-emerald-50 dark:bg-emerald-950/30'
+    };
   }
   
   const type = notification.data?.type || notification.type;
   
   switch (true) {
     case type.includes('Payment'):
-      return { icon: CreditCard, color: 'text-green-500' };
+      return { 
+        icon: CreditCard, 
+        color: 'text-green-500 dark:text-green-400',
+        bgColor: 'bg-green-50 dark:bg-green-950/30'
+      };
     case type.includes('Clearance'):
-      return { icon: FileCheck, color: 'text-blue-500' };
+      return { 
+        icon: FileCheck, 
+        color: 'text-blue-500 dark:text-blue-400',
+        bgColor: 'bg-blue-50 dark:bg-blue-950/30'
+      };
     case type.includes('Report'):
-      return { icon: AlertCircle, color: 'text-orange-500' };
+      return { 
+        icon: AlertCircle, 
+        color: 'text-orange-500 dark:text-orange-400',
+        bgColor: 'bg-orange-50 dark:bg-orange-950/30'
+      };
     case type.includes('Announcement'):
-      return { icon: Info, color: 'text-purple-500' };
+      return { 
+        icon: Info, 
+        color: 'text-purple-500 dark:text-purple-400',
+        bgColor: 'bg-purple-50 dark:bg-purple-950/30'
+      };
     case type.includes('Household'):
-      return { icon: Home, color: 'text-indigo-500' };
+      return { 
+        icon: Home, 
+        color: 'text-indigo-500 dark:text-indigo-400',
+        bgColor: 'bg-indigo-50 dark:bg-indigo-950/30'
+      };
     case type.includes('Member'):
-      return { icon: Users, color: 'text-pink-500' };
+      return { 
+        icon: Users, 
+        color: 'text-pink-500 dark:text-pink-400',
+        bgColor: 'bg-pink-50 dark:bg-pink-950/30'
+      };
     default:
-      return { icon: Bell, color: 'text-gray-500' };
+      return { 
+        icon: Bell, 
+        color: 'text-gray-500 dark:text-gray-400',
+        bgColor: 'bg-gray-50 dark:bg-gray-800'
+      };
   }
 };
 
@@ -223,14 +255,15 @@ const getNotificationLink = (notification: Notification): string => {
 // =============================================
 
 const NotificationIcon = ({ notification }: { notification: Notification }) => {
-  const { icon: Icon, color } = getNotificationIcon(notification);
+  const { icon: Icon, color, bgColor } = getNotificationIcon(notification);
 
   return (
     <div className={cn(
-      "p-3 rounded-xl bg-white dark:bg-gray-900 shadow-sm border",
-      color
+      "p-3 rounded-xl shadow-sm border",
+      bgColor,
+      "border-gray-200 dark:border-gray-700"
     )}>
-      <Icon className="h-5 w-5" />
+      <Icon className={cn("h-5 w-5", color)} />
     </div>
   );
 };
@@ -324,9 +357,10 @@ const NotificationCard = ({
     <Card 
       className={cn(
         "relative overflow-hidden transition-all duration-200 hover:shadow-md",
+        "bg-white dark:bg-gray-900",
         !notification.read_at 
-          ? 'border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20' 
-          : 'hover:bg-gray-50/50 dark:hover:bg-gray-900/50',
+          ? 'border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20 dark:bg-gray-900' 
+          : 'hover:bg-gray-50/50 dark:hover:bg-gray-800/50',
         isHovered && !selectMode && 'scale-[1.01]',
         selectMode && 'cursor-pointer',
         isSelected && 'ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-950/20',
@@ -352,7 +386,7 @@ const NotificationCard = ({
               <Checkbox
                 checked={isSelected}
                 onCheckedChange={() => onSelect?.(notification.id)}
-                className="h-5 w-5"
+                className="h-5 w-5 border-gray-300 dark:border-gray-600"
               />
             </div>
           )}
@@ -366,7 +400,7 @@ const NotificationCard = ({
               <h3 className={cn(
                 "text-base font-semibold truncate",
                 !notification.read_at 
-                  ? 'text-gray-900 dark:text-white' 
+                  ? 'text-gray-900 dark:text-gray-100' 
                   : 'text-gray-700 dark:text-gray-300'
               )}>
                 {notification.title}
@@ -381,14 +415,14 @@ const NotificationCard = ({
                         {formatNotificationTime(notification.created_at)}
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>
+                    <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                       {new Date(notification.created_at).toLocaleString()}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 
                 {!notification.read_at && (
-                  <Badge variant="default" className="bg-blue-500 text-xs animate-pulse">
+                  <Badge variant="default" className="bg-blue-500 dark:bg-blue-600 text-xs animate-pulse">
                     New
                   </Badge>
                 )}
@@ -398,7 +432,7 @@ const NotificationCard = ({
             {/* Resident Name */}
             {notification.resident_name && (
               <div className="flex items-center gap-1 mb-2">
-                <User className="h-3.5 w-3.5 text-purple-500" />
+                <User className="h-3.5 w-3.5 text-purple-500 dark:text-purple-400" />
                 <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
                   {notification.resident_name}
                 </span>
@@ -414,30 +448,30 @@ const NotificationCard = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
                 {notification.formatted_amount && notification.formatted_amount !== '₱0.00' && (
-                  <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">
+                  <Badge variant="secondary" className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border-0">
                     {notification.formatted_amount}
                   </Badge>
                 )}
                 
                 {notification.fee_type && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">
                     {notification.fee_type}
                   </Badge>
                 )}
                 
                 {notification.fee_code && (
-                  <Badge variant="outline" className="text-xs font-mono bg-gray-50 dark:bg-gray-900">
+                  <Badge variant="outline" className="text-xs font-mono bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300">
                     #{notification.fee_code}
                   </Badge>
                 )}
                 
                 {notification.read_at ? (
-                  <Badge variant="outline" className="text-xs text-gray-500 flex items-center gap-1">
+                  <Badge variant="outline" className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 dark:border-gray-600">
                     <MailOpen className="h-3 w-3" />
                     Read
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="text-xs text-blue-500 flex items-center gap-1 border-blue-200">
+                  <Badge variant="outline" className="text-xs text-blue-500 dark:text-blue-400 flex items-center gap-1 border-blue-200 dark:border-blue-800">
                     <Mail className="h-3 w-3" />
                     Unread
                   </Badge>
@@ -454,13 +488,13 @@ const NotificationCard = ({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30"
+                            className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-950/30"
                             onClick={handleMarkAsRead}
                           >
                             <MailOpen className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Mark as read</TooltipContent>
+                        <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">Mark as read</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   )}
@@ -472,13 +506,13 @@ const NotificationCard = ({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/30"
                             onClick={handleDelete}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Delete</TooltipContent>
+                        <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">Delete</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   )}
@@ -488,7 +522,7 @@ const NotificationCard = ({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                       onClick={handleDropdownToggle}
                     >
                       <MoreVertical className="h-4 w-4" />
@@ -497,7 +531,7 @@ const NotificationCard = ({
                     {/* Custom dropdown menu - Simple with only Copy ID and Open in new tab */}
                     {dropdownOpen && (
                       <div 
-                        className="absolute right-0 bottom-full mb-1 w-48 bg-white dark:bg-gray-900 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 dropdown-menu"
+                        className="absolute right-0 bottom-full mb-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 py-1 dropdown-menu"
                         style={{ 
                           zIndex: 9999,
                           position: 'absolute',
@@ -512,7 +546,7 @@ const NotificationCard = ({
                             toast.success('Notification ID copied');
                           })}
                         >
-                          Copy ID
+                          <span>Copy ID</span>
                         </button>
                         
                         <button
@@ -536,7 +570,7 @@ const NotificationCard = ({
 
             {/* Debug info in development */}
             {process.env.NODE_ENV === 'development' && (
-              <div className="mt-2 text-xs text-gray-400 truncate border-t pt-2">
+              <div className="mt-2 text-xs text-gray-400 dark:text-gray-500 truncate border-t dark:border-gray-800 pt-2">
                 <span className="font-mono">Link: {getNotificationLink(notification)}</span>
               </div>
             )}
@@ -795,18 +829,18 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
         {/* Search and Actions Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="relative w-full sm:w-auto flex-1 max-w-md">
-            <Bell className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Bell className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
             <Input
               type="text"
               placeholder="Search notifications..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 pr-10 py-2 w-full"
+              className="pl-10 pr-10 py-2 w-full dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100 dark:placeholder:text-gray-500"
             />
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -820,7 +854,7 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
                   variant="outline"
                   size="sm"
                   onClick={() => setSelectMode(true)}
-                  className="gap-2"
+                  className="gap-2 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   <Square className="h-4 w-4" />
                   Select
@@ -829,7 +863,7 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
                   variant="outline"
                   size="sm"
                   onClick={() => setShowMobileFilters(true)}
-                  className="gap-2 lg:hidden"
+                  className="gap-2 lg:hidden dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   <Filter className="h-4 w-4" />
                   Filters
@@ -841,11 +875,11 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
                   variant="outline"
                   size="sm"
                   onClick={handleSelectAll}
-                  className="gap-2"
+                  className="gap-2 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   <div className="flex items-center justify-center">
                     {selectedIds.length === filteredNotifications.length && filteredNotifications.length > 0 ? (
-                      <CheckCheck className="h-4 w-4 text-blue-600" />
+                      <CheckCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     ) : (
                       <Square className="h-4 w-4" />
                     )}
@@ -860,7 +894,7 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
                     setSelectMode(false);
                     setSelectedIds([]);
                   }}
-                  className="gap-2"
+                  className="gap-2 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
                   <X className="h-4 w-4" />
                   Cancel
@@ -874,7 +908,7 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
                       onClick={() => {
                         selectedIds.forEach(id => handleMarkAsRead(id));
                       }}
-                      className="gap-2 text-blue-600"
+                      className="gap-2 text-blue-600 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-950/30"
                       disabled={loading}
                     >
                       <MailOpen className="h-4 w-4" />
@@ -885,7 +919,7 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
                       variant="outline"
                       size="sm"
                       onClick={() => setShowDeleteDialog(true)}
-                      className="gap-2 text-red-600"
+                      className="gap-2 text-red-600 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-950/30"
                       disabled={loading}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -957,19 +991,19 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
           {/* Type Filter Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="relative">
+              <Button variant="outline" size="sm" className="relative dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
                 <Tag className="h-4 w-4 mr-2" />
                 Type
                 {notificationType !== 'all' && (
-                  <span className="ml-1 text-xs bg-blue-100 text-blue-600 rounded-full px-1.5">
+                  <span className="ml-1 text-xs bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 rounded-full px-1.5">
                     {NOTIFICATION_TYPES.find(t => t.value === notificationType)?.label.split(' ')[0]}
                   </span>
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Filter by type</DropdownMenuLabel>
-              <DropdownMenuSeparator />
+            <DropdownMenuContent align="end" className="w-56 dark:bg-gray-800 dark:border-gray-700">
+              <DropdownMenuLabel className="dark:text-gray-200">Filter by type</DropdownMenuLabel>
+              <DropdownMenuSeparator className="dark:bg-gray-700" />
               {NOTIFICATION_TYPES.map(({ value, label, icon: Icon }) => (
                 <DropdownMenuItem 
                   key={value}
@@ -985,7 +1019,7 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
                     });
                   }}
                   className={cn(
-                    "flex items-center justify-between",
+                    "flex items-center justify-between cursor-pointer dark:text-gray-200 dark:hover:bg-gray-700",
                     notificationType === value && "bg-blue-50 dark:bg-blue-950/30"
                   )}
                 >
@@ -994,7 +1028,7 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
                     <span>{label}</span>
                   </div>
                   {notificationType === value && (
-                    <CheckCheck className="h-4 w-4 text-blue-500" />
+                    <CheckCheck className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                   )}
                 </DropdownMenuItem>
               ))}
@@ -1004,30 +1038,33 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
           {/* Time Filter Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="relative">
+              <Button variant="outline" size="sm" className="relative dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
                 <Calendar className="h-4 w-4 mr-2" />
                 Time
                 {timeFilter !== 'all' && (
-                  <span className="ml-1 text-xs bg-blue-100 text-blue-600 rounded-full px-1.5">
+                  <span className="ml-1 text-xs bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 rounded-full px-1.5">
                     {TIME_FILTERS.find(t => t.value === timeFilter)?.label}
                   </span>
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>Time period</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => {
-                setTimeFilter('all');
-                router.get(route('portal.notifications.index'), { 
-                  ...route().params,
-                  time: '',
-                  page: 1 
-                }, {
-                  preserveState: true,
-                  preserveScroll: true
-                });
-              }}>
+            <DropdownMenuContent align="end" className="w-48 dark:bg-gray-800 dark:border-gray-700">
+              <DropdownMenuLabel className="dark:text-gray-200">Time period</DropdownMenuLabel>
+              <DropdownMenuSeparator className="dark:bg-gray-700" />
+              <DropdownMenuItem 
+                onClick={() => {
+                  setTimeFilter('all');
+                  router.get(route('portal.notifications.index'), { 
+                    ...route().params,
+                    time: '',
+                    page: 1 
+                  }, {
+                    preserveState: true,
+                    preserveScroll: true
+                  });
+                }}
+                className="dark:text-gray-200 dark:hover:bg-gray-700"
+              >
                 All time
               </DropdownMenuItem>
               {TIME_FILTERS.map(({ value, label }) => (
@@ -1045,13 +1082,13 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
                     });
                   }}
                   className={cn(
-                    "flex items-center justify-between",
+                    "flex items-center justify-between cursor-pointer dark:text-gray-200 dark:hover:bg-gray-700",
                     timeFilter === value && "bg-blue-50 dark:bg-blue-950/30"
                   )}
                 >
                   <span>{label}</span>
                   {timeFilter === value && (
-                    <CheckCheck className="h-4 w-4 text-blue-500" />
+                    <CheckCheck className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                   )}
                 </DropdownMenuItem>
               ))}
@@ -1064,7 +1101,7 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
               variant="ghost"
               size="sm"
               onClick={handleClearFilters}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/30"
             >
               <X className="h-4 w-4 mr-1" />
               Clear
@@ -1145,7 +1182,7 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
               loading={loading}
             />
             
-            <p className="text-sm text-center text-gray-500 mt-4">
+            <p className="text-sm text-center text-gray-500 dark:text-gray-400 mt-4">
               Showing {notifications.from} to {notifications.to} of {notifications.total} notifications
             </p>
           </div>
@@ -1236,10 +1273,10 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="dark:bg-gray-900 dark:border-gray-700">
           <DialogHeader>
-            <DialogTitle>Delete notifications</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="dark:text-gray-100">Delete notifications</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
               Are you sure you want to delete {selectedIds.length} notification{selectedIds.length !== 1 ? 's' : ''}? 
               This action cannot be undone.
             </DialogDescription>
@@ -1249,6 +1286,7 @@ export default function NotificationsIndex({ notifications, unreadCount, typeCou
               variant="outline"
               onClick={() => setShowDeleteDialog(false)}
               disabled={loading}
+              className="dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
             >
               Cancel
             </Button>

@@ -32,7 +32,6 @@ interface ModernClearanceTableProps {
   currentResident?: any;
   onCopyReference: (ref: string) => void;
   onViewDetails: (id: number) => void;
-  onMakePayment: (id: number) => void;
   onDownloadClearance: (clearance: any) => void;
   onGenerateReport: (clearance: any) => void;
   onReportIssue: (clearance: any) => void;
@@ -50,7 +49,6 @@ export const ModernClearanceTable = ({
   currentResident,
   onCopyReference,
   onViewDetails,
-  onMakePayment,
   onDownloadClearance,
   onGenerateReport,
   onReportIssue,
@@ -177,17 +175,6 @@ export const ModernClearanceTable = ({
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    {clearance.status === 'pending_payment' && (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="h-8 px-3 text-xs bg-gradient-to-r from-orange-500 to-orange-600"
-                        onClick={() => onMakePayment(clearance.id)}
-                      >
-                        <DollarSign className="h-3 w-3 mr-1" />
-                        Pay
-                      </Button>
-                    )}
                     {clearance.status === 'issued' && clearance.clearance_number && (
                       <Button
                         size="sm"

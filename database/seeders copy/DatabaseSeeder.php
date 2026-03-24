@@ -15,7 +15,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Seed basic data
+        $this->command->info('Starting database seeding...');
+        
+        // Disable foreign key checks for clean seeding
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        
+        // Seed in order of dependencies
         $this->seedPuroks();
         $this->seedRoles();
         $this->seedUsers();
@@ -39,6 +44,11 @@ class DatabaseSeeder extends Seeder
         $this->seedSupportCategories();
         $this->seedSupportTickets();
         $this->seedForms();
+        
+        // Re-enable foreign key checks
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        
+        $this->command->info('✅ Database seeding completed successfully!');
     }
 
     /**
@@ -46,6 +56,8 @@ class DatabaseSeeder extends Seeder
      */
     private function seedPuroks(): void
     {
+        $this->command->info('Seeding puroks...');
+        
         $puroks = [
             ['name' => 'Purok 1', 'slug' => 'purok-1', 'description' => 'Residential area near the barangay hall', 'leader_name' => 'Juan Dela Cruz', 'leader_contact' => '09171234567', 'status' => 'active'],
             ['name' => 'Purok 2', 'slug' => 'purok-2', 'description' => 'Agricultural zone with rice fields', 'leader_name' => 'Maria Santos', 'leader_contact' => '09172345678', 'status' => 'active'],
@@ -58,13 +70,18 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($puroks as $purok) {
-            DB::table('puroks')->insert(array_merge($purok, [
-                'total_households' => 0,
-                'total_residents' => 0,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('puroks')->updateOrInsert(
+                ['slug' => $purok['slug']],
+                array_merge($purok, [
+                    'total_households' => 0,
+                    'total_residents' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($puroks) . ' puroks');
     }
 
     /**
@@ -72,6 +89,8 @@ class DatabaseSeeder extends Seeder
      */
     private function seedRoles(): void
     {
+        $this->command->info('Seeding roles...');
+        
         $roles = [
             ['name' => 'Administrator', 'description' => 'Full system access', 'is_system_role' => 1],
             ['name' => 'Barangay Captain', 'description' => 'Barangay leader', 'is_system_role' => 1],
@@ -80,17 +99,29 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Barangay Kagawad', 'description' => 'Barangay council member', 'is_system_role' => 1],
             ['name' => 'SK Chairman', 'description' => 'Sangguniang Kabataan chairman', 'is_system_role' => 1],
             ['name' => 'SK Kagawad', 'description' => 'Sangguniang Kabataan member', 'is_system_role' => 1],
+            ['name' => 'Resident', 'description' => 'Barangay resident', 'is_system_role' => 0],
+            ['name' => 'Staff', 'description' => 'General staff', 'is_system_role' => 0],
             ['name' => 'Treasury Officer', 'description' => 'Handles treasury operations', 'is_system_role' => 0],
             ['name' => 'Records Clerk', 'description' => 'Manages records and documents', 'is_system_role' => 0],
             ['name' => 'Clearance Officer', 'description' => 'Processes clearance requests', 'is_system_role' => 0],
             ['name' => 'Viewer', 'description' => 'Read-only access', 'is_system_role' => 0],
-            ['name' => 'Staff', 'description' => 'General staff', 'is_system_role' => 0],
-            ['name' => 'Household Head', 'description' => 'Head of a household', 'is_system_role' => 0],
         ];
 
+        $createdCount = 0;
+        $updatedCount = 0;
+
         foreach ($roles as $role) {
-            DB::table('roles')->insert($role);
+            $existing = DB::table('roles')->where('name', $role['name'])->first();
+            if ($existing) {
+                DB::table('roles')->where('id', $existing->id)->update($role);
+                $updatedCount++;
+            } else {
+                DB::table('roles')->insert($role);
+                $createdCount++;
+            }
         }
+        
+        $this->command->info('✅ Seeded ' . count($roles) . ' roles (' . $createdCount . ' new, ' . $updatedCount . ' updated)');
     }
 
     /**
@@ -98,6 +129,10 @@ class DatabaseSeeder extends Seeder
      */
     private function seedUsers(): void
     {
+        $this->command->info('Seeding users...');
+        
+        $roles = DB::table('roles')->get()->keyBy('name');
+        
         $users = [
             [
                 'first_name' => 'Juan',
@@ -106,7 +141,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'admin@barangay.gov.ph',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09171234567',
-                'role_id' => DB::table('roles')->where('name', 'Administrator')->first()->id,
+                'role_id' => $roles['Administrator']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -117,7 +152,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'captain@barangay.gov.ph',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09172345678',
-                'role_id' => DB::table('roles')->where('name', 'Barangay Captain')->first()->id,
+                'role_id' => $roles['Barangay Captain']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -128,7 +163,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'secretary@barangay.gov.ph',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09173456789',
-                'role_id' => DB::table('roles')->where('name', 'Barangay Secretary')->first()->id,
+                'role_id' => $roles['Barangay Secretary']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -139,7 +174,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'treasurer@barangay.gov.ph',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09174567890',
-                'role_id' => DB::table('roles')->where('name', 'Barangay Treasurer')->first()->id,
+                'role_id' => $roles['Barangay Treasurer']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -150,7 +185,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'pedro.fernandez@email.com',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09175678901',
-                'role_id' => DB::table('roles')->where('name', 'Household Head')->first()->id,
+                'role_id' => $roles['Resident']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -161,7 +196,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'ana.reyes@email.com',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09176789012',
-                'role_id' => DB::table('roles')->where('name', 'Household Head')->first()->id,
+                'role_id' => $roles['Resident']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -172,7 +207,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'carlos.mendoza@business.com',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09177890123',
-                'role_id' => DB::table('roles')->where('name', 'Household Head')->first()->id,
+                'role_id' => $roles['Resident']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -183,7 +218,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'luz.villanueva@email.com',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09178901234',
-                'role_id' => DB::table('roles')->where('name', 'Viewer')->first()->id,
+                'role_id' => $roles['Viewer']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -194,7 +229,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'ramon.aquino@barangay.gov.ph',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09179012345',
-                'role_id' => DB::table('roles')->where('name', 'Staff')->first()->id,
+                'role_id' => $roles['Staff']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -205,7 +240,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'josefa.llanes@barangay.gov.ph',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09170123456',
-                'role_id' => DB::table('roles')->where('name', 'Barangay Kagawad')->first()->id,
+                'role_id' => $roles['Barangay Kagawad']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -216,7 +251,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'andres.bonifacio@barangay.gov.ph',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09171234568',
-                'role_id' => DB::table('roles')->where('name', 'SK Chairman')->first()->id,
+                'role_id' => $roles['SK Chairman']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -227,7 +262,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'gabriela.silang@barangay.gov.ph',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09172345679',
-                'role_id' => DB::table('roles')->where('name', 'Treasury Officer')->first()->id,
+                'role_id' => $roles['Treasury Officer']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -238,7 +273,7 @@ class DatabaseSeeder extends Seeder
                 'email' => 'melchora.aquino@barangay.gov.ph',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09173456780',
-                'role_id' => DB::table('roles')->where('name', 'Records Clerk')->first()->id,
+                'role_id' => $roles['Records Clerk']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
@@ -249,19 +284,34 @@ class DatabaseSeeder extends Seeder
                 'email' => 'emilio.aguinaldo@barangay.gov.ph',
                 'password' => Hash::make('password123'),
                 'contact_number' => '09174567891',
-                'role_id' => DB::table('roles')->where('name', 'Clearance Officer')->first()->id,
+                'role_id' => $roles['Clearance Officer']->id ?? null,
                 'status' => 'active',
                 'email_verified_at' => now(),
             ],
         ];
 
+        $createdCount = 0;
+        $updatedCount = 0;
+
         foreach ($users as $user) {
-            DB::table('users')->insert(array_merge($user, [
+            $existing = DB::table('users')->where('username', $user['username'])->first();
+            $userData = array_merge($user, [
                 'login_count' => 0,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]));
+            ]);
+            
+            if ($existing) {
+                unset($userData['password']); // Don't update password if exists
+                DB::table('users')->where('id', $existing->id)->update($userData);
+                $updatedCount++;
+            } else {
+                DB::table('users')->insert($userData);
+                $createdCount++;
+            }
         }
+        
+        $this->command->info('✅ Seeded ' . count($users) . ' users (' . $createdCount . ' new, ' . $updatedCount . ' updated)');
     }
 
     /**
@@ -269,7 +319,10 @@ class DatabaseSeeder extends Seeder
      */
     private function seedResidents(): void
     {
-        $users = DB::table('users')->get();
+        $this->command->info('Seeding residents...');
+        
+        $users = DB::table('users')->get()->keyBy('username');
+        $puroks = DB::table('puroks')->get()->keyBy('slug');
         
         $residents = [
             [
@@ -283,7 +336,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09171234567',
                 'email' => 'juan.delacruz@email.com',
                 'address' => 'Purok 1, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-1')->first()->id,
+                'purok_id' => $puroks['purok-1']->id ?? null,
                 'occupation' => 'Farmer',
                 'employment_status' => 'Self-employed',
                 'educational_attainment' => 'College Graduate',
@@ -292,7 +345,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Manila',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-001',
-                'user_id' => $users->where('username', 'admin')->first()->id,
+                'user_id' => $users['admin']->id ?? null,
             ],
             [
                 'first_name' => 'Maria',
@@ -305,7 +358,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09172345678',
                 'email' => 'maria.santos@email.com',
                 'address' => 'Purok 1, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-1')->first()->id,
+                'purok_id' => $puroks['purok-1']->id ?? null,
                 'occupation' => 'Teacher',
                 'employment_status' => 'Employed',
                 'educational_attainment' => 'Master\'s Degree',
@@ -314,7 +367,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Quezon City',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-002',
-                'user_id' => $users->where('username', 'captain')->first()->id,
+                'user_id' => $users['captain']->id ?? null,
             ],
             [
                 'first_name' => 'Jose',
@@ -327,7 +380,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09173456789',
                 'email' => 'jose.reyes@barangay.gov.ph',
                 'address' => 'Purok 2, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-2')->first()->id,
+                'purok_id' => $puroks['purok-2']->id ?? null,
                 'occupation' => 'Government Employee',
                 'employment_status' => 'Employed',
                 'educational_attainment' => 'College Graduate',
@@ -336,7 +389,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Bulacan',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-003',
-                'user_id' => $users->where('username', 'secretary')->first()->id,
+                'user_id' => $users['secretary']->id ?? null,
             ],
             [
                 'first_name' => 'Teresita',
@@ -349,7 +402,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09174567890',
                 'email' => 'teresita.garcia@barangay.gov.ph',
                 'address' => 'Purok 3, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-3')->first()->id,
+                'purok_id' => $puroks['purok-3']->id ?? null,
                 'occupation' => 'Accountant',
                 'employment_status' => 'Employed',
                 'educational_attainment' => 'College Graduate',
@@ -358,7 +411,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Manila',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-004',
-                'user_id' => $users->where('username', 'treasurer')->first()->id,
+                'user_id' => $users['treasurer']->id ?? null,
             ],
             [
                 'first_name' => 'Pedro',
@@ -371,7 +424,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09175678901',
                 'email' => 'pedro.fernandez@email.com',
                 'address' => 'Purok 2, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-2')->first()->id,
+                'purok_id' => $puroks['purok-2']->id ?? null,
                 'occupation' => 'Software Developer',
                 'employment_status' => 'Employed',
                 'educational_attainment' => 'College Graduate',
@@ -380,7 +433,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Cebu City',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-005',
-                'user_id' => $users->where('username', 'resident1')->first()->id,
+                'user_id' => $users['resident1']->id ?? null,
             ],
             [
                 'first_name' => 'Ana',
@@ -393,7 +446,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09176789012',
                 'email' => 'ana.reyes@email.com',
                 'address' => 'Purok 3, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-3')->first()->id,
+                'purok_id' => $puroks['purok-3']->id ?? null,
                 'occupation' => 'Business Owner',
                 'employment_status' => 'Self-employed',
                 'educational_attainment' => 'College Graduate',
@@ -402,7 +455,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Davao City',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-006',
-                'user_id' => $users->where('username', 'resident2')->first()->id,
+                'user_id' => $users['resident2']->id ?? null,
             ],
             [
                 'first_name' => 'Carlos',
@@ -415,7 +468,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09177890123',
                 'email' => 'carlos.mendoza@business.com',
                 'address' => 'Purok 3, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-3')->first()->id,
+                'purok_id' => $puroks['purok-3']->id ?? null,
                 'occupation' => 'Store Owner',
                 'employment_status' => 'Self-employed',
                 'educational_attainment' => 'High School Graduate',
@@ -424,7 +477,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Bulacan',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-007',
-                'user_id' => $users->where('username', 'business')->first()->id,
+                'user_id' => $users['business']->id ?? null,
             ],
             [
                 'first_name' => 'Luz',
@@ -437,7 +490,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09178901234',
                 'email' => 'luz.villanueva@email.com',
                 'address' => 'Purok 2, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-2')->first()->id,
+                'purok_id' => $puroks['purok-2']->id ?? null,
                 'occupation' => 'Retired',
                 'employment_status' => 'Retired',
                 'educational_attainment' => 'Elementary Graduate',
@@ -446,7 +499,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Pampanga',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-008',
-                'user_id' => $users->where('username', 'viewer')->first()->id,
+                'user_id' => $users['viewer']->id ?? null,
             ],
             [
                 'first_name' => 'Ramon',
@@ -459,7 +512,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09179012345',
                 'email' => 'ramon.aquino@barangay.gov.ph',
                 'address' => 'Purok 1, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-1')->first()->id,
+                'purok_id' => $puroks['purok-1']->id ?? null,
                 'occupation' => 'Staff',
                 'employment_status' => 'Employed',
                 'educational_attainment' => 'College Graduate',
@@ -468,7 +521,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Manila',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-009',
-                'user_id' => $users->where('username', 'staff')->first()->id,
+                'user_id' => $users['staff']->id ?? null,
             ],
             [
                 'first_name' => 'Josefa',
@@ -481,7 +534,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09170123456',
                 'email' => 'josefa.llanes@barangay.gov.ph',
                 'address' => 'Purok 4, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-4')->first()->id,
+                'purok_id' => $puroks['purok-4']->id ?? null,
                 'occupation' => 'Councilor',
                 'employment_status' => 'Employed',
                 'educational_attainment' => 'College Graduate',
@@ -490,7 +543,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Manila',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-010',
-                'user_id' => $users->where('username', 'kagawad')->first()->id,
+                'user_id' => $users['kagawad']->id ?? null,
             ],
             [
                 'first_name' => 'Andres',
@@ -503,7 +556,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09171234568',
                 'email' => 'andres.bonifacio@barangay.gov.ph',
                 'address' => 'Purok 5, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-5')->first()->id,
+                'purok_id' => $puroks['purok-5']->id ?? null,
                 'occupation' => 'Student',
                 'employment_status' => 'Student',
                 'educational_attainment' => 'College Level',
@@ -512,7 +565,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Tondo',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-011',
-                'user_id' => $users->where('username', 'skchairman')->first()->id,
+                'user_id' => $users['skchairman']->id ?? null,
             ],
             [
                 'first_name' => 'Gabriela',
@@ -525,7 +578,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09172345679',
                 'email' => 'gabriela.silang@barangay.gov.ph',
                 'address' => 'Purok 6, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-6')->first()->id,
+                'purok_id' => $puroks['purok-6']->id ?? null,
                 'occupation' => 'Finance Officer',
                 'employment_status' => 'Employed',
                 'educational_attainment' => 'College Graduate',
@@ -534,7 +587,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Ilocos',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-012',
-                'user_id' => $users->where('username', 'treasuryofficer')->first()->id,
+                'user_id' => $users['treasuryofficer']->id ?? null,
             ],
             [
                 'first_name' => 'Melchora',
@@ -547,7 +600,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09173456780',
                 'email' => 'melchora.aquino@barangay.gov.ph',
                 'address' => 'Purok 7, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-7')->first()->id,
+                'purok_id' => $puroks['purok-7']->id ?? null,
                 'occupation' => 'Records Manager',
                 'employment_status' => 'Employed',
                 'educational_attainment' => 'College Graduate',
@@ -556,7 +609,7 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Quezon City',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-013',
-                'user_id' => $users->where('username', 'recordclerk')->first()->id,
+                'user_id' => $users['recordclerk']->id ?? null,
             ],
             [
                 'first_name' => 'Emilio',
@@ -569,7 +622,7 @@ class DatabaseSeeder extends Seeder
                 'contact_number' => '09174567891',
                 'email' => 'emilio.aguinaldo@barangay.gov.ph',
                 'address' => 'Purok 8, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-8')->first()->id,
+                'purok_id' => $puroks['purok-8']->id ?? null,
                 'occupation' => 'Clearance Officer',
                 'employment_status' => 'Employed',
                 'educational_attainment' => 'College Graduate',
@@ -578,16 +631,21 @@ class DatabaseSeeder extends Seeder
                 'place_of_birth' => 'Cavite',
                 'status' => 'active',
                 'resident_id' => 'RES-2024-014',
-                'user_id' => $users->where('username', 'clearanceofficer')->first()->id,
+                'user_id' => $users['clearanceofficer']->id ?? null,
             ],
         ];
 
         foreach ($residents as $resident) {
-            DB::table('residents')->insert(array_merge($resident, [
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('residents')->updateOrInsert(
+                ['resident_id' => $resident['resident_id']],
+                array_merge($resident, [
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($residents) . ' residents');
     }
 
     /**
@@ -595,11 +653,16 @@ class DatabaseSeeder extends Seeder
      */
     private function seedHouseholds(): void
     {
+        $this->command->info('Seeding households...');
+        
+        $users = DB::table('users')->get()->keyBy('username');
+        $puroks = DB::table('puroks')->get()->keyBy('slug');
+        
         $households = [
             [
                 'household_number' => 'HH-2024-001',
                 'address' => 'Purok 1, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-1')->first()->id,
+                'purok_id' => $puroks['purok-1']->id ?? null,
                 'contact_number' => '09171234567',
                 'email' => 'delacruz.family@email.com',
                 'member_count' => 4,
@@ -612,12 +675,12 @@ class DatabaseSeeder extends Seeder
                 'internet' => 1,
                 'vehicle' => 1,
                 'status' => 'active',
-                'user_id' => DB::table('users')->where('username', 'admin')->first()->id,
+                'user_id' => $users['admin']->id ?? null,
             ],
             [
                 'household_number' => 'HH-2024-002',
                 'address' => 'Purok 1, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-1')->first()->id,
+                'purok_id' => $puroks['purok-1']->id ?? null,
                 'contact_number' => '09172345678',
                 'email' => 'santos.family@email.com',
                 'member_count' => 3,
@@ -630,12 +693,12 @@ class DatabaseSeeder extends Seeder
                 'internet' => 1,
                 'vehicle' => 0,
                 'status' => 'active',
-                'user_id' => DB::table('users')->where('username', 'captain')->first()->id,
+                'user_id' => $users['captain']->id ?? null,
             ],
             [
                 'household_number' => 'HH-2024-003',
                 'address' => 'Purok 2, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-2')->first()->id,
+                'purok_id' => $puroks['purok-2']->id ?? null,
                 'contact_number' => '09175678901',
                 'email' => 'fernandez.family@email.com',
                 'member_count' => 5,
@@ -648,12 +711,12 @@ class DatabaseSeeder extends Seeder
                 'internet' => 1,
                 'vehicle' => 1,
                 'status' => 'active',
-                'user_id' => DB::table('users')->where('username', 'resident1')->first()->id,
+                'user_id' => $users['resident1']->id ?? null,
             ],
             [
                 'household_number' => 'HH-2024-004',
                 'address' => 'Purok 3, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-3')->first()->id,
+                'purok_id' => $puroks['purok-3']->id ?? null,
                 'contact_number' => '09176789012',
                 'email' => 'reyes.family@email.com',
                 'member_count' => 4,
@@ -666,12 +729,12 @@ class DatabaseSeeder extends Seeder
                 'internet' => 1,
                 'vehicle' => 1,
                 'status' => 'active',
-                'user_id' => DB::table('users')->where('username', 'resident2')->first()->id,
+                'user_id' => $users['resident2']->id ?? null,
             ],
             [
                 'household_number' => 'HH-2024-005',
                 'address' => 'Purok 3, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-3')->first()->id,
+                'purok_id' => $puroks['purok-3']->id ?? null,
                 'contact_number' => '09177890123',
                 'email' => 'mendoza.family@email.com',
                 'member_count' => 3,
@@ -684,12 +747,12 @@ class DatabaseSeeder extends Seeder
                 'internet' => 0,
                 'vehicle' => 0,
                 'status' => 'active',
-                'user_id' => DB::table('users')->where('username', 'business')->first()->id,
+                'user_id' => $users['business']->id ?? null,
             ],
             [
                 'household_number' => 'HH-2024-006',
                 'address' => 'Purok 2, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-2')->first()->id,
+                'purok_id' => $puroks['purok-2']->id ?? null,
                 'contact_number' => '09178901234',
                 'email' => null,
                 'member_count' => 2,
@@ -702,12 +765,12 @@ class DatabaseSeeder extends Seeder
                 'internet' => 0,
                 'vehicle' => 0,
                 'status' => 'active',
-                'user_id' => DB::table('users')->where('username', 'viewer')->first()->id,
+                'user_id' => $users['viewer']->id ?? null,
             ],
             [
                 'household_number' => 'HH-2024-007',
                 'address' => 'Purok 1, Barangay Sample',
-                'purok_id' => DB::table('puroks')->where('slug', 'purok-1')->first()->id,
+                'purok_id' => $puroks['purok-1']->id ?? null,
                 'contact_number' => '09179012345',
                 'email' => 'aquino.family@email.com',
                 'member_count' => 3,
@@ -720,16 +783,21 @@ class DatabaseSeeder extends Seeder
                 'internet' => 1,
                 'vehicle' => 0,
                 'status' => 'active',
-                'user_id' => DB::table('users')->where('username', 'staff')->first()->id,
+                'user_id' => $users['staff']->id ?? null,
             ],
         ];
 
         foreach ($households as $household) {
-            DB::table('households')->insert(array_merge($household, [
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('households')->updateOrInsert(
+                ['household_number' => $household['household_number']],
+                array_merge($household, [
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($households) . ' households');
     }
 
     /**
@@ -737,7 +805,9 @@ class DatabaseSeeder extends Seeder
      */
     private function seedHouseholdMembers(): void
     {
-        $households = DB::table('households')->get();
+        $this->command->info('Seeding household members...');
+        
+        $households = DB::table('households')->get()->keyBy('household_number');
         $residents = DB::table('residents')->get();
         
         $members = [
@@ -753,23 +823,43 @@ class DatabaseSeeder extends Seeder
             ['household_number' => 'HH-2024-007', 'resident_name' => 'Ramon Aquino', 'relationship' => 'Head', 'is_head' => 1],
         ];
         
+        $createdCount = 0;
+        
         foreach ($members as $member) {
-            $household = $households->where('household_number', $member['household_number'])->first();
-            $resident = $residents->where('first_name', explode(' ', $member['resident_name'])[0])
-                                  ->where('last_name', explode(' ', $member['resident_name'])[1])
-                                  ->first();
+            $household = $households[$member['household_number']] ?? null;
+            
+            // Find resident by full name
+            $resident = null;
+            foreach ($residents as $r) {
+                $fullName = $r->first_name . ' ' . $r->last_name;
+                if ($fullName === $member['resident_name']) {
+                    $resident = $r;
+                    break;
+                }
+            }
             
             if ($household && $resident) {
-                DB::table('household_members')->insert([
-                    'household_id' => $household->id,
-                    'resident_id' => $resident->id,
-                    'relationship_to_head' => $member['relationship'],
-                    'is_head' => $member['is_head'],
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                // Check if already exists
+                $exists = DB::table('household_members')
+                    ->where('household_id', $household->id)
+                    ->where('resident_id', $resident->id)
+                    ->exists();
+                
+                if (!$exists) {
+                    DB::table('household_members')->insert([
+                        'household_id' => $household->id,
+                        'resident_id' => $resident->id,
+                        'relationship_to_head' => $member['relationship'],
+                        'is_head' => $member['is_head'],
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                    $createdCount++;
+                }
             }
         }
+        
+        $this->command->info('✅ Seeded ' . $createdCount . ' household members');
     }
 
     /**
@@ -777,6 +867,8 @@ class DatabaseSeeder extends Seeder
      */
     private function seedCommittees(): void
     {
+        $this->command->info('Seeding committees...');
+        
         $committees = [
             ['code' => 'COM-PEACE', 'name' => 'Peace and Order Committee', 'description' => 'Maintains peace and order in the barangay', 'order' => 1],
             ['code' => 'COM-EDU', 'name' => 'Education Committee', 'description' => 'Oversees educational programs', 'order' => 2],
@@ -788,12 +880,17 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($committees as $committee) {
-            DB::table('committees')->insert(array_merge($committee, [
-                'is_active' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('committees')->updateOrInsert(
+                ['code' => $committee['code']],
+                array_merge($committee, [
+                    'is_active' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($committees) . ' committees');
     }
 
     /**
@@ -801,8 +898,10 @@ class DatabaseSeeder extends Seeder
      */
     private function seedPositions(): void
     {
-        $roles = DB::table('roles')->get();
-        $committees = DB::table('committees')->get();
+        $this->command->info('Seeding positions...');
+        
+        $roles = DB::table('roles')->get()->keyBy('name');
+        $committees = DB::table('committees')->get()->keyBy('code');
         
         $positions = [
             ['code' => 'POS-CAP', 'name' => 'Barangay Captain', 'description' => 'Chief executive of the barangay', 'order' => 1, 'role_name' => 'Barangay Captain', 'committee_code' => null],
@@ -815,22 +914,27 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($positions as $position) {
-            $role = $roles->where('name', $position['role_name'])->first();
-            $committee = $position['committee_code'] ? $committees->where('code', $position['committee_code'])->first() : null;
+            $role = $roles[$position['role_name']] ?? null;
+            $committee = $position['committee_code'] ? ($committees[$position['committee_code']] ?? null) : null;
             
-            DB::table('positions')->insert([
-                'code' => $position['code'],
-                'name' => $position['name'],
-                'description' => $position['description'],
-                'order' => $position['order'],
-                'role_id' => $role->id,
-                'committee_id' => $committee ? $committee->id : null,
-                'requires_account' => 1,
-                'is_active' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            DB::table('positions')->updateOrInsert(
+                ['code' => $position['code']],
+                [
+                    'code' => $position['code'],
+                    'name' => $position['name'],
+                    'description' => $position['description'],
+                    'order' => $position['order'],
+                    'role_id' => $role->id ?? null,
+                    'committee_id' => $committee->id ?? null,
+                    'requires_account' => 1,
+                    'is_active' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($positions) . ' positions');
     }
 
     /**
@@ -838,8 +942,10 @@ class DatabaseSeeder extends Seeder
      */
     private function seedOfficials(): void
     {
+        $this->command->info('Seeding officials...');
+        
         $residents = DB::table('residents')->get();
-        $positions = DB::table('positions')->get();
+        $positions = DB::table('positions')->get()->keyBy('code');
         
         $officials = [
             ['resident_name' => 'Juan Dela Cruz', 'position_code' => 'POS-CAP', 'term_start' => '2023-01-01', 'term_end' => '2025-12-31'],
@@ -851,26 +957,46 @@ class DatabaseSeeder extends Seeder
             ['resident_name' => 'Andres Bonifacio', 'position_code' => 'POS-SK', 'term_start' => '2023-01-01', 'term_end' => '2025-12-31'],
         ];
         
+        $createdCount = 0;
+        
         foreach ($officials as $official) {
-            $resident = $residents->where('first_name', explode(' ', $official['resident_name'])[0])
-                                  ->where('last_name', explode(' ', $official['resident_name'])[1])
-                                  ->first();
-            $position = $positions->where('code', $official['position_code'])->first();
+            // Find resident by full name
+            $resident = null;
+            foreach ($residents as $r) {
+                $fullName = $r->first_name . ' ' . $r->last_name;
+                if ($fullName === $official['resident_name']) {
+                    $resident = $r;
+                    break;
+                }
+            }
+            
+            $position = $positions[$official['position_code']] ?? null;
             
             if ($resident && $position) {
-                DB::table('officials')->insert([
-                    'resident_id' => $resident->id,
-                    'position_id' => $position->id,
-                    'term_start' => $official['term_start'],
-                    'term_end' => $official['term_end'],
-                    'status' => 'active',
-                    'order' => $position->order,
-                    'is_regular' => 1,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                // Check if already exists
+                $exists = DB::table('officials')
+                    ->where('resident_id', $resident->id)
+                    ->where('position_id', $position->id)
+                    ->exists();
+                
+                if (!$exists) {
+                    DB::table('officials')->insert([
+                        'resident_id' => $resident->id,
+                        'position_id' => $position->id,
+                        'term_start' => $official['term_start'],
+                        'term_end' => $official['term_end'],
+                        'status' => 'active',
+                        'order' => $position->order,
+                        'is_regular' => 1,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                    $createdCount++;
+                }
             }
         }
+        
+        $this->command->info('✅ Seeded ' . $createdCount . ' officials');
     }
 
     /**
@@ -878,6 +1004,8 @@ class DatabaseSeeder extends Seeder
      */
     private function seedDocumentCategories(): void
     {
+        $this->command->info('Seeding document categories...');
+        
         $categories = [
             ['name' => 'Government IDs', 'description' => 'Government-issued identification documents', 'slug' => 'government-ids', 'icon' => 'id-card', 'color' => 'blue'],
             ['name' => 'Barangay Clearances', 'description' => 'Barangay clearance documents', 'slug' => 'barangay-clearances', 'icon' => 'file-alt', 'color' => 'green'],
@@ -887,13 +1015,18 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($categories as $category) {
-            DB::table('document_categories')->insert(array_merge($category, [
-                'order' => 0,
-                'is_active' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('document_categories')->updateOrInsert(
+                ['slug' => $category['slug']],
+                array_merge($category, [
+                    'order' => 0,
+                    'is_active' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($categories) . ' document categories');
     }
 
     /**
@@ -901,7 +1034,9 @@ class DatabaseSeeder extends Seeder
      */
     private function seedDocumentTypes(): void
     {
-        $categories = DB::table('document_categories')->get();
+        $this->command->info('Seeding document types...');
+        
+        $categories = DB::table('document_categories')->get()->keyBy('slug');
         
         $docTypes = [
             ['name' => 'UMID ID', 'code' => 'DOC-UMID', 'description' => 'Unified Multi-Purpose ID', 'category_slug' => 'government-ids', 'is_required' => 1],
@@ -913,22 +1048,29 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($docTypes as $docType) {
-            $category = $categories->where('slug', $docType['category_slug'])->first();
+            $category = $categories[$docType['category_slug']] ?? null;
             
-            DB::table('document_types')->insert([
-                'name' => $docType['name'],
-                'code' => $docType['code'],
-                'description' => $docType['description'],
-                'document_category_id' => $category->id,
-                'is_required' => $docType['is_required'],
-                'sort_order' => 0,
-                'accepted_formats' => json_encode(['pdf', 'jpg', 'png']),
-                'max_file_size' => 5120,
-                'is_active' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            if ($category) {
+                DB::table('document_types')->updateOrInsert(
+                    ['code' => $docType['code']],
+                    [
+                        'name' => $docType['name'],
+                        'code' => $docType['code'],
+                        'description' => $docType['description'],
+                        'document_category_id' => $category->id,
+                        'is_required' => $docType['is_required'],
+                        'sort_order' => 0,
+                        'accepted_formats' => json_encode(['pdf', 'jpg', 'png']),
+                        'max_file_size' => 5120,
+                        'is_active' => 1,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]
+                );
+            }
         }
+        
+        $this->command->info('✅ Seeded ' . count($docTypes) . ' document types');
     }
 
     /**
@@ -936,6 +1078,8 @@ class DatabaseSeeder extends Seeder
      */
     private function seedClearanceTypes(): void
     {
+        $this->command->info('Seeding clearance types...');
+        
         $clearanceTypes = [
             ['name' => 'Barangay Clearance', 'code' => 'BC-001', 'description' => 'Standard barangay clearance for various purposes', 'fee' => 50.00, 'processing_days' => 1, 'validity_days' => 365, 'requires_payment' => 1, 'requires_approval' => 1],
             ['name' => 'Certificate of Residency', 'code' => 'COR-001', 'description' => 'Proof of residency in the barangay', 'fee' => 50.00, 'processing_days' => 1, 'validity_days' => 180, 'requires_payment' => 1, 'requires_approval' => 0],
@@ -944,14 +1088,19 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($clearanceTypes as $type) {
-            DB::table('clearance_types')->insert(array_merge($type, [
-                'is_active' => 1,
-                'is_online_only' => 0,
-                'is_discountable' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('clearance_types')->updateOrInsert(
+                ['code' => $type['code']],
+                array_merge($type, [
+                    'is_active' => 1,
+                    'is_online_only' => 0,
+                    'is_discountable' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($clearanceTypes) . ' clearance types');
     }
 
     /**
@@ -959,8 +1108,10 @@ class DatabaseSeeder extends Seeder
      */
     private function seedBusinesses(): void
     {
+        $this->command->info('Seeding businesses...');
+        
         $residents = DB::table('residents')->get();
-        $puroks = DB::table('puroks')->get();
+        $puroks = DB::table('puroks')->get()->keyBy('slug');
         
         $businesses = [
             ['business_name' => 'Dela Cruz Sari-sari Store', 'business_type' => 'Retail', 'owner_name' => 'Juan Dela Cruz', 'address' => 'Purok 1', 'purok_slug' => 'purok-1', 'capital_amount' => 50000, 'monthly_gross' => 30000, 'employee_count' => 1, 'status' => 'active'],
@@ -971,18 +1122,25 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($businesses as $business) {
-            $owner = $residents->where('first_name', explode(' ', $business['owner_name'])[0])
-                               ->where('last_name', explode(' ', $business['owner_name'])[1])
-                               ->first();
-            $purok = $puroks->where('slug', $business['purok_slug'])->first();
+            // Find owner by full name
+            $owner = null;
+            foreach ($residents as $r) {
+                $fullName = $r->first_name . ' ' . $r->last_name;
+                if ($fullName === $business['owner_name']) {
+                    $owner = $r;
+                    break;
+                }
+            }
+            
+            $purok = $puroks[$business['purok_slug']] ?? null;
             
             DB::table('businesses')->insert([
                 'business_name' => $business['business_name'],
                 'business_type' => $business['business_type'],
-                'owner_id' => $owner ? $owner->id : null,
+                'owner_id' => $owner->id ?? null,
                 'owner_name' => $business['owner_name'],
                 'address' => $business['address'],
-                'purok_id' => $purok->id,
+                'purok_id' => $purok->id ?? null,
                 'capital_amount' => $business['capital_amount'],
                 'monthly_gross' => $business['monthly_gross'],
                 'employee_count' => $business['employee_count'],
@@ -991,6 +1149,8 @@ class DatabaseSeeder extends Seeder
                 'updated_at' => now(),
             ]);
         }
+        
+        $this->command->info('✅ Seeded ' . count($businesses) . ' businesses');
     }
 
     /**
@@ -998,8 +1158,7 @@ class DatabaseSeeder extends Seeder
      */
     private function seedFeeTypes(): void
     {
-        // Check if frequency column exists and get its type
-        $columns = DB::select("SHOW COLUMNS FROM fee_types WHERE Field = 'frequency'");
+        $this->command->info('Seeding fee types...');
         
         $feeTypes = [
             [
@@ -1015,6 +1174,7 @@ class DatabaseSeeder extends Seeder
                 'senior_discount_percentage' => 20.00,
                 'has_pwd_discount' => 1,
                 'pwd_discount_percentage' => 20.00,
+                'frequency' => 'one_time',
             ],
             [
                 'code' => 'FEE-CERT',
@@ -1029,6 +1189,7 @@ class DatabaseSeeder extends Seeder
                 'senior_discount_percentage' => 20.00,
                 'has_pwd_discount' => 1,
                 'pwd_discount_percentage' => 20.00,
+                'frequency' => 'one_time',
             ],
             [
                 'code' => 'FEE-BIZ',
@@ -1043,6 +1204,7 @@ class DatabaseSeeder extends Seeder
                 'senior_discount_percentage' => 20.00,
                 'has_pwd_discount' => 1,
                 'pwd_discount_percentage' => 20.00,
+                'frequency' => 'one_time',
             ],
             [
                 'code' => 'FEE-STALL',
@@ -1057,28 +1219,21 @@ class DatabaseSeeder extends Seeder
                 'senior_discount_percentage' => 0.00,
                 'has_pwd_discount' => 0,
                 'pwd_discount_percentage' => 0.00,
+                'frequency' => 'monthly',
             ],
         ];
         
         foreach ($feeTypes as $feeType) {
-            // Only add frequency if the column exists and is not a time/datetime type
-            if (!empty($columns)) {
-                $type = $columns[0]->Type;
-                // If it's ENUM, add frequency with appropriate value
-                if (strpos($type, 'enum') !== false) {
-                    $feeType['frequency'] = 'one_time';
-                }
-                // If it's TIME/DATETIME, add a time value
-                elseif (strpos($type, 'time') !== false || strpos($type, 'datetime') !== false) {
-                    $feeType['frequency'] = '00:00:00';
-                }
-            }
-            
-            DB::table('fee_types')->insert(array_merge($feeType, [
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('fee_types')->updateOrInsert(
+                ['code' => $feeType['code']],
+                array_merge($feeType, [
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($feeTypes) . ' fee types');
     }
 
     /**
@@ -1086,6 +1241,8 @@ class DatabaseSeeder extends Seeder
      */
     private function seedDiscountTypes(): void
     {
+        $this->command->info('Seeding discount types...');
+        
         $discountTypes = [
             ['code' => 'DISC-SENIOR', 'name' => 'Senior Citizen Discount', 'description' => '20% discount for senior citizens', 'default_percentage' => 20.00, 'legal_basis' => 'RA 9994', 'is_mandatory' => 1],
             ['code' => 'DISC-PWD', 'name' => 'PWD Discount', 'description' => '20% discount for persons with disability', 'default_percentage' => 20.00, 'legal_basis' => 'RA 10754', 'is_mandatory' => 1],
@@ -1094,13 +1251,18 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($discountTypes as $type) {
-            DB::table('discount_types')->insert(array_merge($type, [
-                'is_active' => 1,
-                'sort_order' => 0,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('discount_types')->updateOrInsert(
+                ['code' => $type['code']],
+                array_merge($type, [
+                    'is_active' => 1,
+                    'sort_order' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($discountTypes) . ' discount types');
     }
 
     /**
@@ -1108,6 +1270,8 @@ class DatabaseSeeder extends Seeder
      */
     private function seedDiscountRules(): void
     {
+        $this->command->info('Seeding discount rules...');
+        
         $discountRules = [
             ['code' => 'SR-001', 'name' => 'Senior Citizen Discount Rule', 'discount_type' => 'SENIOR', 'value_type' => 'percentage', 'discount_value' => 20.00, 'priority' => 1, 'requires_verification' => 1],
             ['code' => 'PWD-001', 'name' => 'PWD Discount Rule', 'discount_type' => 'PWD', 'value_type' => 'percentage', 'discount_value' => 20.00, 'priority' => 1, 'requires_verification' => 1],
@@ -1115,15 +1279,20 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($discountRules as $rule) {
-            DB::table('discount_rules')->insert(array_merge($rule, [
-                'applicable_to' => 'resident',
-                'stackable' => 0,
-                'is_active' => 1,
-                'sort_order' => 0,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('discount_rules')->updateOrInsert(
+                ['code' => $rule['code']],
+                array_merge($rule, [
+                    'applicable_to' => 'resident',
+                    'stackable' => 0,
+                    'is_active' => 1,
+                    'sort_order' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($discountRules) . ' discount rules');
     }
 
     /**
@@ -1131,6 +1300,12 @@ class DatabaseSeeder extends Seeder
      */
     private function seedAnnouncements(): void
     {
+        $this->command->info('Seeding announcements...');
+        
+        $users = DB::table('users')->get()->keyBy('username');
+        $admin = $users['admin'] ?? null;
+        $roles = DB::table('roles')->get()->keyBy('name');
+        
         $announcements = [
             [
                 'title' => 'Barangay Assembly 2024',
@@ -1142,6 +1317,7 @@ class DatabaseSeeder extends Seeder
                 'end_date' => '2024-03-30',
                 'end_time' => '12:00:00',
                 'audience_type' => 'all',
+                'created_by' => $admin->id ?? null,
             ],
             [
                 'title' => 'Free Medical Mission',
@@ -1153,6 +1329,7 @@ class DatabaseSeeder extends Seeder
                 'end_date' => '2024-04-15',
                 'end_time' => '16:00:00',
                 'audience_type' => 'all',
+                'created_by' => $admin->id ?? null,
             ],
             [
                 'title' => 'Water Interruption Advisory',
@@ -1164,6 +1341,7 @@ class DatabaseSeeder extends Seeder
                 'end_date' => '2024-03-25',
                 'end_time' => '17:00:00',
                 'audience_type' => 'all',
+                'created_by' => $admin->id ?? null,
             ],
             [
                 'title' => 'Registration for Senior Citizens',
@@ -1175,22 +1353,21 @@ class DatabaseSeeder extends Seeder
                 'end_date' => '2024-03-15',
                 'end_time' => '17:00:00',
                 'audience_type' => 'roles',
-                'target_roles' => json_encode([DB::table('roles')->where('name', 'Household Head')->first()->id]),
+                'target_roles' => $roles['Resident'] ? json_encode([$roles['Resident']->id]) : null,
+                'created_by' => $admin->id ?? null,
             ],
         ];
-        
-        $users = DB::table('users')->get();
-        $admin = $users->where('username', 'admin')->first();
         
         foreach ($announcements as $announcement) {
             DB::table('announcements')->insert(array_merge($announcement, [
                 'is_active' => 1,
-                'created_by' => $admin->id,
-                'updated_by' => $admin->id,
+                'updated_by' => $announcement['created_by'],
                 'created_at' => now(),
                 'updated_at' => now(),
             ]));
         }
+        
+        $this->command->info('✅ Seeded ' . count($announcements) . ' announcements');
     }
 
     /**
@@ -1198,6 +1375,8 @@ class DatabaseSeeder extends Seeder
      */
     private function seedReportTypes(): void
     {
+        $this->command->info('Seeding report types...');
+        
         $reportTypes = [
             ['name' => 'Noise Complaint', 'code' => 'REP-NOISE', 'category' => 'Complaint', 'subcategory' => 'Noise', 'priority_level' => 3, 'resolution_days' => 3, 'requires_immediate_action' => 0],
             ['name' => 'Waste Management Issue', 'code' => 'REP-WASTE', 'category' => 'Environmental', 'subcategory' => 'Waste', 'priority_level' => 4, 'resolution_days' => 2, 'requires_immediate_action' => 1],
@@ -1207,15 +1386,20 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($reportTypes as $type) {
-            DB::table('report_types')->insert(array_merge($type, [
-                'description' => $type['name'] . ' reporting form',
-                'is_active' => 1,
-                'requires_evidence' => 1,
-                'allows_anonymous' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('report_types')->updateOrInsert(
+                ['code' => $type['code']],
+                array_merge($type, [
+                    'description' => $type['name'] . ' reporting form',
+                    'is_active' => 1,
+                    'requires_evidence' => 1,
+                    'allows_anonymous' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($reportTypes) . ' report types');
     }
 
     /**
@@ -1223,8 +1407,10 @@ class DatabaseSeeder extends Seeder
      */
     private function seedCommunityReports(): void
     {
-        $reportTypes = DB::table('report_types')->get();
-        $users = DB::table('users')->get();
+        $this->command->info('Seeding community reports...');
+        
+        $reportTypes = DB::table('report_types')->get()->keyBy('code');
+        $users = DB::table('users')->get()->keyBy('username');
         $residents = DB::table('residents')->get();
         
         $reports = [
@@ -1237,6 +1423,7 @@ class DatabaseSeeder extends Seeder
                 'urgency_level' => 'medium',
                 'affected_people' => 'community',
                 'status' => 'pending',
+                'reporter_username' => 'resident1',
             ],
             [
                 'title' => 'Uncollected Garbage',
@@ -1247,6 +1434,7 @@ class DatabaseSeeder extends Seeder
                 'urgency_level' => 'high',
                 'affected_people' => 'community',
                 'status' => 'in_progress',
+                'reporter_username' => 'resident1',
             ],
             [
                 'title' => 'Street Light Not Working',
@@ -1257,32 +1445,36 @@ class DatabaseSeeder extends Seeder
                 'urgency_level' => 'low',
                 'affected_people' => 'community',
                 'status' => 'resolved',
+                'reporter_username' => 'resident2',
             ],
         ];
         
-        $resident = $residents->first();
-        $user = $users->where('username', 'resident1')->first();
-        
         foreach ($reports as $report) {
-            $reportType = $reportTypes->where('code', $report['report_type_code'])->first();
+            $reportType = $reportTypes[$report['report_type_code']] ?? null;
+            $user = $users[$report['reporter_username']] ?? null;
+            $resident = $user ? $residents->where('user_id', $user->id)->first() : null;
             
-            DB::table('community_reports')->insert([
-                'report_type_id' => $reportType->id,
-                'report_number' => 'REP-' . strtoupper(Str::random(8)),
-                'title' => $report['title'],
-                'description' => $report['description'],
-                'location' => $report['location'],
-                'incident_date' => $report['incident_date'],
-                'urgency_level' => $report['urgency_level'],
-                'affected_people' => $report['affected_people'],
-                'status' => $report['status'],
-                'user_id' => $user->id,
-                'reporter_name' => $resident->first_name . ' ' . $resident->last_name,
-                'reporter_contact' => $resident->contact_number,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            if ($reportType && $user && $resident) {
+                DB::table('community_reports')->insert([
+                    'report_type_id' => $reportType->id,
+                    'report_number' => 'REP-' . strtoupper(Str::random(8)),
+                    'title' => $report['title'],
+                    'description' => $report['description'],
+                    'location' => $report['location'],
+                    'incident_date' => $report['incident_date'],
+                    'urgency_level' => $report['urgency_level'],
+                    'affected_people' => $report['affected_people'],
+                    'status' => $report['status'],
+                    'user_id' => $user->id,
+                    'reporter_name' => $resident->first_name . ' ' . $resident->last_name,
+                    'reporter_contact' => $resident->contact_number,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
         }
+        
+        $this->command->info('✅ Seeded ' . count($reports) . ' community reports');
     }
 
     /**
@@ -1290,6 +1482,8 @@ class DatabaseSeeder extends Seeder
      */
     private function seedBlotters(): void
     {
+        $this->command->info('Seeding blotters...');
+        
         $blotters = [
             [
                 'blotter_number' => 'BL-2024-001',
@@ -1335,11 +1529,16 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($blotters as $blotter) {
-            DB::table('blotters')->insert(array_merge($blotter, [
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('blotters')->updateOrInsert(
+                ['blotter_number' => $blotter['blotter_number']],
+                array_merge($blotter, [
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($blotters) . ' blotters');
     }
 
     /**
@@ -1347,6 +1546,8 @@ class DatabaseSeeder extends Seeder
      */
     private function seedSupportCategories(): void
     {
+        $this->command->info('Seeding support categories...');
+        
         $categories = [
             ['name' => 'Account Issues', 'slug' => 'account-issues', 'description' => 'Problems with user account or login'],
             ['name' => 'Document Request', 'slug' => 'document-request', 'description' => 'Request for barangay documents'],
@@ -1356,13 +1557,18 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($categories as $category) {
-            DB::table('support_categories')->insert(array_merge($category, [
-                'order' => 0,
-                'is_active' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('support_categories')->updateOrInsert(
+                ['slug' => $category['slug']],
+                array_merge($category, [
+                    'order' => 0,
+                    'is_active' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($categories) . ' support categories');
     }
 
     /**
@@ -1370,8 +1576,12 @@ class DatabaseSeeder extends Seeder
      */
     private function seedSupportTickets(): void
     {
+        $this->command->info('Seeding support tickets...');
+        
         $residents = DB::table('residents')->get();
-        $categories = DB::table('support_categories')->get();
+        $categories = DB::table('support_categories')->get()->keyBy('slug');
+        $user = DB::table('users')->where('username', 'resident1')->first();
+        $resident = $residents->where('user_id', $user->id ?? null)->first();
         
         $tickets = [
             [
@@ -1394,23 +1604,27 @@ class DatabaseSeeder extends Seeder
             ],
         ];
         
-        $resident = $residents->where('first_name', 'Pedro')->first();
-        
-        foreach ($tickets as $ticket) {
-            $category = $categories->where('slug', $ticket['category_slug'])->first();
-            
-            DB::table('support_tickets')->insert([
-                'resident_id' => $resident->id,
-                'ticket_number' => 'TKT-' . strtoupper(Str::random(10)),
-                'subject' => $ticket['subject'],
-                'category' => $category->name,
-                'priority' => $ticket['priority'],
-                'message' => $ticket['message'],
-                'status' => 'open',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        if ($resident) {
+            foreach ($tickets as $ticket) {
+                $category = $categories[$ticket['category_slug']] ?? null;
+                
+                if ($category) {
+                    DB::table('support_tickets')->insert([
+                        'resident_id' => $resident->id,
+                        'ticket_number' => 'TKT-' . strtoupper(Str::random(10)),
+                        'subject' => $ticket['subject'],
+                        'category' => $category->name,
+                        'priority' => $ticket['priority'],
+                        'message' => $ticket['message'],
+                        'status' => 'open',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
         }
+        
+        $this->command->info('✅ Seeded ' . count($tickets) . ' support tickets');
     }
 
     /**
@@ -1418,8 +1632,10 @@ class DatabaseSeeder extends Seeder
      */
     private function seedForms(): void
     {
-        $users = DB::table('users')->get();
-        $admin = $users->where('username', 'admin')->first();
+        $this->command->info('Seeding forms...');
+        
+        $users = DB::table('users')->get()->keyBy('username');
+        $admin = $users['admin'] ?? null;
         
         $forms = [
             [
@@ -1461,15 +1677,20 @@ class DatabaseSeeder extends Seeder
         ];
         
         foreach ($forms as $form) {
-            DB::table('forms')->insert(array_merge($form, [
-                'file_path' => '/forms/' . $form['file_name'],
-                'is_active' => 1,
-                'is_public' => 1,
-                'download_count' => 0,
-                'created_by' => $admin->id,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]));
+            DB::table('forms')->updateOrInsert(
+                ['slug' => $form['slug']],
+                array_merge($form, [
+                    'file_path' => '/forms/' . $form['file_name'],
+                    'is_active' => 1,
+                    'is_public' => 1,
+                    'download_count' => 0,
+                    'created_by' => $admin->id ?? null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
         }
+        
+        $this->command->info('✅ Seeded ' . count($forms) . ' forms');
     }
 }

@@ -871,7 +871,7 @@ export default function CommunityReports() {
                     { title: 'Community Reports', href: '/portal/community-reports' }
                 ]}
             >
-                <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
+                <div className="space-y-4 md:space-y-6 pb-28 md:pb-6">
                     {/* Mobile Header */}
                     {isMobile && (
                         <div className="flex items-center justify-between sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-10 py-3 px-4 -mx-4">
@@ -1122,9 +1122,9 @@ export default function CommunityReports() {
                     </div>
                 </div>
                 
-                {/* Mobile FAB */}
+                {/* Mobile FAB - repositioned to avoid footer */}
                 {isMobile && !showMobileFilters && (
-                    <div className="fixed bottom-6 right-6 z-50 safe-bottom animate-scale-in">
+                    <div className="fixed bottom-20 right-6 z-50 animate-scale-in">
                         <Link href="/portal/community-reports/create">
                             <Button 
                                 size="lg" 

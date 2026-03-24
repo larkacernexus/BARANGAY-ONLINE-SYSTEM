@@ -25,7 +25,6 @@ interface ModernClearanceGridCardProps {
   currentResident?: any;
   onCopyReference?: (ref: string) => void;
   onViewDetails?: (id: number) => void;
-  onMakePayment?: (id: number) => void;
   onDownloadClearance?: (clearance: any) => void;
   onGenerateReport?: (clearance: any) => void;
   onReportIssue?: (clearance: any) => void;
@@ -42,7 +41,6 @@ export const ModernClearanceGridCard = ({
   currentResident,
   onCopyReference,
   onViewDetails,
-  onMakePayment,
   onDownloadClearance,
   onGenerateReport,
   onReportIssue,
@@ -218,16 +216,6 @@ export const ModernClearanceGridCard = ({
               <Eye className="h-4 w-4" />
               View
             </Button>
-            {clearance.status === 'pending_payment' && (
-              <Button
-                size="sm"
-                className="flex-1 gap-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
-                onClick={() => onMakePayment?.(clearance.id)}
-              >
-                <DollarSign className="h-4 w-4" />
-                Pay
-              </Button>
-            )}
             {clearance.status === 'issued' && clearance.clearance_number && (
               <Button
                 size="sm"
