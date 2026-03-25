@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface MembersTabProps {
-  household?: ProfileUserData['resident']['household'];
+  household?: ProfileUserData['resident'];
   residentId?: number;
 }
 
@@ -117,17 +117,17 @@ function getPrivilegeColor(code: string): string {
   const colorIndex = firstChar % 8;
   
   const colors = [
-    'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900 text-green-700 dark:text-green-400',
-    'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-400',
-    'bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900 text-purple-700 dark:text-purple-400',
-    'bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900 text-orange-700 dark:text-orange-400',
-    'bg-pink-50 dark:bg-pink-950/20 border-pink-200 dark:border-pink-900 text-pink-700 dark:text-pink-400',
-    'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-400',
-    'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-400',
-    'bg-cyan-50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900 text-cyan-700 dark:text-cyan-400',
+    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
+    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
+    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
+    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
+    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
+    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
+    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
+    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
   ];
   
-  return colors[colorIndex] || 'bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-400';
+  return colors[colorIndex] || 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300';
 }
 
 /**
@@ -183,9 +183,11 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
 
   if (!household?.members || household.members.length === 0) {
     return (
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>No household members found.</AlertDescription>
+      <Alert className="bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700">
+        <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+        <AlertDescription className="text-gray-600 dark:text-gray-400">
+          No household members found.
+        </AlertDescription>
       </Alert>
     );
   }
@@ -235,15 +237,15 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-foreground">Household Members</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Household Members</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {household.members.length} {household.members.length === 1 ? 'member' : 'members'} in this household
           </p>
         </div>
         {household.household_number && (
-          <Badge variant="outline" className="text-sm border-border bg-background">
-            <Hash className="h-3 w-3 mr-1 text-muted-foreground" />
-            <span className="text-foreground">#{household.household_number}</span>
+          <Badge variant="outline" className="text-sm border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300">
+            <Hash className="h-3 w-3 mr-1 text-gray-400 dark:text-gray-500" />
+            <span>#{household.household_number}</span>
           </Badge>
         )}
       </div>
@@ -259,39 +261,39 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
             <Card 
               key={member.id} 
               className={cn(
-                "overflow-hidden transition-colors border-border",
-                member.is_head && "border-primary/30 dark:border-primary/40"
+                "overflow-hidden transition-colors bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800",
+                member.is_head && "border-gray-300 dark:border-gray-700"
               )}
             >
               {/* Member Header - Always Visible */}
               <div 
-                className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
+                className="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 onClick={() => toggleMember(member.id)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12 border-2 border-background dark:border-gray-800">
-                      <AvatarFallback className="bg-primary/10 text-primary dark:bg-primary/20">
+                    <Avatar className="h-12 w-12 border border-gray-200 dark:border-gray-700">
+                      <AvatarFallback className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
                         {getInitials(member.full_name)}
                       </AvatarFallback>
                     </Avatar>
                     
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-foreground">{member.full_name}</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">{member.full_name}</span>
                         {member.is_head && (
-                          <Badge variant="secondary" className="text-xs bg-secondary text-secondary-foreground">
+                          <Badge variant="secondary" className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
                             Head
                           </Badge>
                         )}
                         {member.id === residentId && (
-                          <Badge variant="outline" className="text-xs border-primary text-primary">
+                          <Badge variant="outline" className="text-xs border-blue-500 text-blue-600 dark:text-blue-400">
                             You
                           </Badge>
                         )}
                         {getStatusBadge(member.status)}
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                         <span>{member.relationship_to_head}</span>
                         {member.age && (
                           <>
@@ -309,7 +311,7 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                     </div>
                   </div>
                   
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
                     {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -325,8 +327,7 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                               variant="outline" 
                               className={cn(
                                 "text-xs px-2 py-0.5 cursor-help",
-                                badge.color.split(' ')[0],
-                                badge.color.split(' ')[1]
+                                badge.color
                               )}
                             >
                               <span className="mr-1">{badge.icon}</span>
@@ -354,7 +355,7 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Badge variant="outline" className="text-xs px-2 py-0.5 bg-gray-50 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300 dark:border-gray-700">
+                            <Badge variant="outline" className="text-xs px-2 py-0.5 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
                               <span className="mr-1">🗳️</span>
                               Voter
                             </Badge>
@@ -371,13 +372,13 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
 
               {/* Dropdown Details - Shows when open */}
               {isOpen && (
-                <CardContent className="border-t border-border p-4 bg-muted/20 dark:bg-muted/10">
+                <CardContent className="border-t border-gray-100 dark:border-gray-800 p-4 bg-gray-50/30 dark:bg-gray-800/30">
                   <div className="space-y-4">
                     
                     {/* Personal Information Section */}
                     <div>
-                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-foreground">
-                        <User className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                        <User className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                         Personal Information
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -385,22 +386,22 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Resident ID */}
                         {member.resident_id && (
                           <div className="flex items-start gap-2">
-                            <IdCard className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <IdCard className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Resident ID</p>
-                              <p className="text-sm font-mono text-foreground">{member.resident_id}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Resident ID</p>
+                              <p className="text-sm font-mono text-gray-900 dark:text-white">{member.resident_id}</p>
                             </div>
                           </div>
                         )}
 
                         {/* Full Name with details */}
                         <div className="flex items-start gap-2">
-                          <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+                          <User className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                           <div>
-                            <p className="text-xs text-muted-foreground">Full Name</p>
-                            <p className="text-sm text-foreground">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Full Name</p>
+                            <p className="text-sm text-gray-900 dark:text-white">
                               {member.first_name} {member.middle_name ? member.middle_name + ' ' : ''}{member.last_name}
-                              {member.suffix && <span className="text-muted-foreground">, {member.suffix}</span>}
+                              {member.suffix && <span className="text-gray-500 dark:text-gray-400">, {member.suffix}</span>}
                             </p>
                           </div>
                         </div>
@@ -408,12 +409,12 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Birth Date */}
                         {member.birth_date && (
                           <div className="flex items-start gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Birth Date</p>
-                              <p className="text-sm text-foreground">{formatDate(member.birth_date)}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Birth Date</p>
+                              <p className="text-sm text-gray-900 dark:text-white">{formatDate(member.birth_date)}</p>
                               {member.age && (
-                                <p className="text-xs text-muted-foreground">Age: {member.age} years</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Age: {member.age} years</p>
                               )}
                             </div>
                           </div>
@@ -422,10 +423,10 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Place of Birth */}
                         {member.place_of_birth && (
                           <div className="flex items-start gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <MapPin className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Place of Birth</p>
-                              <p className="text-sm text-foreground">{member.place_of_birth}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Place of Birth</p>
+                              <p className="text-sm text-gray-900 dark:text-white">{member.place_of_birth}</p>
                             </div>
                           </div>
                         )}
@@ -433,10 +434,10 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Gender */}
                         {member.gender && (
                           <div className="flex items-start gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <Users className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Gender</p>
-                              <p className="text-sm capitalize text-foreground">{member.gender}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Gender</p>
+                              <p className="text-sm capitalize text-gray-900 dark:text-white">{member.gender}</p>
                             </div>
                           </div>
                         )}
@@ -444,10 +445,10 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Civil Status */}
                         {member.civil_status && (
                           <div className="flex items-start gap-2">
-                            <Heart className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <Heart className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Civil Status</p>
-                              <p className="text-sm capitalize text-foreground">{member.civil_status}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Civil Status</p>
+                              <p className="text-sm capitalize text-gray-900 dark:text-white">{member.civil_status}</p>
                             </div>
                           </div>
                         )}
@@ -455,22 +456,22 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Religion */}
                         {member.religion && (
                           <div className="flex items-start gap-2">
-                            <Church className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <Church className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Religion</p>
-                              <p className="text-sm text-foreground">{member.religion}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Religion</p>
+                              <p className="text-sm text-gray-900 dark:text-white">{member.religion}</p>
                             </div>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <Separator className="bg-border" />
+                    <Separator className="bg-gray-100 dark:bg-gray-800" />
 
                     {/* Contact Information Section */}
                     <div>
-                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-foreground">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                        <Phone className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                         Contact Information
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -478,10 +479,10 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Contact Number */}
                         {member.contact_number && (
                           <div className="flex items-start gap-2">
-                            <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <Phone className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Contact Number</p>
-                              <p className="text-sm text-foreground">{member.contact_number}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Contact Number</p>
+                              <p className="text-sm text-gray-900 dark:text-white">{member.contact_number}</p>
                             </div>
                           </div>
                         )}
@@ -489,10 +490,10 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Email */}
                         {member.email && (
                           <div className="flex items-start gap-2">
-                            <Mail className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <Mail className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Email</p>
-                              <p className="text-sm break-all text-foreground">{member.email}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                              <p className="text-sm break-all text-gray-900 dark:text-white">{member.email}</p>
                             </div>
                           </div>
                         )}
@@ -500,22 +501,22 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Address */}
                         {member.address && (
                           <div className="flex items-start gap-2 sm:col-span-2">
-                            <Home className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <Home className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Address</p>
-                              <p className="text-sm text-foreground">{member.address}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Address</p>
+                              <p className="text-sm text-gray-900 dark:text-white">{member.address}</p>
                             </div>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <Separator className="bg-border" />
+                    <Separator className="bg-gray-100 dark:bg-gray-800" />
 
                     {/* Professional & Education Section */}
                     <div>
-                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-foreground">
-                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                        <Briefcase className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                         Professional & Education
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -523,10 +524,10 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Occupation */}
                         {member.occupation && (
                           <div className="flex items-start gap-2">
-                            <Briefcase className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <Briefcase className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Occupation</p>
-                              <p className="text-sm text-foreground">{member.occupation}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Occupation</p>
+                              <p className="text-sm text-gray-900 dark:text-white">{member.occupation}</p>
                             </div>
                           </div>
                         )}
@@ -534,10 +535,10 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                         {/* Education */}
                         {member.education && (
                           <div className="flex items-start gap-2">
-                            <BookOpen className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <BookOpen className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
                             <div>
-                              <p className="text-xs text-muted-foreground">Education</p>
-                              <p className="text-sm text-foreground">{member.education}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Education</p>
+                              <p className="text-sm text-gray-900 dark:text-white">{member.education}</p>
                             </div>
                           </div>
                         )}
@@ -547,10 +548,10 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                     {/* Special Classifications & Discount Eligibility Section - DYNAMIC */}
                     {hasDiscountEligibility && (
                       <>
-                        <Separator className="bg-border" />
+                        <Separator className="bg-gray-100 dark:bg-gray-800" />
                         <div>
-                          <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-foreground">
-                            <Award className="h-4 w-4 text-muted-foreground" />
+                          <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                            <Award className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                             Special Classifications & Discount Eligibility
                           </h4>
                           
@@ -567,17 +568,17 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                               >
                                 <span className="text-lg mt-0.5">{privilege.icon}</span>
                                 <div>
-                                  <p className="text-xs font-medium">{privilege.name}</p>
+                                  <p className="text-xs font-medium text-gray-900 dark:text-white">{privilege.name}</p>
                                   {privilege.discount_percentage && (
-                                    <p className="text-xs">{privilege.discount_percentage}% Discount</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400">{privilege.discount_percentage}% Discount</p>
                                   )}
                                   {privilege.id_number && (
-                                    <p className="text-xs text-muted-foreground mt-1">
+                                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                                       ID: {privilege.id_number}
                                     </p>
                                   )}
                                   {privilege.expires_at && (
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-xs text-gray-500 dark:text-gray-500">
                                       Expires: {formatDate(privilege.expires_at)}
                                     </p>
                                   )}
@@ -587,8 +588,8 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
 
                             {/* Registered Voter - kept separately */}
                             {member.is_voter && (
-                              <div className="flex items-start gap-2 p-2 bg-gray-50/50 dark:bg-gray-900/50 rounded-lg border border-gray-200/50 dark:border-gray-700/50">
-                                <Shield className="h-4 w-4 text-gray-600 dark:text-gray-400 mt-0.5" />
+                              <div className="flex items-start gap-2 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                                <Shield className="h-4 w-4 text-gray-500 dark:text-gray-400 mt-0.5" />
                                 <div>
                                   <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Registered Voter</p>
                                 </div>
@@ -602,13 +603,13 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                     {/* Remarks/Notes */}
                     {member.remarks && (
                       <>
-                        <Separator className="bg-border" />
+                        <Separator className="bg-gray-100 dark:bg-gray-800" />
                         <div>
-                          <h4 className="text-sm font-medium mb-2 flex items-center gap-2 text-foreground">
-                            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                          <h4 className="text-sm font-medium mb-2 flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                            <AlertCircle className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                             Remarks
                           </h4>
-                          <p className="text-sm italic bg-background/50 dark:bg-background/20 p-3 rounded-lg border border-border text-foreground">
+                          <p className="text-sm italic bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
                             {member.remarks}
                           </p>
                         </div>
@@ -617,7 +618,7 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
 
                     {/* Membership Information */}
                     {member.membership && (
-                      <div className="mt-2 text-xs text-muted-foreground border-t border-border pt-3">
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-800 pt-3">
                         <p>Member since: {member.membership.joined_at ? formatDate(member.membership.joined_at) : 'N/A'}</p>
                       </div>
                     )}
@@ -629,9 +630,9 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
         })}
       </div>
 
-      <Alert className="bg-muted/50 dark:bg-muted/20 border-border">
-        <Info className="h-4 w-4 text-muted-foreground" />
-        <AlertDescription className="text-sm text-muted-foreground">
+      <Alert className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+        <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+        <AlertDescription className="text-sm text-gray-600 dark:text-gray-400">
           Click on each member to view their complete profile information. 
           For updates or corrections, please contact the barangay hall.
         </AlertDescription>

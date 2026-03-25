@@ -1,147 +1,35 @@
+// /Pages/resident/MyClearances.tsx
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { Head, router, usePage, Link } from '@inertiajs/react';
+import { toast } from 'sonner';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Link, usePage, router, Head } from '@inertiajs/react';
-import { toast } from 'sonner';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  AlertCircle,
-  Search,
-  Eye,
-  Plus,
-  Check,
-  X,
-  Square,
-  Grid,
-  List,
-  MoreVertical,
-  Copy,
-  FileText,
-  Printer,
-  Download,
-  Share2,
-  Filter,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  ChevronDown,
-  BarChart,
-  Loader2,
-  Calendar,
-  Clock,
-  DollarSign,
-  FileCheck,
-  User,
-  XCircle,
-  CheckCircle,
-  Zap,
-  Mail,
-  ArrowUpDown,
-  Info,
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { AlertCircle, FileText, Clock, DollarSign, Loader2, CheckCircle, FileCheck, XCircle, Plus } from 'lucide-react';
 
 // Reusable Components
 import { CustomTabs } from '@/components/residentui/CustomTabs';
-import { ModernSelect } from '@/components/residentui/modern-select';
 import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
-import { ModernStatsCards } from '@/components/residentui/modern-stats-cards';
 import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
 import { ModernPagination } from '@/components/residentui/modern-pagination';
 import { ModernLoadingOverlay } from '@/components/residentui/modern-loading-overlay';
 import { ModernSelectionBanner } from '@/components/residentui/modern-selection-banner';
 
 // Clearance-specific components
-import { 
-  STATUS_CONFIG, 
-  URGENCY_CONFIG, 
-  CLEARANCE_TABS,
-  getClearanceStatsCards 
-} from '@/components/residentui/clearances/constants';
-import {
-  formatDate,
-  formatCurrency,
-  getClearanceTypeDisplay,
-  getUrgencyBadge,
-  getStatusCount,
-  copyToClipboard,
-  printClearancesList,
-  exportClearancesToCSV,
-} from '@/components/residentui/clearances/clearance-utils';
+import { CLEARANCE_TABS, getClearanceStatsCards } from '@/components/residentui/clearances/constants';
+import { formatDate, formatCurrency, getClearanceTypeDisplay, getStatusCount, copyToClipboard, printClearancesList, exportClearancesToCSV } from '@/components/residentui/clearances/clearance-utils';
 import { ModernClearanceCard } from '@/components/residentui/clearances/modern-clearance-card';
 import { ModernClearanceGridCard } from '@/components/residentui/clearances/modern-clearance-grid-card';
 import { ModernClearanceFilters } from '@/components/residentui/clearances/modern-clearance-filters';
 import { ModernClearanceTable } from '@/components/residentui/clearances/modern-clearance-table';
+import { CollapsibleStats } from '@/components/residentui/CollapsibleStats';
+import { DesktopStats } from '@/components/portal/clearance/index/DesktopStats';
+import { HeaderSection } from '@/components/portal/clearance/index/HeaderSection';
+import { TabHeader } from '@/components/portal/clearance/index/TabHeader';
+import { FilterModalContent } from '@/components/portal/clearance/index/FilterModalContent';
 
 // Types
-interface ClearanceType {
-    id: number;
-    name: string;
-    code: string;
-    fee: number | string;
-    processing_days: number;
-}
-
-interface Resident {
-    id: number;
-    first_name: string;
-    last_name: string;
-    middle_name?: string;
-    suffix?: string;
-}
-
-interface ClearanceRequest {
-    id: number;
-    resident_id: number;
-    clearance_type_id?: number;
-    reference_number: string;
-    clearance_number?: string;
-    status: string;
-    purpose: string;
-    specific_purpose?: string;
-    urgency: 'normal' | 'rush' | 'express';
-    needed_date: string;
-    additional_requirements?: string;
-    fee_amount: number | string;
-    issue_date?: string;
-    valid_until?: string;
-    remarks?: string;
-    issuing_officer_name?: string;
-    created_at: string;
-    updated_at: string;
-    resident?: Resident;
-    clearance_type?: ClearanceType;
-    formatted_created_at: string;
-    formatted_needed_date: string;
-    formatted_issue_date?: string;
-    formatted_fee: string;
-    is_urgent: boolean;
-    days_until_needed: number;
-}
-
-interface Household {
-    id: number;
-    household_number: string;
-    head_of_family: string;
-    head_resident_id?: number;
-}
+import type { ClearanceRequest, Household, ClearanceStats, ClearanceFilters } from '@/types/portal/clearances/clearance.types';
 
 interface PageProps extends Record<string, any> {
     clearances?: {
@@ -154,133 +42,19 @@ interface PageProps extends Record<string, any> {
         to: number;
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
-    stats?: {
-        total_clearances: number;
-        pending_clearances: number;
-        pending_payment_clearances: number;
-        processing_clearances: number;
-        approved_clearances: number;
-        issued_clearances: number;
-        rejected_clearances: number;
-        cancelled_clearances: number;
-        total_fees: number;
-        total_paid: number;
-        total_balance: number;
-        current_year_total: number;
-        current_year_issued: number;
-    };
+    stats?: ClearanceStats;
     availableYears?: number[];
-    availableClearanceTypes?: ClearanceType[];
-    householdResidents?: Resident[];
-    currentResident?: {
-        id: number;
-        first_name: string;
-        last_name: string;
-    };
+    availableClearanceTypes?: Array<{ id: number; name: string }>;
+    householdResidents?: Array<{ id: number; first_name: string; last_name: string }>;
+    currentResident?: { id: number; first_name: string; last_name: string };
     household?: Household;
-    filters?: {
-        search?: string;
-        status?: string;
-        clearance_type?: string;
-        year?: string;
-        resident?: string;
-        urgency?: string;
-        page?: string;
-    };
+    filters?: ClearanceFilters;
     error?: string;
 }
 
-// StatusBadge Component with dark mode
-const StatusBadge = ({ status }: { status: string }) => {
-    const statusKey = status as keyof typeof STATUS_CONFIG;
-    const config = STATUS_CONFIG[statusKey];
-    
-    if (!config) {
-        return (
-            <Badge className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-0 px-2 py-1 flex items-center gap-1">
-                <span className="capitalize">{status.replace('_', ' ')}</span>
-            </Badge>
-        );
-    }
-    
-    const Icon = config.icon;
-    return (
-        <Badge className={`${config.color} ${config.textColor} border-0 px-2 py-1 flex items-center gap-1`}>
-            <Icon className="h-3 w-3" />
-            <span>{config.label}</span>
-        </Badge>
-    );
-};
-
-// UrgencyBadge Component with dark mode
-const UrgencyBadge = ({ urgency }: { urgency: string }) => {
-    const urgencyKey = urgency as keyof typeof URGENCY_CONFIG;
-    const config = URGENCY_CONFIG[urgencyKey];
-    
-    if (!config) {
-        return (
-            <Badge variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
-                {urgency}
-            </Badge>
-        );
-    }
-    
-    return (
-        <Badge variant="outline" className={`${config.color} ${config.textColor} border-0`}>
-            <span className={`h-2 w-2 rounded-full ${config.dot} mr-2`}></span>
-            <span>{config.label}</span>
-        </Badge>
-    );
-};
-
-// CollapsibleStats Component (Mobile)
-const CollapsibleStats = ({ 
-    showStats, 
-    setShowStats, 
-    stats, 
-    formatCurrency 
-}: any) => (
-    <div className="md:hidden">
-        <Button 
-            variant="outline" 
-            className="w-full justify-between bg-white dark:bg-gray-900 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-            onClick={() => setShowStats(!showStats)}
-        >
-            <div className="flex items-center gap-2">
-                <BarChart className="h-4 w-4" />
-                <span>{showStats ? 'Hide Statistics' : 'Show Statistics'}</span>
-            </div>
-            {showStats ? (
-                <ChevronUp className="h-4 w-4" />
-            ) : (
-                <ChevronDown className="h-4 w-4" />
-            )}
-        </Button>
-        
-        {showStats && (
-            <div className="mt-2 animate-slide-down">
-                <ModernStatsCards 
-                    cards={getClearanceStatsCards(stats, formatCurrency)} 
-                    loading={false}
-                    gridCols="grid-cols-2"
-                />
-            </div>
-        )}
-    </div>
-);
-
-// DesktopStats Component
-const DesktopStats = ({ 
-    stats, 
-    formatCurrency 
-}: any) => (
-    <div className="hidden md:block">
-        <ModernStatsCards 
-            cards={getClearanceStatsCards(stats, formatCurrency)} 
-            loading={false}
-        />
-    </div>
-);
+// Type for status filter - can be string or specific status type
+type StatusFilterValue = string | 'pending' | 'pending_payment' | 'processing' | 'approved' | 'issued' | 'rejected' | 'cancelled' | 'all';
+type UrgencyFilterValue = string | 'normal' | 'rush' | 'express' | 'all';
 
 export default function MyClearances() {
     const page = usePage<PageProps>();
@@ -321,10 +95,10 @@ export default function MyClearances() {
     const filters = pageProps.filters || {};
     
     const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
+    const [statusFilter, setStatusFilter] = useState<StatusFilterValue>(filters.status || 'all');
     const [clearanceTypeFilter, setClearanceTypeFilter] = useState(filters.clearance_type || 'all');
     const [residentFilter, setResidentFilter] = useState(filters.resident || 'all');
-    const [urgencyFilter, setUrgencyFilter] = useState(filters.urgency || 'all');
+    const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilterValue>(filters.urgency || 'all');
     const [yearFilter, setYearFilter] = useState(filters.year || 'all');
     const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
@@ -403,7 +177,7 @@ export default function MyClearances() {
         Object.entries(updatedFilters).forEach(([key, value]) => {
             if (key === 'page' && value === '1') return;
             if (value && value !== '' && value !== 'all' && value !== undefined) {
-                cleanFilters[key] = value;
+                cleanFilters[key] = String(value);
             }
         });
         
@@ -416,18 +190,12 @@ export default function MyClearances() {
     };
     
     const handleTabChange = (tab: string) => {
-        setStatusFilter(tab);
+        setStatusFilter(tab as StatusFilterValue);
         
         if (tab === 'all') {
-            updateFilters({ 
-                status: '',
-                page: '1'
-            });
+            updateFilters({ status: '', page: '1' });
         } else {
-            updateFilters({ 
-                status: tab,
-                page: '1'
-            });
+            updateFilters({ status: tab, page: '1' });
         }
         
         if (isMobile) setShowMobileFilters(false);
@@ -435,37 +203,25 @@ export default function MyClearances() {
     
     const handleClearanceTypeChange = (type: string) => {
         setClearanceTypeFilter(type);
-        updateFilters({ 
-            clearance_type: type === 'all' ? '' : type,
-            page: '1'
-        });
+        updateFilters({ clearance_type: type === 'all' ? '' : type, page: '1' });
         if (isMobile) setShowMobileFilters(false);
     };
     
     const handleResidentChange = (resident: string) => {
         setResidentFilter(resident);
-        updateFilters({ 
-            resident: resident === 'all' ? '' : resident,
-            page: '1'
-        });
+        updateFilters({ resident: resident === 'all' ? '' : resident, page: '1' });
         if (isMobile) setShowMobileFilters(false);
     };
     
     const handleUrgencyChange = (urgency: string) => {
-        setUrgencyFilter(urgency);
-        updateFilters({ 
-            urgency: urgency === 'all' ? '' : urgency,
-            page: '1'
-        });
+        setUrgencyFilter(urgency as UrgencyFilterValue);
+        updateFilters({ urgency: urgency === 'all' ? '' : urgency, page: '1' });
         if (isMobile) setShowMobileFilters(false);
     };
     
     const handleYearChange = (year: string) => {
         setYearFilter(year);
-        updateFilters({ 
-            year: year === 'all' ? '' : year,
-            page: '1'
-        });
+        updateFilters({ year: year === 'all' ? '' : year, page: '1' });
         if (isMobile) setShowMobileFilters(false);
     };
     
@@ -491,26 +247,17 @@ export default function MyClearances() {
         if (searchTimeout.current) {
             clearTimeout(searchTimeout.current);
         }
-        updateFilters({ 
-            search: search.trim(),
-            page: '1'
-        });
+        updateFilters({ search: search.trim(), page: '1' });
     };
     
     const handleSearchClear = () => {
         setSearch('');
-        updateFilters({ 
-            search: '',
-            page: '1'
-        });
+        updateFilters({ search: '', page: '1' });
     };
     
-    // Selection mode functions
     const toggleSelectClearance = (id: number) => {
         setSelectedClearances(prev =>
-            prev.includes(id)
-                ? prev.filter(clearanceId => clearanceId !== id)
-                : [...prev, id]
+            prev.includes(id) ? prev.filter(clearanceId => clearanceId !== id) : [...prev, id]
         );
     };
     
@@ -544,7 +291,6 @@ export default function MyClearances() {
         router.visit(`/portal/my-clearances/${id}`);
     };
     
-    
     const handleDownloadClearance = (clearance: any) => {
         toast.info('Download functionality would be implemented here');
     };
@@ -570,9 +316,7 @@ export default function MyClearances() {
         copyToClipboard(ref, `Copied: ${ref}`);
     };
     
-    const getCurrentTabClearances = () => {
-        return clearances.data;
-    };
+    const getCurrentTabClearances = () => clearances.data;
     
     const hasActiveFilters = useMemo(() => {
         return Object.entries(filters).some(([key, value]) => 
@@ -672,7 +416,6 @@ ${currentResident?.first_name} ${currentResident?.last_name}
             <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
                 <CardContent className="p-4 md:p-6">
                     <ModernSelectionBanner
-                        selectMode={selectMode}
                         selectedCount={selectedClearances.length}
                         totalCount={currentClearances.length}
                         onSelectAll={selectAllClearances}
@@ -685,89 +428,17 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                         deleteLabel="Delete Selected"
                     />
                     
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {displayStatus} Clearance Requests
-                            </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                {tabHasData 
-                                    ? `Showing ${currentClearances.length} request${currentClearances.length !== 1 ? 's' : ''}`
-                                    : `No ${emptyStateStatus} found`
-                                }
-                                {selectMode && selectedClearances.length > 0 && ` • ${selectedClearances.length} selected`}
-                                {(clearanceTypeFilter !== 'all' || residentFilter !== 'all' || urgencyFilter !== 'all' || yearFilter !== 'all' || search) && ' (filtered)'}
-                                {selectMode && ' • Selection Mode'}
-                            </p>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                            {/* Sort Dropdown */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-                                        <ArrowUpDown className="h-4 w-4" />
-                                        Sort
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-                                    <DropdownMenuItem className="text-gray-700 dark:text-gray-300">
-                                        <Calendar className="h-4 w-4 mr-2" />
-                                        Date
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-gray-700 dark:text-gray-300">
-                                        <DollarSign className="h-4 w-4 mr-2" />
-                                        Amount
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-gray-700 dark:text-gray-300">
-                                        <Info className="h-4 w-4 mr-2" />
-                                        Status
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-
-                            {/* View Toggle */}
-                            {!selectMode && tabHasData && (
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
-                                    <Button
-                                        variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                                        size="sm"
-                                        onClick={() => setViewMode('grid')}
-                                        className={cn(
-                                            "h-8 w-8 p-0",
-                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                                        )}
-                                    >
-                                        <Grid className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant={viewMode === 'list' ? 'default' : 'ghost'}
-                                        size="sm"
-                                        onClick={() => setViewMode('list')}
-                                        className={cn(
-                                            "h-8 w-8 p-0",
-                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                                        )}
-                                    >
-                                        <List className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            )}
-
-                            {/* Select Mode Toggle */}
-                            {tabHasData && (
-                                <Button
-                                    variant={selectMode ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={toggleSelectMode}
-                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700"
-                                >
-                                    <Square className="h-4 w-4" />
-                                    {selectMode ? 'Cancel' : 'Select'}
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+                    <TabHeader
+                        displayStatus={displayStatus}
+                        count={currentClearances.length}
+                        selectMode={selectMode}
+                        selectedCount={selectedClearances.length}
+                        hasFilters={clearanceTypeFilter !== 'all' || residentFilter !== 'all' || urgencyFilter !== 'all' || yearFilter !== 'all' || !!search}
+                        viewMode={viewMode}
+                        setViewMode={setViewMode}
+                        onToggleSelectMode={toggleSelectMode}
+                        tabHasData={tabHasData}
+                    />
                     
                     {!tabHasData ? (
                         <ModernEmptyState
@@ -914,109 +585,32 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                 ]}
             >
                 <div className="space-y-4 md:space-y-6 pb-28 md:pb-6">
-                    {/* Mobile Header */}
-                    {isMobile && (
-                        <div className="flex items-center justify-between sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-10 py-3 px-4 -mx-4">
-                            <div>
-                                <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Clearances</h1>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    {stats.total_clearances} request{stats.total_clearances !== 1 ? 's' : ''} total
-                                    {household && (
-                                        <span className="block text-xs">
-                                            {household.household_number}
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setShowStats(!showStats)}
-                                    className="h-8 px-2 rounded-lg border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                                >
-                                    {showStats ? (
-                                        <ChevronUp className="h-4 w-4" />
-                                    ) : (
-                                        <ChevronDown className="h-4 w-4" />
-                                    )}
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setShowMobileFilters(true)}
-                                    className="h-8 px-2 rounded-lg relative border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                                >
-                                    <Filter className="h-4 w-4" />
-                                    {hasActiveFilters && (
-                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 dark:bg-red-400 rounded-full animate-pulse" />
-                                    )}
-                                </Button>
-                                <Link href="/portal/my-clearances/create">
-                                    <Button size="sm" className="h-8 px-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                                        <Plus className="h-4 w-4 mr-1" />
-                                        Request
-                                    </Button>
-                                </Link>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* Desktop Header */}
-                    {!isMobile && (
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                    My Clearances
-                                </h1>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                    Manage and track your clearance requests
-                                    {household && (
-                                        <span className="block text-xs mt-1">
-                                            Household: {household.household_number} • {household.head_of_family}
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handlePrint}
-                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                                >
-                                    <Printer className="h-4 w-4" />
-                                    Print
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleExport}
-                                    disabled={isExporting}
-                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                                >
-                                    <Download className="h-4 w-4" />
-                                    {isExporting ? 'Exporting...' : 'Export'}
-                                </Button>
-                                <Link href="/portal/my-clearances/request">
-                                    <Button className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl">
-                                        <Plus className="h-4 w-4" />
-                                        <span>New Request</span>
-                                    </Button>
-                                </Link>
-                            </div>
-                        </div>
-                    )}
+                    <HeaderSection
+                        isMobile={isMobile}
+                        statsTotal={stats.total_clearances}
+                        householdNumber={household?.household_number}
+                        headOfFamily={household?.head_of_family}
+                        showStats={showStats}
+                        setShowStats={setShowStats}
+                        hasActiveFilters={hasActiveFilters}
+                        setShowMobileFilters={setShowMobileFilters}
+                        onPrint={handlePrint}
+                        onExport={handleExport}
+                        isExporting={isExporting}
+                    />
                     
                     {/* Stats Section */}
                     {showStats && (
                         <div className="animate-slide-down">
-                            <CollapsibleStats
-                                showStats={showStats}
-                                setShowStats={setShowStats}
-                                stats={stats}
-                                formatCurrency={formatCurrency}
-                            />
+                              <CollapsibleStats
+                                    showStats={showStats}
+                                    setShowStats={setShowStats}
+                                    statusFilter={statusFilter}
+                                    stats={stats}
+                                    fees={{ data: [] }} // Pass empty array or actual fees data
+                                    getStatusCount={getStatusCount}
+                                    formatCurrency={formatCurrency}
+                                />
                             <DesktopStats
                                 stats={stats}
                                 formatCurrency={formatCurrency}
@@ -1038,79 +632,21 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                         hasActiveFilters={hasActiveFilters}
                         onClearFilters={handleClearFilters}
                     >
-                        {/* Clearance Type Filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Clearance Type
-                            </label>
-                            <ModernSelect
-                                value={clearanceTypeFilter}
-                                onValueChange={handleClearanceTypeChange}
-                                placeholder="All types"
-                                options={availableClearanceTypes.map(type => ({
-                                    value: type.id.toString(),
-                                    label: type.name
-                                }))}
-                                disabled={loading}
-                                icon={FileText}
-                            />
-                        </div>
-
-                        {/* Resident Filter */}
-                        {householdResidents.length > 0 && (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Resident
-                                </label>
-                                <ModernSelect
-                                    value={residentFilter}
-                                    onValueChange={handleResidentChange}
-                                    placeholder="All residents"
-                                    options={householdResidents.map(resident => ({
-                                        value: resident.id.toString(),
-                                        label: `${resident.first_name} ${resident.last_name}${resident.id === currentResident?.id ? ' (You)' : ''}`
-                                    }))}
-                                    disabled={loading}
-                                    icon={User}
-                                />
-                            </div>
-                        )}
-
-                        {/* Urgency Filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Urgency
-                            </label>
-                            <ModernSelect
-                                value={urgencyFilter}
-                                onValueChange={handleUrgencyChange}
-                                placeholder="All urgency"
-                                options={[
-                                    { value: 'normal', label: 'Normal' },
-                                    { value: 'rush', label: 'Rush' },
-                                    { value: 'express', label: 'Express' },
-                                ]}
-                                disabled={loading}
-                            />
-                        </div>
-
-                        {/* Year Filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Year
-                            </label>
-                            <ModernSelect
-                                value={yearFilter}
-                                onValueChange={handleYearChange}
-                                placeholder="All years"
-                                options={availableYears.map(year => ({
-                                    value: year.toString(),
-                                    label: year.toString()
-                                }))}
-                                disabled={loading}
-                                icon={Calendar}
-                            />
-                        </div>
+                        <FilterModalContent
+                            clearanceTypeFilter={clearanceTypeFilter}
+                            onClearanceTypeChange={handleClearanceTypeChange}
+                            residentFilter={residentFilter}
+                            onResidentChange={handleResidentChange}
+                            urgencyFilter={urgencyFilter}
+                            onUrgencyChange={handleUrgencyChange}
+                            yearFilter={yearFilter}
+                            onYearChange={handleYearChange}
+                            loading={loading}
+                            availableClearanceTypes={availableClearanceTypes}
+                            householdResidents={householdResidents}
+                            availableYears={availableYears}
+                            currentResidentId={currentResident?.id}
+                        />
                     </ModernFilterModal>
                     
                     {/* Desktop Filters */}
@@ -1153,14 +689,13 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                             tabsConfig={CLEARANCE_TABS}
                         />
                         
-                        {/* Tab Content */}
                         <div className="mt-4">
                             {renderTabContent()}
                         </div>
                     </div>
                 </div>
                 
-                {/* Mobile FAB - repositioned to avoid footer */}
+                {/* Mobile FAB */}
                 {isMobile && !showMobileFilters && (
                     <div className="fixed bottom-20 right-6 z-50 animate-scale-in">
                         <Link href="/portal/my-clearances/request">

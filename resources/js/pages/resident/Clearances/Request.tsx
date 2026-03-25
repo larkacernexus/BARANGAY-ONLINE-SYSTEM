@@ -1,20 +1,13 @@
 import { useForm, usePage, Link } from '@inertiajs/react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { route } from 'ziggy-js';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import {
-    ArrowLeft,
-    Save,
-    Send,
-    Loader2,
     FileCheck,
     FileText,
     Upload,
     CheckCircle,
-    AlertCircle,
-    ArrowRight,
-    PenSquare
 } from 'lucide-react';
 
 // Import components
@@ -42,7 +35,6 @@ import { usePurposeManagement } from '@/components/portal/request/hooks/use-purp
 // Import types and constants
 import type { ClearanceType, Resident, PageProps, UploadedFileWithMetadata, FormData } from '@/components/portal/request/types';
 import { COMMON_PURPOSE_OPTIONS } from '@/components/portal/request/constants';
-import { Button } from '@headlessui/react';
 
 export default function RequestClearance({ clearanceTypes, resident }: PageProps) {
     const [selectedClearance, setSelectedClearance] = useState<ClearanceType | null>(null);
@@ -226,29 +218,18 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
             return;
         }
 
-        const formData = new FormData();
-        formData.append('clearance_type_id', data.clearance_type_id);
-        formData.append('purpose', finalPurpose);
-        formData.append('specific_purpose', data.specific_purpose || '');
-        formData.append('needed_date', data.needed_date);
-        formData.append('resident_id', data.resident_id);
+        // Update form data with final purpose
+        setData('purpose', finalPurpose);
         
-        if (data.additional_notes) {
-            formData.append('additional_notes', data.additional_notes);
-        }
-        
-        if (uploadedFiles.length > 0) {
-            uploadedFiles.forEach((uploadedFile, index) => {
-                formData.append(`documents[]`, uploadedFile.file);
-                formData.append(`descriptions[]`, uploadedFile.description || '');
-                formData.append(`document_type_ids[]`, uploadedFile.document_type_id?.toString() || '');
-            });
-        }
+        // Update form data with files
+        setData('documents', uploadedFiles.map(f => f.file));
+        setData('descriptions', uploadedFiles.map(f => f.description));
+        setData('document_type_ids', uploadedFiles.map(f => f.document_type_id || 0));
 
-        post(route('portal.my.clearances.store'), formData, {
+        // Submit using Inertia
+        post(route('portal.my.clearances.store'), {
             preserveScroll: true,
             preserveState: true,
-            forceFormData: true,
             onSuccess: () => {
                 toast.success('Clearance request submitted successfully!');
                 clearDraft();
@@ -266,10 +247,16 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
         });
     };
 
-    const isFormValid = () => {
+    // ✅ Use useMemo for isFormValid - returns boolean value
+    const isFormValid = useMemo(() => {
         const finalPurpose = isCustomPurpose ? data.purpose_custom : data.purpose;
-        return data.clearance_type_id && finalPurpose && data.needed_date && documentRequirements.met;
-    };
+        return Boolean(
+            data.clearance_type_id && 
+            finalPurpose && 
+            data.needed_date && 
+            documentRequirements.met
+        );
+    }, [data.clearance_type_id, data.purpose, data.purpose_custom, data.needed_date, isCustomPurpose, documentRequirements.met]);
 
     const nextStep = useCallback(() => {
         if (activeStep === 1 && !data.clearance_type_id) {
@@ -328,7 +315,7 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
                         <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
                             <div className="lg:col-span-2 space-y-6">
                                 {activeStep === 1 && (
-                                    <ClearanceTypeStep
+                                   <ClearanceTypeStep
                                         clearanceTypes={clearanceTypes}
                                         selectedClearance={selectedClearance}
                                         dataClearanceTypeId={data.clearance_type_id}
@@ -438,7 +425,7 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
                             requiresDocuments={requiresDocuments}
                             documentRequirements={documentRequirements}
                             processing={processing}
-                            isFormValid={isFormValid()}
+                            isFormValid={isFormValid}
                             onPrev={prevStep}
                             onNext={nextStep}
                             onSubmit={handleSubmit}
@@ -452,7 +439,7 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
                             requiresDocuments={requiresDocuments}
                             documentRequirements={documentRequirements}
                             processing={processing}
-                            isFormValid={isFormValid()}
+                            isFormValid={isFormValid}
                             onPrev={prevStep}
                             onNext={nextStep}
                             onSubmit={handleSubmit}

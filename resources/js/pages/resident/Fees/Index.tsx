@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Head, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
 import ResidentLayout from '@/layouts/resident-app-layout';
@@ -29,15 +29,84 @@ import { useMobile } from '@/components/residentui/hooks/use-mobile';
 import { useSelection } from '@/components/residentui/hooks/use-selection';
 import { Receipt, User, Calendar } from 'lucide-react';
 
+// Define the Fee interface for type safety
+interface Fee {
+    id: string | number;
+    fee_code?: string;
+    fee_type?: string;
+    category?: string;
+    amount?: number;
+    status?: string;
+    due_date?: string;
+    created_at?: string;
+    resident_name?: string;
+    resident_id?: string | number;
+    description?: string;
+}
+
+// Define the paginated response structure
+interface FeesPaginatedResponse {
+    data: Fee[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    from: number;
+    to: number;
+    links: Array<{
+        url: string | null;
+        label: string;
+        active: boolean;
+    }>;
+}
+
+// Define the stats structure
+interface FeeStats {
+    total_fees?: number;
+    paid_fees?: number;
+    pending_fees?: number;
+    overdue_fees?: number;
+    total_amount?: number;
+    paid_amount?: number;
+    pending_amount?: number;
+    [key: string]: any;
+}
+
+// Define fee type structure
+interface FeeType {
+    id: string | number;
+    name: string;
+    [key: string]: any;
+}
+
+// Define resident structure
+interface Resident {
+    id: string | number;
+    first_name: string;
+    last_name: string;
+    [key: string]: any;
+}
+
+// Define filter structure
+interface Filters {
+    search?: string;
+    status?: string;
+    fee_type?: string;
+    resident?: string;
+    year?: string;
+    page?: string;
+    [key: string]: any;
+}
+
+// Update PageProps with proper types
 interface PageProps extends Record<string, any> {
-    fees?: any;
-    stats?: any;
+    fees?: FeesPaginatedResponse;
+    stats?: FeeStats;
     availableYears?: number[];
-    availableFeeTypes?: any[];
-    householdResidents?: any[];
-    currentResident?: any;
+    availableFeeTypes?: FeeType[];
+    householdResidents?: Resident[];
+    currentResident?: Resident;
     hasProfile?: boolean;
-    filters?: any;
+    filters?: Filters;
     error?: string;
 }
 
@@ -45,7 +114,15 @@ export default function MyFees() {
     const page = usePage<PageProps>();
     const { props } = page;
     
-    const fees = props.fees || { data: [], current_page: 1, last_page: 1, total: 0, from: 0, to: 0, links: [] };
+    const fees = props.fees || { 
+        data: [], 
+        current_page: 1, 
+        last_page: 1, 
+        total: 0, 
+        from: 0, 
+        to: 0, 
+        links: [] 
+    };
     const stats = props.stats || {};
     const availableYears = props.availableYears || [];
     const availableFeeTypes = props.availableFeeTypes || [];
@@ -65,9 +142,10 @@ export default function MyFees() {
         route: '/portal/fees'
     });
     
-    const { selectedItems, selectMode, toggleSelect, selectAll, clearSelection, toggleSelectMode, setSelectMode } = useSelection(
+    // Now TypeScript knows the fee type, fixing the 'unknown' error
+    const { selectedItems, selectMode, toggleSelect, selectAll, clearSelection, toggleSelectMode, setSelectMode } = useSelection<Fee>(
         fees.data,
-        (fee) => fee.id
+        (fee: Fee) => fee.id
     );
     
     const [isExporting, setIsExporting] = useState(false);
@@ -113,7 +191,21 @@ export default function MyFees() {
                 { title: 'My Fees', href: '/portal/fees' }
             ]}>
                 <Head title="My Fees" />
-                {/* Add your no profile content here */}
+                <div className="flex items-center justify-center min-h-[60vh]">
+                    <Card className="w-full max-w-md">
+                        <CardContent className="pt-6">
+                            <div className="text-center space-y-4">
+                                <div className="rounded-full bg-amber-100 dark:bg-amber-900/30 w-16 h-16 flex items-center justify-center mx-auto">
+                                    <User className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold">Profile Required</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Please complete your profile to view and manage fees.
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             </ResidentLayout>
         );
     }
@@ -136,7 +228,7 @@ export default function MyFees() {
         );
     }
     
-    const currentFees = fees.data;
+    const currentFees = fees.data; // Now properly typed as Fee[]
     const tabHasData = currentFees.length > 0;
     
     return (
@@ -151,7 +243,7 @@ export default function MyFees() {
                     {isMobile ? (
                         <MobileHeader
                             title="My Fees"
-                            subtitle={`${stats.total_fees} fee${stats.total_fees !== 1 ? 's' : ''} total`}
+                            subtitle={`${stats.total_fees || 0} fee${stats.total_fees !== 1 ? 's' : ''} total`}
                             showStats={showStats}
                             onToggleStats={() => setShowStats(!showStats)}
                             onOpenFilters={() => setShowMobileFilters(true)}
@@ -242,7 +334,7 @@ export default function MyFees() {
                                                 sortBy={sortBy}
                                                 sortOrder={sortOrder}
                                                 onSort={(by, order) => {
-                                                    setSortBy(by as any);
+                                                    setSortBy(by as 'date' | 'amount' | 'status');
                                                     setSortOrder(order);
                                                 }}
                                             />
@@ -276,8 +368,8 @@ export default function MyFees() {
                                         selectedFees={selectedItems}
                                         onSelectFee={toggleSelect}
                                         getCategoryDisplay={getCategoryDisplay}
-                                        formatDate={(date) => formatDate(date, isMobile)}
-                                        onPrint={(fee) => printFeesList([fee], 'single', formatDate, getCategoryDisplay, formatCurrency)}
+                                        formatDate={(date: string) => formatDate(date, isMobile)}
+                                        onPrint={(fee: Fee) => printFeesList([fee], 'single', formatDate, getCategoryDisplay, formatCurrency)}
                                         isMobile={isMobile}
                                     />
                                 ) : (
@@ -297,7 +389,7 @@ export default function MyFees() {
                                         <ModernPagination
                                             currentPage={fees.current_page}
                                             lastPage={fees.last_page}
-                                            onPageChange={(page) => updateFilters({ page: page.toString() })}
+                                            onPageChange={(page: number) => updateFilters({ page: page.toString() })}
                                             loading={loading}
                                         />
                                     </div>
@@ -313,8 +405,8 @@ export default function MyFees() {
                     title="Filter Fees"
                     description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
                     search={filters.search || ''}
-                    onSearchChange={(value) => updateFilters({ search: value, page: '1' })}
-                    onSearchSubmit={(e) => { e.preventDefault(); updateFilters({ search: filters.search, page: '1' }); }}
+                    onSearchChange={(value: string) => updateFilters({ search: value, page: '1' })}
+                    onSearchSubmit={(e: React.FormEvent) => { e.preventDefault(); updateFilters({ search: filters.search, page: '1' }); }}
                     onSearchClear={() => updateFilters({ search: '', page: '1' })}
                     loading={loading}
                     hasActiveFilters={hasActiveFilters}
@@ -326,7 +418,7 @@ export default function MyFees() {
                             value={filters.fee_type || 'all'}
                             onValueChange={handleFeeTypeChange}
                             placeholder="All fee types"
-                            options={availableFeeTypes.map(type => ({ value: type.id.toString(), label: type.name }))}
+                            options={availableFeeTypes.map((type: FeeType) => ({ value: type.id.toString(), label: type.name }))}
                             disabled={loading}
                             icon={Receipt}
                         />
@@ -339,7 +431,7 @@ export default function MyFees() {
                                 value={filters.resident || 'all'}
                                 onValueChange={handleResidentChange}
                                 placeholder="All residents"
-                                options={householdResidents.map(resident => ({
+                                options={householdResidents.map((resident: Resident) => ({
                                     value: resident.id.toString(),
                                     label: `${resident.first_name} ${resident.last_name}`
                                 }))}
@@ -355,7 +447,7 @@ export default function MyFees() {
                             value={filters.year || 'all'}
                             onValueChange={handleYearChange}
                             placeholder="All years"
-                            options={availableYears.map(year => ({ value: year.toString(), label: year.toString() }))}
+                            options={availableYears.map((year: number) => ({ value: year.toString(), label: year.toString() }))}
                             disabled={loading}
                             icon={Calendar}
                         />

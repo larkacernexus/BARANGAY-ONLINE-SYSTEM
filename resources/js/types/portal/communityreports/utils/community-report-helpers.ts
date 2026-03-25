@@ -24,7 +24,7 @@ import {
     Video,
     File
 } from 'lucide-react';
-import { ReportType } from '@/types/portal/community-report';
+import { ReportType } from '@/types/portal/reports/community-report';
 
 // Helper function to check if an object is a File
 export const isFile = (obj: any): obj is File => {

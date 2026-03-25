@@ -150,4 +150,4 @@ export const isOtherType = (type: ReportType) => {
 };
 
 // Need to import ReportType here or define it locally
-import { ReportType } from '@/types/portal/community-report';
+import { ReportType } from '@/types/portal/reports/community-report';

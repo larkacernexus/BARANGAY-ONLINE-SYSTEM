@@ -19,7 +19,8 @@ interface PurposeDetailsStepProps {
     showPurposeDropdown: boolean;
     setShowPurposeDropdown: (show: boolean) => void;
     onPurposeSelect: (value: string, label: string) => void;
-    getPurposeSuggestions: () => string;
+    // ✅ Fix: Accept a function that takes purpose and isCustom parameters
+    getPurposeSuggestions: (purpose: string, isCustom: boolean) => string;
 }
 
 export function PurposeDetailsStep({
@@ -36,6 +37,12 @@ export function PurposeDetailsStep({
     onPurposeSelect,
     getPurposeSuggestions
 }: PurposeDetailsStepProps) {
+    // Get the current purpose text
+    const currentPurpose = isCustomPurpose ? data.purpose_custom : data.purpose;
+    
+    // Get suggestions based on current purpose
+    const suggestionText = getPurposeSuggestions(currentPurpose, isCustomPurpose);
+
     return (
         <div className="space-y-6">
             <Card className="rounded-xl border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
@@ -73,7 +80,7 @@ export function PurposeDetailsStep({
                                 id="specific_purpose"
                                 value={data.specific_purpose}
                                 onChange={e => setData('specific_purpose', e.target.value)}
-                                placeholder={getPurposeSuggestions()}
+                                placeholder={suggestionText}
                                 rows={3}
                                 disabled={!data.purpose && !isCustomPurpose}
                                 className="text-sm min-h-[80px] rounded-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 disabled:bg-gray-50 dark:disabled:bg-gray-800/50 disabled:text-gray-500 dark:disabled:text-gray-500"
@@ -87,7 +94,7 @@ export function PurposeDetailsStep({
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => {
-                                        const suggestion = getPurposeSuggestions();
+                                        const suggestion = getPurposeSuggestions(currentPurpose, isCustomPurpose);
                                         if (suggestion) {
                                             setData('specific_purpose', suggestion);
                                         }

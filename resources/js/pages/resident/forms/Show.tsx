@@ -7,12 +7,12 @@ import { ModernFloatingActionButton } from '@/components/residentui/modern-float
 import { useMobileDetect, useScrollSpy } from '@/components/residentui/hooks/useResidentUI';
 import { cn } from '@/lib/utils';
 
-import { FormHeader } from '@/components/portal/forms/components/FormHeader';
-import { MobileFormHeader } from '@/components/portal/forms/components/MobileFormHeader';
-import { FormStats } from '@/components/portal/forms/components/FormStats';
-import { FormTabs } from '@/components/portal/forms/components/FormTabs';
-import { FormSidebar } from '@/components/portal/forms/components/FormSidebar';
-import { FullscreenFormViewer } from '@/components/portal/forms/components/FullscreenFormViewer';
+import { FormHeader } from '@/components/portal/forms/show/components/FormHeader';
+import { MobileFormHeader } from '@/components/portal/forms/show/components/MobileFormHeader';
+import { FormStats } from '@/components/portal/forms/show/components/FormStats';
+import { FormTabs } from '@/components/portal/forms/show/components/FormTabs';
+import { FormSidebar } from '@/components/portal/forms/show/components/FormSidebar';
+import { FullscreenFormViewer } from '@/components/portal/forms/show/components/FullscreenFormViewer';
 import { DetailsTab } from '@/components/portal/forms/tabs/DetailsTab';
 import { PreviewTab } from '@/components/portal/forms/tabs/PreviewTab';
 import { RelatedTab } from '@/components/portal/forms/tabs/RelatedTab';

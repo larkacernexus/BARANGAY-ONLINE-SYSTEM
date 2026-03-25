@@ -73,13 +73,6 @@ const allQuickActions = [
     description: 'Report issue'
   },
   { 
-    title: 'Pay Fees', 
-    shortTitle: 'Pay',
-    href: '/portal/fees/pay', 
-    icon: DollarSign, 
-    description: 'Settle payments'
-  },
-  { 
     title: 'View Announcements', 
     shortTitle: 'News',
     href: '/portal/announcements', 

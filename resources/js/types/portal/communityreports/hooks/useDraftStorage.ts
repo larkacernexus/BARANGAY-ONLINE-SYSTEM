@@ -1,7 +1,7 @@
 // hooks/useDraftStorage.ts
 
 import { useState, useEffect } from 'react';
-import { LocalDraft } from '@/types/portal/community-report';
+import { LocalDraft } from '@/types/portal/reports/community-report';
 import { generateDraftId, DRAFT_KEY, DRAFTS_LIST_KEY } from '@/types/portal/communityreports/utils/community-report-helpers';
 import { toast } from 'sonner';
 

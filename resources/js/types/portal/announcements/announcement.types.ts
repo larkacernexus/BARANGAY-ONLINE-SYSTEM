@@ -1,4 +1,4 @@
-// announcement-show/types/announcement.types.ts
+// /components/residentui/announcements/types.ts
 export interface AnnouncementAttachment {
     id: number;
     announcement_id: number;
@@ -28,6 +28,8 @@ export interface RelatedAnnouncement {
 }
 
 export interface Announcement {
+    is_personalized: any;
+    excerpt: string;
     id: number;
     title: string;
     content: string;
@@ -79,4 +81,29 @@ export interface PriorityConfig {
     bgColor: string;
     textColor: string;
     borderColor: string;
+}
+
+export interface AnnouncementStats {
+    total: number;
+    active: number;
+    unread: number;
+    personalized: number;
+    with_attachments: number;
+}
+
+export interface AnnouncementFilters {
+    search?: string;
+    type?: string;
+    priority?: string;
+    status?: string;
+}
+
+export interface AnnouncementsPaginatedResponse {
+    data: Announcement[];
+    total: number;
+    current_page: number;
+    last_page: number;
+    from: number;
+    to: number;
+    per_page: number;
 }

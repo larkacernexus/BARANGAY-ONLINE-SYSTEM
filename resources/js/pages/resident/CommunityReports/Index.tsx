@@ -1,275 +1,53 @@
+// /Pages/resident/CommunityReports.tsx
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { Head, router, usePage, Link } from '@inertiajs/react';
+import { toast } from 'sonner';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Link, usePage, router, Head } from '@inertiajs/react';
-import { toast } from 'sonner';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-    AlertCircle,
-    Search,
-    Eye,
-    Plus,
-    Check,
-    X,
-    Square,
-    Grid,
-    List,
-    MoreVertical,
-    Copy,
-    FileText,
-    Printer,
-    Download,
-    Share2,
-    Filter,
-    ChevronLeft,
-    ChevronRight,
-    ChevronUp,
-    ChevronDown,
-    BarChart,
-    Loader2,
-    Calendar,
-    Clock,
-    Shield,
-    ArrowUpDown,
-    Info,
-    Flag,
-    MapPin,
-    Paperclip,
-    TrendingUp,
-    CheckCircle,
-    XCircle,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import ResidentMobileFooter from '@/layouts/resident-mobile-sticky-footer';
+import { AlertCircle, FileText, Clock, Loader2, TrendingUp, CheckCircle, XCircle, Plus } from 'lucide-react';
 
 // Reusable Components
 import { CustomTabs } from '@/components/residentui/CustomTabs';
-import { ModernSelect } from '@/components/residentui/modern-select';
 import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
-import { ModernStatsCards } from '@/components/residentui/modern-stats-cards';
 import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
 import { ModernPagination } from '@/components/residentui/modern-pagination';
 import { ModernLoadingOverlay } from '@/components/residentui/modern-loading-overlay';
 import { ModernSelectionBanner } from '@/components/residentui/modern-selection-banner';
 
 // Report-specific components
-import {
-    STATUS_CONFIG,
-    URGENCY_CONFIG,
-    REPORT_TABS,
-    getReportStatsCards
-} from '@/components/residentui/reports/constants';
-import {
-    formatDate,
-    formatDateTime,
-    getStatusCount,
-    copyToClipboard,
-    printReportsList,
-    exportReportsToCSV,
-} from '@/components/residentui/reports/report-utils';
+import { REPORT_TABS, getReportStatsCards } from '@/components/residentui/reports/constants';
+import { formatDate, getStatusCount, copyToClipboard, printReportsList, exportReportsToCSV } from '@/components/residentui/reports/report-utils';
 import { ModernReportCard } from '@/components/residentui/reports/modern-report-card';
 import { ModernReportGridCard } from '@/components/residentui/reports/modern-report-grid-card';
 import { ModernReportFilters } from '@/components/residentui/reports/modern-report-filters';
 import { ModernReportTable } from '@/components/residentui/reports/modern-report-table';
+import { MobileHeader } from '@/components/portal/clearance/index/MobileHeader';
+import { DesktopHeader } from '@/components/portal/clearance/index/DesktopHeader';
+import { TabHeader } from '@/components/portal/clearance/index/TabHeader';
+import { CollapsibleStats } from '@/components/portal/clearance/index/CollapsibleStats';
+import { DesktopStats } from '@/components/portal/clearance/index/DesktopStats';
+import { MobileViewModeToggle } from '@/components/residentui/reports/MobileViewModeToggle';
+import { FilterModalContent } from '@/components/portal/clearance/index/FilterModalContent';
+import ResidentMobileFooter from '@/layouts/resident-mobile-sticky-footer';
 
 // Types
-interface ReportEvidence {
-    id: number;
-    report_id: number;
-    file_path: string;
-    file_name: string;
-    file_type: string;
-    file_size: number;
-    uploaded_by: number;
-    notes: string | null;
-    created_at: string;
-    updated_at: string;
-    file_url: string;
-    is_image: boolean;
-    is_video: boolean;
-    is_pdf: boolean;
-    formatted_size: string;
-}
+import { CommunityReport, ReportStats, FilterOptions, ReportFilters, PaginatedReports } from '@/types/portal/reports/community-report';
 
-interface ReportType {
-    id: number;
-    name: string;
-    category: string;
-    description: string;
-    requires_evidence: boolean;
-    allows_anonymous: boolean;
-    priority_level: number;
-    is_active: boolean;
-}
-
-interface CommunityReport {
-    id: number;
-    report_number: string;
-    report_type_id: number;
-    title: string;
-    description: string;
-    location: string;
-    incident_date: string;
-    incident_time: string | null;
-    urgency: 'low' | 'medium' | 'high';
-    status: 'pending' | 'under_review' | 'in_progress' | 'resolved' | 'rejected';
-    is_anonymous: boolean;
-    reporter_name: string | null;
-    reporter_contact: string | null;
-    admin_notes: string | null;
-    resolved_at: string | null;
-    created_at: string;
-    updated_at: string;
-    user_id: number;
-    report_type: ReportType;
-    evidences_count: number;
-    evidences?: ReportEvidence[];
-    formatted_created_at: string;
-    formatted_incident_date: string;
-    formatted_resolved_date?: string;
-    days_since_created: number;
-}
-
-interface Stats {
-    total: number;
-    resolved: number;
-    pending: number;
-    under_review?: number;
-    in_progress?: number;
-    rejected?: number;
-}
-
-interface FilterOptions {
-    reportTypes: ReportType[];
-    categories: string[];
-    statuses: string[];
-    priorities: string[];
-}
+// Helper function for formatting currency (even if not used, to satisfy props)
+const formatCurrency = (amount: number | string) => {
+    if (typeof amount === 'string') amount = parseFloat(amount);
+    return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
+};
 
 interface PageProps extends Record<string, any> {
-    reports?: {
-        data: CommunityReport[];
-        current_page: number;
-        last_page: number;
-        per_page: number;
-        total: number;
-        from: number;
-        to: number;
-        links: Array<{ url: string | null; label: string; active: boolean }>;
-    };
-    stats?: Stats;
+    reports?: PaginatedReports;
+    stats?: ReportStats;
     filterOptions?: FilterOptions;
-    currentResident?: {
-        id: number;
-        first_name: string;
-        last_name: string;
-    };
-    filters?: {
-        search?: string;
-        status?: string;
-        category?: string;
-        type?: string;
-        priority?: string;
-        page?: string;
-    };
+    currentResident?: { id: number; first_name: string; last_name: string };
+    filters?: ReportFilters;
     error?: string;
 }
-
-// StatusBadge Component with dark mode
-const StatusBadge = ({ status }: { status: string }) => {
-    const statusKey = status as keyof typeof STATUS_CONFIG;
-    const config = STATUS_CONFIG[statusKey];
-    
-    if (!config) {
-        return (
-            <Badge className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-0 px-2 py-1 flex items-center gap-1">
-                <span className="capitalize">{status.replace('_', ' ')}</span>
-            </Badge>
-        );
-    }
-    
-    const Icon = config.icon;
-    return (
-        <Badge className={`${config.color} ${config.textColor} border-0 px-2 py-1 flex items-center gap-1`}>
-            <Icon className="h-3 w-3" />
-            <span>{config.label}</span>
-        </Badge>
-    );
-};
-
-// UrgencyBadge Component with dark mode
-const UrgencyBadge = ({ urgency }: { urgency: string }) => {
-    const urgencyKey = urgency as keyof typeof URGENCY_CONFIG;
-    const config = URGENCY_CONFIG[urgencyKey];
-    
-    if (!config) {
-        return (
-            <Badge variant="outline" className="text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
-                {urgency}
-            </Badge>
-        );
-    }
-    
-    return (
-        <Badge variant="outline" className={`${config.color} ${config.textColor} border-0 flex items-center`}>
-            <span className={`h-2 w-2 rounded-full ${config.dot} mr-2`}></span>
-            <span>{config.label}</span>
-        </Badge>
-    );
-};
-
-// CollapsibleStats Component (Mobile)
-const CollapsibleStats = ({
-    showStats,
-    setShowStats,
-    stats
-}: any) => (
-    <div className="md:hidden">
-        <Button
-            variant="outline"
-            className="w-full justify-between bg-white dark:bg-gray-900 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-            onClick={() => setShowStats(!showStats)}
-        >
-            <div className="flex items-center gap-2">
-                <BarChart className="h-4 w-4" />
-                <span>{showStats ? 'Hide Statistics' : 'Show Statistics'}</span>
-            </div>
-            {showStats ? (
-                <ChevronUp className="h-4 w-4" />
-            ) : (
-                <ChevronDown className="h-4 w-4" />
-            )}
-        </Button>
-        
-        {showStats && (
-            <div className="mt-2 animate-slide-down">
-                <ModernStatsCards
-                    cards={getReportStatsCards(stats)}
-                    loading={false}
-                    gridCols="grid-cols-2"
-                />
-            </div>
-        )}
-    </div>
-);
-
-// DesktopStats Component
-const DesktopStats = ({ stats }: any) => (
-    <div className="hidden md:block">
-        <ModernStatsCards
-            cards={getReportStatsCards(stats)}
-            loading={false}
-        />
-    </div>
-);
 
 export default function CommunityReports() {
     const page = usePage<PageProps>();
@@ -306,10 +84,10 @@ export default function CommunityReports() {
     const filters = pageProps.filters || {};
     
     const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
-    const [urgencyFilter, setUrgencyFilter] = useState(filters.priority || 'all');
-    const [typeFilter, setTypeFilter] = useState(filters.type || 'all');
-    const [categoryFilter, setCategoryFilter] = useState(filters.category || 'all');
+    const [statusFilter, setStatusFilter] = useState<string>(filters.status || 'all');
+    const [urgencyFilter, setUrgencyFilter] = useState<string>(filters.priority || 'all');
+    const [typeFilter, setTypeFilter] = useState<string>(filters.type || 'all');
+    const [categoryFilter, setCategoryFilter] = useState<string>(filters.category || 'all');
     const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [showStats, setShowStats] = useState(true);
@@ -386,7 +164,7 @@ export default function CommunityReports() {
         Object.entries(updatedFilters).forEach(([key, value]) => {
             if (key === 'page' && value === '1') return;
             if (value && value !== '' && value !== 'all' && value !== undefined) {
-                cleanFilters[key] = value;
+                cleanFilters[key] = String(value);
             }
         });
         
@@ -402,15 +180,9 @@ export default function CommunityReports() {
         setStatusFilter(tab);
         
         if (tab === 'all') {
-            updateFilters({ 
-                status: '',
-                page: '1'
-            });
+            updateFilters({ status: '', page: '1' });
         } else {
-            updateFilters({ 
-                status: tab,
-                page: '1'
-            });
+            updateFilters({ status: tab, page: '1' });
         }
         
         if (isMobile) setShowMobileFilters(false);
@@ -418,37 +190,25 @@ export default function CommunityReports() {
     
     const handleStatusChange = (status: string) => {
         setStatusFilter(status);
-        updateFilters({ 
-            status: status === 'all' ? '' : status,
-            page: '1'
-        });
+        updateFilters({ status: status === 'all' ? '' : status, page: '1' });
         if (isMobile) setShowMobileFilters(false);
     };
     
     const handleUrgencyChange = (urgency: string) => {
         setUrgencyFilter(urgency);
-        updateFilters({ 
-            priority: urgency === 'all' ? '' : urgency,
-            page: '1'
-        });
+        updateFilters({ priority: urgency === 'all' ? '' : urgency, page: '1' });
         if (isMobile) setShowMobileFilters(false);
     };
     
     const handleTypeChange = (type: string) => {
         setTypeFilter(type);
-        updateFilters({ 
-            type: type === 'all' ? '' : type,
-            page: '1'
-        });
+        updateFilters({ type: type === 'all' ? '' : type, page: '1' });
         if (isMobile) setShowMobileFilters(false);
     };
     
     const handleCategoryChange = (category: string) => {
         setCategoryFilter(category);
-        updateFilters({ 
-            category: category === 'all' ? '' : category,
-            page: '1'
-        });
+        updateFilters({ category: category === 'all' ? '' : category, page: '1' });
         if (isMobile) setShowMobileFilters(false);
     };
     
@@ -473,26 +233,17 @@ export default function CommunityReports() {
         if (searchTimeout.current) {
             clearTimeout(searchTimeout.current);
         }
-        updateFilters({ 
-            search: search.trim(),
-            page: '1'
-        });
+        updateFilters({ search: search.trim(), page: '1' });
     };
     
     const handleSearchClear = () => {
         setSearch('');
-        updateFilters({ 
-            search: '',
-            page: '1'
-        });
+        updateFilters({ search: '', page: '1' });
     };
     
-    // Selection mode functions
     const toggleSelectReport = (id: number) => {
         setSelectedReports(prev =>
-            prev.includes(id)
-                ? prev.filter(reportId => reportId !== id)
-                : [...prev, id]
+            prev.includes(id) ? prev.filter(reportId => reportId !== id) : [...prev, id]
         );
     };
     
@@ -552,9 +303,7 @@ export default function CommunityReports() {
         }
     };
     
-    const getCurrentTabReports = () => {
-        return reports.data;
-    };
+    const getCurrentTabReports = () => reports.data;
     
     const hasActiveFilters = useMemo(() => {
         return Object.entries(filters).some(([key, value]) => 
@@ -600,110 +349,39 @@ export default function CommunityReports() {
         updateFilters({ page: page.toString() });
     };
     
-    const renderTabContent = () => {
-        const currentReports = getCurrentTabReports();
-        const tabHasData = currentReports.length > 0;
-        
-        return (
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
-                <CardContent className="p-4 md:p-6">
-                    <ModernSelectionBanner
-                        selectMode={selectMode}
-                        selectedCount={selectedReports.length}
-                        totalCount={currentReports.length}
-                        onSelectAll={selectAllReports}
-                        onDeselectAll={() => setSelectedReports([])}
-                        onCancel={() => {
-                            setSelectMode(false);
-                            setSelectedReports([]);
-                        }}
-                        onDelete={handleDeleteSelected}
-                        deleteLabel="Delete Selected"
-                    />
-                    
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                {statusFilter === 'all' ? 'All' : statusFilter.replace('_', ' ')} Reports
-                            </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                {tabHasData 
-                                    ? `Showing ${reports.from}-${reports.to} of ${reports.total} report${reports.total !== 1 ? 's' : ''}`
-                                    : `No ${statusFilter === 'all' ? 'reports' : statusFilter.replace('_', ' ')} found`
-                                }
-                                {selectMode && selectedReports.length > 0 && ` • ${selectedReports.length} selected`}
-                                {(typeFilter !== 'all' || urgencyFilter !== 'all' || categoryFilter !== 'all' || search) && ' (filtered)'}
-                                {selectMode && ' • Selection Mode'}
-                            </p>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                            {/* Sort Dropdown */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-                                        <ArrowUpDown className="h-4 w-4" />
-                                        Sort
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-                                    <DropdownMenuItem className="text-gray-700 dark:text-gray-300">
-                                        <Calendar className="h-4 w-4 mr-2" />
-                                        Date
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-gray-700 dark:text-gray-300">
-                                        <Info className="h-4 w-4 mr-2" />
-                                        Status
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-gray-700 dark:text-gray-300">
-                                        <Flag className="h-4 w-4 mr-2" />
-                                        Urgency
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-
-                            {/* View Toggle */}
-                            {!selectMode && tabHasData && (
-                                <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
-                                    <Button
-                                        variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                                        size="sm"
-                                        onClick={() => setViewMode('grid')}
-                                        className={cn(
-                                            "h-8 w-8 p-0",
-                                            viewMode === 'grid' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                                        )}
-                                    >
-                                        <Grid className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant={viewMode === 'list' ? 'default' : 'ghost'}
-                                        size="sm"
-                                        onClick={() => setViewMode('list')}
-                                        className={cn(
-                                            "h-8 w-8 p-0",
-                                            viewMode === 'list' && "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white"
-                                        )}
-                                    >
-                                        <List className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            )}
-
-                            {/* Select Mode Toggle */}
-                            {tabHasData && (
-                                <Button
-                                    variant={selectMode ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={toggleSelectMode}
-                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700"
-                                >
-                                    <Square className="h-4 w-4" />
-                                    {selectMode ? 'Cancel' : 'Select'}
-                                </Button>
-                            )}
-                        </div>
-                    </div>
+const renderTabContent = () => {
+    const currentReports = getCurrentTabReports();
+    const tabHasData = currentReports.length > 0;
+    
+    const displayStatus = statusFilter === 'all' ? 'All' : statusFilter.replace('_', ' ');
+    
+    return (
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
+            <CardContent className="p-4 md:p-6">
+                <ModernSelectionBanner
+                    selectedCount={selectedReports.length}
+                    totalCount={currentReports.length}
+                    onSelectAll={selectAllReports}
+                    onDeselectAll={() => setSelectedReports([])}
+                    onCancel={() => {
+                        setSelectMode(false);
+                        setSelectedReports([]);
+                    }}
+                    onDelete={handleDeleteSelected}
+                    deleteLabel="Delete Selected"
+                />
+                
+                <TabHeader
+                    displayStatus={displayStatus}
+                    count={currentReports.length}
+                    selectMode={selectMode}
+                    selectedCount={selectedReports.length}
+                    hasFilters={typeFilter !== 'all' || urgencyFilter !== 'all' || categoryFilter !== 'all' || !!search}
+                    viewMode={viewMode}
+                    setViewMode={setViewMode}
+                    onToggleSelectMode={toggleSelectMode}
+                    tabHasData={tabHasData}
+                />
                     
                     {!tabHasData ? (
                         <ModernEmptyState
@@ -719,42 +397,14 @@ export default function CommunityReports() {
                         />
                     ) : (
                         <>
-                            {/* Mobile View Mode Toggle */}
                             {isMobile && tabHasData && !selectMode && (
-                                <div className="mb-4">
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant={viewMode === 'grid' ? 'default' : 'outline'}
-                                            size="sm"
-                                            onClick={() => setViewMode('grid')}
-                                            className="flex-1 rounded-lg"
-                                        >
-                                            <Grid className="h-4 w-4 mr-2" />
-                                            Grid View
-                                        </Button>
-                                        <Button
-                                            variant={viewMode === 'list' ? 'default' : 'outline'}
-                                            size="sm"
-                                            onClick={() => setViewMode('list')}
-                                            className="flex-1 rounded-lg"
-                                        >
-                                            <List className="h-4 w-4 mr-2" />
-                                            List View
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={toggleSelectMode}
-                                            className="flex-1 rounded-lg"
-                                        >
-                                            <Square className="h-4 w-4 mr-2" />
-                                            Select
-                                        </Button>
-                                    </div>
-                                </div>
+                                <MobileViewModeToggle
+                                    viewMode={viewMode}
+                                    setViewMode={setViewMode}
+                                    onToggleSelectMode={toggleSelectMode}
+                                />
                             )}
                             
-                            {/* Grid View */}
                             {viewMode === 'grid' && (
                                 <>
                                     {isMobile && (
@@ -796,7 +446,6 @@ export default function CommunityReports() {
                                 </>
                             )}
                             
-                            {/* List/Table View */}
                             {viewMode === 'list' && !isMobile && (
                                 <ModernReportTable
                                     reports={currentReports}
@@ -811,7 +460,6 @@ export default function CommunityReports() {
                                 />
                             )}
                             
-                            {/* Pagination */}
                             {reports.last_page > 1 && (
                                 <div className="mt-6">
                                     <ModernPagination
@@ -872,115 +520,37 @@ export default function CommunityReports() {
                 ]}
             >
                 <div className="space-y-4 md:space-y-6 pb-28 md:pb-6">
-                    {/* Mobile Header */}
-                    {isMobile && (
-                        <div className="flex items-center justify-between sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl z-10 py-3 px-4 -mx-4">
-                            <div>
-                                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Community Reports</h1>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    {stats.total} report{stats.total !== 1 ? 's' : ''} total
-                                    {currentResident && (
-                                        <span className="block text-xs">
-                                            {currentResident.first_name} {currentResident.last_name}
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setShowStats(!showStats)}
-                                    className="h-8 px-2 rounded-lg border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                                >
-                                    {showStats ? (
-                                        <ChevronUp className="h-4 w-4" />
-                                    ) : (
-                                        <ChevronDown className="h-4 w-4" />
-                                    )}
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setShowMobileFilters(true)}
-                                    className="h-8 px-2 rounded-lg relative border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300"
-                                >
-                                    <Filter className="h-4 w-4" />
-                                    {hasActiveFilters && (
-                                        <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 dark:bg-red-400 rounded-full animate-pulse" />
-                                    )}
-                                </Button>
-                                <Link href="/portal/community-reports/create">
-                                    <Button size="sm" className="h-8 px-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                                        <Plus className="h-4 w-4 mr-1" />
-                                        Report
-                                    </Button>
-                                </Link>
-                            </div>
-                        </div>
+                    {isMobile ? (
+                        <MobileHeader
+                            statsTotal={stats.total}
+                            showStats={showStats}
+                            setShowStats={setShowStats}
+                            hasActiveFilters={hasActiveFilters}
+                            setShowMobileFilters={setShowMobileFilters}
+                        />
+                    ) : (
+                        <DesktopHeader
+                            onPrint={handlePrint}
+                            onExport={handleExport}
+                            isExporting={isExporting}
+                        />
                     )}
                     
-                    {/* Desktop Header */}
-                    {!isMobile && (
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                    Community Reports
-                                </h1>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                    Submit and track community issues, incidents, and concerns
-                                    {currentResident && (
-                                        <span className="block text-xs mt-1">
-                                            Resident: {currentResident.first_name} {currentResident.last_name}
-                                        </span>
-                                    )}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handlePrint}
-                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                                >
-                                    <Printer className="h-4 w-4" />
-                                    Print
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleExport}
-                                    disabled={isExporting}
-                                    className="gap-2 rounded-xl border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                                >
-                                    <Download className="h-4 w-4" />
-                                    {isExporting ? 'Exporting...' : 'Export'}
-                                </Button>
-                                <Link href="/portal/community-reports/create">
-                                    <Button className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl">
-                                        <Plus className="h-4 w-4" />
-                                        <span>New Report</span>
-                                    </Button>
-                                </Link>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* Stats Section */}
                     {showStats && (
                         <div className="animate-slide-down">
                             <CollapsibleStats
                                 showStats={showStats}
                                 setShowStats={setShowStats}
                                 stats={stats}
+                                formatCurrency={formatCurrency}
                             />
                             <DesktopStats
                                 stats={stats}
+                                formatCurrency={formatCurrency}
                             />
                         </div>
                     )}
                     
-                    {/* Mobile Filter Modal */}
                     <ModernFilterModal
                         isOpen={showMobileFilters}
                         onClose={() => setShowMobileFilters(false)}
@@ -994,93 +564,20 @@ export default function CommunityReports() {
                         hasActiveFilters={hasActiveFilters}
                         onClearFilters={handleClearFilters}
                     >
-                        {/* Status Filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Status
-                            </label>
-                            <ModernSelect
-                                value={statusFilter}
-                                onValueChange={handleStatusChange}
-                                placeholder="All status"
-                                options={[
-                                    { value: 'all', label: 'All Status' },
-                                    { value: 'pending', label: 'Pending' },
-                                    { value: 'under_review', label: 'Under Review' },
-                                    { value: 'in_progress', label: 'In Progress' },
-                                    { value: 'resolved', label: 'Resolved' },
-                                    { value: 'rejected', label: 'Rejected' },
-                                ]}
-                                disabled={loading}
-                                icon={Filter}
-                            />
-                        </div>
-
-                        {/* Urgency Filter */}
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Urgency
-                            </label>
-                            <ModernSelect
-                                value={urgencyFilter}
-                                onValueChange={handleUrgencyChange}
-                                placeholder="All urgency"
-                                options={[
-                                    { value: 'all', label: 'All Urgency' },
-                                    { value: 'low', label: 'Low' },
-                                    { value: 'medium', label: 'Medium' },
-                                    { value: 'high', label: 'High' },
-                                ]}
-                                disabled={loading}
-                            />
-                        </div>
-
-                        {/* Category Filter */}
-                        {filterOptions?.categories?.length > 0 && (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Category
-                                </label>
-                                <ModernSelect
-                                    value={categoryFilter}
-                                    onValueChange={handleCategoryChange}
-                                    placeholder="All categories"
-                                    options={[
-                                        { value: 'all', label: 'All Categories' },
-                                        ...filterOptions.categories.map(cat => ({
-                                            value: cat,
-                                            label: cat
-                                        }))
-                                    ]}
-                                    disabled={loading}
-                                />
-                            </div>
-                        )}
-
-                        {/* Report Type Filter */}
-                        {filterOptions?.reportTypes?.length > 0 && (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Report Type
-                                </label>
-                                <ModernSelect
-                                    value={typeFilter}
-                                    onValueChange={handleTypeChange}
-                                    placeholder="All types"
-                                    options={[
-                                        { value: 'all', label: 'All Types' },
-                                        ...filterOptions.reportTypes.map(type => ({
-                                            value: type.id.toString(),
-                                            label: type.name
-                                        }))
-                                    ]}
-                                    disabled={loading}
-                                />
-                            </div>
-                        )}
+                        <FilterModalContent
+                            selectedStatus={statusFilter}
+                            onStatusChange={handleStatusChange}
+                            selectedUrgency={urgencyFilter}
+                            onUrgencyChange={handleUrgencyChange}
+                            selectedCategory={categoryFilter}
+                            onCategoryChange={handleCategoryChange}
+                            selectedType={typeFilter}
+                            onTypeChange={handleTypeChange}
+                            loading={loading}
+                            filterOptions={filterOptions}
+                        />
                     </ModernFilterModal>
                     
-                    {/* Desktop Filters */}
                     {!isMobile && (
                         <ModernReportFilters
                             search={search}
@@ -1106,7 +603,6 @@ export default function CommunityReports() {
                         />
                     )}
                     
-                    {/* Tabs Section */}
                     <div className="mt-4">
                         <CustomTabs
                             statusFilter={statusFilter}
@@ -1115,14 +611,12 @@ export default function CommunityReports() {
                             tabsConfig={REPORT_TABS}
                         />
                         
-                        {/* Tab Content */}
                         <div className="mt-4">
                             {renderTabContent()}
                         </div>
                     </div>
                 </div>
                 
-                {/* Mobile FAB - repositioned to avoid footer */}
                 {isMobile && !showMobileFilters && (
                     <div className="fixed bottom-20 right-6 z-50 animate-scale-in">
                         <Link href="/portal/community-reports/create">
@@ -1136,12 +630,10 @@ export default function CommunityReports() {
                     </div>
                 )}
                 
-                {/* Mobile Footer */}
                 <div className="md:hidden">
                     <ResidentMobileFooter />
                 </div>
                 
-                {/* Loading Overlay */}
                 <ModernLoadingOverlay loading={loading} message="Loading reports..." />
             </ResidentLayout>
         </>

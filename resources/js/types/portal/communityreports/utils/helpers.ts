@@ -1,6 +1,6 @@
 // utils/community-report-helpers.ts
 
-import { ReportType } from '@/types/portal/community-report';
+import { ReportType } from '@/types/portal/reports/community-report';
 import { AlertCircle, Megaphone, Volume, FileText, Users, Zap, Trash2, Droplets, Wrench, Building, Bell, Construction, Car, PawPrint, HeartPulse, Store, UserX, Handshake, HelpCircle } from 'lucide-react';
 
 // Helper function to check if an object is a File

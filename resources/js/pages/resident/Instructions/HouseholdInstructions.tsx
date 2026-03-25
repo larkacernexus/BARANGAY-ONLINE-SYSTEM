@@ -1,185 +1,69 @@
-// resources/js/Pages/HouseholdInstructions.tsx
+// /Pages/HouseholdHeadInstructions.tsx
 import React, { useState, useEffect } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import AppLayout from '@/layouts/resident-app-layout';
 import {
-  BookOpen,
-  HelpCircle,
-  Video,
-  FileText,
-  Download,
-  Search,
-  Printer,
-  Share2,
-  Eye,
-  ChevronRight,
-  ChevronDown,
-  ChevronLeft,
-  CheckCircle,
-  AlertCircle,
-  Info,
-  Users,
   Home,
-  CreditCard,
-  Keyboard,
+  ScrollText,
+  Wallet,
+  ShieldCheck,
   Bell,
-  Settings,
-  UserPlus,
-  UserCheck,
-  BarChart3,
-  PieChart,
-  Calendar,
-  Clock,
-  MapPin,
-  Phone,
-  Mail,
-  Globe,
-  Lock,
-  Unlock,
-  Database,
   Shield,
-  AlertTriangle,
+  AlertCircle,
+  DollarSign,
+  QrCode,
+  BookOpen,
+  Video,
+  HelpCircle,
+  Keyboard,
+  Users,
+  UserPlus,
+  Eye,
+  Download,
+  Flag,
+  Paperclip,
+  Lock,
+  Settings,
+  LucideIcon,
+  Calendar,
+  CheckCircle,
+  Receipt,
+  Link,
   Menu,
   X,
-  Star,
-  TrendingUp,
-  Activity,
-  DollarSign,
-  Receipt,
-  Briefcase,
-  Building,
-  User,
-  Upload,
-  Download as DownloadIcon,
-  Copy,
-  Check,
-  Layers,
-  Grid,
-  List,
-  Zap,
-  Trash2,
-  Leaf,
-  Sun,
-  Moon,
-  Globe2,
-  Map,
-  Flag,
-  TrendingDown,
-  ArrowUp,
-  ArrowDown,
-  Minus,
-  Plus,
-  Divide,
-  Percent,
-  Award,
-  Gift,
-  Package,
-  Box,
-  Archive,
-  Folder,
-  FolderOpen,
-  FolderTree,
-  File,
-  FilePlus,
-  FileEdit,
-  FileMinus,
-  FileCheck,
-  FileX,
-  FileSearch,
-  FileWarning,
-  FileQuestion,
-  FileSignature,
-  FileSpreadsheet,
-  FileCode,
-  FileImage,
-  FileVideo,
-  FileAudio,
-  FileArchive,
-  Sparkles,
-  Users2,
-  Building2,
-  Key,
-  Link2,
-  TreePine,
-  Droplet,
-  RefreshCw,
-  type LucideIcon,
 } from 'lucide-react';
 
-interface Section {
-  id: string;
-  title: string;
-  icon: LucideIcon;
-  description: string;
-  content: React.ReactNode;
-}
+// Import components
+import { WelcomeBanner } from '@/components/residentui/instructions/WelcomeBanner';
+import { QuickStats } from '@/components/residentui/instructions/QuickStats';
+import { QuickActionsGrid } from '@/components/residentui/instructions/QuickActionsGrid';
+import { InfoSection } from '@/components/residentui/instructions/InfoSection';
+import { FeatureCardsGrid } from '@/components/residentui/instructions/FeatureCardsGrid';
+import { StepsGuide } from '@/components/residentui/instructions/StepsGuide';
+import { StatusBadgesGrid } from '@/components/residentui/instructions/StatusBadgesGrid';
+import { PaymentMethodsGrid } from '@/components/residentui/instructions/PaymentMethodsGrid';
+import { VideoTutorialsGrid } from '@/components/residentui/instructions/VideoTutorialsGrid';
+import { FAQAccordion } from '@/components/residentui/instructions/FAQAccordion';
+import { KeyboardShortcutsGrid } from '@/components/residentui/instructions/KeyboardShortcutsGrid';
+import { PageHeader } from '@/components/residentui/instructions/PageHeader';
+import { TabNavigation } from '@/components/residentui/instructions/TabNavigation';
+import { SidebarNavigation } from '@/components/residentui/instructions/SidebarNavigation';
+import { MainContent } from '@/components/residentui/instructions/MainContent';
 
-// Additional icon components
-const Rocket = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-  </svg>
-);
+// Import types
+import { Section, VideoTutorial, FAQItem, Shortcut } from '@/types/portal/instructions/types';
 
-const Navigation = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-  </svg>
-);
-
-const Move = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-  </svg>
-);
-
-const Table = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-  </svg>
-);
-
-const Signature = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z" />
-  </svg>
-);
-
-const QrCode = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-  </svg>
-);
-
-const Target = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-  </svg>
-);
-
-// Simple PDF icon as a React component
-const PdfIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <rect x="4" y="2" width="16" height="20" rx="2" fill="#fff" stroke="#ef4444" strokeWidth="2"/>
-    <path d="M8 16v-4m0 0h1.5a1.5 1.5 0 010 3H8m4-3v4m0 0h1.5a1.5 1.5 0 000-3H12m4 0v4" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-const HouseholdInstructions: React.FC = () => {
+const HouseholdHeadInstructions: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSection, setSelectedSection] = useState<string>('overview');
-  const [expandedSections, setExpandedSections] = useState<string[]>(['getting-started']);
   const [activeTab, setActiveTab] = useState<'guide' | 'videos' | 'faq' | 'shortcuts'>('guide');
-  const [copied, setCopied] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
 
   // Check if mobile on mount and resize
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
-      setWindowWidth(window.innerWidth);
     };
     
     checkMobile();
@@ -195,228 +79,155 @@ const HouseholdInstructions: React.FC = () => {
     }
   }, [selectedSection, isMobile]);
 
-  // Toggle section expansion
-  const toggleSection = (sectionId: string) => {
-    setExpandedSections(prev =>
-      prev.includes(sectionId)
-        ? prev.filter(id => id !== sectionId)
-        : [...prev, sectionId]
-    );
-  };
-
-  // Copy to clipboard
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
-  // Helper function for className merging
-  const cn = (...classes: (string | boolean | undefined)[]) => {
-    return classes.filter(Boolean).join(' ');
-  };
-
-  // Sections data
+  // Section data
   const sections: Section[] = [
     {
       id: 'overview',
-      title: 'Household Management Overview',
+      title: 'Overview for Household Heads',
       icon: Home,
-      description: 'Complete guide to managing households in the barangay',
+      description: 'What you can do as the head of household',
       content: (
         <div className="space-y-4 sm:space-y-6">
-          {/* Welcome Banner */}
-          <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 p-4 sm:p-8 text-white">
-            <div className="absolute right-0 top-0 -mt-10 -mr-10 h-40 w-40 rounded-full bg-white/10"></div>
-            <div className="absolute bottom-0 left-0 -mb-10 -ml-10 h-40 w-40 rounded-full bg-white/10"></div>
-            <h2 className="relative text-lg sm:text-2xl font-bold break-words">Household Management System</h2>
-            <p className="relative mt-2 text-xs sm:text-sm text-emerald-100 break-words">
-              Efficiently manage and track all households in Barangay Kibawe
-            </p>
-            <div className="relative mt-3 sm:mt-4 flex flex-wrap gap-3 sm:gap-4">
-              <div className="flex items-center gap-1 sm:gap-2">
-                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                <span className="text-xs sm:text-sm">Version 2.0</span>
-              </div>
-              <div className="flex items-center gap-1 sm:gap-2">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                <span className="text-xs sm:text-sm">Last Updated: March 2024</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Key Features Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-            {[
-              { icon: Home, value: '1,245', label: 'Total Households', color: 'emerald' },
-              { icon: Users, value: '5,234', label: 'Total Residents', color: 'blue' },
-              { icon: Users2, value: '4.2', label: 'Avg. Household Size', color: 'purple' },
-              { icon: Building2, value: '7', label: 'Puroks', color: 'amber' },
-            ].map((stat, idx) => (
-              <div key={idx} className="rounded-lg border border-gray-200 bg-white p-2 sm:p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                <div className="flex flex-col items-center sm:items-start gap-1 sm:gap-3">
-                  <div className={`rounded-lg bg-${stat.color}-100 p-1.5 sm:p-2 dark:bg-${stat.color}-900/30`}>
-                    <stat.icon className={`h-4 w-4 sm:h-5 sm:w-5 text-${stat.color}-600 dark:text-${stat.color}-400 flex-shrink-0`} />
-                  </div>
-                  <div className="text-center sm:text-left w-full">
-                    <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white break-words">{stat.value}</h3>
-                    <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 break-words">{stat.label}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Quick Actions */}
-          <div className="rounded-lg bg-emerald-50 p-4 sm:p-6 dark:bg-emerald-900/20">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-emerald-900 dark:text-emerald-300 break-words">
-              <Zap className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-              Quick Actions
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-              <Link
-                href="/admin/households/create"
-                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-emerald-700 hover:bg-emerald-100 dark:bg-gray-900 dark:text-emerald-400 dark:hover:bg-gray-700"
-              >
-                <Home className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">Add Household</span>
-              </Link>
-              <Link
-                href="/admin/households?filter=pending"
-                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-amber-700 hover:bg-amber-100 dark:bg-gray-900 dark:text-amber-400 dark:hover:bg-gray-700"
-              >
-                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">Pending</span>
-              </Link>
-              <Link
-                href="/admin/reports/households"
-                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-purple-700 hover:bg-purple-100 dark:bg-gray-900 dark:text-purple-400 dark:hover:bg-gray-700"
-              >
-                <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">Reports</span>
-              </Link>
-              <Link
-                href="/admin/households/export"
-                className="flex items-center gap-1 sm:gap-2 rounded-lg bg-white p-2 sm:p-3 text-xs sm:text-sm text-blue-700 hover:bg-blue-100 dark:bg-gray-900 dark:text-blue-400 dark:hover:bg-gray-700"
-              >
-                <Download className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="truncate">Export</span>
-              </Link>
-            </div>
-          </div>
-
-          {/* Important Information */}
+          <WelcomeBanner
+            title="Welcome, Household Head!"
+            subtitle="As the head of household, you have special privileges to manage your household's affairs"
+            badges={[
+              { icon: Shield, label: 'Household Head Privileges' },
+              { icon: Calendar, label: 'Updated: March 2024' }
+            ]}
+          />
+          <QuickStats stats={[
+            { icon: Users, value: 'Household', label: 'Member Management', color: 'blue' },
+            { icon: ScrollText, value: 'Clearances', label: 'Request & Track', color: 'green' },
+            { icon: Wallet, value: 'Payments', label: 'Pay Fees', color: 'purple' },
+            { icon: ShieldCheck, value: 'Reports', label: 'File Reports', color: 'amber' },
+          ]} />
+          <QuickActionsGrid
+            title="Quick Actions for Household Heads"
+            actions={[
+              { href: '/portal/my-clearances/request', icon: ScrollText, label: 'Request Clearance', color: 'blue' },
+              { href: '/portal/community-reports/create', icon: AlertCircle, label: 'File Report', color: 'amber' },
+              { href: '/portal/fees/pay', icon: DollarSign, label: 'Pay Fees', color: 'emerald' },
+              { href: '/residentsettings/profile?tab=qr', icon: QrCode, label: 'QR Code Login', color: 'purple' },
+            ]}
+          />
+          <InfoSection
+            title="Your Household Head Responsibilities"
+            leftItems={[
+              { icon: CheckCircle, text: 'View all household members' },
+              { icon: CheckCircle, text: 'Request clearances for household members' },
+              { icon: CheckCircle, text: 'Pay fees and view payment history' },
+              { icon: CheckCircle, text: 'File community reports on behalf of household' },
+            ]}
+            rightItems={[
+              { icon: Shield, text: 'Two-Factor Authentication (2FA)' },
+              { icon: Shield, text: 'QR Code Login for family members' },
+              { icon: Shield, text: 'Device management and activity logs' },
+            ]}
+          />
+        </div>
+      )
+    },
+    {
+      id: 'clearances',
+      title: 'Clearance Requests',
+      icon: ScrollText,
+      description: 'Request and track clearances for your household',
+      content: (
+        <div className="space-y-4 sm:space-y-6">
+          <FeatureCardsGrid
+            title="Clearance Management"
+            features={[
+              { icon: UserPlus, title: 'Request Clearance', description: 'Apply for barangay clearances for yourself or household members', color: 'green' },
+              { icon: Eye, title: 'Track Status', description: 'Monitor clearance application progress in real-time', color: 'blue' },
+              { icon: Download, title: 'Download', description: 'Download approved clearances as PDF', color: 'purple' },
+            ]}
+          />
+          <StepsGuide
+            title="How to Request a Clearance"
+            steps={[
+              { step: 1, title: 'Go to Clearances', description: 'Navigate to "Clearances" in the sidebar or click "Request Clearance" in quick actions' },
+              { step: 2, title: 'Select Resident', description: 'Choose which household member needs the clearance' },
+              { step: 3, title: 'Choose Clearance Type', description: 'Select the type of clearance needed (Barangay Clearance, Business Clearance, etc.)' },
+              { step: 4, title: 'Provide Purpose', description: 'Specify the purpose of the clearance' },
+              { step: 5, title: 'Set Urgency', description: 'Choose Normal, Rush, or Express processing' },
+              { step: 6, title: 'Submit & Pay', description: 'Review and submit your request, then proceed to payment' }
+            ]}
+          />
+          <StatusBadgesGrid
+            statuses={[
+              { status: 'Pending', color: 'yellow', description: 'Awaiting review' },
+              { status: 'Pending Payment', color: 'orange', description: 'Awaiting payment' },
+              { status: 'Processing', color: 'blue', description: 'Being processed' },
+              { status: 'Approved', color: 'green', description: 'Ready for pickup' },
+              { status: 'Issued', color: 'emerald', description: 'Already issued' },
+              { status: 'Rejected', color: 'red', description: 'Not approved' }
+            ]}
+          />
+        </div>
+      )
+    },
+    {
+      id: 'payments',
+      title: 'Payments & Fees',
+      icon: DollarSign,
+      description: 'Manage payments and view transaction history',
+      content: (
+        <div className="space-y-4 sm:space-y-6">
+          <FeatureCardsGrid
+            title="Payment Management"
+            bgColor="from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20"
+            features={[
+              { icon: Wallet, title: 'Pay Fees Online', description: 'Pay clearance fees, community fees, and other barangay charges', color: 'emerald' },
+              { icon: Receipt, title: 'Payment History', description: 'View all past transactions and download receipts', color: 'blue' },
+            ]}
+          />
+          <PaymentMethodsGrid methods={['GCash', 'Maya', 'Bank Transfer', 'Over-the-Counter']} />
           <div className="rounded-lg border border-gray-200 p-4 sm:p-6 dark:border-gray-700">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-gray-900 dark:text-white break-words">
-              <Info className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-              Important Information
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <h4 className="mb-2 text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-300 break-words">Household Data Includes</h4>
-                <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  <li className="flex items-start gap-1 sm:gap-2">
-                    <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-green-500" />
-                    <span className="break-words flex-1">Household head information</span>
-                  </li>
-                  <li className="flex items-start gap-1 sm:gap-2">
-                    <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-green-500" />
-                    <span className="break-words flex-1">Complete address and purok</span>
-                  </li>
-                  <li className="flex items-start gap-1 sm:gap-2">
-                    <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-green-500" />
-                    <span className="break-words flex-1">List of all household members</span>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="mb-2 text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-300 break-words">Benefits</h4>
-                <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  <li className="flex items-start gap-1 sm:gap-2">
-                    <TrendingUp className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-blue-500" />
-                    <span className="break-words flex-1">Accurate population tracking</span>
-                  </li>
-                  <li className="flex items-start gap-1 sm:gap-2">
-                    <TrendingUp className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-blue-500" />
-                    <span className="break-words flex-1">Efficient service delivery</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
+            <h3 className="mb-3 sm:mb-4 text-sm sm:text-lg font-semibold text-gray-900 dark:text-white break-words">How to Pay</h3>
+            <ol className="list-decimal space-y-2 pl-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+              <li>Go to "Payments" section from the sidebar</li>
+              <li>Select "Pay Fees" to view outstanding balances</li>
+              <li>Choose the fees you want to pay</li>
+              <li>Select your preferred payment method</li>
+              <li>Follow the instructions for your chosen payment method</li>
+              <li>Upload proof of payment if required</li>
+              <li>Wait for confirmation and download your receipt</li>
+            </ol>
           </div>
         </div>
       )
     },
     {
-      id: 'getting-started',
-      title: 'Getting Started with Households',
-      icon: Rocket,
-      description: 'First-time setup and basic household management',
+      id: 'reports',
+      title: 'Community Reports',
+      icon: AlertCircle,
+      description: 'File and track community reports',
       content: (
         <div className="space-y-4 sm:space-y-6">
-          {/* Welcome Steps */}
-          <div className="relative">
-            <div className="absolute left-4 sm:left-8 top-0 h-full w-0.5 bg-emerald-200 dark:bg-emerald-800"></div>
-            <div className="space-y-4 sm:space-y-6">
+          <FeatureCardsGrid
+            title="File Community Reports"
+            bgColor="from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20"
+            features={[
+              { icon: Flag, title: 'Report Issues', description: 'Report community concerns, incidents, or infrastructure issues', color: 'amber' },
+              { icon: Paperclip, title: 'Attach Evidence', description: 'Upload photos, videos, or documents as proof', color: 'blue' },
+              { icon: Eye, title: 'Track Progress', description: 'Monitor report status and admin responses', color: 'green' },
+            ]}
+          />
+          <div className="rounded-lg border border-gray-200 p-4 sm:p-6 dark:border-gray-700">
+            <h3 className="mb-3 sm:mb-4 text-sm sm:text-lg font-semibold text-gray-900 dark:text-white break-words">Types of Reports You Can File</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               {[
-                {
-                  step: 1,
-                  title: 'Access Household Module',
-                  description: 'Navigate to the Households section',
-                  details: [
-                    'From the main dashboard, click on "Households" in the sidebar',
-                    'You can also use quick access from the Residents dropdown',
-                    'Bookmark the page for faster access'
-                  ]
-                },
-                {
-                  step: 2,
-                  title: 'Review Existing Households',
-                  description: 'Familiarize yourself with current data',
-                  details: [
-                    'Browse through the list of registered households',
-                    'Check household compositions and details',
-                    'Verify purok distribution and statistics'
-                  ]
-                },
-                {
-                  step: 3,
-                  title: 'Set Up Household Categories',
-                  description: 'Configure household classifications',
-                  details: [
-                    'Define tenure types (Owned, Rented, Shared)',
-                    'Set up household types (Single Family, Extended Family, etc.)',
-                    'Configure priority indicators for programs'
-                  ]
-                },
-                {
-                  step: 4,
-                  title: 'Train Staff',
-                  description: 'Ensure your team knows how to manage households',
-                  details: [
-                    'Schedule training on data entry procedures',
-                    'Review data validation rules',
-                    'Practice adding and updating household records',
-                    'Understand reporting features'
-                  ]
-                }
-              ].map((item) => (
-                <div key={item.step} className="relative flex gap-3 sm:gap-4 pl-6 sm:pl-8">
-                  <div className="absolute left-0 flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-emerald-600 text-xs sm:text-sm text-white">
-                    {item.step}
-                  </div>
-                  <div className="flex-1 rounded-lg border border-gray-200 bg-white p-3 sm:p-4 dark:border-gray-700 dark:bg-gray-900">
-                    <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white break-words">{item.title}</h3>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{item.description}</p>
-                    <ul className="mt-2 sm:mt-3 space-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                      {item.details.map((detail, idx) => (
-                        <li key={idx} className="flex items-start gap-1 sm:gap-2">
-                          <CheckCircle className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-green-500" />
-                          <span className="break-words flex-1">{detail}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                'Infrastructure Issues (roads, drainage, streetlights)',
+                'Environmental Concerns (waste, flooding)',
+                'Safety & Security Incidents',
+                'Community Events & Activities',
+                'Health Concerns & Disease Outbreaks',
+                'Noise Complaints & Disturbances'
+              ].map((type, idx) => (
+                <div key={idx} className="flex items-center gap-1 sm:gap-2 rounded-lg bg-gray-50 p-2 sm:p-3 dark:bg-gray-800">
+                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 break-words">{type}</span>
                 </div>
               ))}
             </div>
@@ -425,122 +236,55 @@ const HouseholdInstructions: React.FC = () => {
       )
     },
     {
-      id: 'adding-households',
-      title: 'Adding Households',
-      icon: Home,
-      description: 'Step-by-step guide to registering new households',
+      id: 'security',
+      title: 'Security & Privacy',
+      icon: Shield,
+      description: 'Protect your account and manage security settings',
       content: (
         <div className="space-y-4 sm:space-y-6">
-          {/* Registration Process */}
-          <div className="rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 p-4 sm:p-6 dark:from-emerald-900/20 dark:to-teal-900/20">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-emerald-900 dark:text-emerald-300 break-words">
-              <UserPlus className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-              New Household Registration
-            </h3>
-            
-            <div className="space-y-3 sm:space-y-4">
-              {[
-                {
-                  step: 'Basic Information',
-                  fields: [
-                    'Household Number (auto-generated)',
-                    'Household Name',
-                    'Household Type',
-                    'Tenure Status',
-                    'Year Established'
-                  ],
-                  icon: Home
-                },
-                {
-                  step: 'Location Details',
-                  fields: [
-                    'Purok/Zone',
-                    'Street/Sitio',
-                    'House/Lot Number',
-                    'Landmark',
-                    'GPS Coordinates'
-                  ],
-                  icon: MapPin
-                },
-                {
-                  step: 'Household Head',
-                  fields: [
-                    'Select from existing residents',
-                    'Relationship to household',
-                    'Primary contact number',
-                    'Occupation'
-                  ],
-                  icon: User
-                },
-                {
-                  step: 'Contact Information',
-                  fields: [
-                    'Primary phone number',
-                    'Secondary phone number',
-                    'Email address',
-                    'Emergency contact'
-                  ],
-                  icon: Phone
-                },
-                {
-                  step: 'Household Members',
-                  fields: [
-                    'Add existing residents',
-                    'Register new residents',
-                    'Specify relationship',
-                    'Set dependent status'
-                  ],
-                  icon: Users
-                },
-                {
-                  step: 'Additional Information',
-                  fields: [
-                    'Economic classification',
-                    '4Ps beneficiary',
-                    'Senior count',
-                    'PWD count',
-                    'Solo parent count'
-                  ],
-                  icon: FileText
-                }
-              ].map((section, idx) => (
-                <div key={idx} className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                    <div className="flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex-shrink-0">
-                      <section.icon className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Step {idx + 1}: {section.step}</h4>
-                      <div className="mt-1 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
-                        {section.fields.slice(0, isMobile ? 2 : section.fields.length).map((field, fieldIdx) => (
-                          <span key={fieldIdx} className="rounded-full bg-gray-100 px-2 sm:px-3 py-0.5 sm:py-1 text-[8px] sm:text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {field}
-                          </span>
-                        ))}
-                        {isMobile && section.fields.length > 2 && (
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[8px] text-gray-700 dark:bg-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            +{section.fields.length - 2} more
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+          <FeatureCardsGrid
+            title="Account Security Features"
+            bgColor="from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20"
+            features={[
+              { icon: Lock, title: 'Two-Factor Authentication (2FA)', description: 'Add an extra layer of security to your account', color: 'purple' },
+              { icon: QrCode, title: 'QR Code Login', description: 'Generate QR codes for family members to access household features', color: 'blue' },
+            ]}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
+              <h4 className="mb-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Password Management</h4>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">Change your password regularly for better security</p>
+              <Link href="/residentsettings/security/password" className="mt-2 inline-block text-xs text-blue-600 hover:underline dark:text-blue-400">Change Password →</Link>
+            </div>
+            <div className="rounded-lg border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
+              <h4 className="mb-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Device Management</h4>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">View and manage devices logged into your account</p>
+              <Link href="/residentsettings/devices" className="mt-2 inline-block text-xs text-blue-600 hover:underline dark:text-blue-400">Manage Devices →</Link>
             </div>
           </div>
-
-          {/* Important Notes - Mobile Optimized */}
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4 dark:border-amber-800 dark:bg-amber-900/20">
-            <div className="flex items-start gap-2 sm:gap-3">
-              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="min-w-0 flex-1">
-                <h4 className="text-xs sm:text-sm font-medium text-amber-800 dark:text-amber-400 break-words">Important Notes</h4>
-                <ul className="mt-1 sm:mt-2 space-y-1 text-xs sm:text-sm text-amber-700 dark:text-amber-300">
-                  <li className="break-words">• Household numbers are auto-generated</li>
-                  <li className="break-words">• Must have a household head</li>
-                  <li className="break-words">• Verify all information before saving</li>
-                </ul>
+          <div className="rounded-lg border border-gray-200 p-4 sm:p-6 dark:border-gray-700">
+            <h3 className="mb-3 sm:mb-4 text-sm sm:text-lg font-semibold text-gray-900 dark:text-white break-words">Privacy Controls</h3>
+            <div className="space-y-2 sm:space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Activity Logs</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 break-words">View your recent account activity</p>
+                </div>
+                <Link href="/residentsettings/activities" className="text-xs text-blue-600 hover:underline dark:text-blue-400">View Logs →</Link>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Data Export</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 break-words">Request a copy of your data</p>
+                </div>
+                <Link href="/residentsettings/privacy" className="text-xs text-blue-600 hover:underline dark:text-blue-400">Request Export →</Link>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Notification Preferences</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 break-words">Manage how you receive updates</p>
+                </div>
+                <Link href="/residentsettings/preferences/notifications" className="text-xs text-blue-600 hover:underline dark:text-blue-400">Manage →</Link>
               </div>
             </div>
           </div>
@@ -548,301 +292,32 @@ const HouseholdInstructions: React.FC = () => {
       )
     },
     {
-      id: 'managing-members',
-      title: 'Managing Household Members',
-      icon: Users,
-      description: 'How to add, edit, and manage household members',
+      id: 'notifications',
+      title: 'Notifications',
+      icon: Bell,
+      description: 'Stay updated with important announcements',
       content: (
         <div className="space-y-4 sm:space-y-6">
-          {/* Member Management Overview */}
           <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:p-6 dark:from-blue-900/20 dark:to-indigo-900/20">
             <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-blue-900 dark:text-blue-300 break-words">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-              Household Member Management
+              <Bell className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+              Stay Informed
             </h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
-                <UserPlus className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
-                <h4 className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-400 break-words">Add Members</h4>
-                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
-                  Add existing residents or register new ones
-                </p>
-              </div>
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
-                <UserCheck className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
-                <h4 className="text-xs sm:text-sm font-medium text-green-800 dark:text-green-400 break-words">Update Roles</h4>
-                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
-                  Change relationships and member status
-                </p>
-              </div>
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
-                <User className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
-                <h4 className="text-xs sm:text-sm font-medium text-purple-800 dark:text-purple-400 break-words">Member Profiles</h4>
-                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
-                  View detailed member information
-                </p>
-              </div>
-            </div>
+            <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300 break-words">
+              Receive real-time updates about clearances, payments, and community announcements
+            </p>
           </div>
 
-          {/* Member Roles Table - Mobile Optimized */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-900/50">
-              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Member Roles</h4>
-              <div className="space-y-1 sm:space-y-2">
-                {[
-                  { role: 'Household Head', badge: 'Primary', color: 'blue' },
-                  { role: 'Spouse', badge: 'Secondary', color: 'green' },
-                  { role: 'Child', badge: 'Dependent', color: 'purple' },
-                  { role: 'Parent', badge: 'Senior', color: 'amber' },
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between rounded-lg bg-white p-1.5 sm:p-2 text-xs sm:text-sm dark:bg-gray-900">
-                    <span className="break-words pr-2">{item.role}</span>
-                    <span className={`rounded-full bg-${item.color}-100 px-1.5 sm:px-2 py-0.5 text-[8px] sm:text-xs text-${item.color}-800 dark:bg-${item.color}-900/40 dark:text-${item.color}-300 whitespace-nowrap flex-shrink-0`}>
-                      {item.badge}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-900/50">
-              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Special Categories</h4>
-              <div className="space-y-1 sm:space-y-2">
-                {[
-                  { category: 'Senior Citizen', desc: '60+ years' },
-                  { category: 'PWD', desc: 'With disability' },
-                  { category: 'Solo Parent', desc: 'Single parent' },
-                  { category: '4Ps', desc: 'Beneficiary' },
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between rounded-lg bg-white p-1.5 sm:p-2 text-xs sm:text-sm dark:bg-gray-900">
-                    <span className="break-words pr-2">{item.category}</span>
-                    <span className="text-[8px] sm:text-xs text-gray-500 whitespace-nowrap flex-shrink-0">{item.desc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'household-categories',
-      title: 'Household Categories & Types',
-      icon: Layers,
-      description: 'Understanding household classifications',
-      content: (
-        <div className="space-y-4 sm:space-y-6">
-          {/* Household Types */}
-          <div className="rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 p-4 sm:p-6 dark:from-purple-900/20 dark:to-pink-900/20">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-purple-900 dark:text-purple-300 break-words">
-              <Layers className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-              Household Types
-            </h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
-                <Home className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
-                <h4 className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-400 break-words">Single Family</h4>
-                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
-                  Nuclear family with parents and children
-                </p>
-              </div>
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
-                <Users className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
-                <h4 className="text-xs sm:text-sm font-medium text-green-800 dark:text-green-400 break-words">Extended Family</h4>
-                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
-                  Multiple generations living together
-                </p>
-              </div>
-              <div className="rounded-lg bg-white p-3 sm:p-4 dark:bg-gray-900">
-                <Users2 className="mb-1 sm:mb-2 h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
-                <h4 className="text-xs sm:text-sm font-medium text-purple-800 dark:text-purple-400 break-words">Multi-family</h4>
-                <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">
-                  Multiple families sharing one household
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Tenure Status - Mobile Optimized */}
-          <div className="rounded-lg border border-gray-200 p-4 sm:p-6 dark:border-gray-700">
-            <h3 className="mb-3 sm:mb-4 text-sm sm:text-lg font-semibold text-gray-900 dark:text-white break-words">Tenure Status</h3>
-            
-            <div className="space-y-2 sm:space-y-4">
-              {[
-                { icon: CheckCircle, title: 'Owned', desc: 'Owns the property', color: 'emerald' },
-                { icon: Home, title: 'Rented', desc: 'Pays rent to owner', color: 'blue' },
-                { icon: Users, title: 'Shared', desc: 'Living with relatives', color: 'purple' },
-                { icon: AlertCircle, title: 'Informal Settler', desc: 'No legal claim', color: 'amber' },
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-start gap-2 sm:gap-3">
-                  <div className={`rounded-full bg-${item.color}-100 p-1.5 sm:p-2 dark:bg-${item.color}-900/30 flex-shrink-0`}>
-                    <item.icon className={`h-3 w-3 sm:h-4 sm:w-4 text-${item.color}-600 dark:text-${item.color}-400`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">{item.title}</h4>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'reports-analytics',
-      title: 'Reports & Analytics',
-      icon: BarChart3,
-      description: 'Generate and analyze household reports',
-      content: (
-        <div className="space-y-4 sm:space-y-6">
-          {/* Available Reports */}
-          <div className="rounded-lg bg-gradient-to-r from-indigo-50 to-indigo-100 p-4 sm:p-6 dark:from-indigo-900/20 dark:to-indigo-800/20">
-            <h3 className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-base sm:text-lg font-semibold text-indigo-900 dark:text-indigo-300 break-words">
-              <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-              Household Reports
-            </h3>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
-              {[
-                { title: 'Population Summary', icon: Users },
-                { title: 'Household Distribution', icon: PieChart },
-                { title: 'Demographic Profile', icon: Activity },
-                { title: 'Economic Report', icon: DollarSign },
-                { title: 'Social Services', icon: Award },
-                { title: 'Housing Report', icon: Home },
-              ].map((report, idx) => {
-                const Icon = report.icon;
-                return (
-                  <div key={idx} className="rounded-lg bg-white p-2 sm:p-3 dark:bg-gray-900">
-                    <Icon className="mb-1 h-4 w-4 sm:h-5 sm:w-5 text-indigo-600 flex-shrink-0" />
-                    <h4 className="text-[10px] sm:text-xs font-medium text-indigo-800 dark:text-indigo-400 break-words">{report.title}</h4>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Sample Data - Mobile Optimized */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-lg border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
-              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Households by Purok</h4>
-              <div className="space-y-1 sm:space-y-2">
-                {[
-                  { name: 'Purok 1', count: 245, percent: 35 },
-                  { name: 'Purok 2', count: 189, percent: 27 },
-                  { name: 'Purok 3', count: 312, percent: 45 },
-                ].map((item, idx) => (
-                  <div key={idx}>
-                    <div className="flex justify-between text-xs sm:text-sm">
-                      <span className="break-words pr-2">{item.name}</span>
-                      <span className="font-medium whitespace-nowrap flex-shrink-0">{item.count}</span>
-                    </div>
-                    <div className="mt-1 h-1.5 sm:h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                      <div className={`h-1.5 sm:h-2 rounded-full bg-${idx === 0 ? 'blue' : idx === 1 ? 'green' : 'purple'}-500`} style={{ width: `${item.percent}%` }}></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <h4 className="mb-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Announcements</h4>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">View barangay announcements and community news</p>
+              <Link href="/portal/announcements" className="mt-2 inline-block text-xs text-blue-600 hover:underline dark:text-blue-400">View Announcements →</Link>
             </div>
-
             <div className="rounded-lg border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
-              <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Household Types</h4>
-              <div className="space-y-2">
-                {[
-                  { type: 'Single Family', percent: 58 },
-                  { type: 'Extended Family', percent: 32 },
-                  { type: 'Multi-family', percent: 10 },
-                ].map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 sm:gap-2 min-w-0">
-                      <div className={`h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-${idx === 0 ? 'blue' : idx === 1 ? 'green' : 'purple'}-500 flex-shrink-0`}></div>
-                      <span className="text-xs sm:text-sm break-words">{item.type}</span>
-                    </div>
-                    <span className="text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0">{item.percent}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Export Options - Mobile Optimized */}
-          <div className="rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-900/50">
-            <h4 className="mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">
-              <Download className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              Export Options
-            </h4>
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-              <button className="flex items-center justify-center gap-1 rounded-lg bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700">
-                <PdfIcon className="h-3 w-3 sm:h-4 sm:w-4 text-red-500 flex-shrink-0" />
-                <span className="break-words">PDF</span>
-              </button>
-              <button className="flex items-center justify-center gap-1 rounded-lg bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700">
-                <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
-                <span className="break-words">Excel</span>
-              </button>
-              <button className="flex items-center justify-center gap-1 rounded-lg bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700">
-                <Printer className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500 flex-shrink-0" />
-                <span className="break-words">Print</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'best-practices',
-      title: 'Best Practices',
-      icon: Award,
-      description: 'Tips for effective household management',
-      content: (
-        <div className="space-y-4 sm:space-y-6">
-          {/* Best Practices Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {[
-              { title: 'Data Accuracy', icon: CheckCircle, color: 'blue', items: ['Verify with documents', 'Regular visits', 'Double-check names'] },
-              { title: 'Regular Updates', icon: RefreshCw, color: 'green', items: ['Quarterly updates', 'Track changes', 'Monitor births/deaths'] },
-              { title: 'Data Privacy', icon: Shield, color: 'purple', items: ['Limit access', 'Get consent', 'Follow guidelines'] },
-              { title: 'Community Engagement', icon: Users, color: 'amber', items: ['Involve purok leaders', 'Share statistics', 'Gather feedback'] },
-            ].map((practice, idx) => (
-              <div key={idx} className="rounded-lg border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
-                <div className="mb-2 flex items-center gap-1 sm:gap-2">
-                  <div className={`rounded-full bg-${practice.color}-100 p-1.5 sm:p-2 dark:bg-${practice.color}-900/30 flex-shrink-0`}>
-                    <practice.icon className={`h-3 w-3 sm:h-4 sm:w-4 text-${practice.color}-600 dark:text-${practice.color}-400`} />
-                  </div>
-                  <h4 className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">{practice.title}</h4>
-                </div>
-                <ul className="space-y-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  {practice.items.map((item, itemIdx) => (
-                    <li key={itemIdx} className="break-words">• {item}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-
-          {/* Common Mistakes - Mobile Optimized */}
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 sm:p-4 dark:border-red-800 dark:bg-red-900/20">
-            <h4 className="mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium text-red-800 dark:text-red-400 break-words">
-              <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-              Common Mistakes
-            </h4>
-            <div className="grid grid-cols-1 gap-1 text-xs sm:text-sm text-red-700 dark:text-red-300">
-              <div className="flex items-start gap-1 sm:gap-2">
-                <X className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="break-words flex-1">Duplicate household entries</span>
-              </div>
-              <div className="flex items-start gap-1 sm:gap-2">
-                <X className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="break-words flex-1">Missing household head</span>
-              </div>
-              <div className="flex items-start gap-1 sm:gap-2">
-                <X className="mt-0.5 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="break-words flex-1">Incorrect purok assignments</span>
-              </div>
+              <h4 className="mb-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white break-words">Notification Settings</h4>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">Customize how and when you receive notifications</p>
+              <Link href="/residentsettings/preferences/notifications" className="mt-2 inline-block text-xs text-blue-600 hover:underline dark:text-blue-400">Configure →</Link>
             </div>
           </div>
         </div>
@@ -851,146 +326,66 @@ const HouseholdInstructions: React.FC = () => {
   ];
 
   // Video tutorials
-  const videoTutorials = [
-    {
-      title: 'Household Management Basics',
-      duration: '6:45',
-      thumbnail: '/thumbnails/household-basics.jpg',
-      views: '892'
-    },
-    {
-      title: 'Adding and Managing Household Members',
-      duration: '8:30',
-      thumbnail: '/thumbnails/household-members.jpg',
-      views: '654'
-    },
-    {
-      title: 'Household Reports and Analytics',
-      duration: '5:15',
-      thumbnail: '/thumbnails/household-reports.jpg',
-      views: '423'
-    },
-    {
-      title: 'Best Practices for Household Data',
-      duration: '7:20',
-      thumbnail: '/thumbnails/household-best-practices.jpg',
-      views: '567'
-    }
+  const videoTutorials: VideoTutorial[] = [
+    { title: 'How to Request a Clearance', duration: '4:30', views: '1.2k' },
+    { title: 'Paying Fees Online', duration: '3:45', views: '892' },
+    { title: 'Filing a Community Report', duration: '5:15', views: '654' },
+    { title: 'Setting Up 2FA', duration: '2:30', views: '423' },
+    { title: 'QR Code Login for Family', duration: '3:00', views: '567' }
   ];
 
   // FAQ items
-  const faqItems = [
-    {
-      question: 'How do I transfer a resident to a different household?',
-      answer: 'Go to the household page, click "Manage Members", find the resident, and use the "Transfer" option.'
-    },
-    {
-      question: 'What happens when I delete a household?',
-      answer: 'Households are soft-deleted by default. Members are unlinked but resident records remain.'
-    },
-    {
-      question: 'Can a household have multiple heads?',
-      answer: 'No, each household can only have one designated household head.'
-    },
-    {
-      question: 'How do I handle households with changing members?',
-      answer: 'Use the "Update Composition" feature to add or remove members.'
-    },
-    {
-      question: 'What if a household head passes away?',
-      answer: 'Update the record by removing the deceased as head and assigning a new head.'
-    },
-    {
-      question: 'How do I generate a list of households by purok?',
-      answer: 'Go to Reports → Household Reports → Household Distribution and select "By Purok" filter.'
-    }
+  const faqItems: FAQItem[] = [
+    { question: 'How do I request a clearance for a family member?', answer: 'Go to Clearances → Request Clearance, then select the family member from the dropdown. Fill out the form with their details.' },
+    { question: 'What payment methods are accepted?', answer: 'We accept GCash, Maya, Bank Transfer (BPI, BDO, Metrobank), and over-the-counter payments at the barangay hall.' },
+    { question: 'How long does clearance processing take?', answer: 'Normal: 3-5 business days, Rush: 1-2 business days, Express: Same day processing.' },
+    { question: 'Can I track my community report?', answer: 'Yes! Go to Community Reports and click on your report to see its status and any admin responses.' },
+    { question: 'How do I set up QR code for my family?', answer: 'Go to Profile → QR Code Login to generate a QR code that family members can use to access household features.' },
+    { question: 'What is Two-Factor Authentication?', answer: '2FA adds an extra layer of security. After enabling, you\'ll need both your password and a code from your phone to log in.' }
   ];
 
   // Keyboard shortcuts
-  const shortcuts = [
-    { key: 'Ctrl + H', description: 'Go to Households' },
-    { key: 'Ctrl + N', description: 'Add household' },
-    { key: 'Ctrl + M', description: 'Manage members' },
-    { key: 'Ctrl + F', description: 'Search' },
-    { key: 'Ctrl + E', description: 'Export' },
-    { key: 'Ctrl + P', description: 'Print' },
-    { key: 'Ctrl + R', description: 'Generate report' },
+  const shortcuts: Shortcut[] = [
+    { key: 'Ctrl + C', description: 'Go to Clearances' },
+    { key: 'Ctrl + P', description: 'Go to Payments' },
+    { key: 'Ctrl + R', description: 'File a Report' },
+    { key: 'Ctrl + N', description: 'View Notifications' },
+    { key: 'Ctrl + S', description: 'Security Settings' },
+    { key: 'Ctrl + /', description: 'Show this help menu' }
   ];
 
   const selectedContent = sections.find(s => s.id === selectedSection) || sections[0];
-
-  // Helper function to get icon component
-  const getIcon = (IconComponent: LucideIcon) => {
-    return <IconComponent className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />;
-  };
-
-  // Filtered sections based on search
   const filteredSections = sections.filter(section =>
     section.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     section.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const tabs = [
+    { id: 'guide', label: 'Guide', icon: BookOpen },
+    { id: 'videos', label: 'Videos', icon: Video },
+    { id: 'faq', label: 'FAQ', icon: HelpCircle },
+    { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard }
+  ];
+
   return (
     <>
-      <Head title="Household Management Instructions - Barangay Kibawe" />
+      <Head title="Household Head Guide - Barangay Kibawe" />
       
       <AppLayout>
         <div className="flex-1 space-y-3 sm:space-y-4 p-3 sm:p-4 pt-4 sm:pt-6 md:p-8 max-w-full overflow-hidden">
-          {/* Page Header - Mobile Optimized */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white break-words">
-                Household Instructions
-              </h1>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 break-words">
-                Learn how to manage households effectively
-              </p>
-            </div>
-            
-            {/* Search - Mobile Optimized */}
-            <div className="relative w-full sm:w-72 md:w-96">
-              <Search className="absolute left-2 sm:left-3 top-1/2 h-3 w-3 sm:h-4 sm:w-4 -translate-y-1/2 text-gray-400 flex-shrink-0" />
-              <input
-                type="text"
-                placeholder="Search guides..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 py-1.5 sm:py-2 pl-7 sm:pl-10 pr-3 sm:pr-4 text-xs sm:text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder-gray-400"
-              />
-            </div>
-          </div>
+          <PageHeader
+            title="Household Head Guide"
+            description="Learn how to manage your household and access all features"
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
 
-          {/* Tab Navigation - Scrollable on Mobile */}
-          <div className="border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-            <nav className="-mb-px flex space-x-4 sm:space-x-8 min-w-max px-1">
-              {[
-                { id: 'guide', label: 'Guide', icon: BookOpen },
-                { id: 'videos', label: 'Videos', icon: Video },
-                { id: 'faq', label: 'FAQ', icon: HelpCircle },
-                { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard }
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={cn(
-                      'flex items-center gap-1 sm:gap-2 border-b-2 px-2 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors',
-                      isActive
-                        ? 'border-emerald-500 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400'
-                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'
-                    )}
-                  >
-                    <Icon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
+          <TabNavigation
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={(tabId) => setActiveTab(tabId as any)}
+          />
 
-          {/* Content Area */}
           <div className="mt-4 sm:mt-6">
             {activeTab === 'guide' && (
               <>
@@ -1012,187 +407,35 @@ const HouseholdInstructions: React.FC = () => {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                  {/* Sidebar Navigation - NO SCROLL, FULL HEIGHT */}
-                  <div className={cn(
-                    "md:col-span-3",
-                    isMobile && !isMobileMenuOpen && "hidden",
-                    isMobile && "fixed inset-0 z-50 bg-black/50",
-                  )}>
-                    <div className={cn(
-                      "md:sticky md:top-20 rounded-lg border border-gray-200 bg-white p-3 sm:p-4 dark:border-gray-700 dark:bg-gray-900",
-                      isMobile && "absolute top-0 left-0 h-full w-64 overflow-y-auto rounded-none" // Only scroll on mobile
-                    )}>
-                      {isMobile && (
-                        <div className="mb-3 flex items-center justify-between">
-                          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                            Sections
-                          </h3>
-                          <button
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
-                          >
-                            <X className="h-4 w-4 flex-shrink-0" />
-                          </button>
-                        </div>
-                      )}
-                      <h3 className="mb-3 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white hidden md:block">
-                        Household Guide Sections
-                      </h3>
-                      {searchQuery && filteredSections.length === 0 ? (
-                        <div className="text-center py-4">
-                          <Search className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                          <p className="text-xs text-gray-500">No sections found</p>
-                        </div>
-                      ) : (
-                        <nav className="space-y-1">
-                          {(searchQuery ? filteredSections : sections).map((section) => {
-                            const isSelected = selectedSection === section.id;
-                            return (
-                              <button
-                                key={section.id}
-                                onClick={() => setSelectedSection(section.id)}
-                                className={cn(
-                                  'flex w-full items-start gap-2 sm:gap-3 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-left text-xs sm:text-sm transition-colors',
-                                  isSelected
-                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
-                                    : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                                )}
-                              >
-                                <div className={cn(
-                                  'mt-0.5 rounded p-1 flex-shrink-0',
-                                  isSelected
-                                    ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-800 dark:text-emerald-400'
-                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400'
-                                )}>
-                                  {getIcon(section.icon)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium truncate">{section.title}</div>
-                                  {!isMobile && (
-                                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 break-words">
-                                      {section.description}
-                                    </div>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </nav>
-                      )}
+                  <SidebarNavigation
+                    sections={sections}
+                    selectedSection={selectedSection}
+                    onSectionSelect={setSelectedSection}
+                    searchQuery={searchQuery}
+                    filteredSections={filteredSections}
+                    isMobile={isMobile}
+                    isMobileMenuOpen={isMobileMenuOpen}
+                    onMobileMenuClose={() => setIsMobileMenuOpen(false)}
+                  />
 
-                      {/* Download Resources - Always visible, no scroll */}
-                      {!isMobile && (
-                        <div className="mt-6 rounded-lg bg-gray-50 p-3 sm:p-4 dark:bg-gray-700/50">
-                          <h4 className="mb-2 sm:mb-3 text-xs sm:text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                            Resources
-                          </h4>
-                          <div className="space-y-1 sm:space-y-2">
-                            <a
-                              href="#"
-                              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400"
-                            >
-                              <Download className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                              <span className="truncate">Household Manual</span>
-                            </a>
-                            <a
-                              href="#"
-                              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400"
-                            >
-                              <Download className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                              <span className="truncate">Excel Template</span>
-                            </a>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Main Content */}
-                  <div className={cn(
-                    "md:col-span-9 min-w-0",
-                    isMobile && isMobileMenuOpen && "hidden"
-                  )}>
-                    <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6 dark:border-gray-700 dark:bg-gray-900">
-                      {/* Breadcrumb - Simplified on Mobile */}
-                      <nav className="mb-3 sm:mb-4 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm flex-wrap">
-                        <Link href="/admin/dashboard" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 whitespace-nowrap">
-                          Home
-                        </Link>
-                        <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 flex-shrink-0" />
-                        <Link href="/admin/households" className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 whitespace-nowrap">
-                          Households
-                        </Link>
-                        <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 flex-shrink-0" />
-                        <span className="font-medium text-gray-900 dark:text-white truncate max-w-[100px] sm:max-w-none">
-                          {selectedContent.title}
-                        </span>
-                      </nav>
-
-                      {/* Section Header - Mobile Optimized */}
-                      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                          <div className="rounded-lg bg-emerald-100 p-2 sm:p-3 dark:bg-emerald-900/30 flex-shrink-0">
-                            {getIcon(selectedContent.icon)}
-                          </div>
-                          <div className="min-w-0">
-                            <h2 className="text-sm sm:text-base md:text-2xl font-bold text-gray-900 dark:text-white break-words">
-                              {selectedContent.title}
-                            </h2>
-                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-0.5 sm:mt-1 break-words">
-                              {selectedContent.description}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Action Buttons - Stack on Mobile */}
-                        <div className="flex gap-1 sm:gap-2">
-                          <button className="rounded-lg border border-gray-300 p-1.5 sm:p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700">
-                            <Printer className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                          </button>
-                          <button className="rounded-lg border border-gray-300 p-1.5 sm:p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700">
-                            <Share2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                          </button>
-                          <button className="rounded-lg bg-emerald-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600">
-                            <Download className="mr-1 inline h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                            <span className="hidden sm:inline">Download</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Section Content */}
-                      <div className="prose prose-sm sm:prose-base max-w-none dark:prose-invert overflow-hidden">
-                        {selectedContent.content}
-                      </div>
-
-                      {/* Previous/Next Navigation - Simplified on Mobile */}
-                      <div className="mt-6 sm:mt-8 flex items-center justify-between border-t border-gray-200 pt-4 sm:pt-6 dark:border-gray-700">
-                        <button
-                          onClick={() => {
-                            const currentIndex = sections.findIndex(s => s.id === selectedSection);
-                            if (currentIndex > 0) {
-                              setSelectedSection(sections[currentIndex - 1].id);
-                            }
-                          }}
-                          className="flex items-center gap-1 sm:gap-2 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-                        >
-                          <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                          <span className="hidden sm:inline">Previous</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            const currentIndex = sections.findIndex(s => s.id === selectedSection);
-                            if (currentIndex < sections.length - 1) {
-                              setSelectedSection(sections[currentIndex + 1].id);
-                            }
-                          }}
-                          className="flex items-center gap-1 sm:gap-2 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-                        >
-                          <span className="hidden sm:inline">Next</span>
-                          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <MainContent
+                    selectedContent={selectedContent}
+                    sections={sections}
+                    onPrevious={() => {
+                      const currentIndex = sections.findIndex(s => s.id === selectedSection);
+                      if (currentIndex > 0) {
+                        setSelectedSection(sections[currentIndex - 1].id);
+                      }
+                    }}
+                    onNext={() => {
+                      const currentIndex = sections.findIndex(s => s.id === selectedSection);
+                      if (currentIndex < sections.length - 1) {
+                        setSelectedSection(sections[currentIndex + 1].id);
+                      }
+                    }}
+                    isMobile={isMobile}
+                    isMobileMenuOpen={isMobileMenuOpen}
+                  />
                 </div>
               </>
             )}
@@ -1200,27 +443,7 @@ const HouseholdInstructions: React.FC = () => {
             {activeTab === 'videos' && (
               <div className="space-y-4 sm:space-y-6">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white break-words">Video Tutorials</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
-                  {videoTutorials.map((video, idx) => (
-                    <div key={idx} className="group cursor-pointer rounded-xl border border-gray-200 bg-white p-3 sm:p-4 transition hover:shadow-lg dark:border-gray-700 dark:bg-gray-900">
-                      <div className="relative mb-2 sm:mb-3 aspect-video w-full overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-700">
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="rounded-full bg-black/50 p-2 sm:p-3 text-white group-hover:bg-black/70">
-                            <Video className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                          </div>
-                        </div>
-                        <div className="absolute bottom-1 sm:bottom-2 right-1 sm:right-2 rounded bg-black/70 px-1 sm:px-2 py-0.5 text-[8px] sm:text-xs text-white">
-                          {video.duration}
-                        </div>
-                      </div>
-                      <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white break-words">{video.title}</h3>
-                      <div className="mt-1 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        <Eye className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                        <span className="break-words">{video.views} views</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <VideoTutorialsGrid videos={videoTutorials} />
               </div>
             )}
 
@@ -1229,58 +452,22 @@ const HouseholdInstructions: React.FC = () => {
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white break-words">
                   Frequently Asked Questions
                 </h2>
-                <div className="space-y-2 sm:space-y-4">
-                  {faqItems.map((faq, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-xl border border-gray-200 bg-white p-3 sm:p-4 dark:border-gray-700 dark:bg-gray-900"
-                    >
-                      <button
-                        onClick={() => toggleSection(`faq-${idx}`)}
-                        className="flex w-full items-center justify-between text-left gap-2"
-                      >
-                        <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white break-words flex-1">
-                          {faq.question}
-                        </h3>
-                        {expandedSections.includes(`faq-${idx}`) ? (
-                          <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-gray-500" />
-                        ) : (
-                          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0 text-gray-500" />
-                        )}
-                      </button>
-                      {expandedSections.includes(`faq-${idx}`) && (
-                        <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words">{faq.answer}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <FAQAccordion items={faqItems} />
               </div>
             )}
 
             {activeTab === 'shortcuts' && (
               <div className="space-y-4 sm:space-y-6">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white break-words">Keyboard Shortcuts</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
-                  {shortcuts.map((shortcut, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-2 sm:p-3 dark:border-gray-700 dark:bg-gray-900 gap-2"
-                    >
-                      <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 break-words flex-1">{shortcut.description}</span>
-                      <kbd className="rounded bg-gray-100 px-2 sm:px-2.5 py-1 sm:py-1.5 text-xs sm:text-sm font-mono font-semibold text-gray-900 dark:bg-gray-700 dark:text-white whitespace-nowrap flex-shrink-0">
-                        {shortcut.key}
-                      </kbd>
-                    </div>
-                  ))}
-                </div>
+                <KeyboardShortcutsGrid shortcuts={shortcuts} />
                 
-                <div className="rounded-lg bg-emerald-50 p-3 sm:p-4 dark:bg-emerald-900/20">
-                  <h3 className="mb-1 sm:mb-2 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium text-emerald-800 dark:text-emerald-400 break-words">
+                <div className="rounded-lg bg-blue-50 p-3 sm:p-4 dark:bg-blue-900/20">
+                  <h3 className="mb-1 sm:mb-2 flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-400 break-words">
                     <Keyboard className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                     Pro Tip
                   </h3>
-                  <p className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-400 break-words">
-                    Press <kbd className="rounded bg-emerald-200 px-1 sm:px-2 py-0.5 sm:py-1 text-xs sm:text-sm font-mono dark:bg-emerald-800">Ctrl + /</kbd> to see all shortcuts
+                  <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-400 break-words">
+                    Press <kbd className="rounded bg-blue-200 px-1 sm:px-2 py-0.5 sm:py-1 text-xs sm:text-sm font-mono dark:bg-blue-800">Ctrl + /</kbd> to see all shortcuts from any page
                   </p>
                 </div>
               </div>
@@ -1292,4 +479,4 @@ const HouseholdInstructions: React.FC = () => {
   );
 };
 
-export default HouseholdInstructions;
+export default HouseholdHeadInstructions;

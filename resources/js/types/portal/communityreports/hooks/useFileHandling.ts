@@ -1,7 +1,7 @@
 // hooks/useFileHandling.ts
 
 import { useState, useRef } from 'react';
-import { FileWithPreview, PreviewModalState } from '@/types/portal/community-report';
+import { FileWithPreview, PreviewModalState } from '@/types/portal/reports/community-report';
 import { toast } from 'sonner';
 
 export const useFileHandling = () => {

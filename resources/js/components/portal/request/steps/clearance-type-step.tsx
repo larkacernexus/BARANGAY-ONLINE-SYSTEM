@@ -1,10 +1,11 @@
+// clearance-type-step.tsx
 import { RefObject } from 'react';
 import { Search, X, FileCheck, Check, ArrowRight, Info, Grid, List, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import type { ClearanceType } from '@/components/resident/request/types';
+import type { ClearanceType } from '@/components/portal/request/types';
 
 interface ClearanceTypeStepProps {
     clearanceTypes: ClearanceType[];
@@ -17,13 +18,12 @@ interface ClearanceTypeStepProps {
     categoryFilter: string;
     setCategoryFilter: (filter: string) => void;
     visibleCount: number;
-    setVisibleCount: (count: number) => void;
     categorizedTypes: ClearanceType[];
     hasMore: boolean;
     loadMore: () => void;
     categories: string[];
-    typeListRef: RefObject<HTMLDivElement>;
-    searchInputRef: RefObject<HTMLInputElement>;
+    typeListRef: RefObject<HTMLDivElement | null>;
+    searchInputRef: RefObject<HTMLInputElement | null>;
     isMobile: boolean;
     showSearch: boolean;
     setShowSearch: (show: boolean) => void;
@@ -88,6 +88,7 @@ export function ClearanceTypeStep({
                                 value={categoryFilter}
                                 onChange={(e) => {
                                     setCategoryFilter(e.target.value);
+                                    // ✅ Removed setVisibleCount call
                                 }}
                                 className="flex-1 h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
@@ -156,7 +157,7 @@ export function ClearanceTypeStep({
                 className={`${isMobile && categorizedTypes.length > 6 ? 'max-h-[400px] overflow-y-auto pr-2' : ''}`}
             >
                 {viewMode === 'list' ? (
-                    // LIST VIEW
+                    // LIST VIEW (same as before)
                     <div className="space-y-3">
                         {categorizedTypes.length > 0 ? (
                             categorizedTypes.slice(0, visibleCount).map((type) => (
@@ -170,6 +171,7 @@ export function ClearanceTypeStep({
                                     }`}
                                     onClick={() => onClearanceTypeChange(type.id.toString())}
                                 >
+                                    {/* List view content */}
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className={`p-2 rounded-lg flex-shrink-0 ${
@@ -245,7 +247,7 @@ export function ClearanceTypeStep({
                         )}
                     </div>
                 ) : (
-                    // GRID VIEW
+                    // GRID VIEW (same as before)
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {categorizedTypes.length > 0 ? (
                             categorizedTypes.slice(0, visibleCount).map((type) => (
@@ -259,6 +261,7 @@ export function ClearanceTypeStep({
                                     }`}
                                     onClick={() => onClearanceTypeChange(type.id.toString())}
                                 >
+                                    {/* Grid view content */}
                                     <div className="flex items-start justify-between mb-2">
                                         <div className={`p-2 rounded-lg ${
                                             dataClearanceTypeId === type.id.toString() 
@@ -352,6 +355,7 @@ export function ClearanceTypeStep({
                                     className="text-xs whitespace-nowrap border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                                     onClick={() => {
                                         setCategoryFilter(cat);
+                                        // ✅ Removed setVisibleCount call
                                         typeListRef.current?.scrollIntoView({ behavior: 'smooth' });
                                     }}
                                 >

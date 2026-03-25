@@ -4,6 +4,7 @@ import {
     FolderOpen, Shield, Heart, GraduationCap, Briefcase, Award,
     Type, Clock, AlertCircle, CheckCircle, XCircle 
 } from 'lucide-react';
+import type { StorageStats } from '@/types/portal/records/records';
 
 // Icon mapping
 export const ICON_MAP: Record<string, any> = {
@@ -61,45 +62,103 @@ export const FILE_TYPE_CONFIG: Record<string, { icon: any; color: string }> = {
     'webp': { icon: Image, color: 'text-purple-500 dark:text-purple-400' },
 };
 
-// Stats cards configuration
-export const getRecordStatsCards = (stats: any) => [
-    {
-        title: 'Total Documents',
-        value: stats?.document_count || 0,
-        icon: Folder,
-        color: 'from-blue-500 to-blue-600',
-        bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-        textColor: 'text-blue-600 dark:text-blue-400',
-        trend: '+12.5%',
-        trendUp: true,
-    },
-    {
-        title: 'Storage Used',
-        value: stats?.used || '0 MB',
-        icon: File,
-        color: 'from-purple-500 to-purple-600',
-        bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-        textColor: 'text-purple-600 dark:text-purple-400',
-        trend: `${stats?.percentage || 0}% of limit`,
-        trendUp: stats?.percentage < 70,
-    },
-    {
-        title: 'Categories',
-        value: stats?.categories_count || 0,
-        icon: FolderOpen,
-        color: 'from-green-500 to-green-600',
-        bgColor: 'bg-green-50 dark:bg-green-900/20',
-        textColor: 'text-green-600 dark:text-green-400',
-        trend: 'Active',
-        trendUp: true,
-    },
-    {
-        title: 'Available Space',
-        value: stats?.available || '100 MB',
-        icon: Shield,
-        color: 'from-amber-500 to-amber-600',
-        bgColor: 'bg-amber-50 dark:bg-amber-900/20',
-        textColor: 'text-amber-600 dark:text-amber-400',
-        badge: stats?.percentage > 90 ? 'Almost Full' : null,
-    },
-];
+// Stats cards configuration - UPDATED to match ModernStatsCards expected structure
+export const getRecordStatsCards = (stats: StorageStats) => {
+    const documentCount = stats?.document_count || 0;
+    const usedPercentage = stats?.percentage || 0;
+    
+    return [
+        {
+            title: 'Total Documents',
+            value: documentCount.toLocaleString(),
+            icon: Folder,
+            iconColor: 'text-blue-600 dark:text-blue-400',
+            iconBgColor: 'bg-blue-50 dark:bg-blue-900/20',
+            trend: {
+                value: '12.5%',
+                positive: true
+            },
+            footer: 'vs last month'
+        },
+        {
+            title: 'Storage Used',
+            value: stats?.used || '0 MB',
+            icon: File,
+            iconColor: 'text-purple-600 dark:text-purple-400',
+            iconBgColor: 'bg-purple-50 dark:bg-purple-900/20',
+            trend: {
+                value: `${usedPercentage}%`,
+                positive: usedPercentage < 70
+            },
+            footer: `of ${stats?.limit || '0 MB'}`
+        },
+        {
+            title: 'Categories',
+            value: stats?.categories_count || 0,
+            icon: FolderOpen,
+            iconColor: 'text-green-600 dark:text-green-400',
+            iconBgColor: 'bg-green-50 dark:bg-green-900/20',
+            footer: 'Active categories'
+        },
+        {
+            title: 'Available Space',
+            value: stats?.available || '100 MB',
+            icon: Shield,
+            iconColor: 'text-amber-600 dark:text-amber-400',
+            iconBgColor: 'bg-amber-50 dark:bg-amber-900/20',
+            footer: usedPercentage > 90 ? 'Almost full' : `${100 - usedPercentage}% remaining`
+        },
+    ];
+};
+
+// Alternative: If you prefer to have trend only on some cards
+export const getRecordStatsCardsWithTrends = (stats: StorageStats) => {
+    const documentCount = stats?.document_count || 0;
+    const usedPercentage = stats?.percentage || 0;
+    
+    return [
+        {
+            title: 'Total Documents',
+            value: documentCount.toLocaleString(),
+            icon: Folder,
+            iconColor: 'text-blue-600 dark:text-blue-400',
+            iconBgColor: 'bg-blue-50 dark:bg-blue-900/20',
+            trend: {
+                value: '+12.5%',
+                positive: true
+            },
+            footer: 'Total records in system'
+        },
+        {
+            title: 'Storage Used',
+            value: stats?.used || '0 MB',
+            icon: File,
+            iconColor: 'text-purple-600 dark:text-purple-400',
+            iconBgColor: 'bg-purple-50 dark:bg-purple-900/20',
+            footer: `${stats?.used || '0 MB'} of ${stats?.limit || '0 MB'} used`
+        },
+        {
+            title: 'Categories',
+            value: stats?.categories_count || 0,
+            icon: FolderOpen,
+            iconColor: 'text-green-600 dark:text-green-400',
+            iconBgColor: 'bg-green-50 dark:bg-green-900/20',
+            footer: 'Document categories'
+        },
+        {
+            title: 'Available Space',
+            value: stats?.available || '100 MB',
+            icon: Shield,
+            iconColor: 'text-amber-600 dark:text-amber-400',
+            iconBgColor: 'bg-amber-50 dark:bg-amber-900/20',
+            trend: usedPercentage > 90 ? {
+                value: 'Critical',
+                positive: false
+            } : {
+                value: `${Math.round(100 - usedPercentage)}%`,
+                positive: true
+            },
+            footer: `${Math.round(usedPercentage)}% used`
+        },
+    ];
+};

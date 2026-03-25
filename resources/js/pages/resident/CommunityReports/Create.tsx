@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { AlertTriangle } from 'lucide-react';
 
 // Import types
-import { PageProps, ReportType, UrgencyLevel } from '@/types/portal/community-report';
+import { PageProps, ReportType, UrgencyLevel } from '@/types/portal/reports/community-report';
 
 // Import hooks
 import { useMobileNavigation } from '@/types/portal/communityreports/hooks/useMobileNavigation';
@@ -17,16 +17,16 @@ import { useFileHandling } from '@/types/portal/communityreports/hooks/useFileHa
 import { useDraftStorage } from '@/types/portal/communityreports/hooks/useDraftStorage';
 
 // Import components
-import { StepProgress } from '@/components/portal/community-report/StepProgress';
-import { ReportTypeSelector } from '@/components/portal/community-report/ReportTypeSelector';
-import { DetailsForm } from '@/components/portal/community-report/DetailsForm';
-import { EvidenceUpload } from '@/components/portal/community-report/EvidenceUpload';
-import { ReviewSubmit } from '@/components/portal/community-report/ReviewSubmit';
-import { SidebarInfo } from '@/components/portal/community-report/SidebarInfo';
-import { PreviewModal } from '@/components/portal/community-report/PreviewModal';
-import { EmergencyModal } from '@/components/portal/community-report/EmergencyModal';
-import { MobileStepNavigation } from '@/components/portal/community-report/MobileStepNavigation';
-import { DesktopNavigation } from '@/components/portal/community-report/DesktopNavigation';
+import { StepProgress } from '@/components/portal/community-report/create/StepProgress';
+import { ReportTypeSelector } from '@/components/portal/community-report/create/ReportTypeSelector';
+import { DetailsForm } from '@/components/portal/community-report/create/DetailsForm';
+import { EvidenceUpload } from '@/components/portal/community-report/create/EvidenceUpload';
+import { ReviewSubmit } from '@/components/portal/community-report/create/ReviewSubmit';
+import { SidebarInfo } from '@/components/portal/community-report/create/SidebarInfo';
+import { PreviewModal } from '@/components/portal/community-report/create/PreviewModal';
+import { EmergencyModal } from '@/components/portal/community-report/create/EmergencyModal';
+import { MobileStepNavigation } from '@/components/portal/community-report/create/MobileStepNavigation';
+import { DesktopNavigation } from '@/components/portal/community-report/create/DesktopNavigation';
 
 // Import helpers
 import { isFile } from '@/types/portal/communityreports/utils/community-report-helpers';

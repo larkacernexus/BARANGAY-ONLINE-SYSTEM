@@ -16,6 +16,9 @@ export interface ClearanceType {
 }
 
 export interface Resident {
+    middle_name: any;
+    suffix: any;
+    contact_number: string;
     id: number;
     first_name: string;
     last_name: string;
