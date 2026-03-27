@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// components/admin/users/UsersTable.tsx
+import { JSX, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -45,7 +46,7 @@ import {
   Key
 } from 'lucide-react';
 import UsersTableRow from './UsersTableRow';
-import { User } from '@/types';
+import { User } from '@/types/admin/users/user-types';
 
 interface UsersTableProps {
   users: User[];
@@ -57,6 +58,12 @@ interface UsersTableProps {
   sortBy: string;
   sortOrder: 'asc' | 'desc';
   onSort: (column: string) => void;
+  onUserEdit?: (user: User) => void;
+  onUserDelete?: (user: User) => void;
+  onUserStatusChange?: (user: User, status: string) => void;
+  onCopyToClipboard?: (text: string, label: string) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 export default function UsersTable({
@@ -68,7 +75,13 @@ export default function UsersTable({
   onSelectAll,
   sortBy,
   sortOrder,
-  onSort
+  onSort,
+  onUserEdit,
+  onUserDelete,
+  onUserStatusChange,
+  onCopyToClipboard,
+  canEdit = true,
+  canDelete = true
 }: UsersTableProps) {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
@@ -159,6 +172,14 @@ export default function UsersTable({
     }
   };
 
+  // Wrap status change handler to match UsersTableRow's expected signature
+  const handleStatusChange = (user: User) => {
+    if (onUserStatusChange) {
+      const newStatus = user.status === 'active' ? 'inactive' : 'active';
+      onUserStatusChange(user, newStatus);
+    }
+  };
+
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -176,7 +197,7 @@ export default function UsersTable({
               </TableHead>
             )}
             <TableHead 
-              className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100"
+              className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
               onClick={() => onSort('name')}
             >
               <div className="flex items-center gap-1">
@@ -185,7 +206,7 @@ export default function UsersTable({
               </div>
             </TableHead>
             <TableHead 
-              className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
+              className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
               onClick={() => onSort('role')}
             >
               <div className="flex items-center gap-1">
@@ -199,7 +220,7 @@ export default function UsersTable({
               Department
             </TableHead>
             <TableHead 
-              className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+              className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
               onClick={() => onSort('status')}
             >
               <div className="flex items-center gap-1">
@@ -232,6 +253,10 @@ export default function UsersTable({
               getStatusIcon={getStatusIcon}
               getRoleBadgeVariant={getRoleBadgeVariant}
               formatDate={formatDate}
+              // Map props correctly
+              onDelete={onUserDelete}
+              onToggleStatus={handleStatusChange}
+              onCopyToClipboard={onCopyToClipboard}
             />
           ))}
         </TableBody>

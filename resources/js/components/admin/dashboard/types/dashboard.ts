@@ -1,3 +1,5 @@
+// types/dashboard.ts - Revised version
+
 import { type LucideIcon } from 'lucide-react';
 
 export type StatItem = {
@@ -12,17 +14,23 @@ export type StatItem = {
     sparkline?: number[];
 };
 
+// This matches what RecentActivities expects (icon as string, not component)
 export type ActivityItem = {
+    causer: any;
+    subject_type: any;
+    subject_id: any;
+    properties: any;
     id: number;
     type: 'payment' | 'clearance' | 'registration' | 'complaint' | 'meeting' | 'alert' | 'event' | 'announcement';
     description: string;
     time: string;
-    icon: React.ComponentType<any>;
+    icon: string; // Changed from React.ComponentType to string
     iconColor: string;
     bgColor: string;
     data?: any;
     isRead?: boolean;
     priority?: 'low' | 'medium' | 'high';
+    created_at?: string; // Made optional since it might not always be present
 };
 
 export type QuickAction = {
@@ -44,6 +52,40 @@ export type SystemStatus = {
     responseTime?: string;
 };
 
+// Updated PrivilegeStat to match what PrivilegeStats component expects
+export type PrivilegeStat = {
+    id: number;
+    name: string;
+    code: string;
+    count: number;
+    percentage: number;
+    activeCount: number;
+    expiringCount: number;
+    expiredCount: number;
+};
+
+// Updated ExpiringPrivilege to include all fields that the PrivilegeStats component expects
+export type ExpiringPrivilege = {
+    id: number;
+    resident_id: number;
+    resident_name: string;
+    first_name: string;      // Added - required by component
+    last_name: string;       // Added - required by component
+    privilege_type: string;
+    privilege_name: string;  // Added - required by component
+    privilege_code: string;  // Added - required by component
+    expiry_date: string;
+    expires_at: string;      // Added - required by component
+    days_remaining: number;
+};
+
+export type PrivilegeStatsData = {
+    byPrivilege: PrivilegeStat[];
+    expiringSoon: ExpiringPrivilege[];
+    recentlyExpired: ExpiringPrivilege[];
+    totalActive: number;
+};
+
 export type PageProps = {
     stats: {
         totalResidents: number;
@@ -55,6 +97,7 @@ export type PageProps = {
         soloParents: number;
         fourPs: number;
     };
+    activities?: ActivityItem[];
     recentActivities: {
         newResidents: Array<{
             id: number;
@@ -162,8 +205,8 @@ export type PageProps = {
         monthlyAvg: string;
         projectedMonthly: string;
         growthRate: string;
-        selectedPeriod?: string;        // NEW: Collections for selected period
-        selectedPeriodLabel?: string;   // NEW: Label for selected period
+        selectedPeriod?: string;
+        selectedPeriodLabel?: string;
     };
     activityStats: {
         newResidentsToday: number;
@@ -228,5 +271,6 @@ export type PageProps = {
             count: number;
         }>;
     };
-    selectedDateRange?: 'today' | 'week' | 'month' | 'year';  // NEW: Selected date range from backend
+    privilegeStats?: PrivilegeStatsData;
+    selectedDateRange?: 'today' | 'week' | 'month' | 'year';
 };

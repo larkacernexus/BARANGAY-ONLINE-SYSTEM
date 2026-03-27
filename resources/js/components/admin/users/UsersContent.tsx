@@ -1,3 +1,4 @@
+// components/admin/users/UsersContent.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -6,54 +7,20 @@ import { Checkbox } from '@/components/ui/checkbox';
 import UsersTable from './UsersTable';
 import UsersGridView from './UsersGridView';
 import UsersBulkActions from './UsersBulkActions';
-import { ViewToggle } from '@/components/adminui/view-toggle';
 import { Pagination } from '@/components/adminui/pagination';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { SelectAllFloat } from '@/components/adminui/select-all-float';
 import { GridSelectionSummary } from '@/components/adminui/grid-selection-summary';
-import { User } from '@/types';
 import { 
   UserIcon,
-  Plus,
   List,
   Grid3X3
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-
-interface UsersContentProps {
-  users: {
-    data: User[];
-    current_page: number;
-    last_page: number;
-    total: number;
-    from: number;
-    to: number;
-    per_page: number;
-  };
-  selectedUsers: number[];
-  selectedUsersData: User[];
-  isBulkMode: boolean;
-  setIsBulkMode: (value: boolean) => void;
-  isSelectAll: boolean;
-  viewMode: 'table' | 'grid';
-  setViewMode: (mode: 'table' | 'grid') => void;
-  isMobile: boolean;
-  hasActiveFilters: boolean;
-  handleClearFilters: () => void;
-  handleSelectAllOnPage: () => void;
-  handleItemSelect: (id: number) => void;
-  handlePageChange: (page: number) => void;
-  setShowBulkDeleteDialog: (show: boolean) => void;
-  setShowBulkStatusDialog: (show: boolean) => void;
-  setShowBulkRoleDialog: (show: boolean) => void;
-  roles: Array<{ id: number; name: string; count: number }>;
-  sortBy: string;
-  sortOrder: 'asc' | 'desc';
-  onSort: (column: string) => void;
-  onClearSelection: () => void;
-}
+import { UsersContentProps, ViewMode } from '@/types/admin/users/user-types';
+import { toast } from 'sonner';
 
 export default function UsersContent({
   users,
@@ -77,7 +44,17 @@ export default function UsersContent({
   sortBy,
   sortOrder,
   onSort,
-  onClearSelection
+  onClearSelection,
+  onBulkOperation,
+  onCopySelectedData,
+  isLoading = false,
+  canEdit = true,
+  canDelete = true,
+  onUserClick,
+  onUserEdit,
+  onUserDelete,
+  onUserStatusChange,
+  onUserImpersonate
 }: UsersContentProps) {
   // Toggle handler for bulk mode
   const handleBulkModeToggle = () => {
@@ -94,13 +71,18 @@ export default function UsersContent({
     }
   }, [isMobile, viewMode, setViewMode]);
 
+  // Handle view mode change with proper typing
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+  };
+
   // Bulk action items configuration
   const bulkActions = {
     primary: [
       {
         label: 'Export',
         icon: <UserIcon className="h-3.5 w-3.5 mr-1.5" />,
-        onClick: () => console.log('Export'),
+        onClick: () => onBulkOperation('export'),
         tooltip: 'Export selected users'
       },
       {
@@ -124,16 +106,10 @@ export default function UsersContent({
         tooltip: 'Change role for selected users'
       },
       {
-        label: 'Reset Password',
+        label: 'Copy Data',
         icon: <UserIcon className="h-3.5 w-3.5 mr-1.5" />,
-        onClick: () => console.log('Reset Password'),
-        tooltip: 'Reset passwords for selected users'
-      },
-      {
-        label: 'Send Email',
-        icon: <UserIcon className="h-3.5 w-3.5 mr-1.5" />,
-        onClick: () => console.log('Send Email'),
-        tooltip: 'Send email to selected users'
+        onClick: () => onCopySelectedData(),
+        tooltip: 'Copy selected users data'
       }
     ],
     destructive: [
@@ -146,6 +122,44 @@ export default function UsersContent({
       }
     ]
   };
+
+  // Handle copy to clipboard
+  const handleCopyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
+  };
+
+  // Handle toggle status
+  const handleToggleStatus = (user: any) => {
+    const newStatus = user.status === 'active' ? 'inactive' : 'active';
+    if (onUserStatusChange) {
+      onUserStatusChange(user, newStatus);
+    }
+  };
+
+  // Handle delete
+  const handleDelete = (user: any) => {
+    if (confirm(`Are you sure you want to delete ${user.email}?`)) {
+      if (onUserDelete) {
+        onUserDelete(user);
+      }
+    }
+  };
+
+  // Empty state for no users
+  const emptyState = (
+    <EmptyState
+      title="No users found"
+      description={hasActiveFilters 
+        ? 'No users match your current filters. Try adjusting your search or filters.'
+        : 'No users have been created yet.'}
+      icon={<UserIcon className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
+      hasFilters={hasActiveFilters}
+      onClearFilters={handleClearFilters}
+      onCreateNew={() => window.location.href = '/admin/users/create'}
+      createLabel="Create User"
+    />
+  );
 
   return (
     <>
@@ -201,7 +215,7 @@ export default function UsersContent({
                         ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' 
                         : ''
                     }`}
-                    onClick={() => setViewMode('table')}
+                    onClick={() => handleViewModeChange('table')}
                   >
                     <List className="h-4 w-4" />
                   </Button>
@@ -220,7 +234,7 @@ export default function UsersContent({
                         ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' 
                         : ''
                     }`}
-                    onClick={() => setViewMode('grid')}
+                    onClick={() => handleViewModeChange('grid')}
                   >
                     <Grid3X3 className="h-4 w-4" />
                   </Button>
@@ -284,23 +298,10 @@ export default function UsersContent({
           </div>
         </CardHeader>
         <CardContent className="p-0 dark:bg-gray-900">
-          {/* Empty State with dark mode */}
           {users.data.length === 0 ? (
-            <EmptyState
-              icon={<UserIcon className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
-              title="No users found"
-              description={hasActiveFilters 
-                ? "No users match your current filters. Try adjusting your search or filters."
-                : "No users have been created yet."}
-              action={hasActiveFilters ? {
-                label: "Clear Filters",
-                onClick: handleClearFilters
-              } : {
-                label: "Create User",
-                onClick: () => window.location.href = '/admin/users/create'
-              }}
-              className="py-12 sm:py-16 dark:bg-gray-900"
-            />
+            <div className="py-12 sm:py-16 dark:bg-gray-900">
+              {emptyState}
+            </div>
           ) : (
             <>
               {/* Table View */}
@@ -315,6 +316,12 @@ export default function UsersContent({
                   sortBy={sortBy}
                   sortOrder={sortOrder}
                   onSort={onSort}
+                  onUserEdit={onUserEdit}
+                  onUserDelete={handleDelete}
+                  onUserStatusChange={handleToggleStatus}
+                  onCopyToClipboard={handleCopyToClipboard}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
                 />
               ) : (
                 // Grid View
@@ -324,10 +331,19 @@ export default function UsersContent({
                   selectedUsers={selectedUsers}
                   onItemSelect={handleItemSelect}
                   isMobile={isMobile}
+                  hasActiveFilters={hasActiveFilters}
+                  onClearFilters={handleClearFilters}
+                  onDelete={handleDelete}
+                  onToggleStatus={handleToggleStatus}
+                  onCopyToClipboard={handleCopyToClipboard}
+                  onUserClick={onUserClick}
+                  onUserEdit={onUserEdit}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
                 />
               )}
 
-              {/* Grid Selection Summary with dark mode */}
+              {/* Grid Selection Summary */}
               {viewMode === 'grid' && isBulkMode && selectedUsers.length > 0 && (
                 <GridSelectionSummary
                   selectedCount={selectedUsers.length}
@@ -339,7 +355,7 @@ export default function UsersContent({
                 />
               )}
 
-              {/* Pagination with dark mode */}
+              {/* Pagination */}
               {users.last_page > 1 && (
                 <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
                   <Pagination

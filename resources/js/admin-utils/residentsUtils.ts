@@ -1,21 +1,33 @@
 // resources/js/admin-utils/residentsUtils.ts
-import { Resident, Purok, ResidentPrivilege } from '@/types';
+import { Resident, Purok, Privilege, Household } from '@/types/admin/residents/residents-types';
 import { toast } from 'sonner';
 
 // ========== LOCAL TYPE DEFINITIONS ==========
 
 // Define FilterState locally since it's not exported from types
+// IMPORTANT: Keep this consistent with the main FilterState in your types file
 interface FilterState {
     status: string;
     purok_id: string | number;
     gender: string;
-    min_age?: number;
-    max_age?: number;
+    min_age: string | number;
+    max_age: string | number;
     civil_status: string;
     is_voter: string;
     is_head: string;
     privilege_id?: string | number;
     privilege?: string;
+    search?: string;
+}
+
+// Extended Privilege type with additional properties needed for the UI
+// This matches the structure from your pivot relationship
+interface PrivilegeWithDetails extends Privilege {
+    id_number?: string;
+    expires_at?: string;
+    status?: 'active' | 'expiring_soon' | 'expired' | 'pending';
+    granted_at?: string;
+    granted_by?: number;
 }
 
 // ========== TYPE GUARDS ==========
@@ -35,25 +47,23 @@ const isNumber = (value: unknown): value is number => {
 };
 
 /**
- * Type guard to check if a value is a valid ResidentPrivilege
+ * Type guard to check if a value is a valid Privilege with pivot details
  */
-const isResidentPrivilege = (value: unknown): value is ResidentPrivilege => {
+const isPrivilegeWithDetails = (value: unknown): value is PrivilegeWithDetails => {
     if (!value || typeof value !== 'object') return false;
     const obj = value as Record<string, unknown>;
     return (
         (typeof obj.id === 'number' || typeof obj.id === 'undefined') &&
-        (typeof obj.privilege_id === 'number' || typeof obj.privilege_id === 'undefined') &&
         (typeof obj.code === 'string' || typeof obj.code === 'undefined') &&
-        (typeof obj.name === 'string' || typeof obj.name === 'undefined') &&
-        (typeof obj.status === 'string' || typeof obj.status === 'undefined')
+        (typeof obj.name === 'string' || typeof obj.name === 'undefined')
     );
 };
 
 /**
- * Type guard to check if a value is an array of ResidentPrivilege
+ * Type guard to check if a value is an array of Privilege
  */
-const isResidentPrivilegeArray = (value: unknown): value is ResidentPrivilege[] => {
-    return Array.isArray(value) && value.every(isResidentPrivilege);
+const isPrivilegeArray = (value: unknown): value is PrivilegeWithDetails[] => {
+    return Array.isArray(value) && value.every(isPrivilegeWithDetails);
 };
 
 /**
@@ -62,7 +72,7 @@ const isResidentPrivilegeArray = (value: unknown): value is ResidentPrivilege[] 
 interface HouseholdMembership {
     is_head: boolean;
     relationship_to_head?: string;
-    household?: {
+    household?: Household | {
         id: number;
         household_number: string;
         head_of_family?: string;
@@ -239,17 +249,27 @@ export const getHouseholdInfo = (resident: Resident): HouseholdInfo | null => {
             const household = membership.household;
             return {
                 id: safeNumber(household.id),
-                name: safeString(household.household_number || household.head_of_family || household.name || 'Unknown Household')
+                name: safeString(
+                    (household as any).household_number || 
+                    (household as any).head_of_family || 
+                    (household as any).name || 
+                    'Unknown Household'
+                )
             };
         }
     }
     
     // Check direct household property
-    if (resident.household && typeof resident.household === 'object') {
-        const household = resident.household as Record<string, unknown>;
+    if (resident.household) {
+        const household = resident.household;
         return {
             id: safeNumber(household.id),
-            name: safeString(household.household_number || household.name || household.head_of_family || 'Unknown Household')
+            name: safeString(
+                household.household_number || 
+                (household as any).name || 
+                (household as any).head_of_family || 
+                'Unknown Household'
+            )
         };
     }
     
@@ -277,8 +297,8 @@ export const getDetailedHouseholdInfo = (resident: Resident): DetailedHouseholdI
             const household = membership.household;
             return {
                 id: safeNumber(household.id),
-                household_number: safeString(household.household_number),
-                head_of_family: safeString(household.head_of_family || household.name),
+                household_number: safeString((household as any).household_number),
+                head_of_family: safeString((household as any).head_of_family || (household as any).name),
                 relationship_to_head: safeString(membership.relationship_to_head),
                 is_head: membership.is_head === true
             };
@@ -309,15 +329,19 @@ export const isHeadOfHousehold = (resident: Resident): boolean => {
 /**
  * Get status badge variant
  */
-export const getStatusBadgeVariant = (status: unknown): string => {
+export const getStatusBadgeVariant = (status: unknown): "default" | "secondary" | "destructive" | "outline" => {
     const statusStr = safeString(status).toLowerCase();
     
     switch (statusStr) {
-        case 'active': return 'default';
+        case 'active': 
+            return 'default';
         case 'inactive':
         case 'deceased':
             return 'secondary';
-        default: return 'outline';
+        case 'suspended':
+            return 'destructive';
+        default: 
+            return 'outline';
     }
 };
 
@@ -385,31 +409,68 @@ export const getTruncationLength = (type: 'name' | 'address' | 'contact' | 'occu
 // ========== PRIVILEGE UTILITIES ==========
 
 /**
- * Get active privileges from resident
+ * Get privilege status from pivot data
  */
-export const getActivePrivileges = (resident: Resident): ResidentPrivilege[] => {
-    const privileges = resident.privileges;
-    
-    if (!isResidentPrivilegeArray(privileges)) {
-        return [];
+const getPrivilegeStatus = (privilege: PrivilegeWithDetails): 'active' | 'expiring_soon' | 'expired' | 'pending' => {
+    // If status is already set in the privilege object
+    if (privilege.status) {
+        return privilege.status;
     }
     
-    return privileges.filter(p => 
-        p.status === 'active' || p.status === 'expiring_soon'
-    );
+    // Check if there's a valid_until date in the pivot
+    const validUntil = privilege.valid_until || privilege.pivot?.valid_until;
+    
+    if (!validUntil) {
+        return 'active';
+    }
+    
+    const expiryDate = new Date(validUntil);
+    const now = new Date();
+    const diffDays = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+        return 'expired';
+    } else if (diffDays <= 30) {
+        return 'expiring_soon';
+    }
+    
+    return 'active';
 };
 
 /**
- * Get all privileges from resident
+ * Get active privileges from resident
  */
-export const getAllPrivileges = (resident: Resident): ResidentPrivilege[] => {
+export const getActivePrivileges = (resident: Resident): PrivilegeWithDetails[] => {
     const privileges = resident.privileges;
     
-    if (!isResidentPrivilegeArray(privileges)) {
+    if (!isPrivilegeArray(privileges)) {
         return [];
     }
     
-    return privileges;
+    return privileges.filter(p => {
+        const status = getPrivilegeStatus(p);
+        return status === 'active' || status === 'expiring_soon';
+    });
+};
+
+/**
+ * Get all privileges from resident with details
+ */
+export const getAllPrivileges = (resident: Resident): PrivilegeWithDetails[] => {
+    const privileges = resident.privileges;
+    
+    if (!isPrivilegeArray(privileges)) {
+        return [];
+    }
+    
+    return privileges.map(p => ({
+        ...p,
+        status: getPrivilegeStatus(p),
+        id_number: (p as any).id_number || p.pivot?.id_number?.toString(),
+        expires_at: (p as any).expires_at || p.valid_until || p.pivot?.valid_until,
+        granted_at: (p as any).granted_at || p.pivot?.granted_at,
+        granted_by: (p as any).granted_by || p.pivot?.granted_by
+    }));
 };
 
 /**
@@ -418,7 +479,7 @@ export const getAllPrivileges = (resident: Resident): ResidentPrivilege[] => {
 export const hasPrivilege = (resident: Resident, privilegeCode: string): boolean => {
     const privileges = resident.privileges;
     
-    if (!isResidentPrivilegeArray(privileges)) {
+    if (!isPrivilegeArray(privileges)) {
         return false;
     }
     
@@ -435,16 +496,17 @@ export const hasPrivilege = (resident: Resident, privilegeCode: string): boolean
 export const hasActivePrivilege = (resident: Resident, privilegeCode: string): boolean => {
     const privileges = resident.privileges;
     
-    if (!isResidentPrivilegeArray(privileges)) {
+    if (!isPrivilegeArray(privileges)) {
         return false;
     }
     
     const code = safeString(privilegeCode).toUpperCase();
     
-    return privileges.some(p => 
-        safeString(p.code).toUpperCase() === code && 
-        (p.status === 'active' || p.status === 'expiring_soon')
-    );
+    return privileges.some(p => {
+        const status = getPrivilegeStatus(p);
+        return safeString(p.code).toUpperCase() === code && 
+               (status === 'active' || status === 'expiring_soon');
+    });
 };
 
 /**
@@ -460,15 +522,16 @@ export const hasPrivilegeByCode = (resident: Resident, privilegeCode: string): b
 export const getPrivilegeCountByStatus = (resident: Resident, status: string): number => {
     const privileges = resident.privileges;
     
-    if (!isResidentPrivilegeArray(privileges)) {
+    if (!isPrivilegeArray(privileges)) {
         return 0;
     }
     
     const statusLower = safeString(status).toLowerCase();
     
-    return privileges.filter(p => 
-        safeString(p.status).toLowerCase() === statusLower
-    ).length;
+    return privileges.filter(p => {
+        const privStatus = getPrivilegeStatus(p);
+        return privStatus === statusLower;
+    }).length;
 };
 
 /**
@@ -517,10 +580,10 @@ export const getPrivilegeColor = (code: unknown): string => {
 /**
  * Format privilege display
  */
-export const formatPrivilegeDisplay = (privilege: ResidentPrivilege): string => {
+export const formatPrivilegeDisplay = (privilege: PrivilegeWithDetails): string => {
     const name = safeString(privilege.name || privilege.code);
-    const idNumber = safeString(privilege.id_number);
-    const expiresAt = privilege.expires_at;
+    const idNumber = safeString((privilege as any).id_number);
+    const expiresAt = (privilege as any).expires_at || privilege.valid_until;
     
     let display = name || 'Unknown';
     
@@ -624,10 +687,10 @@ export const filterResidents = (
         const searchLower = search.toLowerCase();
         result = result.filter(resident => {
             const fullName = getFullName(resident).toLowerCase();
-            const residentId = safeString(resident.resident_id).toLowerCase();
+            const residentId = safeString((resident as any).resident_id).toLowerCase();
             const contactNumber = safeString(resident.contact_number).toLowerCase();
             const email = safeString(resident.email).toLowerCase();
-            const address = safeString(resident.address).toLowerCase();
+            const address = safeString((resident as any).address).toLowerCase();
             const occupation = safeString(resident.occupation).toLowerCase();
             
             // Safely get purok name
@@ -635,25 +698,25 @@ export const filterResidents = (
             if (isPurokObject(resident.purok)) {
                 purokName = resident.purok.name.toLowerCase();
             } else if (isString(resident.purok)) {
-                purokName = resident.purok.toLowerCase();
+                purokName = (resident.purok as string).toLowerCase();
             }
             
             // Safely get household number
             let householdNumber = '';
-            const memberships = resident.household_memberships;
+            const memberships = (resident as any).household_memberships;
             if (Array.isArray(memberships) && memberships.length > 0) {
                 const membership = memberships[0];
                 if (isHouseholdMembership(membership) && membership.household) {
-                    householdNumber = safeString(membership.household.household_number).toLowerCase();
+                    householdNumber = safeString((membership.household as any).household_number).toLowerCase();
                 }
             }
             
             // Search in privileges
-            const privilegeMatches = isResidentPrivilegeArray(resident.privileges) &&
-                resident.privileges.some((p: ResidentPrivilege) => 
+            const privilegeMatches = isPrivilegeArray(resident.privileges) &&
+                resident.privileges.some((p: PrivilegeWithDetails) => 
                     safeString(p.name).toLowerCase().includes(searchLower) ||
                     safeString(p.code).toLowerCase().includes(searchLower) ||
-                    safeString(p.id_number).toLowerCase().includes(searchLower)
+                    safeString((p as any).id_number).toLowerCase().includes(searchLower)
                 );
             
             return fullName.includes(searchLower) ||
@@ -669,44 +732,44 @@ export const filterResidents = (
     }
 
     // Status filter
-    if (filters.status !== 'all') {
+    if (filters.status && filters.status !== 'all') {
         result = result.filter(resident => resident.status === filters.status);
     }
 
     // Purok filter
-    if (filters.purok_id !== 'all') {
+    if (filters.purok_id && filters.purok_id !== 'all') {
         const purokId = safeNumber(filters.purok_id);
         result = result.filter(resident => resident.purok_id === purokId);
     }
 
     // Gender filter
-    if (filters.gender !== 'all') {
+    if (filters.gender && filters.gender !== 'all') {
         result = result.filter(resident => resident.gender === filters.gender);
     }
 
-    // Age filter
-    if (filters.min_age) {
+    // Age filter - Convert string to number before comparing
+    if (filters.min_age && filters.min_age !== '') {
         const minAge = safeNumber(filters.min_age);
         result = result.filter(resident => (resident.age || 0) >= minAge);
     }
-    if (filters.max_age) {
+    if (filters.max_age && filters.max_age !== '') {
         const maxAge = safeNumber(filters.max_age);
         result = result.filter(resident => (resident.age || 0) <= maxAge);
     }
 
     // Civil status filter
-    if (filters.civil_status !== 'all') {
+    if (filters.civil_status && filters.civil_status !== 'all') {
         result = result.filter(resident => resident.civil_status === filters.civil_status);
     }
 
     // Voter filter
-    if (filters.is_voter !== 'all') {
+    if (filters.is_voter && filters.is_voter !== 'all') {
         const isVoter = filters.is_voter === '1' || filters.is_voter === 'yes';
         result = result.filter(resident => resident.is_voter === isVoter);
     }
     
     // Head of household filter
-    if (filters.is_head !== 'all') {
+    if (filters.is_head && filters.is_head !== 'all') {
         const isHead = filters.is_head === '1' || filters.is_head === 'yes';
         result = result.filter(resident => isHeadOfHousehold(resident) === isHead);
     }
@@ -715,8 +778,8 @@ export const filterResidents = (
     if (filters.privilege_id && filters.privilege_id !== 'all') {
         const privilegeId = safeNumber(filters.privilege_id);
         result = result.filter(resident => 
-            isResidentPrivilegeArray(resident.privileges) &&
-            resident.privileges.some((p: ResidentPrivilege) => p.privilege_id === privilegeId)
+            isPrivilegeArray(resident.privileges) &&
+            resident.privileges.some((p: PrivilegeWithDetails) => p.id === privilegeId)
         );
     }
 
@@ -772,8 +835,8 @@ export const filterResidents = (
                 bValue = safeString(bHousehold?.name).toLowerCase();
                 break;
             case 'privileges_count':
-                aValue = isResidentPrivilegeArray(a.privileges) ? a.privileges.length : 0;
-                bValue = isResidentPrivilegeArray(b.privileges) ? b.privileges.length : 0;
+                aValue = isPrivilegeArray(a.privileges) ? a.privileges.length : 0;
+                bValue = isPrivilegeArray(b.privileges) ? b.privileges.length : 0;
                 break;
             default:
                 aValue = safeString(a.last_name).toLowerCase();
@@ -802,6 +865,7 @@ interface SelectionStats {
     averageAge: number;
     hasPhotos: number;
     active: number;
+    inactive: number;
     privilegeCounts: Record<string, number>;
 }
 
@@ -820,6 +884,7 @@ export const getSelectionStats = (selectedResidents: Resident[]): SelectionStats
             averageAge: 0,
             hasPhotos: 0,
             active: 0,
+            inactive: 0,
             privilegeCounts: {}
         };
     }
@@ -828,11 +893,11 @@ export const getSelectionStats = (selectedResidents: Resident[]): SelectionStats
         ? selectedResidents.reduce((sum, r) => sum + (r.age || 0), 0) / selectedResidents.length
         : 0;
     
-    // Calculate privilege counts - DYNAMIC
+    // Calculate privilege counts
     const privilegeCounts: Record<string, number> = {};
     selectedResidents.forEach(resident => {
-        if (isResidentPrivilegeArray(resident.privileges)) {
-            resident.privileges.forEach((p: ResidentPrivilege) => {
+        if (isPrivilegeArray(resident.privileges)) {
+            resident.privileges.forEach((p: PrivilegeWithDetails) => {
                 const code = safeString(p.code);
                 if (code) {
                     privilegeCounts[code] = (privilegeCounts[code] || 0) + 1;
@@ -842,17 +907,17 @@ export const getSelectionStats = (selectedResidents: Resident[]): SelectionStats
     });
     
     return {
-        total: selectedResidents.length,
-        male: selectedResidents.filter(r => r.gender === 'male').length,
-        female: selectedResidents.filter(r => r.gender === 'female').length,
-        other: selectedResidents.filter(r => r.gender === 'other').length,
-        voters: selectedResidents.filter(r => r.is_voter === true).length,
-        heads: selectedResidents.filter(r => isHeadOfHousehold(r)).length,
-        active: selectedResidents.filter(r => r.status === 'active').length,
-        hasPhotos: selectedResidents.filter(r => r.photo_path).length,
-        averageAge: Math.round(avgAge * 10) / 10,
-        privilegeCounts
-    };
+    total: selectedResidents.length,
+    male: selectedResidents.filter(r => r.gender === 'male').length,
+    female: selectedResidents.filter(r => r.gender === 'female').length,
+    other: selectedResidents.filter(r => r.gender === 'other').length,
+    voters: selectedResidents.filter(r => r.is_voter === true).length,
+    heads: selectedResidents.filter(r => isHeadOfHousehold(r)).length,
+    active: selectedResidents.filter(r => r.status === 'active').length,
+    hasPhotos: selectedResidents.filter(r => (r as any).photo_path).length,
+    averageAge: Math.round(avgAge * 10) / 10,
+    inactive: selectedResidents.filter(r => r.status === 'inactive').length,
+    privilegeCounts};
 };
 
 // ========== FORMATTING ==========
@@ -907,12 +972,12 @@ export const formatForClipboard = (residents: Resident[]): string => {
     const rows = residents.map(resident => {
         // Format privileges as pipe-separated codes with status
         let privilegesFormatted = '';
-        if (isResidentPrivilegeArray(resident.privileges)) {
+        if (isPrivilegeArray(resident.privileges)) {
             privilegesFormatted = resident.privileges
-                .map((p: ResidentPrivilege) => {
+                .map((p: PrivilegeWithDetails) => {
                     let priv = safeString(p.code);
-                    const status = safeString(p.status);
-                    const idNumber = safeString(p.id_number);
+                    const status = getPrivilegeStatus(p);
+                    const idNumber = safeString((p as any).id_number);
                     
                     if (status && status !== 'active') {
                         priv += `(${status})`;
@@ -937,17 +1002,17 @@ export const formatForClipboard = (residents: Resident[]): string => {
         
         return [
             `"${getFullName(resident)}"`,
-            `"${safeString(resident.resident_id)}"`,
+            `"${safeString((resident as any).resident_id)}"`,
             `"${safeString(resident.gender) || 'N/A'}"`,
             safeString(resident.age),
             `"${formatDate(resident.birth_date)}"`,
             `"${safeString(resident.contact_number)}"`,
             `"${safeString(resident.email)}"`,
-            `"${safeString(resident.address)}"`,
+            `"${safeString((resident as any).address)}"`,
             `"${purokName}"`,
             `"${safeString(resident.civil_status) || 'N/A'}"`,
             `"${safeString(resident.occupation)}"`,
-            `"${safeString(resident.educational_attainment)}"`,
+            `"${safeString((resident as any).educational_attainment)}"`,
             `"${safeString(resident.status) || 'N/A'}"`,
             resident.is_voter ? 'Yes' : 'No',
             isHeadOfHousehold(resident) ? 'Yes' : 'No',

@@ -28,7 +28,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2, Award, CheckCircle, AlertCircle, Users, Shield, ShieldOff } from 'lucide-react';
-import { Purok } from '@/types';
+import { Purok } from '@/types/admin/residents/residents-types';
 import { useState, useEffect } from 'react';
 
 interface Privilege {
@@ -48,15 +48,20 @@ interface SelectionStats {
     active: number;
     male: number;
     female: number;
-    other: number;
+    other?: number;
     voters: number;
-    seniors: number;
-    pwds: number;
+    seniors?: number; // Make optional
+    pwds?: number;    // Make optional
     heads: number;
-    avgAge: number;
-    hasPhotos: number;
+    avgAge?: number;   // Make optional
+    hasPhotos?: number;
     privilegeCounts?: Record<string, number>;
     hasPrivileges?: number;
+    // Add additional fields that might come from parent
+    males?: number;
+    females?: number;
+    inactive?: number;
+    averageAge?: number;
 }
 
 interface ResidentsDialogsProps {
@@ -138,6 +143,11 @@ export default function ResidentsDialogs({
         setSelectedCount(selectedResidents.length);
     }, [selectedResidents]);
 
+    // Helper function to safely get stats values
+    const getStat = (value: number | undefined, fallback: number = 0): number => {
+        return value !== undefined ? value : fallback;
+    };
+
     // Group privileges by category for better organization
     const groupedPrivileges = privileges.reduce((acc, privilege) => {
         const category = privilege.category || 'Other';
@@ -157,6 +167,13 @@ export default function ResidentsDialogs({
         setBulkEditValue('');
     };
 
+    // Get safe stats values
+    const headsCount = getStat(selectionStats?.heads);
+    const hasPrivilegesCount = getStat(selectionStats?.hasPrivileges);
+    const seniorsCount = getStat(selectionStats?.seniors);
+    const pwdsCount = getStat(selectionStats?.pwds);
+    const avgAgeValue = getStat(selectionStats?.avgAge, getStat(selectionStats?.averageAge));
+
     return (
         <>
             {/* Bulk Delete Dialog */}
@@ -173,14 +190,15 @@ export default function ResidentsDialogs({
                                 This action cannot be undone.
                             </p>
                             
-                            {selectionStats?.heads && selectionStats.heads > 0 && (
+                            {/* Heads warning */}
+                            {headsCount > 0 && (
                                 <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
                                     <div className="flex items-start gap-3">
                                         <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                                         <div>
                                             <p className="font-semibold text-amber-800">Warning: Household Heads Selected</p>
                                             <p className="text-sm text-amber-700 mt-1">
-                                                {selectionStats.heads} of the selected residents {selectionStats.heads === 1 ? 'is' : 'are'} household heads. 
+                                                {headsCount} of the selected residents {headsCount === 1 ? 'is' : 'are'} household heads. 
                                                 Deleting them will:
                                             </p>
                                             <ul className="list-disc list-inside text-sm text-amber-700 mt-2 space-y-1">
@@ -193,12 +211,39 @@ export default function ResidentsDialogs({
                                 </div>
                             )}
 
-                            {selectionStats?.hasPrivileges && selectionStats.hasPrivileges > 0 && (
+                            {/* Seniors warning */}
+                            {seniorsCount > 0 && (
+                                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <div className="flex items-start gap-2">
+                                        <Users className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                                        <p className="text-sm text-blue-700">
+                                            <span className="font-semibold">{seniorsCount}</span> senior citizen{seniorsCount !== 1 ? 's' : ''} selected. 
+                                            Deleting them will remove their senior citizen privileges and records.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* PWDs warning */}
+                            {pwdsCount > 0 && (
+                                <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                    <div className="flex items-start gap-2">
+                                        <Shield className="h-4 w-4 text-purple-600 shrink-0 mt-0.5" />
+                                        <p className="text-sm text-purple-700">
+                                            <span className="font-semibold">{pwdsCount}</span> PWD{ pwdsCount !== 1 ? 's' : ''} selected. 
+                                            Deleting them will remove their PWD privileges and records.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Privileges warning */}
+                            {hasPrivilegesCount > 0 && (
                                 <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                     <div className="flex items-start gap-2">
                                         <Award className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
                                         <p className="text-sm text-blue-700">
-                                            <span className="font-semibold">{selectionStats.hasPrivileges}</span> resident{selectionStats.hasPrivileges !== 1 ? 's' : ''} with active privileges will lose all privilege benefits.
+                                            <span className="font-semibold">{hasPrivilegesCount}</span> resident{hasPrivilegesCount !== 1 ? 's' : ''} with active privileges will lose all privilege benefits.
                                         </p>
                                     </div>
                                 </div>
@@ -344,7 +389,7 @@ export default function ResidentsDialogs({
                                 </Select>
                             </div>
 
-                            {selectionStats?.heads && selectionStats.heads > 0 && (
+                            {headsCount > 0 && (
                                 <div className="rounded-lg bg-amber-50 p-3 border border-amber-200">
                                     <p className="text-xs text-amber-700">
                                         <span className="font-medium">Note:</span> Moving household heads will also affect their household's purok assignment.

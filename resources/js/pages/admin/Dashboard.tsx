@@ -2,7 +2,7 @@
 import AppLayout from '@/layouts/admin-app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, usePage, router } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 // Import components
 import { Header } from '@/components/admin/dashboard/Header';
@@ -23,14 +23,19 @@ import { DailyCollectionsChart } from '@/components/admin/dashboard/charts/Daily
 import { ClearanceStatusChart } from '@/components/admin/dashboard/charts/ClearanceStatusChart';
 
 // Import types
-import { type PageProps, type StatItem, type QuickAction } from '@/components/admin/dashboard/types/dashboard';
+import { 
+    type PageProps, 
+    type StatItem, 
+    type QuickAction, 
+    type ActivityItem,
+    type PrivilegeStatsData,
+    type SystemStatus as SystemStatusType
+} from '@/components/admin/dashboard/types/dashboard';
 
 // Import icons
 import { 
     Users, Home, CreditCard, FileText, Heart, HeartHandshake, Baby, Gift,
-    UserPlus, FilePlus, TrendingUp, Award, DollarSign, PieChart, Bell, 
-    Clock, Activity, MapPin, BarChart, Calendar, Shield, Star, Zap,
-    CheckCircle, XCircle, AlertCircle, Menu, X, ChevronDown
+    UserPlus, FilePlus, Menu, X, ChevronDown
 } from 'lucide-react';
 
 const DASHBOARD_URL = '/admin/dashboard';
@@ -42,12 +47,37 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+// Local interface that matches exactly what RecentActivities expects
+interface RecentActivityItem {
+    id: number;
+    description: string;
+    type: string;
+    time: string;
+    icon: string;
+    iconColor: string;
+    bgColor: string;
+    priority: string;
+    isRead: boolean;
+    data?: any;
+    created_at?: string;
+    causer?: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+    subject_type?: string;
+    subject_id?: number;
+    properties?: any;
+}
+
 export default function Dashboard() {
     const { props } = usePage<PageProps>();
     const [activeView, setActiveView] = useState<'overview' | 'detailed' | 'analytics' | 'demographics'>('overview');
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-    const [selectedTimeRange, setSelectedTimeRange] = useState<'today' | 'week' | 'month' | 'year'>(props.selectedDateRange || 'week');
+    const [selectedTimeRange, setSelectedTimeRange] = useState<'today' | 'week' | 'month' | 'year'>(
+        props.selectedDateRange || 'week'
+    );
     const [autoRefresh, setAutoRefresh] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
@@ -56,7 +86,8 @@ export default function Dashboard() {
         quickActions: true,
         charts: false,
         recent: true,
-        summary: true
+        summary: true,
+        recentResidents: false
     });
 
     // Check if mobile on mount and resize
@@ -95,31 +126,7 @@ export default function Dashboard() {
         return () => window.removeEventListener('orientationchange', handleOrientationChange);
     }, []);
 
-    const formatRelativeTime = (dateString: string) => {
-        if (!dateString) return 'Unknown';
-        
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-        
-        if (diffInMinutes < 1) return 'Just now';
-        if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
-        if (diffInMinutes < 1440) {
-            const hours = Math.floor(diffInMinutes / 60);
-            return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-        }
-        if (diffInMinutes < 10080) {
-            const days = Math.floor(diffInMinutes / 1440);
-            return `${days} day${days > 1 ? 's' : ''} ago`;
-        }
-        return date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
-    };
-
-    const handleRefresh = () => {
+    const handleRefresh = useCallback(() => {
         setRefreshing(true);
         router.reload({
             only: [
@@ -134,9 +141,9 @@ export default function Dashboard() {
                 setRefreshing(false);
             }
         });
-    };
+    }, []);
 
-    const toggleFullscreen = () => {
+    const toggleFullscreen = useCallback(() => {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen();
             setIsFullscreen(true);
@@ -146,28 +153,27 @@ export default function Dashboard() {
                 setIsFullscreen(false);
             }
         }
-    };
+    }, []);
 
-    const toggleSection = (section: string) => {
+    const toggleSection = useCallback((section: string) => {
         setExpandedSections(prev => ({
             ...prev,
             [section]: !prev[section]
         }));
-    };
+    }, []);
 
-    const calculateChange = (current: number, previous: number) => {
+    const calculateChange = useCallback((current: number, previous: number) => {
         if (previous === 0) return current > 0 ? '+100%' : '0%';
         const change = ((current - previous) / previous) * 100;
         return `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
-    };
+    }, []);
 
-    const getYesterdayStats = () => {
+    const yesterdayStats = useMemo(() => {
         const todayResidents = props.stats.totalResidents;
         const newResidentsToday = props.activityStats?.newResidentsToday ?? 0;
         const yesterdayResidents = Math.max(0, todayResidents - newResidentsToday);
         
         const yesterdayPayments = parseFloat(props.collectionStats.yesterday.replace(/,/g, '')) || 0;
-        const todayPayments = parseFloat(props.collectionStats.today.replace(/,/g, '')) || 0;
         
         const pendingClearances = props.stats.pendingClearances;
         const clearanceRequestsToday = props.activityStats?.clearanceRequestsToday ?? 0;
@@ -178,11 +184,9 @@ export default function Dashboard() {
             payments: yesterdayPayments,
             clearances: yesterdayClearances
         };
-    };
+    }, [props.stats, props.activityStats, props.collectionStats]);
 
-    const yesterdayStats = getYesterdayStats();
-
-    const stats: StatItem[] = [
+    const stats: StatItem[] = useMemo(() => [
         {
             title: 'Total Residents',
             value: props.stats.totalResidents.toLocaleString(),
@@ -226,9 +230,9 @@ export default function Dashboard() {
             href: '/admin/clearances?status=pending',
             trend: props.stats.pendingClearances < yesterdayStats.clearances ? 'down' : 'up',
         },
-    ];
+    ], [props.stats, props.collectionStats, yesterdayStats, calculateChange]);
 
-    const detailedStats: StatItem[] = [
+    const detailedStats: StatItem[] = useMemo(() => [
         {
             title: 'Senior Citizens',
             value: props.stats.seniorCitizens?.toLocaleString() || '0',
@@ -269,9 +273,9 @@ export default function Dashboard() {
             href: '/admin/residents?privilege=4ps',
             trend: 'up'
         },
-    ];
+    ], [props.stats]);
 
-    const quickActions: QuickAction[] = [
+    const quickActions: QuickAction[] = useMemo(() => [
         { 
             icon: UserPlus, 
             label: 'Register Resident', 
@@ -316,47 +320,158 @@ export default function Dashboard() {
             category: 'payment',
             shortcut: 'Alt+P'
         },
-    ];
+    ], [props.activityStats, props.recentActivities, props.stats.pendingClearances]);
 
     const mobileQuickActions = quickActions.slice(0, 4);
-    const recentPayments = props.recentActivities?.recentPayments || [];
-    const popularClearances = props.clearanceTypeStats || [];
-    const recentResidents = props.recentActivities?.newResidents || [];
-    const dailyCollections = props.paymentStats?.dailyCollections || [];
-    const clearanceStatus = props.clearanceRequestStats?.byStatus || [];
-    const privilegeStats = props.privilegeStats || {
-        byPrivilege: [],
-        expiringSoon: [],
-        recentlyExpired: [],
-        totalActive: 0
-    };
-
-    const systemStatus = [
-        {
-            service: 'Database',
-            status: 'online' as const,
-            lastCheck: 'Just now',
-            details: `Residents: ${props.stats.totalResidents}`,
-            uptime: '99.9%',
-            responseTime: '45ms'
-        },
-        {
-            service: 'Payment System',
-            status: 'online' as const,
-            lastCheck: '5 min ago',
-            details: `₱${props.collectionStats.today} collected`,
-            uptime: '99.5%',
-            responseTime: '120ms'
-        },
-        {
-            service: 'Clearance System',
-            status: (props.stats.pendingClearances > 10 ? 'warning' : 'online') as const,
-            lastCheck: '2 hours ago',
-            details: `${props.stats.pendingClearances} pending`,
-            uptime: '98.2%',
-            responseTime: '230ms'
+    
+    // Transform activities to match what RecentActivities expects (with priority as required string)
+    const transformedActivities: RecentActivityItem[] = useMemo(() => {
+        const rawActivities = props.activities || [];
+        return rawActivities.map(activity => ({
+            id: activity.id || 0,
+            type: activity.type || 'announcement',
+            description: activity.description || '',
+            time: activity.time || activity.created_at || new Date().toISOString(),
+            icon: activity.icon || 'Activity',
+            iconColor: activity.iconColor || 'text-blue-500',
+            bgColor: activity.bgColor || 'bg-blue-100',
+            data: activity.data,
+            isRead: activity.isRead || false,
+            priority: activity.priority || 'medium', // Ensure priority is always a string
+            created_at: activity.created_at || new Date().toISOString(),
+            causer: activity.causer,
+            subject_type: activity.subject_type,
+            subject_id: activity.subject_id,
+            properties: activity.properties
+        }));
+    }, [props.activities]);
+    
+    // Ensure we have valid arrays
+    const recentPayments = useMemo(() => props.recentActivities?.recentPayments || [], [props.recentActivities]);
+    const popularClearances = useMemo(() => props.clearanceTypeStats || [], [props.clearanceTypeStats]);
+    const recentResidents = useMemo(() => props.recentActivities?.newResidents || [], [props.recentActivities]);
+    const dailyCollections = useMemo(() => props.paymentStats?.dailyCollections || [], [props.paymentStats]);
+    const clearanceStatus = useMemo(() => props.clearanceRequestStats?.byStatus || [], [props.clearanceRequestStats]);
+    
+    // Transform storage stats to match SystemStatus expected format
+    const transformedStorageStats = useMemo(() => {
+        const storage = props.storageStats;
+        if (!storage) {
+            return {
+                percentage: 0,
+                usedPrecise: '0 MB',
+                total: '0 MB',
+                database: 0,
+                files: 0,
+                backups: 0,
+                logs: 0,
+                details: {
+                    tableCount: 0,
+                    totalRows: 0,
+                    residentCount: 0,
+                    householdCount: 0,
+                    paymentCount: 0,
+                    clearanceCount: 0,
+                },
+                backupStatus: {
+                    lastBackup: 'Never',
+                    backupSize: '0 MB',
+                },
+                topTables: [] as [string, { size_kb: number; rows: number }][]
+            };
         }
-    ];
+        
+        const topTables: [string, { size_kb: number; rows: number }][] = Object.entries(storage.details?.tableSizes || {})
+            .sort((a, b) => b[1].size_kb - a[1].size_kb)
+            .slice(0, 5)
+            .map(([name, data]) => [name, { size_kb: data.size_kb, rows: data.rows }]);
+        
+        return {
+            percentage: storage.percentage,
+            usedPrecise: `${storage.totalUsedMB} MB`,
+            total: `${storage.totalStorageMB} MB`,
+            database: storage.breakdown?.database || 0,
+            files: storage.breakdown?.files || 0,
+            backups: storage.breakdown?.backups || 0,
+            logs: storage.breakdown?.logs || 0,
+            details: {
+                tableCount: storage.details?.tableCount || 0,
+                totalRows: storage.details?.totalRows || 0,
+                residentCount: storage.details?.residentCount || 0,
+                householdCount: storage.details?.householdCount || 0,
+                paymentCount: storage.details?.paymentCount || 0,
+                clearanceCount: storage.details?.clearanceCount || 0,
+            },
+            backupStatus: storage.backupStatus || {
+                lastBackup: 'Never',
+                backupSize: '0 MB',
+            },
+            topTables
+        };
+    }, [props.storageStats]);
+
+    // Transform privilege stats to match component expectations
+    const transformedPrivilegeStats: PrivilegeStatsData = useMemo(() => {
+        if (!props.privilegeStats) {
+            return {
+                byPrivilege: [],
+                expiringSoon: [],
+                recentlyExpired: [],
+                totalActive: 0
+            };
+        }
+        
+        // Transform expiringSoon and recentlyExpired to include all required fields
+        const transformExpiringItem = (item: any) => ({
+            id: item.id || 0,
+            resident_id: item.resident_id || 0,
+            resident_name: item.resident_name || item.name || '',
+            first_name: item.first_name || '',
+            last_name: item.last_name || '',
+            privilege_type: item.privilege_type || item.type || '',
+            privilege_name: item.privilege_name || item.name || '',
+            privilege_code: item.privilege_code || item.code || '',
+            expiry_date: item.expiry_date || item.expires_at || '',
+            expires_at: item.expires_at || item.expiry_date || '',
+            days_remaining: item.days_remaining || 0
+        });
+        
+        return {
+            byPrivilege: props.privilegeStats.byPrivilege || [],
+            expiringSoon: (props.privilegeStats.expiringSoon || []).map(transformExpiringItem),
+            recentlyExpired: (props.privilegeStats.recentlyExpired || []).map(transformExpiringItem),
+            totalActive: props.privilegeStats.totalActive || 0
+        };
+    }, [props.privilegeStats]);
+
+    const systemStatus: SystemStatusType[] = useMemo(() => {
+        return [
+            {
+                service: 'Database',
+                status: 'online',
+                lastCheck: 'Just now',
+                details: `Residents: ${props.stats.totalResidents}`,
+                uptime: '99.9%',
+                responseTime: '45ms'
+            },
+            {
+                service: 'Payment System',
+                status: 'online',
+                lastCheck: '5 min ago',
+                details: `₱${props.collectionStats.today} collected`,
+                uptime: '99.5%',
+                responseTime: '120ms'
+            },
+            {
+                service: 'Clearance System',
+                status: props.stats.pendingClearances > 10 ? 'warning' : 'online',
+                lastCheck: '2 hours ago',
+                details: `${props.stats.pendingClearances} pending`,
+                uptime: '98.2%',
+                responseTime: '230ms'
+            }
+        ];
+    }, [props.stats, props.collectionStats]);
 
     // Mobile view rendering
     if (isMobile) {
@@ -364,7 +479,6 @@ export default function Dashboard() {
             <AppLayout breadcrumbs={breadcrumbs}>
                 <Head title="Barangay Dashboard - Management System" />
                 
-                {/* Mobile Header */}
                 <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3">
                     <div className="flex items-center justify-between">
                         <h1 className="text-lg font-semibold text-gray-900">Barangay Dashboard</h1>
@@ -372,6 +486,7 @@ export default function Dashboard() {
                             <button
                                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                                 className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                                aria-label="Toggle menu"
                             >
                                 {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                             </button>
@@ -399,32 +514,28 @@ export default function Dashboard() {
                 </div>
                 
                 <div className="flex h-full flex-1 flex-col gap-4 p-3 pb-24">
-                    {/* Stats Grid - Always visible first */}
                     <div className="grid grid-cols-2 gap-2">
                         {stats.map((stat) => (
                             <StatCard key={stat.title} stat={stat} />
                         ))}
                     </div>
 
-                    {/* Quick Actions */}
                     <div className="space-y-2">
                         <h2 className="text-sm font-medium text-gray-500">Quick Actions</h2>
                         <QuickActions actions={mobileQuickActions} />
                     </div>
 
-                    {/* Recent Activities */}
                     <div className="space-y-2">
                         <h2 className="text-sm font-medium text-gray-500">Recent Activities</h2>
-                        <RecentActivities activities={props.activities || []} isMobile={true} />
+                        <RecentActivities activities={transformedActivities} isMobile={true} />
                     </div>
 
-                    {/* Collapsible Sections */}
                     <div className="space-y-3">
-                        {/* Charts Section */}
                         <div className="border rounded-lg overflow-hidden">
                             <button 
                                 onClick={() => toggleSection('charts')}
-                                className="w-full flex items-center justify-between p-3 bg-gray-50"
+                                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                                aria-expanded={expandedSections.charts}
                             >
                                 <span className="text-sm font-medium text-gray-700">Analytics & Charts</span>
                                 <ChevronDown className={`w-4 h-4 transition-transform ${expandedSections.charts ? 'rotate-180' : ''}`} />
@@ -436,16 +547,16 @@ export default function Dashboard() {
                                     <RecentPayments payments={recentPayments.slice(0, 3)} />
                                     <PopularClearances clearances={popularClearances.slice(0, 3)} />
                                     <ClearanceStatusChart data={clearanceStatus} />
-                                    <PrivilegeStats data={privilegeStats} />
+                                    <PrivilegeStats data={transformedPrivilegeStats} />
                                 </div>
                             )}
                         </div>
 
-                        {/* Summary Section */}
                         <div className="border rounded-lg overflow-hidden">
                             <button 
                                 onClick={() => toggleSection('summary')}
-                                className="w-full flex items-center justify-between p-3 bg-gray-50"
+                                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                                aria-expanded={expandedSections.summary}
                             >
                                 <span className="text-sm font-medium text-gray-700">Summary</span>
                                 <ChevronDown className={`w-4 h-4 transition-transform ${expandedSections.summary ? 'rotate-180' : ''}`} />
@@ -460,7 +571,7 @@ export default function Dashboard() {
                                     />
                                     <SystemStatus 
                                         statuses={systemStatus}
-                                        storageUsage={props.storageStats}
+                                        storageUsage={transformedStorageStats}
                                         autoRefresh={autoRefresh}
                                         onAutoRefreshToggle={() => setAutoRefresh(!autoRefresh)}
                                     />
@@ -468,11 +579,11 @@ export default function Dashboard() {
                             )}
                         </div>
 
-                        {/* Recent Residents Section */}
                         <div className="border rounded-lg overflow-hidden">
                             <button 
                                 onClick={() => toggleSection('recentResidents')}
-                                className="w-full flex items-center justify-between p-3 bg-gray-50"
+                                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                                aria-expanded={expandedSections.recentResidents}
                             >
                                 <span className="text-sm font-medium text-gray-700">Recent Residents</span>
                                 <ChevronDown className={`w-4 h-4 transition-transform ${expandedSections.recentResidents ? 'rotate-180' : ''}`} />
@@ -486,8 +597,6 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
-
-                {/* Removed the duplicate mobile footer - now using global MobileStickyFooter */}
             </AppLayout>
         );
     }
@@ -497,7 +606,6 @@ export default function Dashboard() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Barangay Dashboard - Management System" />
             
-            {/* Desktop Header */}
             <div className="hidden md:block">
                 <Header 
                     activeView={activeView}
@@ -513,14 +621,12 @@ export default function Dashboard() {
             </div>
             
             <div className="flex h-full flex-1 flex-col gap-4 p-6">
-                {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     {stats.map((stat) => (
                         <StatCard key={stat.title} stat={stat} />
                     ))}
                 </div>
 
-                {/* Detailed Stats */}
                 {(activeView === 'detailed' || activeView === 'analytics') && (
                     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                         {detailedStats.map((stat) => (
@@ -529,7 +635,6 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* View-specific content */}
                 {activeView === 'detailed' && props.paymentStats && props.clearanceRequestStats && props.clearanceTypeStats && (
                     <DetailedView 
                         paymentStats={props.paymentStats}
@@ -553,36 +658,27 @@ export default function Dashboard() {
                     />
                 )}
 
-                {/* Main Content */}
                 <div className="grid gap-6 lg:grid-cols-3">
-                    {/* Left Column */}
                     <div className="lg:col-span-2 space-y-6">
                         <QuickActions actions={quickActions} />
+                        <RecentActivities activities={transformedActivities} />
                         
-                        <RecentActivities 
-                            activities={props.activities || []} 
-                        />
-                        
-                        {/* Charts Row 1 */}
                         <div className="grid gap-6 md:grid-cols-2">
                             <DailyCollectionsChart data={dailyCollections} />
                             <RecentPayments payments={recentPayments} />
                         </div>
                         
-                        {/* Charts Row 2 */}
                         <div className="grid gap-6 md:grid-cols-2">
                             <PopularClearances clearances={popularClearances} />
                             <ClearanceStatusChart data={clearanceStatus} />
                         </div>
                         
-                        {/* Charts Row 3 */}
                         <div className="grid gap-6 md:grid-cols-2">
-                            <PrivilegeStats data={privilegeStats} />
+                            <PrivilegeStats data={transformedPrivilegeStats} />
                             <RecentResidents residents={recentResidents} />
                         </div>
                     </div>
 
-                    {/* Right Column */}
                     <div className="space-y-6">
                         <CollectionSummary collectionStats={props.collectionStats} />
                         <ClearanceOverview 
@@ -591,7 +687,7 @@ export default function Dashboard() {
                         />
                         <SystemStatus 
                             statuses={systemStatus}
-                            storageUsage={props.storageStats}
+                            storageUsage={transformedStorageStats}
                             autoRefresh={autoRefresh}
                             onAutoRefreshToggle={() => setAutoRefresh(!autoRefresh)}
                         />

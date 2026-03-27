@@ -1,3 +1,4 @@
+// components/admin/residents/ResidentsBulkActions.tsx
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
@@ -11,10 +12,12 @@ import {
     FileDown,
     CheckSquare,
     Square,
-    Home
+    Home,
+    Award
 } from 'lucide-react';
+import { SelectionMode, SelectionStats } from '@/types/admin/residents/residents-types';
 
-interface BulkActionItem {
+export interface BulkActionItem {
     label: string;
     icon: React.ReactNode;
     onClick: () => void;
@@ -23,15 +26,10 @@ interface BulkActionItem {
     disabled?: boolean;
 }
 
-interface ResidentBulkActionsProps {
+export interface ResidentBulkActionsProps {
     selectedResidents: number[];
-    selectionMode: 'page' | 'filtered' | 'all';
-    selectionStats?: {
-        male?: number;
-        female?: number;
-        active?: number;
-        voters?: number;
-    };
+    selectionMode: SelectionMode;
+    selectionStats?: SelectionStats;
     isPerformingBulkAction: boolean;
     isSelectAll: boolean;
     isMobile?: boolean;
@@ -41,7 +39,7 @@ interface ResidentBulkActionsProps {
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: string, data?: any) => void;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     
@@ -50,6 +48,7 @@ interface ResidentBulkActionsProps {
         primary?: BulkActionItem[];
         secondary?: BulkActionItem[];
         destructive?: BulkActionItem[];
+        privilege?: BulkActionItem[];
     };
 }
 
@@ -70,6 +69,18 @@ export default function ResidentBulkActions({
     bulkActions: customBulkActions
 }: ResidentBulkActionsProps) {
     
+    // Helper to get selection mode display text
+    const getSelectionModeText = () => {
+        switch (selectionMode) {
+            case 'filtered':
+                return 'Filtered';
+            case 'all':
+                return 'All Residents';
+            default:
+                return '';
+        }
+    };
+    
     // Default bulk actions if not provided
     const defaultBulkActions = {
         primary: [
@@ -78,14 +89,16 @@ export default function ResidentBulkActions({
                 icon: <Download className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('export'),
                 tooltip: 'Export selected residents',
-                variant: 'default' as const
+                variant: 'default' as const,
+                disabled: false
             },
             {
                 label: 'Print IDs',
                 icon: <Printer className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('print_ids'),
                 tooltip: 'Print IDs for selected residents',
-                variant: 'default' as const
+                variant: 'default' as const,
+                disabled: false
             }
         ],
         secondary: [
@@ -94,42 +107,66 @@ export default function ResidentBulkActions({
                 icon: <UserPlus className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('activate'),
                 tooltip: 'Activate selected residents',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Deactivate',
                 icon: <UserMinus className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('deactivate'),
                 tooltip: 'Deactivate selected residents',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
-                label: 'Change Status',
+                label: 'Update Status',
                 icon: <Edit className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_status'),
-                tooltip: 'Change status for selected residents',
-                variant: 'outline' as const
+                onClick: () => onBulkOperation('update_status'),
+                tooltip: 'Update status for selected residents',
+                variant: 'outline' as const,
+                disabled: false
             },
             {
-                label: 'Change Purok',
+                label: 'Update Purok',
                 icon: <Home className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_purok'),
-                tooltip: 'Change purok for selected residents',
-                variant: 'outline' as const
+                onClick: () => onBulkOperation('update_purok'),
+                tooltip: 'Update purok for selected residents',
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Export CSV',
                 icon: <FileDown className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('export_csv'),
                 tooltip: 'Export as CSV',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Copy Data',
                 icon: <Copy className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: onCopySelectedData,
                 tooltip: 'Copy selected data to clipboard',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
+            }
+        ],
+        privilege: [
+            {
+                label: 'Add Privilege',
+                icon: <Award className="h-3.5 w-3.5 mr-1.5" />,
+                onClick: () => onBulkOperation('add_privilege'),
+                tooltip: 'Add privilege to selected residents',
+                variant: 'outline' as const,
+                disabled: false
+            },
+            {
+                label: 'Remove Privilege',
+                icon: <Award className="h-3.5 w-3.5 mr-1.5" />,
+                onClick: () => onBulkOperation('remove_privilege'),
+                tooltip: 'Remove privilege from selected residents',
+                variant: 'outline' as const,
+                disabled: false
             }
         ],
         destructive: [
@@ -138,7 +175,8 @@ export default function ResidentBulkActions({
                 icon: <Trash2 className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => setShowBulkDeleteDialog?.(true),
                 tooltip: 'Delete selected residents',
-                variant: 'destructive' as const
+                variant: 'destructive' as const,
+                disabled: false
             }
         ]
     };
@@ -160,9 +198,9 @@ export default function ResidentBulkActions({
                             <span className="font-medium text-sm sm:text-base">
                                 {selectedResidents.length} resident(s) selected
                             </span>
-                            {selectionMode !== 'page' && (
+                            {selectionMode !== 'page' && selectionMode !== 'none' && (
                                 <span className="ml-2 text-xs px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full">
-                                    {selectionMode === 'filtered' ? 'Filtered' : 'All'}
+                                    {getSelectionModeText()}
                                 </span>
                             )}
                         </div>
@@ -171,16 +209,16 @@ export default function ResidentBulkActions({
                     {/* Selection Stats */}
                     {selectionStats && (
                         <div className="hidden sm:flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                            {selectionStats.male && selectionStats.male > 0 && (
+                            {selectionStats.males && selectionStats.males > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                    {selectionStats.male} male
+                                    {selectionStats.males} male
                                 </span>
                             )}
-                            {selectionStats.female && selectionStats.female > 0 && (
+                            {selectionStats.females && selectionStats.females > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-pink-500"></div>
-                                    {selectionStats.female} female
+                                    {selectionStats.females} female
                                 </span>
                             )}
                             {selectionStats.active && selectionStats.active > 0 && (
@@ -193,6 +231,18 @@ export default function ResidentBulkActions({
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                                     {selectionStats.voters} voters
+                                </span>
+                            )}
+                            {selectionStats.heads && selectionStats.heads > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                                    {selectionStats.heads} heads
+                                </span>
+                            )}
+                            {selectionStats.hasPrivileges && selectionStats.hasPrivileges > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                                    {selectionStats.hasPrivileges} with privileges
                                 </span>
                             )}
                         </div>
@@ -240,8 +290,7 @@ export default function ResidentBulkActions({
                                         className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
                                         disabled={isPerformingBulkAction}
                                     >
-                                        {isSelectAll ? '✓ ' : ''}
-                                        {isSelectAll ? 'Deselect Page' : 'Select Page'}
+                                        Select Page
                                     </button>
                                     <button
                                         onClick={onSelectAllFiltered}
@@ -266,7 +315,7 @@ export default function ResidentBulkActions({
                     <div className="flex items-center gap-2 flex-wrap">
                         {/* Primary Actions */}
                         {bulkActions.primary?.map((action, index) => (
-                            <Tooltip key={index}>
+                            <Tooltip key={`primary-${index}`}>
                                 <TooltipTrigger asChild>
                                     <Button
                                         variant={action.variant || 'default'}
@@ -285,6 +334,36 @@ export default function ResidentBulkActions({
                             </Tooltip>
                         ))}
                         
+                        {/* Privilege Actions */}
+                        {bulkActions.privilege && bulkActions.privilege.length > 0 && (
+                            <div className="relative group">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isPerformingBulkAction}
+                                    className="text-xs h-8"
+                                >
+                                    <Award className="h-3.5 w-3.5 mr-1.5" />
+                                    Privileges
+                                </Button>
+                                <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                                    <div className="py-1">
+                                        {bulkActions.privilege.map((action, index) => (
+                                            <button
+                                                key={`privilege-${index}`}
+                                                onClick={action.onClick}
+                                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                                disabled={isPerformingBulkAction || action.disabled}
+                                            >
+                                                {action.icon}
+                                                {action.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
                         {/* More Actions Dropdown */}
                         {bulkActions.secondary && bulkActions.secondary.length > 0 && (
                             <div className="relative group">
@@ -300,7 +379,7 @@ export default function ResidentBulkActions({
                                     <div className="py-1">
                                         {bulkActions.secondary.map((action, index) => (
                                             <button
-                                                key={index}
+                                                key={`secondary-${index}`}
                                                 onClick={action.onClick}
                                                 className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
                                                 disabled={isPerformingBulkAction || action.disabled}
@@ -316,7 +395,7 @@ export default function ResidentBulkActions({
                         
                         {/* Destructive Actions */}
                         {bulkActions.destructive?.map((action, index) => (
-                            <Tooltip key={index}>
+                            <Tooltip key={`destructive-${index}`}>
                                 <TooltipTrigger asChild>
                                     <Button
                                         variant={action.variant || 'destructive'}
@@ -337,6 +416,36 @@ export default function ResidentBulkActions({
                     </div>
                 </div>
             </div>
+            
+            {/* Mobile Stats Summary */}
+            {isMobile && selectionStats && (
+                <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+                    {selectionStats.males && selectionStats.males > 0 && (
+                        <span className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                            {selectionStats.males} male
+                        </span>
+                    )}
+                    {selectionStats.females && selectionStats.females > 0 && (
+                        <span className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-pink-500"></div>
+                            {selectionStats.females} female
+                        </span>
+                    )}
+                    {selectionStats.active && selectionStats.active > 0 && (
+                        <span className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                            {selectionStats.active} active
+                        </span>
+                    )}
+                    {selectionStats.voters && selectionStats.voters > 0 && (
+                        <span className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                            {selectionStats.voters} voters
+                        </span>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

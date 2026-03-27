@@ -1,3 +1,4 @@
+// app/Pages/Admin/Users.tsx
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePage, router } from '@inertiajs/react';
 import { toast } from 'sonner';
@@ -13,68 +14,46 @@ import UsersPermissionsOverview from '@/components/admin/users/UsersPermissionsO
 import { Button } from '@/components/ui/button';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 
-// Types
-interface User {
-  id: number;
-  first_name: string | null;
-  last_name: string | null;
-  email: string;
-  role_id: number;
-  role?: { id: number; name: string };
-  status: 'active' | 'inactive' | 'suspended' | 'pending';
-  email_verified_at: string | null;
-  two_factor_enabled: boolean;
-  last_login_at: string | null;
-  department?: { id: number; name: string };
-  created_at: string;
-  updated_at: string;
-  [key: string]: any;
-}
+// Import types
+import type { 
+  UsersPageProps, 
+  User, 
+  UserStatus, 
+  SortOrder,
+  BulkOperation,
+  SelectionMode,
+  UserRole,
+  LaravelPaginatedData,
+  ViewMode
+} from '@/types/admin/users/user-types';
 
-interface PagePropsWithData {
-  users: {
-    data: User[];
-    current_page: number;
-    last_page: number;
-    total: number;
-    from: number;
-    to: number;
-    per_page: number;
-    links: Array<{ url: string | null; label: string; active: boolean }>;
-  };
-  stats: Array<{ label: string; value: number; change?: number; icon?: string; color?: string }>;
-  roles: Array<{ id: number; name: string; count: number }>;
-  filters: {
-    search?: string;
-    role_id?: string | number;
-    status?: string;
-    sort_by?: string;
-    sort_order?: 'asc' | 'desc';
-  };
+// Page props with data (matches Laravel response)
+interface PageProps extends UsersPageProps {
+  // Additional props specific to this page if needed
 }
 
 export default function Users() {
-  const { users, stats, roles, filters } = usePage<PagePropsWithData>().props;
+  const { users, stats, roles, filters, can, departments } = usePage<PageProps>().props;
   
   // Filter states
   const [search, setSearch] = useState(filters.search || '');
   const [roleFilter, setRoleFilter] = useState<string>(filters.role_id?.toString() || 'all');
   const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
   const [sortBy, setSortBy] = useState(filters.sort_by || 'name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(filters.sort_order || 'asc');
+  const [sortOrder, setSortOrder] = useState<SortOrder>(filters.sort_order || 'asc');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   
   // UI states
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>(isMobile ? 'grid' : 'table');
+  const [viewMode, setViewMode] = useState<ViewMode>(isMobile ? 'grid' : 'table');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Bulk selection states
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [isSelectAll, setIsSelectAll] = useState(false);
-  const [selectionMode, setSelectionMode] = useState<'page' | 'filtered' | 'all'>('page');
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('page');
   
   // Dialog states
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
@@ -82,6 +61,17 @@ export default function Users() {
   const [showBulkRoleDialog, setShowBulkRoleDialog] = useState(false);
   const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
   const [bulkEditValue, setBulkEditValue] = useState<string>('');
+
+  // Safe can object with default values to prevent undefined errors
+  const safeCan = {
+    create_users: can?.create_users ?? false,
+    edit_users: can?.edit_users ?? false,
+    delete_users: can?.delete_users ?? false,
+    bulk_actions: can?.bulk_actions ?? false,
+    export_users: can?.export_users ?? false,
+    manage_roles: can?.manage_roles ?? false,
+    impersonate: can?.impersonate ?? false,
+  };
 
   // Track window resize
   useEffect(() => {
@@ -111,8 +101,6 @@ export default function Users() {
     }
   }, []);
 
-  
-
   // Reset selection when bulk mode is turned off or filters change
   useEffect(() => {
     if (!isBulkMode) {
@@ -128,13 +116,19 @@ export default function Users() {
     setIsSelectAll(allSelected);
   }, [selectedUsers, users.data]);
 
+  // Ensure hasActiveFilters returns boolean, not string | boolean
   const hasActiveFilters = useMemo(() => {
-    return search || roleFilter !== 'all' || statusFilter !== 'all';
+    return !!(search || roleFilter !== 'all' || statusFilter !== 'all');
   }, [search, roleFilter, statusFilter]);
 
   const selectedUsersData = useMemo(() => {
     return users.data.filter(user => selectedUsers.includes(user.id));
   }, [users.data, selectedUsers]);
+
+  // Create a wrapper for setViewMode that matches the expected signature
+  const handleSetViewMode = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+  }, []);
 
   // Bulk selection handlers
   const handleSelectAllOnPage = useCallback(() => {
@@ -227,8 +221,8 @@ export default function Users() {
     });
   }, []);
 
-  // Bulk operation handler
-  const handleBulkOperation = useCallback(async (operation: string) => {
+  // Bulk operation handler with proper typing
+  const handleBulkOperation = useCallback(async (operation: BulkOperation) => {
     if (selectedUsers.length === 0) {
       toast.error('Please select at least one user');
       return;
@@ -267,12 +261,25 @@ export default function Users() {
           toast.success(`Exported ${selectedUsers.length} users`);
           break;
         case 'activate':
-          // Activate logic
-          toast.success(`${selectedUsers.length} users activated`);
+          // Make API call to Laravel backend
+          router.post('/admin/users/bulk-activate', 
+            { users: selectedUsers, selection_mode: selectionMode },
+            {
+              preserveState: true,
+              onSuccess: () => toast.success(`${selectedUsers.length} users activated`),
+              onError: () => toast.error('Failed to activate users')
+            }
+          );
           break;
         case 'deactivate':
-          // Deactivate logic
-          toast.success(`${selectedUsers.length} users deactivated`);
+          router.post('/admin/users/bulk-deactivate', 
+            { users: selectedUsers, selection_mode: selectionMode },
+            {
+              preserveState: true,
+              onSuccess: () => toast.success(`${selectedUsers.length} users deactivated`),
+              onError: () => toast.error('Failed to deactivate users')
+            }
+          );
           break;
         case 'delete':
           setShowBulkDeleteDialog(true);
@@ -288,7 +295,7 @@ export default function Users() {
     } finally {
       setIsPerformingBulkAction(false);
     }
-  }, [selectedUsers, selectedUsersData]);
+  }, [selectedUsers, selectedUsersData, selectionMode]);
 
   const handleCopySelectedData = useCallback(() => {
     if (selectedUsersData.length === 0) {
@@ -316,6 +323,58 @@ export default function Users() {
     });
   }, [selectedUsersData]);
 
+  // Confirm bulk delete
+  const handleBulkDeleteConfirm = useCallback(() => {
+    router.delete('/admin/users/bulk', 
+      { 
+        data: { users: selectedUsers, selection_mode: selectionMode },
+        preserveState: true,
+        onSuccess: () => {
+          toast.success(`${selectedUsers.length} users deleted`);
+          setShowBulkDeleteDialog(false);
+          setSelectedUsers([]);
+          setIsBulkMode(false);
+        },
+        onError: () => toast.error('Failed to delete users')
+      }
+    );
+  }, [selectedUsers, selectionMode]);
+
+  // Confirm bulk status change
+  const handleBulkStatusConfirm = useCallback((status: UserStatus) => {
+    router.post('/admin/users/bulk-status', 
+      { users: selectedUsers, status, selection_mode: selectionMode },
+      {
+        preserveState: true,
+        onSuccess: () => {
+          toast.success(`${selectedUsers.length} users updated to ${status}`);
+          setShowBulkStatusDialog(false);
+          setSelectedUsers([]);
+          setIsBulkMode(false);
+        },
+        onError: () => toast.error('Failed to update users')
+      }
+    );
+  }, [selectedUsers, selectionMode]);
+
+  // Confirm bulk role change
+  const handleBulkRoleConfirm = useCallback((roleId: number) => {
+    router.post('/admin/users/bulk-role', 
+      { users: selectedUsers, role_id: roleId, selection_mode: selectionMode },
+      {
+        preserveState: true,
+        onSuccess: () => {
+          const roleName = roles.find(r => r.id === roleId)?.name;
+          toast.success(`${selectedUsers.length} users assigned to ${roleName}`);
+          setShowBulkRoleDialog(false);
+          setSelectedUsers([]);
+          setIsBulkMode(false);
+        },
+        onError: () => toast.error('Failed to update user roles')
+      }
+    );
+  }, [selectedUsers, selectionMode, roles]);
+
   return (
     <AppLayout
       title="Users"
@@ -333,6 +392,7 @@ export default function Users() {
               isBulkMode={isBulkMode}
               setIsBulkMode={setIsBulkMode}
               isMobile={isMobile}
+              canCreateUsers={safeCan.create_users}
             />
             <Button
               variant="outline"
@@ -362,6 +422,7 @@ export default function Users() {
             hasActiveFilters={hasActiveFilters}
             handleClearFilters={handleClearFilters}
             roles={roles}
+            departments={departments}
             isBulkMode={isBulkMode}
             selectedUsers={selectedUsers}
             setSelectedUsers={setSelectedUsers}
@@ -406,7 +467,7 @@ export default function Users() {
             setIsBulkMode={setIsBulkMode}
             isSelectAll={isSelectAll}
             viewMode={viewMode}
-            setViewMode={setViewMode}
+            setViewMode={handleSetViewMode}
             isMobile={isMobile}
             hasActiveFilters={hasActiveFilters}
             handleClearFilters={handleClearFilters}
@@ -424,6 +485,8 @@ export default function Users() {
             onBulkOperation={handleBulkOperation}
             onCopySelectedData={handleCopySelectedData}
             isLoading={isRefreshing}
+            canEdit={safeCan.edit_users}
+            canDelete={safeCan.delete_users}
           />
 
           {/* Permissions Overview */}
@@ -483,6 +546,10 @@ export default function Users() {
         bulkEditValue={bulkEditValue}
         setBulkEditValue={setBulkEditValue}
         roles={roles}
+        departments={departments}
+        onBulkDeleteConfirm={handleBulkDeleteConfirm}
+        onBulkStatusConfirm={handleBulkStatusConfirm}
+        onBulkRoleConfirm={handleBulkRoleConfirm}
       />
 
       {/* Keyboard Shortcuts Component */}

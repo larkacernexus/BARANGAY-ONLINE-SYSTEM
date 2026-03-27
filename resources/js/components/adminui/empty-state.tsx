@@ -1,3 +1,4 @@
+// components/adminui/empty-state.tsx
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { ReactNode } from 'react';
@@ -11,6 +12,10 @@ interface EmptyStateProps {
     onCreateNew?: () => void;
     createLabel?: string;
     children?: ReactNode;
+    action?: {
+        label: string;
+        onClick: () => void;
+    };
 }
 
 export function EmptyState({
@@ -21,7 +26,8 @@ export function EmptyState({
     onClearFilters,
     onCreateNew,
     createLabel = "Create New",
-    children
+    children,
+    action
 }: EmptyStateProps) {
     return (
         <div className="text-center py-8 text-gray-500">
@@ -36,6 +42,12 @@ export function EmptyState({
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {action && !hasFilters && !onCreateNew && (
+                        <Button onClick={action.onClick} className="h-8 text-xs">
+                            <Plus className="h-3 w-3 mr-1" />
+                            {action.label}
+                        </Button>
+                    )}
                     {hasFilters && onClearFilters && (
                         <Button
                             variant="outline"

@@ -1,3 +1,4 @@
+// Updated ResidentsContent.tsx with fixed customBulkActions type
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -30,11 +31,14 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import ResidentsTableView from './ResidentsTableView';
 import ResidentsGridView from './ResidentsGridView';
 import ResidentBulkActions from './ResidentsBulkActions';
-import { Resident } from '@/types';
+import { Resident, Purok, FilterState, Stats, SelectionMode, SelectionStats } from '@/types/admin/residents/residents-types';
+
+// Import BulkActionItem type
+import { BulkActionItem } from './ResidentsBulkActions';
 
 interface ResidentsContentProps {
     residents: Resident[];
-    stats?: any;
+    stats?: Stats;
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
@@ -60,15 +64,23 @@ interface ResidentsContentProps {
     onCopyToClipboard: (text: string, label: string) => void;
     onCopySelectedData: () => void;
     onSort: (column: string) => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: string, data?: any) => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
-    filtersState: any;
+    setShowBulkStatusDialog?: (show: boolean) => void;
+    setShowBulkPurokDialog?: (show: boolean) => void;
+    setShowBulkPrivilegeDialog?: (show: boolean) => void;
+    setShowBulkRemovePrivilegeDialog?: (show: boolean) => void;
+    filtersState: FilterState;
     isPerformingBulkAction: boolean;
-    selectionMode: 'page' | 'filtered' | 'all';
-    selectionStats?: any;
-    puroks?: any[];
-    // Optional custom bulk actions
-    customBulkActions?: any;
+    selectionMode: SelectionMode;
+    selectionStats?: SelectionStats;
+    puroks?: Purok[];
+    customBulkActions?: {
+        primary?: BulkActionItem[];
+        secondary?: BulkActionItem[];
+        destructive?: BulkActionItem[];
+        privilege?: BulkActionItem[];
+    };
 }
 
 export default function ResidentsContent({
@@ -101,6 +113,10 @@ export default function ResidentsContent({
     onSort,
     onBulkOperation,
     setShowBulkDeleteDialog,
+    setShowBulkStatusDialog,
+    setShowBulkPurokDialog,
+    setShowBulkPrivilegeDialog,
+    setShowBulkRemovePrivilegeDialog,
     filtersState,
     isPerformingBulkAction,
     selectionMode,
@@ -117,6 +133,39 @@ export default function ResidentsContent({
         }
     };
 
+    // Ensure hasActiveFilters is a boolean (in case it's passed as string)
+    const activeFilters = Boolean(hasActiveFilters);
+
+    // Convert selectionStats to match the expected SelectionStats type
+    // The SelectionStats interface expects both singular and plural forms
+    const normalizedSelectionStats = selectionStats ? {
+        // Core stats
+        total: selectionStats.total,
+        
+        // Gender stats - both singular and plural
+        male: selectionStats.male || selectionStats.males || 0,
+        female: selectionStats.female || selectionStats.females || 0,
+        males: selectionStats.males || selectionStats.male || 0,
+        females: selectionStats.females || selectionStats.female || 0,
+        other: selectionStats.other || 0,
+        
+        // Voter and household stats
+        voters: selectionStats.voters || 0,
+        heads: selectionStats.heads || 0,
+        
+        // Status stats
+        active: selectionStats.active || 0,
+        inactive: selectionStats.inactive || 0,
+        
+        // Additional stats
+        averageAge: selectionStats.averageAge || 0,
+        hasPhotos: selectionStats.hasPhotos || 0,
+        
+        // Privilege stats
+        privilegeCounts: selectionStats.privilegeCounts || {},
+        hasPrivileges: selectionStats.hasPrivileges || 0
+    } : undefined;
+
     return (
         <>
             {/* Enhanced Bulk Actions Bar */}
@@ -124,7 +173,7 @@ export default function ResidentsContent({
                 <ResidentBulkActions
                     selectedResidents={selectedResidents}
                     selectionMode={selectionMode}
-                    selectionStats={selectionStats}
+                    selectionStats={normalizedSelectionStats}
                     isPerformingBulkAction={isPerformingBulkAction}
                     isSelectAll={isSelectAll}
                     isMobile={isMobile}
@@ -225,14 +274,13 @@ export default function ResidentsContent({
                         <EmptyState
                             icon={<User className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
                             title="No residents found"
-                            description={hasActiveFilters 
+                            description={activeFilters 
                                 ? "No residents match your current filters. Try adjusting your search or filters."
                                 : "No residents have been added yet."}
-                            action={hasActiveFilters ? {
+                            action={activeFilters ? {
                                 label: "Clear Filters",
                                 onClick: onClearFilters
                             } : undefined}
-                            className="py-12 sm:py-16 dark:bg-gray-900"
                         />
                     ) : (
                         <>
@@ -245,7 +293,7 @@ export default function ResidentsContent({
                                     filtersState={filtersState}
                                     onItemSelect={onItemSelect}
                                     onSort={onSort}
-                                    hasActiveFilters={hasActiveFilters}
+                                    hasActiveFilters={activeFilters}
                                     onClearFilters={onClearFilters}
                                     onDelete={onDelete}
                                     onToggleStatus={onToggleStatus}
@@ -261,7 +309,7 @@ export default function ResidentsContent({
                                     isBulkMode={isBulkMode}
                                     selectedResidents={selectedResidents}
                                     onItemSelect={onItemSelect}
-                                    hasActiveFilters={hasActiveFilters}
+                                    hasActiveFilters={activeFilters}
                                     onClearFilters={onClearFilters}
                                     onDelete={onDelete}
                                     onToggleStatus={onToggleStatus}
