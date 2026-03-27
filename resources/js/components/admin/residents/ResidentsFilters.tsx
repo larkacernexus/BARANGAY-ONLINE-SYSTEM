@@ -10,10 +10,14 @@ import {
 } from '@/components/ui/select';
 import { Download, Filter, X, ChevronDown, ChevronUp, Award } from 'lucide-react';
 import { useState } from 'react';
+import { FilterState } from '@/types/admin/residents/residents-types';
 
-interface CivilStatusOption {
-    value: string;
-    label: string;
+// Import types from the main types file
+interface Purok {
+    id: number;
+    name: string;
+    code?: string;
+    description?: string;
 }
 
 interface Privilege {
@@ -22,26 +26,38 @@ interface Privilege {
     code: string;
     description?: string;
     category?: string;
-}
-
-interface Purok {
-    id: number;
-    name: string;
+    is_active: boolean;
+    requires_verification: boolean;
 }
 
 interface AgeRange {
-    value: string;
-    label: string;
     min: number;
     max: number;
+    label: string;
+}
+
+interface CivilStatusOption {
+    value: string;
+    label: string;
+}
+
+interface Stats {
+    total: number;
+    active: number;
+    inactive: number;
+    male: number;
+    female: number;
+    voters: number;
+    heads_of_household: number;
+    with_privileges: number;
 }
 
 interface ResidentsFiltersProps {
-    stats?: any;
+    stats?: Stats;
     search: string;
     setSearch: (value: string) => void;
-    filtersState: any;
-    updateFilter: (key: string, value: string) => void;
+    filtersState: FilterState;
+    updateFilter: (key: keyof FilterState, value: string) => void;
     showAdvancedFilters?: boolean;
     setShowAdvancedFilters?: (value: boolean) => void;
     handleClearFilters: () => void;
@@ -54,11 +70,12 @@ interface ResidentsFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef?: React.RefObject<HTMLInputElement>;
+    searchInputRef?: React.RefObject<HTMLInputElement | null>;
     onSearchChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export default function ResidentsFilters({
+    stats,
     search,
     setSearch,
     filtersState,
@@ -97,6 +114,31 @@ export default function ResidentsFilters({
         acc[category].push(privilege);
         return acc;
     }, {} as Record<string, Privilege[]>);
+
+    // Handle age range change
+    const handleAgeRangeChange = (value: string) => {
+        if (value === 'all') {
+            updateFilter('min_age', '');
+            updateFilter('max_age', '');
+        } else {
+            const range = ageRanges.find(r => `${r.min}-${r.max}` === value || r.label === value);
+            if (range) {
+                updateFilter('min_age', range.min.toString());
+                updateFilter('max_age', range.max.toString());
+            }
+        }
+    };
+
+    // Get current age range value for display
+    const getCurrentAgeRangeValue = () => {
+        if (!filtersState.min_age && !filtersState.max_age) return 'all';
+        const minAge = filtersState.min_age?.toString();
+        const maxAge = filtersState.max_age?.toString();
+        const range = ageRanges.find(r => 
+            r.min.toString() === minAge && r.max.toString() === maxAge
+        );
+        return range ? `${range.min}-${range.max}` : 'custom';
+    };
 
     return (
         <div className="space-y-4">
@@ -137,8 +179,9 @@ export default function ResidentsFilters({
                             const exportUrl = new URL('/admin/residents/export', window.location.origin);
                             if (search) exportUrl.searchParams.append('search', search);
                             Object.keys(filtersState).forEach(key => {
-                                if (filtersState[key] && filtersState[key] !== 'all' && filtersState[key] !== '') {
-                                    exportUrl.searchParams.append(key, filtersState[key]);
+                                const value = filtersState[key as keyof FilterState];
+                                if (value && value !== 'all' && value !== '') {
+                                    exportUrl.searchParams.append(key, String(value));
                                 }
                             });
                             window.open(exportUrl.toString(), '_blank');
@@ -175,6 +218,8 @@ export default function ResidentsFilters({
                             <SelectItem value="all" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">All Status</SelectItem>
                             <SelectItem value="active" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Active</SelectItem>
                             <SelectItem value="inactive" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Inactive</SelectItem>
+                            <SelectItem value="pending" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Pending</SelectItem>
+                            <SelectItem value="suspended" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Suspended</SelectItem>
                         </SelectContent>
                     </Select>
 
@@ -189,11 +234,12 @@ export default function ResidentsFilters({
                             <SelectItem value="all" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">All Genders</SelectItem>
                             <SelectItem value="male" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Male</SelectItem>
                             <SelectItem value="female" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Female</SelectItem>
+                            <SelectItem value="other" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Other</SelectItem>
                         </SelectContent>
                     </Select>
 
                     <Select
-                        value={filtersState.purok_id || 'all'}
+                        value={filtersState.purok_id?.toString() || 'all'}
                         onValueChange={(value) => updateFilter('purok_id', value)}
                     >
                         <SelectTrigger className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
@@ -239,8 +285,8 @@ export default function ResidentsFilters({
                         </SelectTrigger>
                         <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
                             <SelectItem value="all" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">All Voter Status</SelectItem>
-                            <SelectItem value="yes" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Voters Only</SelectItem>
-                            <SelectItem value="no" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Non-Voters Only</SelectItem>
+                            <SelectItem value="true" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Voters Only</SelectItem>
+                            <SelectItem value="false" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Non-Voters Only</SelectItem>
                         </SelectContent>
                     </Select>
 
@@ -253,14 +299,14 @@ export default function ResidentsFilters({
                         </SelectTrigger>
                         <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
                             <SelectItem value="all" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">All Head Status</SelectItem>
-                            <SelectItem value="yes" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Heads Only</SelectItem>
-                            <SelectItem value="no" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Non-Heads Only</SelectItem>
+                            <SelectItem value="true" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Heads Only</SelectItem>
+                            <SelectItem value="false" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Non-Heads Only</SelectItem>
                         </SelectContent>
                     </Select>
 
                     {/* Privilege Filter */}
                     <Select
-                        value={filtersState.privilege_id || 'all'}
+                        value={filtersState.privilege_id?.toString() || 'all'}
                         onValueChange={(value) => updateFilter('privilege_id', value)}
                     >
                         <SelectTrigger 
@@ -275,7 +321,7 @@ export default function ResidentsFilters({
                                     <div className="flex items-center gap-2">
                                         <Award className="h-4 w-4 text-purple-500 dark:text-purple-400" />
                                         <span>
-                                            {privileges.find(p => p.id.toString() === filtersState.privilege_id)?.name || 'Privilege'}
+                                            {privileges.find(p => p.id.toString() === filtersState.privilege_id?.toString())?.name || 'Privilege'}
                                         </span>
                                     </div>
                                 ) : (
@@ -346,21 +392,8 @@ export default function ResidentsFilters({
 
                     {/* Age Range Filter */}
                     <Select
-                        value={filtersState.age_range || 'all'}
-                        onValueChange={(value) => {
-                            if (value === 'all') {
-                                updateFilter('min_age', '');
-                                updateFilter('max_age', '');
-                                updateFilter('age_range', 'all');
-                            } else {
-                                const range = ageRanges.find(r => r.value === value);
-                                if (range) {
-                                    updateFilter('min_age', range.min.toString());
-                                    updateFilter('max_age', range.max.toString());
-                                    updateFilter('age_range', value);
-                                }
-                            }
-                        }}
+                        value={getCurrentAgeRangeValue()}
+                        onValueChange={handleAgeRangeChange}
                     >
                         <SelectTrigger className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
                             <SelectValue placeholder="Age Range" />
@@ -368,7 +401,7 @@ export default function ResidentsFilters({
                         <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
                             <SelectItem value="all" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">All Ages</SelectItem>
                             {ageRanges.map((range) => (
-                                <SelectItem key={range.value} value={range.value} className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">
+                                <SelectItem key={`${range.min}-${range.max}`} value={`${range.min}-${range.max}`} className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">
                                     {range.label}
                                 </SelectItem>
                             ))}
@@ -384,7 +417,7 @@ export default function ResidentsFilters({
                 {filtersState.privilege_id && filtersState.privilege_id !== 'all' && (
                     <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30 px-2 py-1 rounded-md">
                         <Award className="h-3 w-3" />
-                        <span>Filtered by: {privileges.find(p => p.id.toString() === filtersState.privilege_id)?.name}</span>
+                        <span>Filtered by: {privileges.find(p => p.id.toString() === filtersState.privilege_id?.toString())?.name}</span>
                     </div>
                 )}
             </div>

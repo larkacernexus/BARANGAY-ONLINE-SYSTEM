@@ -48,6 +48,12 @@ class DatabaseSeeder extends Seeder
         // Re-enable foreign key checks
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
         
+        // Run RolePermissionSeeder to handle permissions
+        $this->command->info('');
+        $this->command->info('Running RolePermissionSeeder...');
+        $this->call(RolePermissionSeeder::class);
+        
+        $this->command->info('');
         $this->command->info('✅ Database seeding completed successfully!');
     }
 
@@ -85,7 +91,7 @@ class DatabaseSeeder extends Seeder
     }
 
     /**
-     * Seed Roles - Updated to match RolePermissionSeeder
+     * Seed Roles - Updated to include Household Head role
      */
     private function seedRoles(): void
     {
@@ -99,6 +105,7 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Barangay Kagawad', 'description' => 'Barangay council member', 'is_system_role' => 1],
             ['name' => 'SK Chairman', 'description' => 'Sangguniang Kabataan chairman', 'is_system_role' => 1],
             ['name' => 'SK Kagawad', 'description' => 'Sangguniang Kabataan member', 'is_system_role' => 1],
+            ['name' => 'Household Head', 'description' => 'Head of a household', 'is_system_role' => 0],
             ['name' => 'Resident', 'description' => 'Barangay resident', 'is_system_role' => 0],
             ['name' => 'Staff', 'description' => 'General staff', 'is_system_role' => 0],
             ['name' => 'Treasury Officer', 'description' => 'Handles treasury operations', 'is_system_role' => 0],
@@ -1154,7 +1161,7 @@ class DatabaseSeeder extends Seeder
     }
 
     /**
-     * Seed Fee Types
+     * Seed Fee Types - Fixed frequency column issue
      */
     private function seedFeeTypes(): void
     {

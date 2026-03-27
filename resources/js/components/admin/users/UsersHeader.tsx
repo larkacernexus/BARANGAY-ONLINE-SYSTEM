@@ -1,14 +1,17 @@
+// components/admin/users/UsersHeader.tsx
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
 import { Plus, Layers, MousePointer } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { UsersHeaderProps } from '@/types/admin/users/user-types';
 
-interface UsersHeaderProps {
-  isBulkMode: boolean;
-  setIsBulkMode: (value: boolean) => void;
-}
-
-export default function UsersHeader({ isBulkMode, setIsBulkMode }: UsersHeaderProps) {
+export default function UsersHeader({ 
+  isBulkMode, 
+  setIsBulkMode, 
+  isMobile = false,
+  canCreateUsers = true,
+  onUserCreate 
+}: UsersHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <div>
@@ -44,13 +47,15 @@ export default function UsersHeader({ isBulkMode, setIsBulkMode }: UsersHeaderPr
             <p className="text-xs text-gray-500">Select multiple users for batch operations</p>
           </TooltipContent>
         </Tooltip>
-        <Link href="/admin/users/create">
-          <Button className="h-9">
-            <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Add User</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
-        </Link>
+        {canCreateUsers && (
+          <Link href="/admin/users/create">
+            <Button className="h-9">
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Add User</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          </Link>
+        )}
       </div>
     </div>
   );

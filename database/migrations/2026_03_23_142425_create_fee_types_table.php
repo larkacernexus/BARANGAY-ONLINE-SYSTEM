@@ -37,7 +37,7 @@ return new class extends Migration
             $table->integer('has_penalty')->nullable()->default(NULL);
             $table->decimal('penalty_percentage', 10, 2)->nullable();
             $table->decimal('penalty_fixed', 10, 2)->nullable();
-            $table->time('frequency')->nullable();
+            $table->string('frequency')->nullable();
             $table->integer('validity_days')->nullable()->default(NULL);
             $table->string('applicable_to', 255)->nullable()->default(NULL);
             $table->text('applicable_puroks')->nullable()->default(NULL);

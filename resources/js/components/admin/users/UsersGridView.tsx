@@ -1,3 +1,4 @@
+// components/admin/users/UsersGridView.tsx
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -32,7 +33,7 @@ import {
   CheckSquare,
   Square
 } from 'lucide-react';
-import { User } from '@/types';
+import { User } from '@/types/admin/users/user-types';
 import { JSX } from 'react';
 
 interface UsersGridViewProps {
@@ -41,12 +42,16 @@ interface UsersGridViewProps {
   selectedUsers: number[];
   onItemSelect: (id: number) => void;
   isMobile?: boolean;
-  hasActiveFilters: boolean;
-  onClearFilters: () => void;
-  onDelete: (user: User) => void;
-  onToggleStatus: (user: User) => void;
-  onCopyToClipboard: (text: string, label: string) => void;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
+  onDelete?: (user: User) => void;
+  onToggleStatus?: (user: User) => void;
+  onCopyToClipboard?: (text: string, label: string) => void;
   onSendMessage?: (user: User) => void;
+  onUserClick?: (user: User) => void;
+  onUserEdit?: (user: User) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 export default function UsersGridView({
@@ -55,14 +60,17 @@ export default function UsersGridView({
   selectedUsers,
   onItemSelect,
   isMobile = false,
-  hasActiveFilters,
-  onClearFilters,
-  onDelete,
-  onToggleStatus,
-  onCopyToClipboard,
-  onSendMessage
+  hasActiveFilters = false,
+  onClearFilters = () => {},
+  onDelete = () => {},
+  onToggleStatus = () => {},
+  onCopyToClipboard = () => {},
+  onSendMessage,
+  onUserClick,
+  onUserEdit,
+  canEdit = true,
+  canDelete = true
 }: UsersGridViewProps) {
-  // Helper function to safely get string values from unknown
   const getStringValue = (value: unknown, defaultValue: string = ''): string => {
     if (typeof value === 'string') {
       return value;
@@ -70,7 +78,6 @@ export default function UsersGridView({
     return defaultValue;
   };
 
-  // Helper function to safely get status string
   const getStatusString = (status: unknown): string => {
     if (typeof status === 'string') {
       return status;
@@ -127,7 +134,6 @@ export default function UsersGridView({
     return text.substring(0, maxLength) + '...';
   };
 
-  // Type guard to check if an object has the expected shape
   const isValidRoleObject = (role: unknown): role is { name: string } => {
     return typeof role === 'object' && role !== null && 'name' in role && typeof (role as any).name === 'string';
   };
@@ -137,22 +143,17 @@ export default function UsersGridView({
   };
 
   const getFullName = (user: User): string => {
-    // Use type assertion or safe property access
-    const firstName = (user as any).first_name;
-    const lastName = (user as any).last_name;
-    
-    if (firstName && lastName && typeof firstName === 'string' && typeof lastName === 'string') {
-      return `${firstName} ${lastName}`.trim();
-    } else if (firstName && typeof firstName === 'string') {
-      return firstName;
-    } else if (lastName && typeof lastName === 'string') {
-      return lastName;
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`.trim();
+    } else if (user.first_name) {
+      return user.first_name;
+    } else if (user.last_name) {
+      return user.last_name;
     } else {
       return user.email;
     }
   };
 
-  // Helper function to safely access role name
   const getRoleName = (user: User): string => {
     if (isValidRoleObject(user.role)) {
       return user.role.name;
@@ -163,7 +164,6 @@ export default function UsersGridView({
     return 'N/A';
   };
 
-  // Helper function to safely access department name
   const getDepartmentName = (user: User): string => {
     if (isValidDepartmentObject(user.department)) {
       return user.department.name;
@@ -171,19 +171,16 @@ export default function UsersGridView({
     return 'N/A';
   };
 
-  // Helper function to safely access position
   const getPosition = (user: User): string | null => {
     const position = (user as any).position;
     return typeof position === 'string' ? position : null;
   };
 
-  // Helper function to safely access contact number
   const getContactNumber = (user: User): string | null => {
     const contactNumber = (user as any).contact_number;
     return typeof contactNumber === 'string' ? contactNumber : null;
   };
 
-  // Helper function to safely access two_factor_confirmed_at
   const getTwoFactorConfirmedAt = (user: User): string | null => {
     const twoFactor = (user as any).two_factor_confirmed_at;
     return typeof twoFactor === 'string' ? twoFactor : null;
@@ -203,6 +200,18 @@ export default function UsersGridView({
     />
   );
 
+  const handleCardClick = (user: User, e: React.MouseEvent) => {
+    if (isBulkMode && e.target instanceof HTMLElement && 
+        !e.target.closest('a') && 
+        !e.target.closest('button') &&
+        !e.target.closest('[role="menuitem"]') &&
+        !e.target.closest('[data-radix-menu-content]')) {
+      onItemSelect(user.id);
+    } else if (!isBulkMode && onUserClick) {
+      onUserClick(user);
+    }
+  };
+
   return (
     <GridLayout
       isEmpty={users.length === 0}
@@ -213,35 +222,25 @@ export default function UsersGridView({
     >
       {users.map((user) => {
         const isSelected = selectedUsers.includes(user.id);
-        
         const fullName = getFullName(user);
         const roleName = getRoleName(user);
         const departmentName = getDepartmentName(user);
         const position = getPosition(user);
         const contactNumber = getContactNumber(user);
         const twoFactorConfirmedAt = getTwoFactorConfirmedAt(user);
-        const status = getStatusString((user as any).status);
+        const status = getStatusString(user.status);
 
         return (
           <Card 
             key={user.id}
-            className={`overflow-hidden transition-all hover:shadow-md bg-white dark:bg-gray-900 border ${
+            className={`overflow-hidden transition-all hover:shadow-md bg-white dark:bg-gray-900 border cursor-pointer ${
               isSelected 
                 ? 'border-blue-500 border-2 bg-blue-50 dark:bg-blue-900/20' 
                 : 'border-gray-200 dark:border-gray-700'
             }`}
-            onClick={(e) => {
-              if (isBulkMode && e.target instanceof HTMLElement && 
-                  !e.target.closest('a') && 
-                  !e.target.closest('button') &&
-                  !e.target.closest('[role="menuitem"]') &&
-                  !e.target.closest('[data-radix-menu-content]')) {
-                onItemSelect(user.id);
-              }
-            }}
+            onClick={(e) => handleCardClick(user, e)}
           >
             <CardContent className="p-4">
-              {/* Header with Checkbox and DropdownMenu */}
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
@@ -283,18 +282,25 @@ export default function UsersGridView({
                         </Link>
                       </DropdownMenuItem>
                       
-                      <DropdownMenuItem asChild>
-                        <Link href={`/admin/users/${user.id}/edit`} className="flex items-center gap-2 cursor-pointer">
-                          <Edit className="h-4 w-4" />
-                          <span>Edit User</span>
-                        </Link>
-                      </DropdownMenuItem>
+                      {canEdit && onUserEdit && (
+                        <DropdownMenuItem asChild>
+                          <Link 
+                            href={`/admin/users/${user.id}/edit`} 
+                            className="flex items-center gap-2 cursor-pointer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Edit className="h-4 w-4" />
+                            <span>Edit User</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
                       
                       <DropdownMenuSeparator />
                       
                       <DropdownMenuItem 
                         onClick={(e) => {
                           e.preventDefault();
+                          e.stopPropagation();
                           onCopyToClipboard(user.email, 'Email');
                         }}
                         className="flex items-center gap-2 cursor-pointer"
@@ -306,6 +312,7 @@ export default function UsersGridView({
                       <DropdownMenuItem 
                         onClick={(e) => {
                           e.preventDefault();
+                          e.stopPropagation();
                           onCopyToClipboard(fullName, 'Name');
                         }}
                         className="flex items-center gap-2 cursor-pointer"
@@ -329,6 +336,7 @@ export default function UsersGridView({
                         <DropdownMenuItem 
                           onClick={(e) => {
                             e.preventDefault();
+                            e.stopPropagation();
                             onSendMessage(user);
                           }}
                           className="flex items-center gap-2 cursor-pointer"
@@ -344,6 +352,7 @@ export default function UsersGridView({
                           <DropdownMenuItem 
                             onClick={(e) => {
                               e.preventDefault();
+                              e.stopPropagation();
                               onItemSelect(user.id);
                             }}
                             className="flex items-center gap-2 cursor-pointer"
@@ -368,6 +377,7 @@ export default function UsersGridView({
                       <DropdownMenuItem 
                         onClick={(e) => {
                           e.preventDefault();
+                          e.stopPropagation();
                           onToggleStatus(user);
                         }}
                         className={`flex items-center gap-2 cursor-pointer ${
@@ -383,26 +393,28 @@ export default function UsersGridView({
                         <span>{status === 'active' ? 'Deactivate User' : 'Activate User'}</span>
                       </DropdownMenuItem>
                       
-                      <DropdownMenuSeparator />
-                      
-                      <DropdownMenuItem 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          onDelete(user);
-                        }}
-                        className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/30"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span>Delete User</span>
-                      </DropdownMenuItem>
+                      {canDelete && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onDelete(user);
+                            }}
+                            className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/30"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>Delete User</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
               </div>
 
-              {/* Content */}
               <div className="space-y-3">
-                {/* Status and Role Badges */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   <Badge 
                     variant={getStatusBadgeVariant(status)} 
@@ -431,7 +443,6 @@ export default function UsersGridView({
                   </Badge>
                 </div>
 
-                {/* User Details */}
                 <div className="space-y-2 text-sm">
                   {position && (
                     <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
@@ -469,7 +480,6 @@ export default function UsersGridView({
                   )}
                 </div>
 
-                {/* Mobile simplified view */}
                 {isMobile && (
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">

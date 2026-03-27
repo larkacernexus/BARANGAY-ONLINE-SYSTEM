@@ -1,9 +1,8 @@
-// resources/js/pages/residents/index.tsx
 import { router, usePage } from '@inertiajs/react';
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { ResidentsProps, Resident, FilterState, SelectionMode, SelectionStats } from '@/types';
+import { ResidentsProps, Resident, FilterState, SelectionMode, SelectionStats, Privilege } from '@/types/admin/residents/residents-types';
 import { 
     filterResidents,
     getSelectionStats,
@@ -54,7 +53,8 @@ export default function Residents() {
         privilege: filters.privilege || 'all',
         privilege_id: filters.privilege_id || 'all',
         sort_by: filters.sort_by || 'last_name',
-        sort_order: filters.sort_order || 'asc'
+        sort_order: filters.sort_order || 'asc',
+        search: filters.search || ''
     });
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -92,14 +92,15 @@ export default function Residents() {
         };
         
         // Clean up empty values
+        const cleanedParams: Record<string, any> = {};
         Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all' || params[k] === '') {
-                delete params[k];
+            const value = params[key as keyof typeof params];
+            if (value !== undefined && value !== '' && value !== 'all') {
+                cleanedParams[key] = value;
             }
         });
         
-        router.get('/admin/residents', params, {
+        router.get('/admin/residents', cleanedParams, {
             preserveState: true,
             replace: true,
             preserveScroll: true,
@@ -255,7 +256,7 @@ export default function Residents() {
     }, [selectedResidents, filteredResidents]);
 
     // Calculate selection stats including privilege information
-    const selectionStats = useMemo(() => {
+    const rawSelectionStats = useMemo(() => {
         const baseStats = getSelectionStats(selectedResidentsData);
         
         // Add privilege stats
@@ -264,7 +265,7 @@ export default function Residents() {
         
         selectedResidentsData.forEach(resident => {
             if (resident.privileges && Array.isArray(resident.privileges)) {
-                resident.privileges.forEach((privilege: any) => {
+                resident.privileges.forEach((privilege: Privilege) => {
                     if (privilege.code) {
                         privilegeCounts[privilege.code] = (privilegeCounts[privilege.code] || 0) + 1;
                     }
@@ -279,6 +280,26 @@ export default function Residents() {
             hasPrivileges: selectedResidentsData.filter(r => r.privileges?.length > 0).length
         };
     }, [selectedResidentsData]);
+
+    // Normalize selection stats to match the SelectionStats interface
+    const selectionStats: SelectionStats = useMemo(() => {
+        return {
+            total: rawSelectionStats.total || 0,
+            male: rawSelectionStats.male || 0,
+            female: rawSelectionStats.female || 0,
+            males: rawSelectionStats.male || rawSelectionStats.male || 0,
+            females: rawSelectionStats.female || rawSelectionStats.female || 0,
+            other: rawSelectionStats.other || 0,
+            voters: rawSelectionStats.voters || 0,
+            heads: rawSelectionStats.heads || 0,
+            active: rawSelectionStats.active || 0,
+            inactive: rawSelectionStats.inactive || 0,
+            averageAge: rawSelectionStats.averageAge || 0,
+            hasPhotos: rawSelectionStats.hasPhotos || 0,
+            privilegeCounts: rawSelectionStats.privilegeCounts || {},
+            hasPrivileges: rawSelectionStats.hasPrivileges || 0
+        };
+    }, [rawSelectionStats]);
 
     // Bulk operations
     const handleBulkOperation = async (operation: string, data?: any) => {
@@ -384,7 +405,7 @@ export default function Residents() {
             await router.post('/admin/residents/bulk-action', {
                 action: bulkPrivilegeAction === 'add' ? 'add_privilege' : 'remove_privilege',
                 resident_ids: selectedResidents,
-                privilege_id: parseInt(bulkEditValue), // Send privilege_id instead of code
+                privilege_id: parseInt(bulkEditValue),
             }, {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -488,28 +509,15 @@ export default function Residents() {
         }
     };
 
-    // Copy selected data to clipboard (includes privilege information)
+    // Copy selected data to clipboard
     const handleCopySelectedData = () => {
         if (selectedResidentsData.length === 0) {
             toast.error('No data to copy');
             return;
         }
         
-        // Format data with privilege information
-        const formattedData = selectedResidentsData.map(resident => ({
-            'Full Name': getFullName(resident),
-            'Age': resident.age,
-            'Gender': resident.gender || 'N/A',
-            'Purok': resident.purok?.name || 'N/A',
-            'Status': resident.status,
-            'Civil Status': resident.civil_status || 'N/A',
-            'Is Voter': resident.is_voter ? 'Yes' : 'No',
-            'Is Head': isHeadOfHousehold(resident) ? 'Yes' : 'No',
-            'Privileges': resident.privileges?.map((p: any) => p.name).join(', ') || 'None',
-            'Contact': resident.contact_number || 'N/A'
-        }));
-        
-        const csv = formatForClipboard(formattedData);
+        // Directly use formatForClipboard with the selected residents data
+        const csv = formatForClipboard(selectedResidentsData);
         
         navigator.clipboard.writeText(csv).then(() => {
             toast.success(`${selectedResidentsData.length} records copied to clipboard`);
@@ -581,14 +589,15 @@ export default function Residents() {
         };
         
         // Clean up empty values
+        const cleanedParams: Record<string, any> = {};
         Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all' || params[k] === '') {
-                delete params[k];
+            const value = params[key as keyof typeof params];
+            if (value !== undefined && value !== '' && value !== 'all') {
+                cleanedParams[key] = value;
             }
         });
         
-        router.get('/admin/residents', params, {
+        router.get('/admin/residents', cleanedParams, {
             preserveState: true,
             replace: true,
             preserveScroll: true,
@@ -609,7 +618,8 @@ export default function Residents() {
             privilege: 'all',
             privilege_id: 'all',
             sort_by: 'last_name',
-            sort_order: 'asc'
+            sort_order: 'asc',
+            search: ''
         });
         
         // Trigger server-side filter clear
@@ -650,21 +660,23 @@ export default function Residents() {
         };
         
         // Clean up empty values
+        const cleanedParams: Record<string, any> = {};
         Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all' || params[k] === '') {
-                delete params[k];
+            const value = params[key as keyof typeof params];
+            if (value !== undefined && value !== '' && value !== 'all') {
+                cleanedParams[key] = value;
             }
         });
         
-        router.get('/admin/residents', params, {
+        router.get('/admin/residents', cleanedParams, {
             preserveState: true,
             replace: true,
             preserveScroll: true,
         });
     };
 
-    const hasActiveFilters = 
+    // Ensure hasActiveFilters is a boolean
+    const hasActiveFilters = Boolean(
         search || 
         filtersState.status !== 'all' || 
         filtersState.purok_id !== 'all' || 
@@ -675,7 +687,8 @@ export default function Residents() {
         filtersState.is_voter !== 'all' ||
         filtersState.is_head !== 'all' ||
         filtersState.privilege !== 'all' ||
-        filtersState.privilege_id !== 'all';
+        filtersState.privilege_id !== 'all'
+    );
 
     return (
         <AppLayout

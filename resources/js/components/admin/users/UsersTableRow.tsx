@@ -26,7 +26,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { User } from '@/types';
+import { User } from '@/types/admin/users/user-types';
 import { JSX } from 'react';
 
 interface UsersTableRowProps {

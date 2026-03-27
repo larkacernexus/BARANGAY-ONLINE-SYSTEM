@@ -1,8 +1,8 @@
+// components/admin/users/UsersFilters.tsx
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Search, 
@@ -16,28 +16,7 @@ import {
   RotateCcw 
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-
-interface UsersFiltersProps {
-  search: string;
-  setSearch: (value: string) => void;
-  roleFilter: string;
-  setRoleFilter: (value: string) => void;
-  statusFilter: string;
-  setStatusFilter: (value: string) => void;
-  showAdvancedFilters: boolean;
-  setShowAdvancedFilters: (value: boolean) => void;
-  hasActiveFilters: boolean;
-  handleClearFilters: () => void;
-  roles: Array<{ id: number; name: string; count: number }>;
-  isBulkMode: boolean;
-  selectedUsers: number[];
-  setSelectedUsers: (ids: number[]) => void;
-  setIsSelectAll: (value: boolean) => void;
-  users: any;
-  selectionMode: 'page' | 'filtered' | 'all';
-  setSelectionMode: (mode: 'page' | 'filtered' | 'all') => void;
-  isLoading?: boolean;
-}
+import { UsersFiltersProps } from '@/types/admin/users/user-types';
 
 export default function UsersFilters({
   search,
@@ -51,6 +30,9 @@ export default function UsersFilters({
   hasActiveFilters,
   handleClearFilters,
   roles,
+  departments,
+  departmentFilter,
+  setDepartmentFilter,
   isBulkMode,
   selectedUsers,
   setSelectedUsers,
@@ -58,16 +40,18 @@ export default function UsersFilters({
   users,
   selectionMode,
   setSelectionMode,
-  isLoading = false
+  isLoading = false,
+  perPage,
+  onPerPageChange
 }: UsersFiltersProps) {
   const [showSelectionOptions, setShowSelectionOptions] = useState(false);
   const selectionRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const handleSelectAllOnPage = () => {
-    const pageIds = users.data.map((user: any) => user.id);
+    const pageIds = users.data.map(user => user.id);
     const isSelectAll = selectedUsers.length === pageIds.length && 
-                       pageIds.every((id: number) => selectedUsers.includes(id));
+                       pageIds.every(id => selectedUsers.includes(id));
     
     if (isSelectAll) {
       setSelectedUsers(selectedUsers.filter(id => !pageIds.includes(id)));
@@ -81,7 +65,7 @@ export default function UsersFilters({
   };
 
   const handleSelectAllFiltered = () => {
-    const allIds = users.data.map((user: any) => user.id);
+    const allIds = users.data.map(user => user.id);
     if (selectedUsers.length === allIds.length && allIds.every(id => selectedUsers.includes(id))) {
       setSelectedUsers(selectedUsers.filter(id => !allIds.includes(id)));
     } else {
@@ -94,7 +78,7 @@ export default function UsersFilters({
 
   const handleSelectAll = () => {
     if (confirm(`This will select ALL ${users.total} users. This action may take a moment.`)) {
-      const pageIds = users.data.map((user: any) => user.id);
+      const pageIds = users.data.map(user => user.id);
       setSelectedUsers(pageIds);
       setSelectionMode('all');
       setShowSelectionOptions(false);
@@ -259,46 +243,43 @@ export default function UsersFilters({
           {showAdvancedFilters && (
             <div className="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* 2FA Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Two-Factor Authentication</label>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                      disabled={isLoading}
-                    >
-                      2FA Enabled
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                      disabled={isLoading}
-                    >
-                      2FA Disabled
-                    </Button>
-                  </div>
-                </div>
-
                 {/* Department Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
-                  <select
-                    className="w-full border rounded px-2 py-1 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
-                    onChange={(e) => {}}
-                    disabled={isLoading}
-                  >
-                    <option value="all" className="bg-white dark:bg-gray-900">All Departments</option>
-                    <option value="Barangay Office" className="bg-white dark:bg-gray-900">Barangay Office</option>
-                    <option value="Finance" className="bg-white dark:bg-gray-900">Finance</option>
-                    <option value="Registry" className="bg-white dark:bg-gray-900">Registry</option>
-                    <option value="Services" className="bg-white dark:bg-gray-900">Services</option>
-                    <option value="Planning" className="bg-white dark:bg-gray-900">Planning</option>
-                    <option value="Internal Audit" className="bg-white dark:bg-gray-900">Internal Audit</option>
-                  </select>
-                </div>
+                {departments && departments.length > 0 && setDepartmentFilter && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
+                    <select
+                      className="w-full border rounded px-2 py-1 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                      value={departmentFilter || 'all'}
+                      onChange={(e) => setDepartmentFilter(e.target.value)}
+                      disabled={isLoading}
+                    >
+                      <option value="all" className="bg-white dark:bg-gray-900">All Departments</option>
+                      {departments.map((dept) => (
+                        <option key={dept.id} value={dept.id} className="bg-white dark:bg-gray-900">
+                          {dept.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Per Page Selector */}
+                {onPerPageChange && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Items per page</label>
+                    <select
+                      className="w-full border rounded px-2 py-1 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                      value={perPage || 10}
+                      onChange={(e) => onPerPageChange(Number(e.target.value))}
+                      disabled={isLoading}
+                    >
+                      <option value={10}>10 per page</option>
+                      <option value={25}>25 per page</option>
+                      <option value={50}>50 per page</option>
+                      <option value={100}>100 per page</option>
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
           )}
