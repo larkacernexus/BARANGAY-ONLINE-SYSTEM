@@ -1,4 +1,7 @@
-// types/officials.types.ts
+// types/admin/officials/officials.types.ts
+
+// Import shared types from household types
+import { Gender, CivilStatus } from '@/types/admin/households/household.types';
 
 // ========== CORE MODELS ==========
 
@@ -10,9 +13,9 @@ export interface Resident {
     suffix?: string;
     full_name: string;
     age: number;
-    gender: string;
+    gender: Gender; // Use shared Gender type
     birth_date?: string;
-    civil_status?: string;
+    civil_status?: CivilStatus; // Use shared CivilStatus type
     contact_number?: string;
     email?: string;
     address?: string;
@@ -91,6 +94,8 @@ export interface User {
     full_name?: string;
     has_qr_code?: boolean;
     is_logged_in?: boolean;
+    activities?: ActivityLog[];
+
 }
 
 export interface Official {
@@ -120,8 +125,8 @@ export interface Official {
     user?: User;
     
     // Computed attributes
-    position?: string; // Legacy field, use positionData.name instead
-    committee?: string; // Legacy field, use committeeData.name instead
+    position?: string;
+    committee?: string;
     full_position?: string;
     position_name?: string;
     position_code?: string;
@@ -135,31 +140,20 @@ export interface Official {
 // ========== FORM DATA TYPES ==========
 
 export interface OfficialFormData {
-    // Resident & Position
     resident_id: number | null;
     position_id: number | null;
     committee_id: number | null;
-    
-    // Term Details
     term_start: string;
     term_end: string;
     status: 'active' | 'inactive' | 'former';
     order: number;
-    
-    // Official Details
     responsibilities: string;
     contact_number: string;
     email: string;
     achievements: string;
-    
-    // Photo
     photo: File | null;
     use_resident_photo: boolean;
-    
-    // Official Type
     is_regular: boolean;
-    
-    // Position Account Assignment
     user_id: number | null;
 }
 
@@ -223,8 +217,10 @@ export type BulkOperation =
     | 'message_officials';
 
 // ========== PROPS TYPES ==========
+import { PageProps } from '@/types/admin/households/household.types';
 
-export interface OfficialsProps {
+
+export interface OfficialsProps extends PageProps {
     officials: {
         data: Official[];
         current_page: number;
@@ -441,6 +437,23 @@ export interface OfficialsStatsProps {
     stats: OfficialStats;
     positions: Record<string, { name: string; order: number }>;
     committees: Record<string, string>;
+}
+
+export interface ActivityLog {
+    id: number;
+    user_id: number;
+    action: string;
+    description: string;
+    properties?: {
+        status?: string;
+        ip?: string;
+        user_agent?: string;
+        [key: string]: any;
+    };
+    ip_address?: string;
+    user_agent?: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface OfficialsFiltersProps {

@@ -15,7 +15,7 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import OfficialsTableView from './OfficialsTableView';
 import OfficialsGridView from './OfficialsGridView';
 import OfficialsBulkActions from './OfficialsBulkActions';
-import { Official } from '@/types/officials';
+import { Official } from '@/types/admin/officials/officials';
 import { FilterState, SelectionMode, SelectionStats } from '@/admin-utils/officialsUtils';
 
 interface OfficialsContentProps {

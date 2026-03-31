@@ -12,27 +12,34 @@ import {
     Home,
     Search,
     Filter,
-    Calendar
+    Calendar,
+    Users,
+    Building2,
+    Receipt,
+    AlertCircle
 } from 'lucide-react';
-import { useState } from 'react';
-import { formatDateTime, formatTimeAgo } from '../utils/helpers';
+import { useState, useMemo } from 'react';
 
-interface Activity {
-    id: number;
-    description: string;
-    event: string;
+// Import types from shared types file
+import { ActivityLog } from '@/types/admin/households/household.types';
+import { formatDateTime, getRelativeTime } from '@/types/admin/households/household.types';
+
+// Extended activity type for display
+interface ExtendedActivity extends ActivityLog {
+    event?: string;
     causer?: {
         id: number;
         name: string;
     };
-    properties: any;
-    created_at: string;
-    subject_type: string;
+    properties?: {
+        old?: Record<string, any>;
+        attributes?: Record<string, any>;
+    };
 }
 
 interface ActivityLogTabProps {
     householdId: number;
-    activities: Activity[];
+    activities: ExtendedActivity[];
     totalActivities: number;
 }
 
@@ -40,36 +47,122 @@ export const ActivityLogTab = ({ householdId, activities, totalActivities }: Act
     const [searchQuery, setSearchQuery] = useState('');
     const [filterEvent, setFilterEvent] = useState('all');
 
-    const getEventIcon = (event: string) => {
-        if (event.includes('created')) return <Home className="h-4 w-4 text-green-500" />;
-        if (event.includes('updated')) return <FileText className="h-4 w-4 text-blue-500" />;
-        if (event.includes('deleted')) return <FileText className="h-4 w-4 text-red-500" />;
-        if (event.includes('payment')) return <CreditCard className="h-4 w-4 text-purple-500" />;
-        if (event.includes('privilege')) return <Award className="h-4 w-4 text-yellow-500" />;
+    const getEventIcon = (action: string) => {
+        const actionLower = action?.toLowerCase() || '';
+        if (actionLower.includes('created') || actionLower.includes('added')) 
+            return <Home className="h-4 w-4 text-green-500" />;
+        if (actionLower.includes('updated') || actionLower.includes('edited')) 
+            return <FileText className="h-4 w-4 text-blue-500" />;
+        if (actionLower.includes('deleted') || actionLower.includes('removed')) 
+            return <FileText className="h-4 w-4 text-red-500" />;
+        if (actionLower.includes('payment')) 
+            return <CreditCard className="h-4 w-4 text-purple-500" />;
+        if (actionLower.includes('privilege') || actionLower.includes('benefit')) 
+            return <Award className="h-4 w-4 text-yellow-500" />;
+        if (actionLower.includes('member')) 
+            return <Users className="h-4 w-4 text-indigo-500" />;
+        if (actionLower.includes('household')) 
+            return <Building2 className="h-4 w-4 text-gray-500" />;
+        if (actionLower.includes('fee') || actionLower.includes('payment')) 
+            return <Receipt className="h-4 w-4 text-orange-500" />;
         return <History className="h-4 w-4 text-gray-500" />;
     };
 
-    const getEventBadge = (event: string) => {
-        if (event.includes('created')) return <Badge className="bg-green-100 text-green-800">Created</Badge>;
-        if (event.includes('updated')) return <Badge className="bg-blue-100 text-blue-800">Updated</Badge>;
-        if (event.includes('deleted')) return <Badge className="bg-red-100 text-red-800">Deleted</Badge>;
-        if (event.includes('payment')) return <Badge className="bg-purple-100 text-purple-800">Payment</Badge>;
-        if (event.includes('privilege')) return <Badge className="bg-yellow-100 text-yellow-800">Privilege</Badge>;
-        return <Badge variant="outline">{event}</Badge>;
+    const getEventBadge = (action: string) => {
+        const actionLower = action?.toLowerCase() || '';
+        if (actionLower.includes('created') || actionLower.includes('added')) 
+            return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Created</Badge>;
+        if (actionLower.includes('updated') || actionLower.includes('edited')) 
+            return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">Updated</Badge>;
+        if (actionLower.includes('deleted') || actionLower.includes('removed')) 
+            return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Deleted</Badge>;
+        if (actionLower.includes('payment')) 
+            return <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">Payment</Badge>;
+        if (actionLower.includes('privilege') || actionLower.includes('benefit')) 
+            return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Privilege</Badge>;
+        if (actionLower.includes('member')) 
+            return <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400">Member</Badge>;
+        return <Badge variant="outline" className="dark:border-gray-600">{action || 'Activity'}</Badge>;
     };
 
-    const filteredActivities = activities.filter(activity => {
-        const matchesSearch = searchQuery === '' || 
-            activity.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            activity.causer?.name?.toLowerCase().includes(searchQuery.toLowerCase());
-        
-        const matchesEvent = filterEvent === 'all' || activity.event.includes(filterEvent);
-        
-        return matchesSearch && matchesEvent;
-    });
+    const getActionDisplay = (action: string): string => {
+        // Format action for display (e.g., "household.created" -> "Household Created")
+        const parts = action?.split('.') || [];
+        const lastPart = parts[parts.length - 1] || action;
+        return lastPart.charAt(0).toUpperCase() + lastPart.slice(1).replace(/_/g, ' ');
+    };
 
-    // Get unique events for filter
-    const uniqueEvents = [...new Set(activities.map(a => a.event.split(':')[0]))];
+    // Get unique event types for filter
+    const uniqueEvents = useMemo(() => {
+        const events = new Set<string>();
+        activities.forEach(a => {
+            if (a.action) {
+                const mainAction = a.action.split('.')[0];
+                events.add(mainAction);
+            }
+        });
+        return Array.from(events);
+    }, [activities]);
+
+    const filteredActivities = useMemo(() => {
+        return activities.filter(activity => {
+            const matchesSearch = searchQuery === '' || 
+                activity.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                activity.action?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                activity.user_name?.toLowerCase().includes(searchQuery.toLowerCase());
+            
+            const matchesEvent = filterEvent === 'all' || 
+                (activity.action && activity.action.includes(filterEvent));
+            
+            return matchesSearch && matchesEvent;
+        });
+    }, [activities, searchQuery, filterEvent]);
+
+    const renderChanges = (activity: ExtendedActivity) => {
+        const oldValues = activity.properties?.old;
+        const newValues = activity.properties?.attributes;
+        
+        if (!oldValues || !newValues) return null;
+        
+        const changedKeys = Object.keys(newValues).filter(key => 
+            oldValues[key] !== newValues[key]
+        );
+        
+        if (changedKeys.length === 0) return null;
+        
+        return (
+            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs">
+                <p className="font-medium mb-2 dark:text-gray-200">Changes:</p>
+                <div className="space-y-1">
+                    {changedKeys.slice(0, 5).map(key => {
+                        const oldValue = oldValues[key];
+                        const newValue = newValues[key];
+                        const formattedKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        
+                        return (
+                            <div key={key} className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium capitalize text-gray-700 dark:text-gray-300">
+                                    {formattedKey}:
+                                </span>
+                                <span className="text-red-500 line-through text-xs">
+                                    {oldValue === null || oldValue === '' ? 'empty' : String(oldValue).substring(0, 50)}
+                                </span>
+                                <span className="text-gray-400">→</span>
+                                <span className="text-green-500 text-xs">
+                                    {newValue === null || newValue === '' ? 'empty' : String(newValue).substring(0, 50)}
+                                </span>
+                            </div>
+                        );
+                    })}
+                    {changedKeys.length > 5 && (
+                        <p className="text-gray-400 text-xs mt-1">
+                            + {changedKeys.length - 5} more changes
+                        </p>
+                    )}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="space-y-6">
@@ -80,7 +173,7 @@ export const ActivityLogTab = ({ householdId, activities, totalActivities }: Act
                             <History className="h-5 w-5" />
                             Activity History
                         </CardTitle>
-                        <Badge variant="secondary" className="text-sm">
+                        <Badge variant="secondary" className="text-sm dark:bg-gray-800 dark:text-gray-300">
                             {totalActivities} activities
                         </Badge>
                     </div>
@@ -88,25 +181,29 @@ export const ActivityLogTab = ({ householdId, activities, totalActivities }: Act
                 <CardContent>
                     {/* Filters */}
                     <div className="flex flex-wrap gap-4 mb-6">
-                        <div className="flex-1 relative">
+                        <div className="flex-1 relative min-w-[200px]">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                             <Input
-                                placeholder="Search activities..."
+                                placeholder="Search activities by description, action, or user..."
                                 className="pl-9 dark:bg-gray-900 dark:border-gray-700"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <select
-                            className="px-3 py-2 border rounded-md dark:bg-gray-900 dark:border-gray-700"
-                            value={filterEvent}
-                            onChange={(e) => setFilterEvent(e.target.value)}
-                        >
-                            <option value="all">All Activities</option>
-                            {uniqueEvents.map(event => (
-                                <option key={event} value={event}>{event}</option>
-                            ))}
-                        </select>
+                        {uniqueEvents.length > 0 && (
+                            <select
+                                className="px-3 py-2 border rounded-md dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
+                                value={filterEvent}
+                                onChange={(e) => setFilterEvent(e.target.value)}
+                            >
+                                <option value="all">All Activities</option>
+                                {uniqueEvents.map(event => (
+                                    <option key={event} value={event}>
+                                        {event.charAt(0).toUpperCase() + event.slice(1)}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
 
                     {/* Activities List */}
@@ -123,23 +220,23 @@ export const ActivityLogTab = ({ householdId, activities, totalActivities }: Act
                             {filteredActivities.map((activity) => (
                                 <div key={activity.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
                                     <div className="flex items-start gap-3">
-                                        <div className="flex-shrink-0">
-                                            {getEventIcon(activity.event)}
+                                        <div className="flex-shrink-0 mt-0.5">
+                                            {getEventIcon(activity.action || activity.description || '')}
                                         </div>
-                                        <div className="flex-1">
-                                            <div className="flex items-start justify-between">
-                                                <div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-start justify-between flex-wrap gap-2">
+                                                <div className="flex-1">
                                                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                                                        {getEventBadge(activity.event)}
+                                                        {getEventBadge(activity.action || activity.description || '')}
                                                         <span className="text-sm font-medium dark:text-gray-200">
-                                                            {activity.description}
+                                                            {activity.description || getActionDisplay(activity.action || '')}
                                                         </span>
                                                     </div>
-                                                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                                        {activity.causer && (
+                                                    <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                                        {activity.user_name && (
                                                             <div className="flex items-center gap-1">
                                                                 <User className="h-3 w-3" />
-                                                                <span>By: {activity.causer.name}</span>
+                                                                <span>By: {activity.user_name}</span>
                                                             </div>
                                                         )}
                                                         <div className="flex items-center gap-1">
@@ -148,33 +245,27 @@ export const ActivityLogTab = ({ householdId, activities, totalActivities }: Act
                                                         </div>
                                                         <div className="flex items-center gap-1">
                                                             <History className="h-3 w-3" />
-                                                            <span>{formatTimeAgo(activity.created_at)}</span>
+                                                            <span>{getRelativeTime(activity.created_at)}</span>
                                                         </div>
+                                                        {activity.model_type && (
+                                                            <div className="flex items-center gap-1">
+                                                                <FileText className="h-3 w-3" />
+                                                                <span className="capitalize">
+                                                                    {activity.model_type.split('\\').pop()?.replace(/([A-Z])/g, ' $1').trim()}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
                                             
                                             {/* Show changes if available */}
-                                            {activity.properties?.old && activity.properties?.attributes && (
-                                                <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg text-xs">
-                                                    <p className="font-medium mb-2 dark:text-gray-200">Changes:</p>
-                                                    <div className="space-y-1">
-                                                        {Object.keys(activity.properties.attributes).map(key => {
-                                                            const oldValue = activity.properties.old?.[key];
-                                                            const newValue = activity.properties.attributes[key];
-                                                            if (oldValue !== newValue) {
-                                                                return (
-                                                                    <div key={key} className="flex items-center gap-2">
-                                                                        <span className="font-medium capitalize">{key}:</span>
-                                                                        <span className="text-red-500 line-through">{oldValue || 'empty'}</span>
-                                                                        <span>→</span>
-                                                                        <span className="text-green-500">{newValue || 'empty'}</span>
-                                                                    </div>
-                                                                );
-                                                            }
-                                                            return null;
-                                                        })}
-                                                    </div>
+                                            {renderChanges(activity)}
+                                            
+                                            {/* Show IP address if available */}
+                                            {activity.ip_address && (
+                                                <div className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                                                    IP: {activity.ip_address}
                                                 </div>
                                             )}
                                         </div>

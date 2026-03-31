@@ -1,15 +1,17 @@
+// components/admin/officials/OfficialsFilters.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Search, Filter, Download, X, FilterX, ChevronUp, ChevronDown } from 'lucide-react';
-import { FilterState } from '@/admin-utils/officialsUtils';
+import { FilterOptions } from '@/admin-utils/officialsUtils';
 
 interface OfficialsFiltersProps {
     search: string;
     setSearch: (value: string) => void;
-    filtersState: FilterState;
-    updateFilter: (key: keyof FilterState, value: string) => void;
+    filtersState: FilterOptions;
+    updateFilter: (key: keyof FilterOptions, value: string) => void;
     showAdvancedFilters: boolean;
     setShowAdvancedFilters: (value: boolean) => void;
     handleClearFilters: () => void;
@@ -22,7 +24,7 @@ interface OfficialsFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef: React.RefObject<HTMLInputElement>;
+    searchInputRef: React.RefObject<HTMLInputElement | null>;
     handleSort: (column: string) => void;
     exportData: () => void;
     isLoading?: boolean;
@@ -109,11 +111,9 @@ export default function OfficialsFilters({
                         </div>
                     </div>
 
-                    {/* Advanced Filters */}
                     {showAdvancedFilters && (
                         <div className="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                {/* Status Filter */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</Label>
                                     <select
@@ -130,7 +130,6 @@ export default function OfficialsFilters({
                                     </select>
                                 </div>
 
-                                {/* Position Filter */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Position</Label>
                                     <select
@@ -148,7 +147,6 @@ export default function OfficialsFilters({
                                     </select>
                                 </div>
 
-                                {/* Committee Filter */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Committee</Label>
                                     <select
@@ -166,7 +164,6 @@ export default function OfficialsFilters({
                                     </select>
                                 </div>
 
-                                {/* Type Filter */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Type</Label>
                                     <select
@@ -184,7 +181,6 @@ export default function OfficialsFilters({
                                 </div>
                             </div>
 
-                            {/* Sort Options */}
                             <div className="space-y-2">
                                 <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort By</Label>
                                 <div className="flex flex-wrap gap-2">
@@ -249,7 +245,6 @@ export default function OfficialsFilters({
                         </div>
                     )}
 
-                    {/* Active filters indicator and clear button */}
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                             Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} officials
@@ -276,7 +271,6 @@ export default function OfficialsFilters({
                         </div>
                     </div>
 
-                    {/* Loading indicator */}
                     {isLoading && (
                         <div className="text-xs text-gray-500 dark:text-gray-400 animate-pulse">
                             Updating...

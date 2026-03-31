@@ -14,6 +14,11 @@ export type BulkAction = 'delete' | 'activate' | 'deactivate' | 'export' | 'prin
 export type BulkEditField = 'status' | 'purok_id' | 'notes';
 export type SelectionMode = 'page' | 'filtered' | 'all';
 export type ExportFormat = 'csv' | 'excel' | 'pdf';
+export type FeeStatus = 'issued' | 'pending' | 'paid' | 'overdue' | 'cancelled';
+export type PaymentMethod = 'cash' | 'gcash' | 'maya' | 'online' | 'bank' | 'other';
+export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+export type ClearanceStatus = 'pending' | 'approved' | 'rejected' | 'released' | 'expired';
+export type ResidentDocumentStatus = 'active' | 'expired' | 'pending' | 'rejected';
 
 // ============================================================================
 // Household Types
@@ -99,7 +104,7 @@ export interface Resident {
     last_name: string;
     middle_name?: string;
     age?: number;
-    date_of_birth?: string; 
+    date_of_birth?: string;
     address?: string;
     purok_id?: number;
     purok_name?: string;
@@ -108,18 +113,24 @@ export interface Resident {
     gender?: Gender;
     civil_status?: CivilStatus;
     occupation?: string;
+    education?: string;
+    religion?: string;
+    contact_number?: string;
+    email?: string;
+    place_of_birth?: string;
+    is_voter?: boolean;
+    remarks?: string;
     
     // Computed field
     full_name?: string;
 }
-
 
 export interface ExtendedMember extends HouseholdMember {
     resident: Resident & {
         privileges_list?: ExtendedPrivilege[];
         full_name?: string;
         age?: number;
-        date_of_birth?: string; // Added date_of_birth
+        date_of_birth?: string;
         gender?: string;
         civil_status?: string;
         contact_number?: string;
@@ -131,12 +142,10 @@ export interface ExtendedMember extends HouseholdMember {
         is_voter?: boolean;
         place_of_birth?: string;
         remarks?: string;
-        
     };
     relationship_to_head?: string;
 }
 
-// Extended types for modal
 export interface ExtendedPrivilege extends Privilege {
     id_number?: string;
     discount_percentage?: number;
@@ -188,17 +197,21 @@ export interface Fee {
     id: number;
     household_id: number;
     fee_type: string;
+    fee_type_id?: number;
     amount: number;
     total_amount?: number;
     amount_paid?: number;
-    status: 'issued' | 'pending' | 'paid' | 'overdue' | 'cancelled';
+    status: FeeStatus;
     due_date?: string;
     paid_date?: string;
-    payment_method?: string;
+    payment_method?: PaymentMethod;
     reference_number?: string;
+    receipt_number?: string;
+    or_number?: string;
     notes?: string;
     created_at: string;
     updated_at: string;
+    deleted_at?: string | null;
 }
 
 // ============================================================================
@@ -211,10 +224,10 @@ export interface Payment {
     fee_id?: number;
     amount: number;
     total_amount?: number;
-    payment_method: 'cash' | 'gcash' | 'maya' | 'online' | 'other';
+    payment_method: PaymentMethod;
     reference_number?: string;
     payment_date: string;
-    status: 'pending' | 'completed' | 'failed' | 'refunded';
+    status: PaymentStatus;
     receipt_number?: string;
     notes?: string;
     created_at: string;
@@ -226,11 +239,14 @@ export interface Payment {
 // ============================================================================
 
 export interface Clearance {
+    resident: any;
     id: number;
     household_id: number;
     resident_id?: number;
     clearance_type: string;
-    status: 'pending' | 'approved' | 'rejected' | 'released' | 'expired';
+    clearance_type_id?: number;
+    clearance_number?: string;
+    status: ClearanceStatus;
     purpose?: string;
     requested_date: string;
     approved_date?: string;
@@ -240,6 +256,7 @@ export interface Clearance {
     notes?: string;
     created_at: string;
     updated_at: string;
+    deleted_at?: string | null;
 }
 
 // ============================================================================
@@ -253,13 +270,16 @@ export interface ResidentDocument {
     document_number?: string;
     file_path?: string;
     file_url?: string;
-    status: 'active' | 'expired' | 'pending' | 'rejected';
+    status: ResidentDocumentStatus;
     issue_date?: string;
     expiry_date?: string;
     issued_by?: string;
     notes?: string;
+    description?: string;
+    reference_number?: string;
     created_at: string;
     updated_at: string;
+    deleted_at?: string | null;
 }
 
 // ============================================================================

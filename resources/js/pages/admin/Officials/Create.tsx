@@ -8,9 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Link, useForm } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { PageProps } from '@/types';
-import { Resident, Position, Committee, Role, OfficialFormData, User } from '@/components/admin/officials/shared/types/official';
 import { Save, UserPlus, Shield, Phone, Info, Camera } from 'lucide-react';
+
+// Import types from shared officials types
+import { 
+    Resident, 
+    Position, 
+    Committee, 
+    Role, 
+    User,
+    OfficialFormData 
+} from '@/types/admin/officials/officials';
 
 // Import shared components
 import { OfficialFormHeader } from '@/components/admin/officials/shared/official-form-header';
@@ -23,7 +31,7 @@ import { PhotoUpload } from '@/components/admin/officials/shared/photo-upload';
 import { PreviewCard } from '@/components/admin/officials/shared/preview-card';
 import { QuickStats } from '@/components/admin/officials/shared/quick-stats';
 
-interface CreateOfficialProps extends PageProps {
+interface CreateOfficialProps {
     positions: Position[];
     committees: Committee[];
     availableResidents: Resident[];
@@ -57,7 +65,7 @@ export default function CreateOfficial({
         photo: null,
         use_resident_photo: false,
         is_regular: true,
-        user_id: null, // This is the POSITION account being assigned
+        user_id: null,
     });
 
     const [selectedResident, setSelectedResident] = useState<Resident | null>(null);

@@ -1,4 +1,5 @@
 // components/admin/officials/show/components/tabs/activity-tab.tsx
+
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,53 +16,28 @@ import {
     Trash2, 
     UserPlus, 
     UserX, 
-    Lock, 
     KeyRound,
     LogIn,
     LogOut,
-    RefreshCw,
     Shield,
     Mail
 } from 'lucide-react';
 
-interface ActivityLog {
-    id: number;
-    user_id: number;
-    action: string;
-    description: string;
-    properties?: {
-        status?: string;
-        ip?: string;
-        user_agent?: string;
-        [key: string]: any;
-    };
-    ip_address?: string;
-    user_agent?: string;
-    created_at: string;
-    updated_at: string;
-}
+// Import types from shared officials types
+import { ActivityLog, Official, User as UserType } from '@/types/admin/officials/officials';
 
 interface ActivityTabProps {
-    official: {
-        id: number;
-        user_id?: number;
-        resident?: {
-            full_name: string;
-        };
-        user?: {
-            id: number;
-            name: string;
-            email: string;
-            role: string;
-            created_at: string;
-            last_login_at?: string;
+    official: Official & {
+        user?: UserType & {
             activities?: ActivityLog[];
         };
     };
-    formatDate: (date: string | null, includeTime?: boolean) => string;
+    formatDate: (date: string | null | undefined) => string;
+    formatDateTime: (date: string | null | undefined) => string;
+    formatTimeAgo: (date: string) => string;
 }
 
-export const ActivityTab = ({ official, formatDate }: ActivityTabProps) => {
+export const ActivityTab = ({ official, formatDate, formatDateTime, formatTimeAgo }: ActivityTabProps) => {
     // Get activities from the associated user account
     const activities = official.user?.activities || [];
 
@@ -100,7 +76,7 @@ export const ActivityTab = ({ official, formatDate }: ActivityTabProps) => {
     };
 
     // Helper function to get status badge variant
-    const getStatusVariant = (status?: string) => {
+    const getStatusVariant = (status?: string): "default" | "secondary" | "destructive" | "outline" => {
         if (!status) return 'secondary';
         switch (status.toLowerCase()) {
             case 'success':
@@ -131,6 +107,27 @@ export const ActivityTab = ({ official, formatDate }: ActivityTabProps) => {
         }
     };
 
+    // Calculate activities in last 30 days
+    const activitiesLast30Days = activities.filter(a => {
+        const days = (Date.now() - new Date(a.created_at).getTime()) / (1000 * 60 * 60 * 24);
+        return days <= 30;
+    }).length;
+
+    // Get last activity
+    const lastActivity = activities.length > 0 ? activities[0] : null;
+
+    // Get user display name
+    const getUserName = () => {
+        if (official.user?.username) return official.user.username;
+        if (official.resident?.full_name) return official.resident.full_name;
+        return 'the official';
+    };
+
+    // Get user email
+    const getUserEmail = () => {
+        return official.user?.email || official.email || '';
+    };
+
     return (
         <Card className="dark:bg-gray-900">
             <CardHeader>
@@ -141,13 +138,13 @@ export const ActivityTab = ({ official, formatDate }: ActivityTabProps) => {
                             User Activity Log
                         </CardTitle>
                         <CardDescription className="dark:text-gray-400">
-                            Recent activities performed by {official.user?.name || official.resident?.full_name || 'the official'}
+                            Recent activities performed by {getUserName()}
                         </CardDescription>
                     </div>
-                    {official.user && (
+                    {official.user && getUserEmail() && (
                         <Badge variant="outline" className="dark:border-gray-600 px-3 py-1">
                             <User className="h-3 w-3 mr-1" />
-                            {official.user.email}
+                            {getUserEmail()}
                         </Badge>
                     )}
                 </div>
@@ -174,7 +171,7 @@ export const ActivityTab = ({ official, formatDate }: ActivityTabProps) => {
                         </p>
                         {official.user.last_login_at && (
                             <div className="mt-4 text-xs text-gray-400 dark:text-gray-500">
-                                Last login: {formatDate(official.user.last_login_at, true)}
+                                Last login: {formatDateTime(official.user.last_login_at)}
                             </div>
                         )}
                     </div>
@@ -188,20 +185,18 @@ export const ActivityTab = ({ official, formatDate }: ActivityTabProps) => {
                             </div>
                             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Last 30 Days</p>
-                                <p className="text-xl font-bold dark:text-gray-200">
-                                    {activities.filter(a => {
-                                        const days = (Date.now() - new Date(a.created_at).getTime()) / (1000 * 60 * 60 * 24);
-                                        return days <= 30;
-                                    }).length}
-                                </p>
+                                <p className="text-xl font-bold dark:text-gray-200">{activitiesLast30Days}</p>
                             </div>
                             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Last Activity</p>
                                 <p className="text-sm font-medium dark:text-gray-200">
-                                    {activities.length > 0 
-                                        ? formatDate(activities[0].created_at, true)
-                                        : 'N/A'}
+                                    {lastActivity ? formatDateTime(lastActivity.created_at) : 'N/A'}
                                 </p>
+                                {lastActivity && (
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                        {formatTimeAgo(lastActivity.created_at)}
+                                    </p>
+                                )}
                             </div>
                             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Account Status</p>
@@ -252,10 +247,10 @@ export const ActivityTab = ({ official, formatDate }: ActivityTabProps) => {
                                             <TableCell className="dark:text-gray-300">
                                                 <div className="flex flex-col">
                                                     <span className="whitespace-nowrap">
-                                                        {formatDate(activity.created_at, true)}
+                                                        {formatDateTime(activity.created_at)}
                                                     </span>
                                                     <span className="text-xs text-gray-400 dark:text-gray-500">
-                                                        {formatDate(activity.created_at, false)}
+                                                        {formatTimeAgo(activity.created_at)}
                                                     </span>
                                                 </div>
                                             </TableCell>
@@ -281,7 +276,7 @@ export const ActivityTab = ({ official, formatDate }: ActivityTabProps) => {
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
                                 <Clock className="h-3 w-3" />
-                                Last updated: {formatDate(new Date().toISOString(), true)}
+                                Last updated: {formatDateTime(new Date().toISOString())}
                             </div>
                         </div>
                     </div>

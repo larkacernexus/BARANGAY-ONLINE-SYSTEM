@@ -10,22 +10,18 @@ import {
     Download,
     Banknote,
     Smartphone,
-    Loader2
+    Loader2,
+    CheckCircle,
+    Clock,
+    XCircle
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
+import { useMemo } from 'react';
 
-interface Payment {
-    id: number;
-    or_number: string;
-    total_amount: number;
-    amount_paid: number;
-    payment_method: string;
-    payment_date: string;
-    status: string;
-    payer_name: string;
-    purpose: string;
-}
+// Import types from shared types file
+import { Payment, PaymentMethod, PaymentStatus } from '@/types/admin/households/household.types';
+import { formatDate, formatDateTime } from '@/types/admin/households/household.types';
 
 interface PaymentsTabProps {
     householdId: number;
@@ -44,29 +40,153 @@ export const PaymentsTab = ({
     cashPayments,
     onlinePayments
 }: PaymentsTabProps) => {
-    const getPaymentMethodIcon = (method: string) => {
+    // Group payments by status for better organization
+    const paymentsByStatus = useMemo(() => {
+        return {
+            completed: payments.filter(p => p.status === 'completed'),
+            pending: payments.filter(p => p.status === 'pending'),
+            failed: payments.filter(p => p.status === 'failed'),
+            refunded: payments.filter(p => p.status === 'refunded')
+        };
+    }, [payments]);
+
+    const getPaymentMethodIcon = (method: PaymentMethod) => {
         switch (method) {
             case 'cash':
                 return <Banknote className="h-4 w-4 text-green-500" />;
             case 'gcash':
             case 'maya':
-            case 'online':
                 return <Smartphone className="h-4 w-4 text-blue-500" />;
+            case 'online':
+                return <CreditCard className="h-4 w-4 text-purple-500" />;
+            case 'bank':
+                return <Banknote className="h-4 w-4 text-indigo-500" />;
+            case 'other':
+                return <CreditCard className="h-4 w-4 text-gray-500" />;
             default:
                 return <CreditCard className="h-4 w-4 text-gray-500" />;
         }
     };
 
-    const getPaymentMethodBadge = (method: string) => {
-        const methods: Record<string, string> = {
+    const getPaymentMethodBadge = (method: PaymentMethod) => {
+        const methods: Record<PaymentMethod, string> = {
             cash: 'Cash',
             gcash: 'GCash',
             maya: 'Maya',
             online: 'Online Payment',
             bank: 'Bank Transfer',
-            check: 'Check'
+            other: 'Other'
         };
         return methods[method] || method;
+    };
+
+    const getPaymentStatusBadge = (status: PaymentStatus) => {
+        switch (status) {
+            case 'completed':
+                return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    Completed
+                </Badge>;
+            case 'pending':
+                return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Pending
+                </Badge>;
+            case 'failed':
+                return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 flex items-center gap-1">
+                    <XCircle className="h-3 w-3" />
+                    Failed
+                </Badge>;
+            case 'refunded':
+                return <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-400 flex items-center gap-1">
+                    Refunded
+                </Badge>;
+            default:
+                return <Badge variant="outline">{status}</Badge>;
+        }
+    };
+
+    const formatAmount = (amount: number): string => {
+        return `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const formatDateSafe = (date?: string): string => {
+        if (!date) return 'N/A';
+        return formatDate(date);
+    };
+
+    const renderPaymentList = (paymentsList: Payment[]) => {
+        return (
+            <div className="space-y-3">
+                {paymentsList.map((payment) => (
+                    <div key={payment.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
+                        <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 flex-wrap mb-2">
+                                    <div className="flex items-center gap-2">
+                                        {getPaymentMethodIcon(payment.payment_method)}
+                                        <h3 className="font-semibold dark:text-gray-100">
+                                            {payment.receipt_number ? `Receipt #${payment.receipt_number}` : `Payment #${payment.id}`}
+                                        </h3>
+                                    </div>
+                                    {getPaymentStatusBadge(payment.status)}
+                                    <Badge variant="outline" className="flex items-center gap-1 dark:border-gray-600">
+                                        {getPaymentMethodIcon(payment.payment_method)}
+                                        {getPaymentMethodBadge(payment.payment_method)}
+                                    </Badge>
+                                </div>
+                                
+                                {payment.notes && (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                                        {payment.notes}
+                                    </p>
+                                )}
+                                
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div>
+                                        <p className="text-gray-500 dark:text-gray-400">Amount</p>
+                                        <p className="font-medium dark:text-gray-200">{formatAmount(payment.amount)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-500 dark:text-gray-400">Total Amount</p>
+                                        <p className="font-medium dark:text-gray-200">{formatAmount(payment.total_amount || payment.amount)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-500 dark:text-gray-400">Payment Date</p>
+                                        <p className="font-medium dark:text-gray-200">
+                                            {formatDateSafe(payment.payment_date)}
+                                        </p>
+                                    </div>
+                                    {payment.reference_number && (
+                                        <div>
+                                            <p className="text-gray-500 dark:text-gray-400">Reference #</p>
+                                            <p className="font-mono text-xs dark:text-gray-300">{payment.reference_number}</p>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {payment.receipt_number && (
+                                    <p className="text-xs text-gray-400 mt-2">Receipt #: {payment.receipt_number}</p>
+                                )}
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                <Link href={route('admin.payments.show', payment.id)}>
+                                    <Button variant="ghost" size="sm" title="View Details">
+                                        <Eye className="h-4 w-4" />
+                                    </Button>
+                                </Link>
+                                {payment.status === 'completed' && (
+                                    <Button variant="ghost" size="sm" title="Download Receipt">
+                                        <Download className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
     };
 
     return (
@@ -86,7 +206,7 @@ export const PaymentsTab = ({
                     <CardContent className="pt-6">
                         <div className="text-center space-y-2">
                             <Banknote className="h-8 w-8 text-green-500 mx-auto" />
-                            <p className="text-2xl font-bold dark:text-gray-100">₱{totalAmount.toLocaleString()}</p>
+                            <p className="text-2xl font-bold dark:text-gray-100">{formatAmount(totalAmount)}</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Total Amount</p>
                         </div>
                     </CardContent>
@@ -132,58 +252,39 @@ export const PaymentsTab = ({
                             <p className="text-gray-500 dark:text-gray-400">This household has no payment records yet.</p>
                         </div>
                     ) : (
-                        <div className="space-y-4">
-                            {payments.map((payment) => (
-                                <div key={payment.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 flex-wrap mb-2">
-                                                <h3 className="font-semibold dark:text-gray-100">OR# {payment.or_number}</h3>
-                                                <Badge variant="outline" className="flex items-center gap-1">
-                                                    {getPaymentMethodIcon(payment.payment_method)}
-                                                    {getPaymentMethodBadge(payment.payment_method)}
-                                                </Badge>
-                                                <Badge className={payment.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                                                    {payment.status === 'completed' ? 'Completed' : 'Pending'}
-                                                </Badge>
-                                            </div>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                                                {payment.purpose || 'Payment transaction'}
-                                            </p>
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                                <div>
-                                                    <p className="text-gray-500 dark:text-gray-400">Amount</p>
-                                                    <p className="font-medium dark:text-gray-200">₱{payment.total_amount.toLocaleString()}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-gray-500 dark:text-gray-400">Paid</p>
-                                                    <p className="font-medium text-green-600">₱{payment.amount_paid.toLocaleString()}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-gray-500 dark:text-gray-400">Payment Date</p>
-                                                    <p className="font-medium dark:text-gray-200">
-                                                        {new Date(payment.payment_date).toLocaleDateString()}
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-gray-500 dark:text-gray-400">Payer</p>
-                                                    <p className="font-medium dark:text-gray-200">{payment.payer_name}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Link href={route('admin.payments.show', payment.id)}>
-                                                <Button variant="ghost" size="sm">
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
-                                            </Link>
-                                            <Button variant="ghost" size="sm">
-                                                <Download className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
+                        <div className="space-y-6">
+                            {/* Completed Payments Section */}
+                            {paymentsByStatus.completed.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
+                                        <CheckCircle className="h-4 w-4" />
+                                        Completed Payments ({paymentsByStatus.completed.length})
+                                    </h4>
+                                    {renderPaymentList(paymentsByStatus.completed)}
                                 </div>
-                            ))}
+                            )}
+
+                            {/* Pending Payments Section */}
+                            {paymentsByStatus.pending.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-yellow-600 dark:text-yellow-400 mb-3 flex items-center gap-2">
+                                        <Clock className="h-4 w-4" />
+                                        Pending Payments ({paymentsByStatus.pending.length})
+                                    </h4>
+                                    {renderPaymentList(paymentsByStatus.pending)}
+                                </div>
+                            )}
+
+                            {/* Failed Payments Section */}
+                            {paymentsByStatus.failed.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-red-600 dark:text-red-400 mb-3 flex items-center gap-2">
+                                        <XCircle className="h-4 w-4" />
+                                        Failed Payments ({paymentsByStatus.failed.length})
+                                    </h4>
+                                    {renderPaymentList(paymentsByStatus.failed)}
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>

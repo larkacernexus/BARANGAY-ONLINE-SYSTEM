@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/Officials/Show.tsx
+
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -19,9 +20,14 @@ import { DetailsTab } from '@/components/admin/officials/show/components/tabs/de
 import { ActivityTab } from '@/components/admin/officials/show/components/tabs/activity-tab';
 import { DeleteConfirmationDialog } from '@/components/admin/officials/show/components/delete-confirmation-dialog';
 
-// Import types and utilities
-import { ShowOfficialProps } from '@/components/admin/officials/show/types';
-import { formatDate, getStatusColor, getStatusIcon, getPositionIcon, getPositionColor } from '@/components/admin/officials/show/utils/helpers';
+// Import types from shared officials types
+import { ShowOfficialProps } from '@/types/admin/officials/officials';
+
+// Import utilities from officialsUtils
+import { formatDate, formatDateTime, formatTimeAgo } from '@/admin-utils/officialsUtils';
+
+// Import helpers from local utils (for colors and icons)
+import { getStatusColor, getStatusIcon, getPositionIcon, getPositionColor } from '@/components/admin/officials/show/utils/helpers';
 
 export default function ShowOfficial({ official }: ShowOfficialProps) {
     const [copied, setCopied] = useState(false);
@@ -31,13 +37,13 @@ export default function ShowOfficial({ official }: ShowOfficialProps) {
 
     const handleDelete = () => {
         setIsDeleting(true);
-        router.delete(`/officials/${official.id}`, {
+        router.delete(`/admin/officials/${official.id}`, {
             onFinish: () => {
                 setIsDeleting(false);
                 setShowDeleteDialog(false);
             },
             onSuccess: () => {
-                router.visit('/officials');
+                router.visit('/admin/officials');
             }
         });
     };
@@ -57,24 +63,20 @@ export default function ShowOfficial({ official }: ShowOfficialProps) {
     const handleExport = () => {
         const data = {
             official: {
-                ...official,
-                resident: official.resident ? {
-                    id: official.resident.id,
-                    full_name: official.resident.full_name,
-                    age: official.resident.age,
-                    gender: official.resident.gender,
-                    contact_number: official.resident.contact_number,
-                    email: official.resident.email,
-                    address: official.resident.address
-                } : null,
-                user: official.user ? {
-                    id: official.user.id,
-                    name: official.user.name,
-                    email: official.user.email,
-                    role: official.user.role,
-                    created_at: official.user.created_at,
-                    last_login_at: official.user.last_login_at
-                } : null
+                id: official.id,
+                resident: official.resident,
+                positionData: official.positionData,
+                committeeData: official.committeeData,
+                user: official.user,
+                term_start: official.term_start,
+                term_end: official.term_end,
+                status: official.status,
+                is_current: official.is_current,
+                is_regular: official.is_regular,
+                responsibilities: official.responsibilities,
+                achievements: official.achievements,
+                created_at: official.created_at,
+                updated_at: official.updated_at
             }
         };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -83,6 +85,7 @@ export default function ShowOfficial({ official }: ShowOfficialProps) {
         a.href = url;
         a.download = `official-${official.id}-data.json`;
         a.click();
+        URL.revokeObjectURL(url);
     };
 
     // Tab definitions
@@ -112,9 +115,9 @@ export default function ShowOfficial({ official }: ShowOfficialProps) {
             <AppLayout
                 title={`Official: ${official.resident?.full_name || 'Unknown'}`}
                 breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Officials', href: '/officials' },
-                    { title: official.resident?.full_name || 'Official', href: `/officials/${official.id}` }
+                    { title: 'Dashboard', href: '/admin/dashboard' },
+                    { title: 'Officials', href: '/admin/officials' },
+                    { title: official.resident?.full_name || 'Official', href: `/admin/officials/${official.id}` }
                 ]}
             >
                 <div className="space-y-6">
@@ -169,6 +172,8 @@ export default function ShowOfficial({ official }: ShowOfficialProps) {
                             <ActivityTab
                                 official={official}
                                 formatDate={formatDate}
+                                formatDateTime={formatDateTime}
+                                formatTimeAgo={formatTimeAgo}
                             />
                         </AdminTabPanel>
                     </AdminTabsWithContent>

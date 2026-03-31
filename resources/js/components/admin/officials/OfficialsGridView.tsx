@@ -26,7 +26,7 @@ import {
     Users,
     Briefcase
 } from 'lucide-react';
-import { Official, OfficialsGridViewProps } from '@/types/officials';
+import { Official, OfficialsGridViewProps } from '@/types/admin/officials/officials';
 import { toast } from 'sonner';
 
 // Helper functions (can be moved to utils file)

@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
-import { OfficialsProps, Official } from '@/types/officials';
+import { OfficialsProps, Official } from '@/types/admin/officials/officials';
 import { 
     filterOfficials,
     getSelectionStats,
@@ -37,6 +37,7 @@ export default function Officials() {
     // State management
     const [search, setSearch] = useState(filters.search || '');
     const [filtersState, setFiltersState] = useState<FilterState>({
+        search: filters.search || '',  
         status: filters.status || 'active',
         position: filters.position || 'all',
         committee: filters.committee || 'all',
@@ -62,7 +63,7 @@ export default function Officials() {
     const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
 
-    const searchInputRef = useRef<HTMLInputElement>(null);
+    const searchInputRef = useRef<HTMLInputElement | null>(null);
 
     // Handle window resize
     useEffect(() => {
@@ -441,6 +442,7 @@ export default function Officials() {
     const handleClearFilters = () => {
         setSearch('');
         setFiltersState({
+            search: '',  // Add this missing property
             status: 'active',
             position: 'all',
             committee: 'all',
@@ -459,12 +461,13 @@ export default function Officials() {
         setFiltersState(prev => ({ ...prev, [key]: value }));
     };
 
-    const hasActiveFilters = 
+    const hasActiveFilters = Boolean(
         search || 
         filtersState.status !== 'active' ||
         filtersState.position !== 'all' || 
         filtersState.committee !== 'all' ||
-        filtersState.type !== 'all';
+        filtersState.type !== 'all'
+    );
 
     return (
         <AppLayout

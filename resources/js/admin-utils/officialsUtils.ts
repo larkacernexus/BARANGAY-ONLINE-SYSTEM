@@ -1,14 +1,20 @@
 // admin-utils/officialsUtils.ts
-import { Official } from '@/types/officials';
 
-export interface FilterState {
-    search: string;
+import { Official } from '@/types/admin/officials/officials';
+// Import shared utilities from household types
+import { formatDate as formatDateShared, formatDateTime, getRelativeTime } from '@/types/admin/households/household.types';
+
+export interface FilterOptions {
     status: string;
     position: string;
     committee: string;
     type: string;
     sort_by: string;
     sort_order: string;
+}
+
+export interface FilterState extends FilterOptions {
+    search?: string;  // Optional search
 }
 
 export type BulkOperation = 
@@ -44,11 +50,15 @@ export interface OfficialStats {
     by_status: Record<string, number>;
 }
 
+// Re-export shared date utilities
+export const formatDate = formatDateShared;
+export { formatDateTime, getRelativeTime as formatTimeAgo };
+
 // Filter officials
 export const filterOfficials = (
     officials: Official[],
     search: string,
-    filters: FilterState,
+    filters: FilterOptions,
     positions: Record<string, { name: string; order: number }>,
     committees: Record<string, string>
 ): Official[] => {
@@ -60,8 +70,8 @@ export const filterOfficials = (
         result = result.filter(official => {
             const resident = official.resident;
             return (
-                resident?.full_name.toLowerCase().includes(searchLower) ||
-                official.full_position.toLowerCase().includes(searchLower) ||
+                resident?.full_name?.toLowerCase().includes(searchLower) ||
+                official.full_position?.toLowerCase().includes(searchLower) ||
                 official.committee?.toLowerCase().includes(searchLower) ||
                 official.responsibilities?.toLowerCase().includes(searchLower) ||
                 resident?.contact_number?.includes(search) ||
@@ -105,16 +115,20 @@ export const filterOfficials = (
                 bValue = b.order;
                 break;
             case 'position':
-                aValue = positions[a.position]?.order || 0;
-                bValue = positions[b.position]?.order || 0;
+                const aPos = a.position || '';
+                const bPos = b.position || '';
+                aValue = positions[aPos]?.order ?? 999;
+                bValue = positions[bPos]?.order ?? 999;
                 break;
             case 'name':
                 aValue = a.resident?.full_name || '';
                 bValue = b.resident?.full_name || '';
                 break;
             case 'committee':
-                aValue = committees[a.committee || ''] || '';
-                bValue = committees[b.committee || ''] || '';
+                const aComm = a.committee || '';
+                const bComm = b.committee || '';
+                aValue = committees[aComm] || '';
+                bValue = committees[bComm] || '';
                 break;
             case 'term_start':
                 aValue = new Date(a.term_start).getTime();
@@ -128,6 +142,10 @@ export const filterOfficials = (
                 aValue = a.order;
                 bValue = b.order;
         }
+
+        // Handle null/undefined values in comparison
+        if (aValue === undefined || aValue === null) aValue = '';
+        if (bValue === undefined || bValue === null) bValue = '';
 
         if (filters.sort_order === 'asc') {
             return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
@@ -163,10 +181,12 @@ export const getSelectionStats = (selectedOfficials: Official[]): SelectionStats
 
 // Format for clipboard/export
 export const formatForClipboard = (officials: Official[]): string => {
+    if (officials.length === 0) return '';
+    
     const data = officials.map(official => ({
         'ID': official.id,
         'Full Name': official.resident?.full_name || '',
-        'Position': official.full_position,
+        'Position': official.full_position || official.position || '',
         'Committee': official.committee || '',
         'Contact Number': official.contact_number || official.resident?.contact_number || '',
         'Email': official.email || '',
@@ -175,7 +195,7 @@ export const formatForClipboard = (officials: Official[]): string => {
         'Status': official.status,
         'Is Current': official.is_current ? 'Yes' : 'No',
         'Type': official.is_regular ? 'Regular' : 'Ex-Officio',
-        'Created At': official.created_at,
+        'Created At': formatDate(official.created_at || ''),
     }));
     
     const headers = Object.keys(data[0]);
@@ -184,27 +204,15 @@ export const formatForClipboard = (officials: Official[]): string => {
         ...data.map(row => 
             headers.map(header => {
                 const value = row[header as keyof typeof row];
-                return typeof value === 'string' && value.includes(',') 
-                    ? `"${value}"` 
-                    : value;
+                if (value === undefined || value === null) return '';
+                const stringValue = String(value);
+                if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                    return `"${stringValue.replace(/"/g, '""')}"`;
+                }
+                return stringValue;
             }).join(',')
         )
     ].join('\n');
-};
-
-// Format date
-export const formatDate = (dateString: string): string => {
-    if (!dateString) return 'N/A';
-    try {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-PH', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    } catch (error) {
-        return 'Invalid Date';
-    }
 };
 
 // Truncate text with responsive length
@@ -219,7 +227,7 @@ export const getTruncationLength = (
     type: 'name' | 'position' | 'committee' | 'term' = 'name',
     windowWidth: number
 ): number => {
-    if (windowWidth < 640) { // Mobile
+    if (windowWidth < 640) {
         switch(type) {
             case 'name': return 12;
             case 'position': return 10;
@@ -228,7 +236,7 @@ export const getTruncationLength = (
             default: return 12;
         }
     }
-    if (windowWidth < 768) { // Tablet
+    if (windowWidth < 768) {
         switch(type) {
             case 'name': return 15;
             case 'position': return 12;
@@ -237,7 +245,7 @@ export const getTruncationLength = (
             default: return 15;
         }
     }
-    if (windowWidth < 1024) { // Small desktop
+    if (windowWidth < 1024) {
         switch(type) {
             case 'name': return 20;
             case 'position': return 15;
@@ -246,7 +254,6 @@ export const getTruncationLength = (
             default: return 20;
         }
     }
-    // Large desktop
     switch(type) {
         case 'name': return 25;
         case 'position': return 20;
@@ -257,38 +264,33 @@ export const getTruncationLength = (
 };
 
 // Get status badge variant
-export const getStatusBadgeVariant = (status: string, isCurrent: boolean) => {
+export const getStatusBadgeVariant = (status: string, isCurrent: boolean): { className: string; text: string } => {
     if (isCurrent) {
-        return { className: 'bg-green-100 text-green-800 hover:bg-green-200', text: 'Current' };
+        return { className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', text: 'Current' };
     }
     switch (status) {
         case 'active':
-            return { className: 'bg-blue-100 text-blue-800 hover:bg-blue-200', text: 'Active' };
+            return { className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', text: 'Active' };
         case 'inactive':
-            return { className: 'bg-gray-100 text-gray-800 hover:bg-gray-200', text: 'Inactive' };
+            return { className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400', text: 'Inactive' };
         case 'former':
-            return { className: 'bg-amber-100 text-amber-800 hover:bg-amber-200', text: 'Former' };
+            return { className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400', text: 'Former' };
         default:
-            return { className: '', text: status };
+            return { className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400', text: status };
     }
 };
 
 // Get position badge variant
-export const getPositionBadgeVariant = (position: string) => {
-    switch (position) {
-        case 'captain':
-            return { className: 'bg-red-100 text-red-800 hover:bg-red-200', text: 'Captain' };
-        case 'kagawad':
-            return { className: 'bg-blue-100 text-blue-800 hover:bg-blue-200', text: 'Kagawad' };
-        case 'secretary':
-            return { className: 'bg-purple-100 text-purple-800 hover:bg-purple-200', text: 'Secretary' };
-        case 'treasurer':
-            return { className: 'bg-green-100 text-green-800 hover:bg-green-200', text: 'Treasurer' };
-        case 'sk_chairman':
-            return { className: 'bg-pink-100 text-pink-800 hover:bg-pink-200', text: 'SK Chairman' };
-        default:
-            return { className: 'bg-gray-100 text-gray-800 hover:bg-gray-200', text: position };
-    }
+export const getPositionBadgeVariant = (position: string): { className: string; text: string } => {
+    const positionMap: Record<string, { className: string; text: string }> = {
+        captain: { className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', text: 'Captain' },
+        kagawad: { className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', text: 'Kagawad' },
+        secretary: { className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', text: 'Secretary' },
+        treasurer: { className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', text: 'Treasurer' },
+        sk_chairman: { className: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400', text: 'SK Chairman' },
+    };
+    
+    return positionMap[position] || { className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400', text: position };
 };
 
 // Get stats card color
@@ -297,17 +299,17 @@ export const getStatsCardColor = (index: number): string => {
     return colors[index % colors.length];
 };
 
-// Get color class
+// Get color class with dark mode support
 export const getColorClass = (color: string): string => {
-    switch (color) {
-        case 'blue': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-        case 'green': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-        case 'purple': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-        case 'orange': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-        case 'red': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-        case 'indigo': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
-        case 'pink': return 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200';
-        case 'teal': return 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200';
-        default: return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-    }
+    const colorMap: Record<string, string> = {
+        blue: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+        green: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+        purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+        orange: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+        red: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+        indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400',
+        pink: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400',
+        teal: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
+    };
+    return colorMap[color] || colorMap.blue;
 };

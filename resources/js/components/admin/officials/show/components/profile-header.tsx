@@ -1,3 +1,5 @@
+// resources/js/Pages/Admin/Officials/components/profile-header.tsx
+
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +30,12 @@ import {
     Target,
     Star,
 } from 'lucide-react';
-import { Official } from '../types';
+
+// Import types from shared officials types
+import { Official } from '@/types/admin/officials/officials';
+
+// Import utilities from officialsUtils
+import { formatDate, getStatusBadgeVariant, getPositionBadgeVariant } from '@/admin-utils/officialsUtils';
 
 interface Props {
     official: Official;
@@ -48,16 +55,6 @@ const getInitials = (name: string): string => {
         .slice(0, 2);
 };
 
-// Format date helper
-const formatDate = (date: string | null): string => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
-};
-
 export const ProfileHeader = ({ 
     official, 
     getPositionColor, 
@@ -66,8 +63,8 @@ export const ProfileHeader = ({
     getStatusIcon 
 }: Props) => {
     const resident = official.resident;
-    const fullName = resident?.full_name || 'Unknown Official';
-    const position = official.full_position || official.position || 'No Position';
+    const fullName = resident?.full_name || official.full_name || 'Unknown Official';
+    const position = official.positionData?.name || official.full_position || official.position || 'No Position';
     const status = official.status || 'inactive';
     const isCurrent = official.is_current || false;
 
@@ -82,6 +79,8 @@ export const ProfileHeader = ({
     };
 
     const daysRemaining = getDaysRemaining();
+    const statusBadge = getStatusBadgeVariant(status, isCurrent);
+    const positionBadge = getPositionBadgeVariant(position.toLowerCase());
 
     return (
         <div className="flex items-start gap-4 p-4 bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
@@ -106,9 +105,9 @@ export const ProfileHeader = ({
                 <div className="space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
                         <h2 className="text-lg font-semibold truncate">{fullName}</h2>
-                        <Badge className={`${getStatusColor(status, isCurrent)} px-2 py-0.5 text-xs h-5`}>
+                        <Badge className={`${statusBadge.className} px-2 py-0.5 text-xs h-5`}>
                             {getStatusIcon(status, isCurrent)}
-                            <span className="ml-1">{isCurrent ? 'Current' : status}</span>
+                            <span className="ml-1">{statusBadge.text}</span>
                         </Badge>
                     </div>
                     
@@ -116,11 +115,14 @@ export const ProfileHeader = ({
                         <div className="flex items-center gap-2 text-muted-foreground">
                             {getPositionIcon(position)}
                             <span className="font-medium text-foreground">{position}</span>
+                            <Badge variant="outline" className={positionBadge.className + " text-xs ml-1"}>
+                                {positionBadge.text}
+                            </Badge>
                         </div>
                         
                         <div className="flex items-center gap-2 text-xs">
                             <Hash className="h-3 w-3 text-muted-foreground" />
-                            <span>Official ID: {official.official_id || 'N/A'}</span>
+                            <span>Official ID: {official.id || 'N/A'}</span>
                         </div>
 
                         {official.order && (

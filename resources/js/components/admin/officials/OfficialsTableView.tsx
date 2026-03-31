@@ -32,7 +32,7 @@ import {
     RefreshCw,
     PowerOff
 } from 'lucide-react';
-import { Official } from '@/types/officials';
+import { Official } from '@/types/admin/officials/officials';
 import { FilterState } from '@/admin-utils/officialsUtils';
 import { truncateText, getTruncationLength, getStatusBadgeVariant, formatDate, getPositionBadgeVariant } from '@/admin-utils/officialsUtils';
 import { toast } from 'sonner';

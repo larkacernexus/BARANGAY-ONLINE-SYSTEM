@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/Officials/components/official-header.tsx
+
 import React, { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
@@ -39,7 +40,12 @@ import {
     AlertCircle,
     Sparkles
 } from 'lucide-react';
-import { Official } from '../types';
+
+// Import types from shared officials types
+import { Official } from '@/types/admin/officials/officials';
+
+// Import utilities from officialsUtils
+import { formatDate, getStatusBadgeVariant, getPositionBadgeVariant } from '@/admin-utils/officialsUtils';
 
 interface Props {
     official: Official;
@@ -49,21 +55,28 @@ interface Props {
     onDelete: () => void;
 }
 
-// Helper function to safely get status badge color
-const getStatusBadgeColor = (status: string = 'active'): string => {
-    switch (status?.toLowerCase()) {
-        case 'active':
-        case 'serving':
-            return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
-        case 'inactive':
-        case 'ended':
-        case 'resigned':
-            return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-700';
-        case 'pending':
-            return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800';
-        default:
-            return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-700';
+// Helper function to safely construct full name
+const getFullName = (official: Official): string => {
+    if (!official) return 'Official';
+    
+    const resident = official.resident;
+    if (resident?.full_name) return resident.full_name;
+    
+    const parts = [];
+    if (resident?.first_name) parts.push(resident.first_name);
+    if (resident?.middle_name) parts.push(resident.middle_name);
+    if (resident?.last_name) parts.push(resident.last_name);
+    
+    let fullName = parts.join(' ');
+    if (resident?.suffix && fullName) {
+        fullName += `, ${resident.suffix}`;
     }
+    
+    return fullName || official.full_name || 'Official';
+};
+
+const getOfficialGradient = (): string => {
+    return 'from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700';
 };
 
 // Helper function to safely get status icon
@@ -83,53 +96,18 @@ const getStatusIcon = (status: string = 'active') => {
     }
 };
 
-// Helper function to safely get position badge color
-const getPositionBadgeColor = (position?: string): string => {
+// Helper function to safely get position icon
+const getPositionIcon = (position?: string) => {
     switch (position?.toLowerCase()) {
         case 'captain':
         case 'barangay captain':
-            return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800';
+            return <Award className="h-3 w-3 mr-1" />;
         case 'secretary':
-            return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
+            return <Mail className="h-3 w-3 mr-1" />;
         case 'treasurer':
-            return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800';
-        case 'councilor':
-            return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800';
+            return <Shield className="h-3 w-3 mr-1" />;
         default:
-            return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-700';
-    }
-};
-
-const getOfficialGradient = (): string => {
-    return 'from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700';
-};
-
-// Helper function to safely construct full name
-const getFullName = (official: Official): string => {
-    if (!official) return 'Official';
-    
-    const parts = [];
-    
-    if (official.first_name) parts.push(official.first_name);
-    if (official.middle_name) parts.push(official.middle_name);
-    if (official.last_name) parts.push(official.last_name);
-    
-    let fullName = parts.join(' ');
-    
-    if (official.suffix && fullName) {
-        fullName += `, ${official.suffix}`;
-    }
-    
-    return fullName || 'Official';
-};
-
-// Helper function to safely format date
-const formatDate = (dateString?: string): string => {
-    if (!dateString) return 'N/A';
-    try {
-        return new Date(dateString).toLocaleDateString();
-    } catch {
-        return 'Invalid date';
+            return <Award className="h-3 w-3 mr-1" />;
     }
 };
 
@@ -159,14 +137,18 @@ export const OfficialHeader = ({
     // Safely get values with defaults
     const officialId = official?.id;
     const fullName = getFullName(official);
-    const position = official?.position || 'No Position';
+    const position = official?.positionData?.name || official?.position || 'No Position';
     const status = official?.status || 'active';
-    const email = official?.email;
-    const phone = official?.phone;
-    const purok = official?.purok;
+    const isCurrent = official?.is_current || false;
+    const email = official?.email || official?.resident?.email;
+    const phone = official?.contact_number || official?.resident?.contact_number;
+    const purok = official?.resident?.purok?.name;
     const termStart = official?.term_start;
     const termEnd = official?.term_end;
-    const isActive = official?.is_active;
+
+    // Get badge styles from shared utilities
+    const statusBadge = getStatusBadgeVariant(status, isCurrent);
+    const positionBadge = getPositionBadgeVariant(position.toLowerCase());
 
     return (
         <TooltipProvider>
@@ -188,15 +170,15 @@ export const OfficialHeader = ({
                             </h1>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
                                 {/* Status Badge */}
-                                <Badge variant="outline" className={getStatusBadgeColor(status)}>
+                                <Badge variant="outline" className={statusBadge.className}>
                                     {getStatusIcon(status)}
-                                    <span className="ml-1 capitalize">{status}</span>
+                                    <span className="ml-1 capitalize">{statusBadge.text}</span>
                                 </Badge>
 
                                 {/* Position Badge */}
-                                <Badge variant="outline" className={getPositionBadgeColor(position)}>
-                                    <Award className="h-3 w-3 mr-1" />
-                                    <span className="capitalize">{position}</span>
+                                <Badge variant="outline" className={positionBadge.className}>
+                                    {getPositionIcon(position)}
+                                    <span className="capitalize">{positionBadge.text}</span>
                                 </Badge>
 
                                 {/* Official ID with Copy */}

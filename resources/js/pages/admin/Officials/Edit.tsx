@@ -8,9 +8,19 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Link, router, useForm } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { PageProps } from '@/types';
-import { Resident, Position, Committee, Role, Official, OfficialFormData, User } from '@/components/admin/officials/shared/types/official';
 import { toast } from 'sonner';
+import { Save, UserPlus, Shield, Phone, Info, Camera } from 'lucide-react';
+
+// Import types from shared officials types
+import { 
+    Resident, 
+    Position, 
+    Committee, 
+    Role, 
+    Official, 
+    User,
+    OfficialFormData 
+} from '@/types/admin/officials/officials';
 
 // Import shared components
 import { OfficialFormHeader } from '@/components/admin/officials/shared/official-form-header';
@@ -22,9 +32,8 @@ import { UserAssignment } from '@/components/admin/officials/shared/user-assignm
 import { PhotoUpload } from '@/components/admin/officials/shared/photo-upload';
 import { PreviewCard } from '@/components/admin/officials/shared/preview-card';
 import { QuickStats } from '@/components/admin/officials/shared/quick-stats';
-import { UserPlus, Shield, Phone, Info, Camera, Save } from 'lucide-react';
 
-interface EditOfficialProps extends PageProps {
+interface EditOfficialProps {
     official: Official & {
         resident: Resident;
         positionData: Position;
@@ -49,24 +58,24 @@ export default function EditOfficial({
     statusOptions,
 }: EditOfficialProps) {
     // Initialize form with EXISTING official data
-    const initialFormData: OfficialFormData = {
-        resident_id: official.resident_id,
-        position_id: official.position_id,
-        committee_id: official.committee_id,
-        term_start: official.term_start,
-        term_end: official.term_end,
-        status: official.status,
-        order: official.order || 0,
-        responsibilities: official.responsibilities || '',
-        contact_number: official.contact_number || official.resident?.contact_number || '',
-        email: official.email || official.resident?.email || '',
-        achievements: official.achievements || '',
-        photo: null,
-        use_resident_photo: !official.photo_path && !!official.resident?.photo_path,
-        is_regular: official.is_regular ?? true,
-        user_id: official.user_id,
-    };
 
+        const initialFormData: OfficialFormData = {
+            resident_id: official.resident_id,
+            position_id: official.position_id,
+            committee_id: official.committee_id ?? null,  // Convert undefined to null
+            term_start: official.term_start,
+            term_end: official.term_end,
+            status: official.status,
+            order: official.order || 0,
+            responsibilities: official.responsibilities || '',
+            contact_number: official.contact_number || official.resident?.contact_number || '',
+            email: official.email || official.resident?.email || '',
+            achievements: official.achievements || '',
+            photo: null,
+            use_resident_photo: !official.photo_path && !!official.resident?.photo_path,
+            is_regular: official.is_regular ?? true,
+            user_id: official.user_id ?? null,  // Convert undefined to null
+        };
     const { data, setData, processing, errors } = useForm<OfficialFormData>(initialFormData);
 
     const [selectedResident, setSelectedResident] = useState<Resident | null>(official.resident || null);
@@ -77,12 +86,6 @@ export default function EditOfficial({
     const [photoPreview, setPhotoPreview] = useState<string | null>(
         official.photo_url || official.resident?.photo_url || null
     );
-
-    // Debug: Log initial data
-    useEffect(() => {
-        console.log('Initial form data:', initialFormData);
-        console.log('Official data from server:', official);
-    }, []);
 
     // Effect to handle position changes
     useEffect(() => {
@@ -115,8 +118,6 @@ export default function EditOfficial({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         
-        console.log('Submitting form data:', data);
-        
         // Create FormData
         const formData = new FormData();
         
@@ -136,7 +137,7 @@ export default function EditOfficial({
         formData.append('email', data.email || '');
         formData.append('achievements', data.achievements || '');
         
-        // FIX: Send boolean fields as 1/0 instead of true/false strings
+        // Send boolean fields as 1/0
         formData.append('is_regular', data.is_regular ? '1' : '0');
         formData.append('user_id', data.user_id ? String(data.user_id) : '');
         formData.append('use_resident_photo', data.use_resident_photo ? '1' : '0');
@@ -144,12 +145,6 @@ export default function EditOfficial({
         // Handle photo - ONLY append if it's a File
         if (data.photo && data.photo instanceof File) {
             formData.append('photo', data.photo);
-        }
-        
-        // Log FormData contents
-        console.log('FormData entries:');
-        for (let pair of formData.entries()) {
-            console.log(pair[0] + ': ' + pair[1]);
         }
         
         // Use POST with _method=PUT
@@ -161,13 +156,9 @@ export default function EditOfficial({
                 toast.error('Failed to update official');
             },
             onSuccess: (response) => {
-                console.log('Update successful', response);
                 toast.success('Official updated successfully');
                 router.visit('/admin/officials');
             },
-            onFinish: () => {
-                console.log('Request finished');
-            }
         });
     };
 
