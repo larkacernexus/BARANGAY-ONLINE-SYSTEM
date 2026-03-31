@@ -40,58 +40,9 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { ClearanceType, Resident, Household, Business } from '@/types/admin/clearances/clearance-types';
 
-// --- Interfaces ---
-interface ClearanceType {
-    id: number;
-    name: string;
-    code: string;
-    description: string;
-    fee: number;
-    formatted_fee: string;
-    processing_days: number;
-    validity_days: number;
-    requires_payment: boolean;
-    requires_approval: boolean;
-    is_online_only: boolean;
-    is_discountable: boolean;
-    requirements?: string[];
-    purpose_options?: string;
-}
-
-interface Resident {
-    id: number;
-    name: string;
-    first_name: string;
-    last_name: string;
-    middle_name?: string;
-    age?: number;
-    contact_number: string;
-    address: string;
-    purok: string;
-    purok_id?: number;
-    household_id?: number;
-    household_number?: string;
-}
-
-interface Household {
-    id: number;
-    household_number: string;
-    head_name: string;
-    address: string;
-    purok: string;
-}
-
-interface Business {
-    id: number;
-    business_name: string;
-    owner_name: string;
-    contact_number: string;
-    address: string;
-    purok: string;
-    business_permit_number?: string;
-}
-
+// --- Page Props Interface ---
 interface PageProps {
     residents: Resident[];
     households?: Household[];
@@ -110,6 +61,24 @@ interface PageProps {
         reference_number?: string;
         needed_date?: string;
     };
+    [key: string]: any;
+}
+
+// --- Form Data Interface ---
+interface ClearanceFormData {
+    payer_type: 'resident' | 'household' | 'business';
+    payer_id: string;
+    resident_id: string;
+    household_id: string;
+    business_id: string;
+    clearance_type_id: string;
+    purpose: string;
+    specific_purpose: string;
+    urgency: 'normal' | 'rush' | 'express';
+    needed_date: string;
+    additional_requirements: string;
+    fee_amount: number;
+    remarks: string;
 }
 
 // --- Helper Functions ---
@@ -194,17 +163,17 @@ export default function CreateClearanceRequest() {
         needed_date?: string;
     }>({});
 
-    // FIXED: Added payer_id to the form data
-    const { data, setData, post, processing, errors } = useForm({
-        payer_type: 'resident' as 'resident' | 'household' | 'business',
-        payer_id: '', // ADDED: This was missing
+    // Form data with proper typing
+    const { data, setData, post, processing, errors } = useForm<ClearanceFormData>({
+        payer_type: 'resident',
+        payer_id: '',
         resident_id: '',
         household_id: '',
         business_id: '',
         clearance_type_id: '',
         purpose: '',
         specific_purpose: '',
-        urgency: 'normal' as 'normal' | 'rush' | 'express',
+        urgency: 'normal',
         needed_date: new Date().toISOString().split('T')[0],
         additional_requirements: '',
         fee_amount: 0,
@@ -218,7 +187,7 @@ export default function CreateClearanceRequest() {
             if (searchTerm.trim()) {
                 const term = searchTerm.toLowerCase();
                 const results = residentsArray.filter(resident =>
-                    (resident.name?.toLowerCase() || '').includes(term) ||
+                    (resident.full_name?.toLowerCase() || '').includes(term) ||
                     (resident.first_name?.toLowerCase() || '').includes(term) ||
                     (resident.last_name?.toLowerCase() || '').includes(term) ||
                     (resident.address?.toLowerCase() || '').includes(term) ||
@@ -233,7 +202,7 @@ export default function CreateClearanceRequest() {
             if (searchTerm.trim()) {
                 const term = searchTerm.toLowerCase();
                 const results = householdsArray.filter(household =>
-                    (household.head_name?.toLowerCase() || '').includes(term) ||
+                    (household.head_of_family?.toLowerCase() || '').includes(term) ||
                     (household.household_number?.toLowerCase() || '').includes(term) ||
                     (household.address?.toLowerCase() || '').includes(term)
                 );
@@ -284,7 +253,7 @@ export default function CreateClearanceRequest() {
                     setData({
                         ...data,
                         resident_id: residentId,
-                        payer_id: residentId // ADDED: Set payer_id
+                        payer_id: residentId
                     });
                 }
             }
@@ -298,7 +267,7 @@ export default function CreateClearanceRequest() {
                     setData({
                         ...data,
                         household_id: householdId,
-                        payer_id: householdId // ADDED: Set payer_id
+                        payer_id: householdId
                     });
                 }
             }
@@ -312,7 +281,7 @@ export default function CreateClearanceRequest() {
                     setData({
                         ...data,
                         business_id: businessId,
-                        payer_id: businessId // ADDED: Set payer_id
+                        payer_id: businessId
                     });
                 }
             }
@@ -345,7 +314,7 @@ export default function CreateClearanceRequest() {
         }
     }, [residents, households, businesses, clearanceTypes]);
 
-    // Update fee amount and auto-calculate urgency fee
+    // Update fee amount based on urgency
     useEffect(() => {
         if (selectedClearanceType) {
             let fee = getFeeAsNumber(selectedClearanceType.fee);
@@ -370,26 +339,25 @@ export default function CreateClearanceRequest() {
         setData({
             ...data,
             payer_type: type,
-            payer_id: '', // Clear payer_id
+            payer_id: '',
             resident_id: '',
             household_id: '',
             business_id: ''
         });
         
-        // Clear selected payer
         setSelectedResident(null);
         setSelectedHousehold(null);
         setSelectedBusiness(null);
         setSearchTerm('');
     };
 
-    // FIXED: Added payer_id to selection handlers
+    // Selection handlers
     const handleSelectResident = (resident: Resident) => {
         setSelectedResident(resident);
         setData({
             ...data,
             resident_id: resident.id.toString(),
-            payer_id: resident.id.toString(), // ADDED: Set payer_id
+            payer_id: resident.id.toString(),
             payer_type: 'resident'
         });
         setSearchTerm('');
@@ -400,7 +368,7 @@ export default function CreateClearanceRequest() {
         setData({
             ...data,
             household_id: household.id.toString(),
-            payer_id: household.id.toString(), // ADDED: Set payer_id
+            payer_id: household.id.toString(),
             payer_type: 'household'
         });
         setSearchTerm('');
@@ -411,7 +379,7 @@ export default function CreateClearanceRequest() {
         setData({
             ...data,
             business_id: business.id.toString(),
-            payer_id: business.id.toString(), // ADDED: Set payer_id
+            payer_id: business.id.toString(),
             payer_type: 'business'
         });
         setSearchTerm('');
@@ -474,7 +442,7 @@ export default function CreateClearanceRequest() {
         return true;
     };
 
-    // ===== FIXED: submit function with payer_id already in form data =====
+    // Submit function
     const submit = (e: React.FormEvent, proceedToPayment: boolean = false) => {
         e.preventDefault();
         
@@ -482,24 +450,21 @@ export default function CreateClearanceRequest() {
         
         setIsSubmitting(true);
         
-        // Add a flag to indicate if we should proceed to payment
         const formData = {
             ...data,
             proceed_to_payment: proceedToPayment
         };
 
-        console.log('Submitting form data:', formData); // For debugging
+        console.log('Submitting form data:', formData);
 
         post('/admin/clearances', {
             data: formData,
             onSuccess: (page) => {
                 setIsSubmitting(false);
                 
-                // If proceedToPayment is true and fee > 0, redirect to payment page
-                if (proceedToPayment && data.fee_amount > 0 && page.props?.clearance?.id) {
+                 if (proceedToPayment && data.fee_amount > 0 && (page.props as any)?.clearance?.id) {
                     const clearance = page.props.clearance as any;
                     
-                    // Get the selected payer info based on payer type
                     let payerId = '';
                     let payerName = '';
                     let contactNumber = '';
@@ -508,20 +473,19 @@ export default function CreateClearanceRequest() {
                     
                     if (payerType === 'resident' && selectedResident) {
                         payerId = selectedResident.id.toString();
-                        payerName = selectedResident.name;
-                        contactNumber = selectedResident.contact_number;
-                        address = selectedResident.address;
-                        purok = selectedResident.purok;
+                        payerName = selectedResident.full_name;
+                        contactNumber = selectedResident.contact_number || '';
+                        address = selectedResident.address || '';
+                        purok = selectedResident.purok || '';
                     } else if (payerType === 'household' && selectedHousehold) {
                         payerId = selectedHousehold.id.toString();
-                        payerName = selectedHousehold.head_name;
-                        address = selectedHousehold.address;
-                        purok = selectedHousehold.purok;
+                        payerName = selectedHousehold.head_of_family;
+                        address = selectedHousehold.address || '';
+                        purok = selectedHousehold.purok || '';
                         
-                        // For households, try to get contact from head resident if available
-                        const headResident = residents.find(r => r.name === selectedHousehold.head_name);
+                        const headResident = residents.find(r => r.full_name === selectedHousehold.head_of_family);
                         if (headResident) {
-                            contactNumber = headResident.contact_number;
+                            contactNumber = headResident.contact_number || '';
                         }
                     } else if (payerType === 'business' && selectedBusiness) {
                         payerId = selectedBusiness.id.toString();
@@ -531,34 +495,23 @@ export default function CreateClearanceRequest() {
                         purok = selectedBusiness.purok;
                     }
                     
-                    // Build URL parameters for direct navigation to payment page
                     const params = new URLSearchParams({
-                        // Payer info (to fetch ALL their outstanding fees)
                         payer_type: payerType,
                         payer_id: payerId,
                         payer_name: payerName,
-                        
-                        // Contact details (for display)
-                        contact_number: contactNumber || '',
-                        address: address || '',
-                        purok: purok || '',
-                        
-                        // NEWLY CREATED CLEARANCE FEE - this will be pre-selected
+                        contact_number: contactNumber,
+                        address: address,
+                        purok: purok,
                         fee_id: clearance.id.toString(),
                         fee_code: clearance.fee_code || `CLR-${clearance.id}`,
                         fee_amount: clearance.amount?.toString() || data.fee_amount.toString(),
                         fee_description: `${selectedClearanceType?.name} Clearance`,
-                        
-                        // Additional context for the payment page
                         from_clearance: 'true',
                         clearance_created: 'true',
                         clearance_type: selectedClearanceType?.name || 'Clearance',
-                        
-                        // Timestamp to prevent caching
                         _t: Date.now().toString()
                     });
                     
-                    // GO DIRECTLY TO PAYMENT PAGE
                     router.visit(route('payments.create') + '?' + params.toString());
                 }
             },
@@ -584,11 +537,8 @@ export default function CreateClearanceRequest() {
     };
 
     const getRequirements = () => {
-        if (selectedClearanceType?.requirements) {
-            if (Array.isArray(selectedClearanceType.requirements)) {
-                return selectedClearanceType.requirements;
-            }
-            return [];
+        if (selectedClearanceType?.document_requirements) {
+            return selectedClearanceType.document_requirements.map(req => req.name);
         }
         return [
             'Valid ID presented',
@@ -601,18 +551,17 @@ export default function CreateClearanceRequest() {
     const requirements = getRequirements();
     const safePurposeOptions = Array.isArray(purposeOptions) ? purposeOptions : [];
 
-    // Get current selected payer display
     const getSelectedPayerDisplay = () => {
         if (payerType === 'resident' && selectedResident) {
             return {
-                name: selectedResident.name,
-                details: `${selectedResident.address} • ${selectedResident.contact_number}`,
+                name: selectedResident.full_name,
+                details: `${selectedResident.address || 'No address'} • ${selectedResident.contact_number || 'No contact'}`,
                 extra: selectedResident.purok ? `Purok ${selectedResident.purok}` : null
             };
         } else if (payerType === 'household' && selectedHousehold) {
             return {
-                name: selectedHousehold.head_name,
-                details: `${selectedHousehold.address} • Household #${selectedHousehold.household_number}`,
+                name: selectedHousehold.head_of_family,
+                details: `${selectedHousehold.address || 'No address'} • Household #${selectedHousehold.household_number}`,
                 extra: selectedHousehold.purok ? `Purok ${selectedHousehold.purok}` : null
             };
         } else if (payerType === 'business' && selectedBusiness) {
@@ -627,7 +576,6 @@ export default function CreateClearanceRequest() {
 
     const selectedPayer = getSelectedPayerDisplay();
 
-    // FIXED: Added Change button handler to clear payer_id
     const handleChangePayer = () => {
         setSelectedResident(null);
         setSelectedHousehold(null);
@@ -637,7 +585,7 @@ export default function CreateClearanceRequest() {
             resident_id: '',
             household_id: '',
             business_id: '',
-            payer_id: '' // Clear payer_id
+            payer_id: ''
         });
         setSearchTerm('');
     };
@@ -653,7 +601,7 @@ export default function CreateClearanceRequest() {
         >
             <form onSubmit={(e) => submit(e, false)}>
                 <div className="space-y-6">
-                    {/* Header with Actions - Matching Forms pattern */}
+                    {/* Header with Actions */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <Link href="/admin/clearances">
@@ -924,9 +872,9 @@ export default function CreateClearanceRequest() {
                                                         className="p-3 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg cursor-pointer border border-gray-100 dark:border-gray-800 transition-colors"
                                                         onClick={() => handleSelectResident(resident)}
                                                     >
-                                                        <div className="font-medium dark:text-gray-100">{resident.name}</div>
+                                                        <div className="font-medium dark:text-gray-100">{resident.full_name}</div>
                                                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                            {resident.address} • {resident.contact_number}
+                                                            {resident.address || 'No address'} • {resident.contact_number || 'No contact'}
                                                             {resident.purok && ` • ${resident.purok}`}
                                                         </div>
                                                     </div>
@@ -942,9 +890,9 @@ export default function CreateClearanceRequest() {
                                                         className="p-3 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-lg cursor-pointer border border-gray-100 dark:border-gray-800 transition-colors"
                                                         onClick={() => handleSelectHousehold(household)}
                                                     >
-                                                        <div className="font-medium dark:text-gray-100">{household.head_name}</div>
+                                                        <div className="font-medium dark:text-gray-100">{household.head_of_family}</div>
                                                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                            {household.address} • Household #{household.household_number}
+                                                            {household.address || 'No address'} • Household #{household.household_number}
                                                             {household.purok && ` • ${household.purok}`}
                                                         </div>
                                                     </div>
@@ -1040,10 +988,10 @@ export default function CreateClearanceRequest() {
                                                         <div className="flex items-center justify-between w-full">
                                                             <div className="flex items-center gap-2">
                                                                 <span>{type.name}</span>
-                                                                {type.is_discountable && (
+                                                                {type.is_popular && (
                                                                     <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 text-xs">
                                                                         <Tag className="h-3 w-3 mr-1" />
-                                                                        Discountable
+                                                                        Popular
                                                                     </Badge>
                                                                 )}
                                                             </div>
@@ -1359,17 +1307,17 @@ export default function CreateClearanceRequest() {
                                         <div className="space-y-3">
                                             <div>
                                                 <div className="text-sm text-gray-500 dark:text-gray-400">Description</div>
-                                                <div className="text-sm font-medium dark:text-gray-300">{selectedClearanceType.description}</div>
+                                                <div className="text-sm font-medium dark:text-gray-300">{selectedClearanceType.description || 'No description available'}</div>
                                             </div>
 
-                                            {selectedClearanceType.is_discountable && (
+                                            {selectedClearanceType.is_popular && (
                                                 <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
                                                     <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
                                                         <Shield className="h-4 w-4" />
-                                                        <span className="text-sm font-medium">Discount Eligible</span>
+                                                        <span className="text-sm font-medium">Popular Clearance Type</span>
                                                     </div>
                                                     <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                                                        This clearance type qualifies for discounts (Senior Citizen, PWD, Solo Parent, etc.)
+                                                        This clearance type is frequently requested
                                                     </p>
                                                 </div>
                                             )}
@@ -1403,9 +1351,10 @@ export default function CreateClearanceRequest() {
                                                         Needs Approval
                                                     </Badge>
                                                 )}
-                                                {selectedClearanceType.is_online_only && (
+                                                {selectedClearanceType.requires_documents && (
                                                     <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
-                                                        Online Only
+                                                        <FileText className="h-3 w-3 mr-1" />
+                                                        Documents Required
                                                     </Badge>
                                                 )}
                                             </div>
@@ -1414,7 +1363,7 @@ export default function CreateClearanceRequest() {
                                 </Card>
                             )}
 
-                            {/* Payment Information Card - Shows what happens with Create & Pay */}
+                            {/* Payment Information Card */}
                             {data.fee_amount > 0 && (
                                 <Card className="dark:bg-gray-900">
                                     <CardHeader>
@@ -1438,32 +1387,6 @@ export default function CreateClearanceRequest() {
                                                         <li>View and add other outstanding fees</li>
                                                         <li>Pay multiple fees in one transaction</li>
                                                     </ul>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <div className="text-sm text-gray-500 dark:text-gray-400">Outstanding Fees</div>
-                                                <div className="text-sm dark:text-gray-300">
-                                                    After creation, the payment page will show other unpaid fees for this payer:
-                                                </div>
-                                                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-900">
-                                                    <div className="flex items-center justify-between text-sm">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                                                            <span className="dark:text-gray-300">Garbage Collection Fee</span>
-                                                        </div>
-                                                        <span className="font-medium dark:text-gray-300">₱50.00</span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between text-sm mt-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                                                            <span className="dark:text-gray-300">Barangay Dues</span>
-                                                        </div>
-                                                        <span className="font-medium dark:text-gray-300">₱100.00</span>
-                                                    </div>
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                                        * Example only. Actual fees will be shown on payment page.
-                                                    </div>
                                                 </div>
                                             </div>
 

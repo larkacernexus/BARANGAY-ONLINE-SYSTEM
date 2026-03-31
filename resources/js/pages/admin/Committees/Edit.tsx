@@ -1,4 +1,5 @@
 // resources/js/Pages/admin/Committees/Edit.tsx
+
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,7 @@ import {
     Users,
 } from 'lucide-react';
 import { Link, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { PageProps } from '@/types/admin/committees/committees';
 import { useState, useEffect } from 'react';
 
 interface Committee {
@@ -74,7 +75,7 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
             const generatedCode = generateCode(data.name);
             setData('code', generatedCode);
         }
-    }, [data.name, isCodeManuallyEdited]);
+    }, [data.name, isCodeManuallyEdited, committee.name]);
 
     const handleNameChange = (value: string) => {
         setData('name', value);
@@ -99,6 +100,10 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
 
     const isCodeChanged = data.code !== committee.code;
     const isNameChanged = data.name !== committee.name;
+    
+    // FIXED: Convert to boolean explicitly
+    const hasPositions = committee.positions_count !== undefined && committee.positions_count > 0;
+    const isDeleteDisabled = processing || hasPositions;
 
     return (
         <AppLayout
@@ -116,7 +121,7 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <Link href="/admin/committees">
-                                <Button variant="ghost" size="sm" type="button" className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700">
+                                <Button variant="ghost" size="sm" type="button">
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
                                 </Button>
@@ -133,13 +138,12 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                 type="button"
                                 variant="destructive"
                                 onClick={handleDelete}
-                                disabled={processing || (committee.positions_count && committee.positions_count > 0)}
-                                className="dark:bg-red-900 dark:hover:bg-red-800"
+                                disabled={isDeleteDisabled}
                             >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
                             </Button>
-                            <Button type="submit" disabled={processing} className="dark:bg-blue-600 dark:hover:bg-blue-700">
+                            <Button type="submit" disabled={processing}>
                                 <Save className="h-4 w-4 mr-2" />
                                 {processing ? 'Saving...' : 'Save Changes'}
                             </Button>
@@ -147,7 +151,7 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                     </div>
 
                     {/* Warning for committees with positions */}
-                    {committee.positions_count && committee.positions_count > 0 && (
+                    {hasPositions && (
                         <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400">
                             <div className="flex items-center gap-2">
                                 <CheckCircle className="h-5 w-5" />
@@ -216,7 +220,7 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={resetCodeToAutoGenerate}
-                                                    className="h-6 text-xs dark:text-gray-400 dark:hover:text-white"
+                                                    className="h-6 text-xs"
                                                 >
                                                     Auto-generate
                                                 </Button>
@@ -230,7 +234,7 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                                 onChange={(e) => handleCodeChange(e.target.value)}
                                                 required
                                                 readOnly={!isCodeManuallyEdited}
-                                                className={`${!isCodeManuallyEdited ? "bg-gray-50 dark:bg-gray-700 pr-10" : ""} ${isCodeChanged ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
+                                                className={`${!isCodeManuallyEdited ? "bg-gray-50 dark:bg-gray-800 pr-10" : ""} ${isCodeChanged ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
                                             />
                                             {!isCodeManuallyEdited && (
                                                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -341,7 +345,7 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                 <div className="pt-4 border-t dark:border-gray-700 space-y-3">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-500 dark:text-gray-400">Code:</span>
-                                        <code className="font-mono font-medium bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded text-xs dark:text-gray-300">
+                                        <code className="font-mono font-medium bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-xs dark:text-gray-300">
                                             {committee.code}
                                         </code>
                                     </div>
@@ -392,14 +396,14 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <Link href={`/admin/committees/${committee.id}`}>
-                                    <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
+                                    <Button variant="outline" className="w-full justify-start">
                                         <Target className="h-4 w-4 mr-2" />
                                         View Committee Details
                                     </Button>
                                 </Link>
                                 
                                 <Link href={`/admin/positions?committee=${committee.id}`}>
-                                    <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
+                                    <Button variant="outline" className="w-full justify-start">
                                         <Users className="h-4 w-4 mr-2" />
                                         View Assigned Positions
                                     </Button>
@@ -412,6 +416,7 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                             variant={data.is_active ? "default" : "outline"}
                                             className="w-full justify-start"
                                             onClick={() => setData('is_active', true)}
+                                            type="button"
                                         >
                                             <CheckCircle className="h-4 w-4 mr-2" />
                                             Set as Active
@@ -420,6 +425,7 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                             variant={!data.is_active ? "default" : "outline"}
                                             className="w-full justify-start"
                                             onClick={() => setData('is_active', false)}
+                                            type="button"
                                         >
                                             <Lock className="h-4 w-4 mr-2" />
                                             Set as Inactive
@@ -434,12 +440,12 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                     <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
                         <div className="flex items-center gap-2">
                             <Link href={`/admin/committees/${committee.id}`}>
-                                <Button variant="outline" type="button" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
+                                <Button variant="outline" type="button">
                                     View Details
                                 </Button>
                             </Link>
                             <Link href="/admin/committees">
-                                <Button variant="outline" type="button" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
+                                <Button variant="outline" type="button">
                                     Back to List
                                 </Button>
                             </Link>
@@ -459,14 +465,13 @@ export default function EditCommittee({ committee }: EditCommitteeProps) {
                                     setIsCodeManuallyEdited(false);
                                 }}
                                 disabled={processing}
-                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                             >
                                 Reset Changes
                             </Button>
                             <Button 
                                 type="submit" 
                                 disabled={processing}
-                                className={`${Object.keys(errors).length === 0 ? '' : 'opacity-50'} dark:bg-blue-600 dark:hover:bg-blue-700`}
+                                className={Object.keys(errors).length === 0 ? '' : 'opacity-50'}
                             >
                                 <Save className="h-4 w-4 mr-2" />
                                 {processing ? 'Saving...' : 'Save Changes'}

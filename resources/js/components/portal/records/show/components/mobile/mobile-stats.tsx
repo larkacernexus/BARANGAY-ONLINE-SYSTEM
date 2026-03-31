@@ -1,7 +1,7 @@
 // components/document/mobile/mobile-stats.tsx
 import { Eye, Download, HardDrive } from 'lucide-react';
 import { formatFileSize } from '@/components/residentui/lib/resident-ui-utils';
-import { Document } from '@/types/portal/records/document.types';
+import { Document } from '@/types/portal/records/records';
 
 interface MobileStatsProps {
     document: Document;

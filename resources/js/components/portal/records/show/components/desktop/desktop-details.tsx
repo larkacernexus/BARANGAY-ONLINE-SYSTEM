@@ -7,7 +7,7 @@ import { Copy, Calendar, Clock, Tag, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatDateTime } from '@/components/residentui/lib/resident-ui-utils';
 import { getDocumentStatus } from '@/utils/portal/records/document.utils';
-import { Document } from '@/types/portal/records/document.types';
+import { Document } from '@/types/portal/records/records';
 
 interface DesktopDetailsProps {
     document: Document;

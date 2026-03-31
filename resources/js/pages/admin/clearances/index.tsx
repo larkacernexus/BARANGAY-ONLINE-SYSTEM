@@ -3,15 +3,17 @@ import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
 import { 
-    ClearanceRequest, 
-    ClearanceType, 
+    ClearanceRequest,
+    ClearanceType,
     StatusOption,
-    Filters, 
-    Stats, 
-    PaginationData, 
-    BulkOperation, 
-    SelectionMode 
-} from '@/types/clearances';
+    Filters,
+    Stats,
+    PaginationData,
+    BulkOperation,
+    SelectionMode,
+    ClearanceStatus,
+    PaymentStatus
+} from '@/types/admin/clearances/clearance-types';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Import reusable components

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
 import { FileCheck, Clock, Edit } from 'lucide-react';
-import { Blotter } from '@/components/admin/blotters/show/types';
+import { Blotter } from '@/types/admin/blotters/blotter';
 import { formatDateTime } from '@/components/admin/blotters/show/utils/helpers';
 
 interface ActionTabProps {

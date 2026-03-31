@@ -1,4 +1,5 @@
-// app/pages/admin/fee-types/index.tsx
+// pages/admin/fee-types/index.tsx
+
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -29,44 +30,36 @@ import {
     safeNumber
 } from '@/admin-utils/feeTypesUtils';
 
-// Import types
-import { FeeType, BulkOperation, BulkEditField, SelectionMode, FilterState, SelectionStats } from '@/types/fee-types';
+// Import types from centralized location
+import type { 
+    FeeType, 
+    BulkOperation, 
+    BulkEditField, 
+    SelectionMode, 
+    FilterState, 
+    SelectionStats,
+    PageProps
+} from '@/types/admin/fee-types/fee.types';
 
-interface PageProps {
-    feeTypes: FeeType[];
-    categories: Record<string, string>;
-    filters: {
-        search?: string;
-        category?: string;
-        status?: string;
-    };
-}
-
-declare module '@inertiajs/react' {
-    interface PageProps {
-        feeTypes: FeeType[];
-        categories: Record<string, string>;
-        filters: {
-            search?: string;
-            category?: string;
-            status?: string;
-        };
-    }
-}
-
-export default function FeeTypesIndex({ 
-    feeTypes = [], 
-    categories = {},
-    filters = {},
-}: PageProps) {
-    const safeFeeTypes = Array.isArray(feeTypes) ? feeTypes : [];
+export default function FeeTypesIndex() {
+    const { props } = usePage<PageProps>();
+    const { 
+        feeTypes = [], 
+        categories = {},
+        filters = {}
+    } = props;
+    
+    const safeFeeTypes: FeeType[] = Array.isArray(feeTypes) ? feeTypes : [];
     
     // State management
-    const [search, setSearch] = useState(filters.search || '');
+    const [search, setSearch] = useState<string>(filters.search || '');
     const [filtersState, setFiltersState] = useState<FilterState>({
         search: filters.search || '',
         category: filters.category || 'all',
-        status: filters.status || 'all'
+        status: filters.status || 'all',
+        hasDiscount: filters.hasDiscount || 'all',  // Added
+        hasPenalty: filters.hasPenalty || 'all',   // Added
+        frequency: filters.frequency || 'all'      // Added
     });
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
@@ -74,19 +67,28 @@ export default function FeeTypesIndex({
     
     // Bulk selection states
     const [selectedFeeTypes, setSelectedFeeTypes] = useState<number[]>([]);
-    const [isBulkMode, setIsBulkMode] = useState(false);
-    const [isSelectAll, setIsSelectAll] = useState(false);
+    const [isBulkMode, setIsBulkMode] = useState<boolean>(false);
+    const [isSelectAll, setIsSelectAll] = useState<boolean>(false);
     const [selectionMode, setSelectionMode] = useState<SelectionMode>('page');
     
     // Dialog states
-    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-    const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
-    const [showBulkCategoryDialog, setShowBulkCategoryDialog] = useState(false);
-    const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
+    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState<boolean>(false);
+    const [showBulkStatusDialog, setShowBulkStatusDialog] = useState<boolean>(false);
+    const [showBulkCategoryDialog, setShowBulkCategoryDialog] = useState<boolean>(false);
+    const [isPerformingBulkAction, setIsPerformingBulkAction] = useState<boolean>(false);
     const [bulkEditValue, setBulkEditValue] = useState<string>('');
     const [bulkEditField, setBulkEditField] = useState<BulkEditField>('status');
 
     const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Debounced search function
+    const debouncedSearch = useMemo(
+        () => debounce((value: string) => {
+            setFiltersState(prev => ({ ...prev, search: value }));
+            updateFilter('search', value);
+        }, 300),
+        []
+    );
 
     // Handle window resize
     useEffect(() => {
@@ -113,6 +115,12 @@ export default function FeeTypesIndex({
             setIsSelectAll(false);
         }
     }, [isBulkMode]);
+
+    // Handle search input change
+    const handleSearchChange = (value: string) => {
+        setSearch(value);
+        debouncedSearch(value);
+    };
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -163,24 +171,29 @@ export default function FeeTypesIndex({
     const filteredFeeTypes = useMemo(() => {
         return filterFeeTypes(
             safeFeeTypes,
-            search,
+            filtersState.search,
             filtersState,
             'name',
             'asc'
         );
-    }, [safeFeeTypes, search, filtersState]);
+    }, [safeFeeTypes, filtersState]);
 
     // Calculate pagination
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [itemsPerPage] = useState<number>(10);
     const totalItems = filteredFeeTypes.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
     const paginatedFeeTypes = filteredFeeTypes.slice(startIndex, endIndex);
 
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filtersState]);
+
     // Selection handlers
-    const handleSelectAllOnPage = () => {
+    const handleSelectAllOnPage = useCallback(() => {
         const pageIds = paginatedFeeTypes.map(feeType => feeType.id);
         if (isSelectAll) {
             setSelectedFeeTypes(prev => prev.filter(id => !pageIds.includes(id)));
@@ -190,9 +203,9 @@ export default function FeeTypesIndex({
         }
         setIsSelectAll(!isSelectAll);
         setSelectionMode('page');
-    };
+    }, [paginatedFeeTypes, isSelectAll, selectedFeeTypes]);
 
-    const handleSelectAllFiltered = () => {
+    const handleSelectAllFiltered = useCallback(() => {
         const allIds = filteredFeeTypes.map(feeType => feeType.id);
         if (selectedFeeTypes.length === allIds.length && allIds.every(id => selectedFeeTypes.includes(id))) {
             setSelectedFeeTypes(prev => prev.filter(id => !allIds.includes(id)));
@@ -201,17 +214,17 @@ export default function FeeTypesIndex({
             setSelectedFeeTypes(newSelected);
             setSelectionMode('filtered');
         }
-    };
+    }, [filteredFeeTypes, selectedFeeTypes]);
 
-    const handleSelectAll = () => {
+    const handleSelectAll = useCallback(() => {
         if (confirm(`This will select ALL ${safeFeeTypes.length} fee types. This action may take a moment.`)) {
-            const pageIds = paginatedFeeTypes.map(feeType => feeType.id);
-            setSelectedFeeTypes(pageIds);
+            const allIds = filteredFeeTypes.map(feeType => feeType.id);
+            setSelectedFeeTypes(allIds);
             setSelectionMode('all');
         }
-    };
+    }, [safeFeeTypes.length, filteredFeeTypes]);
 
-    const handleItemSelect = (id: number) => {
+    const handleItemSelect = useCallback((id: number) => {
         setSelectedFeeTypes(prev => {
             if (prev.includes(id)) {
                 return prev.filter(itemId => itemId !== id);
@@ -219,7 +232,7 @@ export default function FeeTypesIndex({
                 return [...prev, id];
             }
         });
-    };
+    }, []);
 
     // Check if all items on current page are selected
     useEffect(() => {
@@ -234,7 +247,7 @@ export default function FeeTypesIndex({
     }, [selectedFeeTypes, filteredFeeTypes]);
 
     // Calculate selection stats
-    const selectionStats = useMemo(() => {
+    const selectionStats = useMemo((): SelectionStats => {
         return getSelectionStats(selectedFeeTypesData);
     }, [selectedFeeTypesData]);
 
@@ -267,6 +280,24 @@ export default function FeeTypesIndex({
         return counts;
     }, [filteredFeeTypes]);
 
+    // Update filter function
+    const updateFilter = (key: keyof FilterState, value: string) => {
+        const params: Record<string, any> = {};
+        
+        const newFilters = { ...filtersState, [key]: value };
+        Object.entries(newFilters).forEach(([k, v]) => {
+            if (v && v !== 'all') {
+                params[k] = v;
+            }
+        });
+        
+        router.get(route('fee-types.index'), params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
+
     // Bulk operations
     const handleBulkOperation = async (operation: BulkOperation) => {
         if (selectedFeeTypes.length === 0) {
@@ -283,9 +314,6 @@ export default function FeeTypesIndex({
                     break;
 
                 case 'activate':
-                    setShowBulkStatusDialog(true);
-                    break;
-
                 case 'deactivate':
                     setShowBulkStatusDialog(true);
                     break;
@@ -303,11 +331,17 @@ export default function FeeTypesIndex({
                         'Amount Type': feeType.amount_type || 'fixed',
                         'Frequency': feeType.frequency || 'one_time',
                         'Validity Days': feeType.validity_days || '',
+                        'Senior Discount': feeType.has_senior_discount ? `${feeType.senior_discount_percentage}%` : 'No',
+                        'PWD Discount': feeType.has_pwd_discount ? `${feeType.pwd_discount_percentage}%` : 'No',
+                        'Solo Parent Discount': feeType.has_solo_parent_discount ? `${feeType.solo_parent_discount_percentage}%` : 'No',
+                        'Indigent Discount': feeType.has_indigent_discount ? `${feeType.indigent_discount_percentage}%` : 'No',
+                        'Has Surcharge': feeType.has_surcharge ? 'Yes' : 'No',
+                        'Has Penalty': feeType.has_penalty ? 'Yes' : 'No',
                         'Status': feeType.is_active ? 'Active' : 'Inactive',
                         'Mandatory': feeType.is_mandatory ? 'Yes' : 'No',
                         'Auto Generate': feeType.auto_generate ? 'Yes' : 'No',
-                        'Created At': feeType.created_at,
-                        'Updated At': feeType.updated_at,
+                        'Created At': formatDate(feeType.created_at),
+                        'Updated At': formatDate(feeType.updated_at),
                     }));
                     
                     const headers = Object.keys(exportData[0]);
@@ -356,6 +390,60 @@ export default function FeeTypesIndex({
 
                 case 'update_category':
                     setShowBulkCategoryDialog(true);
+                    break;
+
+                case 'enable_discounts':
+                    if (confirm(`Enable discounts for ${selectedFeeTypes.length} selected fee type(s)?`)) {
+                        await router.post(route('fee-types.bulk-enable-discounts'), {
+                            ids: selectedFeeTypes
+                        }, {
+                            preserveScroll: true,
+                            onSuccess: () => {
+                                toast.success(`${selectedFeeTypes.length} fee type(s) discounts enabled`);
+                                setSelectedFeeTypes([]);
+                            },
+                            onError: (errors) => {
+                                toast.error('Failed to enable discounts');
+                                console.error('Enable discounts errors:', errors);
+                            }
+                        });
+                    }
+                    break;
+
+                case 'disable_discounts':
+                    if (confirm(`Disable discounts for ${selectedFeeTypes.length} selected fee type(s)?`)) {
+                        await router.post(route('fee-types.bulk-disable-discounts'), {
+                            ids: selectedFeeTypes
+                        }, {
+                            preserveScroll: true,
+                            onSuccess: () => {
+                                toast.success(`${selectedFeeTypes.length} fee type(s) discounts disabled`);
+                                setSelectedFeeTypes([]);
+                            },
+                            onError: (errors) => {
+                                toast.error('Failed to disable discounts');
+                                console.error('Disable discounts errors:', errors);
+                            }
+                        });
+                    }
+                    break;
+
+                case 'apply_standard_discounts':
+                    if (confirm(`Apply Philippine standard discounts (Senior:20%, PWD:20%, Solo Parent:10%, Indigent:50%) to ${selectedFeeTypes.length} selected fee type(s)?`)) {
+                        await router.post(route('fee-types.bulk-apply-standard-discounts'), {
+                            ids: selectedFeeTypes
+                        }, {
+                            preserveScroll: true,
+                            onSuccess: () => {
+                                toast.success(`Standard discounts applied to ${selectedFeeTypes.length} fee type(s)`);
+                                setSelectedFeeTypes([]);
+                            },
+                            onError: (errors) => {
+                                toast.error('Failed to apply standard discounts');
+                                console.error('Apply standard discounts errors:', errors);
+                            }
+                        });
+                    }
                     break;
 
                 default:
@@ -429,27 +517,7 @@ export default function FeeTypesIndex({
     };
 
     const handleSort = (column: string) => {
-        // For client-side sorting, we could implement it here
-        // For server-side sorting, we would update filters
         toast.info(`Sort by ${column} - to be implemented`);
-    };
-
-    const updateFilter = (key: keyof FilterState, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
-        
-        const params = { ...filtersState, [key]: value };
-        Object.keys(params).forEach(k => {
-            const key = k as keyof typeof params;
-            if (!params[key] || params[key] === 'all') {
-                delete params[key];
-            }
-        });
-        
-        router.get(route('fee-types.index'), params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
     };
 
     const handleClearFilters = () => {
@@ -457,7 +525,10 @@ export default function FeeTypesIndex({
         setFiltersState({
             search: '',
             category: 'all',
-            status: 'all'
+            status: 'all',
+            hasDiscount: 'all',
+            hasPenalty: 'all',
+            frequency: 'all'
         });
         
         router.get(route('fee-types.index'), {}, {
@@ -477,14 +548,43 @@ export default function FeeTypesIndex({
     };
 
     const handleViewPhoto = (feeType: FeeType) => {
-        // Implement if needed
         toast.info('Feature to be implemented');
     };
 
     const hasActiveFilters = 
-        search || 
+        search !== '' || 
         filtersState.category !== 'all' || 
-        filtersState.status !== 'all';
+        filtersState.status !== 'all' ||
+        filtersState.hasDiscount !== 'all' ||
+        filtersState.hasPenalty !== 'all' ||
+        filtersState.frequency !== 'all';
+
+    // Add error boundary fallback
+    if (!Array.isArray(safeFeeTypes)) {
+        return (
+            <AppLayout
+                title="Fee Types"
+                breadcrumbs={[
+                    { title: 'Dashboard', href: '/admin/dashboard' },
+                    { title: 'Fee Types', href: '/admin/fee-types' }
+                ]}
+            >
+                <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                        <div className="text-red-600 text-xl mb-2">Error Loading Fee Types</div>
+                        <p className="text-gray-600">Fee types data is not in the expected format.</p>
+                        <Button 
+                            onClick={() => router.reload()} 
+                            className="mt-4"
+                            variant="outline"
+                        >
+                            Reload Page
+                        </Button>
+                    </div>
+                </div>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout
@@ -509,7 +609,7 @@ export default function FeeTypesIndex({
 
                     <FeeTypesFilters
                         search={search}
-                        setSearch={setSearch}
+                        setSearch={handleSearchChange}
                         filtersState={filtersState}
                         updateFilter={updateFilter}
                         handleClearFilters={handleClearFilters}
@@ -567,17 +667,17 @@ export default function FeeTypesIndex({
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border dark:border-gray-700">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <KeyRound className="h-4 w-4 text-gray-500" />
-                                    <span className="text-sm font-medium">Keyboard Shortcuts</span>
+                                    <KeyRound className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                    <span className="text-sm font-medium dark:text-gray-200">Keyboard Shortcuts</span>
                                 </div>
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => setIsBulkMode(false)}
-                                    className="h-7 text-xs"
+                                    className="h-7 text-xs dark:text-gray-300 dark:hover:bg-gray-800"
                                     disabled={isPerformingBulkAction}
                                 >
                                     Exit Bulk Mode
@@ -585,19 +685,19 @@ export default function FeeTypesIndex({
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
                                 <div className="flex items-center gap-1">
-                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+A</kbd>
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200">Ctrl+A</kbd>
                                     <span>Select page</span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Shift+Ctrl+A</kbd>
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200">Shift+Ctrl+A</kbd>
                                     <span>Select filtered</span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Delete</kbd>
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200">Delete</kbd>
                                     <span>Delete selected</span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200">Esc</kbd>
                                     <span>Exit/clear</span>
                                 </div>
                             </div>

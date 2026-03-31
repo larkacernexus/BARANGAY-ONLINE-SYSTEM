@@ -1,7 +1,9 @@
 // components/adminui/empty-state.tsx
+
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
 interface EmptyStateProps {
     title: string;
@@ -16,6 +18,7 @@ interface EmptyStateProps {
         label: string;
         onClick: () => void;
     };
+    className?: string;
 }
 
 export function EmptyState({
@@ -27,10 +30,49 @@ export function EmptyState({
     onCreateNew,
     createLabel = "Create New",
     children,
-    action
+    action,
+    className
 }: EmptyStateProps) {
+    // Determine which action to show
+    const showAction = () => {
+        // If action is provided directly, use that
+        if (action) {
+            return (
+                <Button onClick={action.onClick} className="h-8 text-xs">
+                    <Plus className="h-3 w-3 mr-1" />
+                    {action.label}
+                </Button>
+            );
+        }
+        
+        // If there are active filters, show clear filters button
+        if (hasFilters && onClearFilters) {
+            return (
+                <Button
+                    variant="outline"
+                    onClick={onClearFilters}
+                    className="h-8 text-xs"
+                >
+                    Clear Filters
+                </Button>
+            );
+        }
+        
+        // If onCreateNew is provided, show create button
+        if (onCreateNew) {
+            return (
+                <Button onClick={onCreateNew} className="h-8 text-xs">
+                    <Plus className="h-3 w-3 mr-1" />
+                    {createLabel}
+                </Button>
+            );
+        }
+        
+        return null;
+    };
+
     return (
-        <div className="text-center py-8 text-gray-500">
+        <div className={cn("text-center py-8 text-gray-500", className)}>
             <div className="flex flex-col items-center justify-center space-y-4">
                 {icon}
                 <div>
@@ -42,27 +84,7 @@ export function EmptyState({
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {action && !hasFilters && !onCreateNew && (
-                        <Button onClick={action.onClick} className="h-8 text-xs">
-                            <Plus className="h-3 w-3 mr-1" />
-                            {action.label}
-                        </Button>
-                    )}
-                    {hasFilters && onClearFilters && (
-                        <Button
-                            variant="outline"
-                            onClick={onClearFilters}
-                            className="h-8 text-xs"
-                        >
-                            Clear Filters
-                        </Button>
-                    )}
-                    {onCreateNew && (
-                        <Button onClick={onCreateNew} className="h-8 text-xs">
-                            <Plus className="h-3 w-3 mr-1" />
-                            {createLabel}
-                        </Button>
-                    )}
+                    {showAction()}
                 </div>
                 {children}
             </div>

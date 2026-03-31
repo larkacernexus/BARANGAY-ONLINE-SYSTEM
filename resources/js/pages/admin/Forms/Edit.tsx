@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { Link, useForm, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { PageProps } from '@/types';
+import { PageProps } from '@/types/admin/forms/forms.types';
 
 // Reuse the same constants
 const CATEGORIES = [

@@ -9,7 +9,7 @@ import { X, ZoomIn, ZoomOut, RotateCw, RefreshCw, Download, Info, Eye, BarChart3
 import { cn } from '@/lib/utils';
 import { formatDate, formatDateTime, formatFileSize } from '@/components/residentui/lib/resident-ui-utils';
 import { getFileIcon, getFileColor } from '@/utils/portal/records/document.utils';
-import { Document } from '@/types/portal/records/document.types';
+import { Document } from '@/types/portal/records/records';
 import { Badge } from '@/components/ui/badge';
 
 

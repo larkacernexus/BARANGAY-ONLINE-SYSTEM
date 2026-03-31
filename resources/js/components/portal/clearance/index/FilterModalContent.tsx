@@ -1,92 +1,116 @@
-// /components/portal/clearance/index/FilterModalContent.tsx
+// /components/residentui/reports/ReportFilterModalContent.tsx
 import { ModernSelect } from '@/components/residentui/modern-select';
-import { Flag, FileText, Calendar, Users, DollarSign } from 'lucide-react';
+import { Flag, FileText, FolderOpen, AlertCircle } from 'lucide-react';
+import { FilterOptions, ReportCategory, ReportStatus, UrgencyLevel } from '@/types/portal/reports/community-report';
 
-interface FilterModalContentProps {
-    clearanceTypeFilter: string;
-    onClearanceTypeChange: (value: string) => void;
-    residentFilter: string;
-    onResidentChange: (value: string) => void;
-    urgencyFilter: string;
-    onUrgencyChange: (value: string) => void;
-    yearFilter: string;
-    onYearChange: (value: string) => void;
+interface ReportFilterModalContentProps {
+    selectedStatus: string;
+    onStatusChange: (status: string) => void;
+    selectedUrgency: string;
+    onUrgencyChange: (urgency: string) => void;
+    selectedCategory: string;
+    onCategoryChange: (category: string) => void;
+    selectedType: string;
+    onTypeChange: (type: string) => void;
     loading: boolean;
-    availableClearanceTypes: Array<{ id: number; name: string }>;
-    householdResidents: Array<{ 
-        id: number; 
-        first_name: string; 
-        last_name: string;
-        full_name?: string;
-    }>;
-    availableYears: number[];
-    currentResidentId?: number;
+    filterOptions: FilterOptions;
 }
 
-export const FilterModalContent = ({
-    clearanceTypeFilter,
-    onClearanceTypeChange,
-    residentFilter,
-    onResidentChange,
-    urgencyFilter,
+export const ReportFilterModalContent = ({
+    selectedStatus,
+    onStatusChange,
+    selectedUrgency,
     onUrgencyChange,
-    yearFilter,
-    onYearChange,
+    selectedCategory,
+    onCategoryChange,
+    selectedType,
+    onTypeChange,
     loading,
-    availableClearanceTypes,
-    householdResidents,
-    availableYears,
-    currentResidentId
-}: FilterModalContentProps) => {
-    // Helper function to get resident display name
-    const getResidentName = (resident: { first_name: string; last_name: string; full_name?: string }) => {
-        return resident.full_name || `${resident.first_name} ${resident.last_name}`.trim();
-    };
+    filterOptions
+}: ReportFilterModalContentProps) => {
+    // Map statuses to display labels
+    const statusOptions = [
+        { value: 'all', label: 'All Statuses' },
+        ...(filterOptions.statuses || []).map(status => ({
+            value: status,
+            label: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        }))
+    ];
+
+    // Map urgency levels
+    const urgencyOptions = [
+        { value: 'all', label: 'All Urgency' },
+        ...(filterOptions.priorities || ['low', 'medium', 'high']).map(urgency => ({
+            value: urgency,
+            label: urgency.charAt(0).toUpperCase() + urgency.slice(1)
+        }))
+    ];
+
+    // Map categories
+    const categoryOptions = [
+        { value: 'all', label: 'All Categories' },
+        ...(filterOptions.categories || []).map(category => ({
+            value: category,
+            label: category.charAt(0).toUpperCase() + category.slice(1)
+        }))
+    ];
+
+    // Map report types
+    const typeOptions = [
+        { value: 'all', label: 'All Report Types' },
+        ...(filterOptions.reportTypes || []).map(type => ({
+            value: type.id.toString(),
+            label: type.name
+        }))
+    ];
 
     return (
-        <>
-            {/* Clearance Type Filter */}
-            {availableClearanceTypes && availableClearanceTypes.length > 0 && (
+        <div className="space-y-4">
+            {/* Status Filter */}
+            <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Status
+                </label>
+                <ModernSelect
+                    value={selectedStatus}
+                    onValueChange={onStatusChange}
+                    placeholder="All statuses"
+                    options={statusOptions}
+                    disabled={loading}
+                    icon={AlertCircle}
+                />
+            </div>
+
+            {/* Report Type Filter */}
+            {filterOptions.reportTypes && filterOptions.reportTypes.length > 0 && (
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Clearance Type
+                        Report Type
                     </label>
                     <ModernSelect
-                        value={clearanceTypeFilter}
-                        onValueChange={onClearanceTypeChange}
-                        placeholder="All clearance types"
-                        options={[
-                            { value: 'all', label: 'All Types' },
-                            ...availableClearanceTypes.map(type => ({
-                                value: type.id.toString(),
-                                label: type.name
-                            }))
-                        ]}
+                        value={selectedType}
+                        onValueChange={onTypeChange}
+                        placeholder="All report types"
+                        options={typeOptions}
                         disabled={loading}
                         icon={FileText}
                     />
                 </div>
             )}
 
-            {/* Resident Filter */}
-            {householdResidents && householdResidents.length > 0 && (
+            {/* Category Filter */}
+            {filterOptions.categories && filterOptions.categories.length > 0 && (
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Resident
+                        Category
                     </label>
                     <ModernSelect
-                        value={residentFilter}
-                        onValueChange={onResidentChange}
-                        placeholder="All residents"
-                        options={[
-                            { value: 'all', label: 'All Residents' },
-                            ...householdResidents.map(resident => ({
-                                value: resident.id.toString(),
-                                label: getResidentName(resident)
-                            }))
-                        ]}
+                        value={selectedCategory}
+                        onValueChange={onCategoryChange}
+                        placeholder="All categories"
+                        options={categoryOptions}
                         disabled={loading}
-                        icon={Users}
+                        icon={FolderOpen}
                     />
                 </div>
             )}
@@ -97,43 +121,14 @@ export const FilterModalContent = ({
                     Urgency
                 </label>
                 <ModernSelect
-                    value={urgencyFilter}
+                    value={selectedUrgency}
                     onValueChange={onUrgencyChange}
                     placeholder="All urgency"
-                    options={[
-                        { value: 'all', label: 'All Urgency' },
-                        { value: 'normal', label: 'Normal' },
-                        { value: 'rush', label: 'Rush' },
-                        { value: 'express', label: 'Express' },
-                    ]}
+                    options={urgencyOptions}
                     disabled={loading}
                     icon={Flag}
                 />
             </div>
-
-            {/* Year Filter */}
-            {availableYears && availableYears.length > 0 && (
-                <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Year
-                    </label>
-                    <ModernSelect
-                        value={yearFilter}
-                        onValueChange={onYearChange}
-                        placeholder="All years"
-                        options={[
-                            { value: 'all', label: 'All Years' },
-                            ...availableYears.map(year => ({
-                                value: year.toString(),
-                                label: year.toString()
-                            }))
-                        ]}
-                        disabled={loading}
-                        icon={Calendar}
-                    />
-                </div>
-            )}
-
-        </>
+        </div>
     );
 };

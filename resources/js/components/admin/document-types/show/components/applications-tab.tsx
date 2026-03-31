@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/DocumentTypes/components/applications-tab.tsx
+
 import React from 'react';
 import { Link } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,12 +20,36 @@ import {
 } from 'lucide-react';
 import { route } from 'ziggy-js';
 
+// Import types from centralized location
+import type { RecentApplication } from '@/types/admin/document-types/document-types';
+
 interface Props {
-    recentApplications: any[];
+    recentApplications: RecentApplication[];
     formatShortDate: (date: string) => string;
 }
 
 export const ApplicationsTab = ({ recentApplications, formatShortDate }: Props) => {
+    // Helper to get status badge styling
+    const getStatusBadge = (status: string) => {
+        switch (status?.toLowerCase()) {
+            case 'approved':
+                return {
+                    variant: 'default' as const,
+                    className: 'dark:bg-green-900/30 dark:text-green-300'
+                };
+            case 'rejected':
+                return {
+                    variant: 'destructive' as const,
+                    className: 'dark:bg-red-900/30 dark:text-red-300'
+                };
+            default:
+                return {
+                    variant: 'outline' as const,
+                    className: 'dark:border-gray-600 dark:text-gray-300'
+                };
+        }
+    };
+
     return (
         <Card className="dark:bg-gray-900">
             <CardHeader>
@@ -56,34 +81,44 @@ export const ApplicationsTab = ({ recentApplications, formatShortDate }: Props) 
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {recentApplications.map((app: any) => (
-                                        <TableRow key={app.id} className="dark:border-gray-700">
-                                            <TableCell className="dark:text-gray-300">#{app.id}</TableCell>
-                                            <TableCell className="dark:text-gray-200">{app.clearance_type?.name}</TableCell>
-                                            <TableCell className="dark:text-gray-300">{app.applicant?.name}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={
-                                                    app.status === 'approved' ? 'default' :
-                                                    app.status === 'rejected' ? 'destructive' :
-                                                    'outline'
-                                                } className={
-                                                    app.status === 'approved' ? 'dark:bg-green-900/30 dark:text-green-300' :
-                                                    app.status === 'rejected' ? 'dark:bg-red-900/30 dark:text-red-300' :
-                                                    'dark:border-gray-600 dark:text-gray-300'
-                                                }>
-                                                    {app.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="dark:text-gray-300">{formatShortDate(app.created_at)}</TableCell>
-                                            <TableCell>
-                                                <Button variant="ghost" size="sm" asChild className="dark:text-gray-400 dark:hover:text-white">
-                                                    <Link href={route('clearance-applications.show', app.id)}>
-                                                        <Eye className="h-4 w-4" />
-                                                    </Link>
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {recentApplications.map((app) => {
+                                        const statusBadge = getStatusBadge(app.status);
+                                        return (
+                                            <TableRow key={app.id} className="dark:border-gray-700">
+                                                <TableCell className="dark:text-gray-300">#{app.id}</TableCell>
+                                                <TableCell className="dark:text-gray-200">
+                                                    {app.clearance_type?.name || app.clearance_type_name || 'N/A'}
+                                                </TableCell>
+                                                <TableCell className="dark:text-gray-300">
+                                                    {app.complainant_name || app.applicant_name || 'N/A'}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge 
+                                                        variant={statusBadge.variant} 
+                                                        className={statusBadge.className}
+                                                    >
+                                                        {app.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="dark:text-gray-300">
+                                                    {formatShortDate(app.created_at)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        asChild 
+                                                        className="dark:text-gray-400 dark:hover:text-white"
+                                                    >
+                                                        <Link href={route('clearance-applications.show', app.id)}>
+                                                            <Eye className="h-4 w-4" />
+                                                            <span className="sr-only">View application</span>
+                                                        </Link>
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </div>

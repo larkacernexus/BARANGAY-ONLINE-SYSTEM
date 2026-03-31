@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/Announcements/components/audience-tab.tsx
+
 import React from 'react';
 import { Link } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,41 +20,64 @@ import {
     Edit,
     Eye,
     Copy,
-    TrendingUp
+    TrendingUp,
+    Building,
+    Phone
 } from 'lucide-react';
 import { route } from 'ziggy-js';
 
-interface Announcement {
-    id: number;
-    audience_type: string;
-    audience_type_label: string;
-    audience_summary: string;
-    estimated_reach: number;
-}
-
-interface AudienceDetails {
-    roles?: Array<{ id: number; name: string }>;
-    puroks?: Array<{ id: number; name: string }>;
-    households?: Array<{ id: number; household_number: string; purok?: { name: string } }>;
-    businesses?: Array<{ id: number; business_name: string; owner_name?: string }>;
-    users?: Array<{ id: number; first_name: string; last_name: string; email: string; role?: { name: string } }>;
-}
+// Import types from admin types
+import type { 
+    Announcement, 
+    AudienceDetails,
+    AnnouncementType,
+    PriorityLevel
+} from '@/types/admin/announcements/announcement.types';
 
 interface Props {
     announcement: Announcement;
     audience_details: AudienceDetails;
+    audience_types: Record<string, string>;
+    types: Record<string, string>;
+    priorities: Record<string, string>;
     AudienceIcon: React.ElementType;
     onPreview: (e: React.MouseEvent) => void;
     onDuplicate: () => void;
+    formatDate: (date: string | null) => string;
+    getTypeIcon: (type: AnnouncementType | string) => React.ReactNode;
+    getTypeColor: (type: AnnouncementType | string) => string;
+    getPriorityIcon: (priority: PriorityLevel | number) => React.ReactNode;
+    getPriorityColor: (priority: PriorityLevel | number) => string;
 }
 
 export const AudienceTab = ({
     announcement,
     audience_details,
+    audience_types,
+    types,
+    priorities,
     AudienceIcon,
     onPreview,
-    onDuplicate
+    onDuplicate,
+    formatDate,
+    getTypeIcon,
+    getTypeColor,
+    getPriorityIcon,
+    getPriorityColor
 }: Props) => {
+    // Helper to get user initials
+    const getUserInitials = (firstName: string, lastName: string): string => {
+        return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    };
+
+    // Helper to get audience display name
+    const getAudienceDisplayName = (): string => {
+        if (announcement.audience_type_label) {
+            return announcement.audience_type_label;
+        }
+        return audience_types[announcement.audience_type] || announcement.audience_type;
+    };
+
     return (
         <div className="grid gap-6 lg:grid-cols-3">
             {/* Left Column - Audience List */}
@@ -75,7 +99,8 @@ export const AudienceTab = ({
                                 <Globe className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                                 <h3 className="text-lg font-semibold dark:text-gray-100 mb-2">All Users</h3>
                                 <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-                                    This announcement is visible to all users of the system, including residents, households, businesses, and administrators.
+                                    This announcement is visible to all users of the system, including residents, 
+                                    households, businesses, and administrators.
                                 </p>
                             </div>
                         )}
@@ -85,7 +110,7 @@ export const AudienceTab = ({
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2">
                                     <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/30">
-                                        <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                        <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                     </div>
                                     <h3 className="font-medium dark:text-gray-200">Target Roles ({audience_details.roles.length})</h3>
                                 </div>
@@ -112,7 +137,7 @@ export const AudienceTab = ({
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                     {audience_details.puroks.map((purok) => (
                                         <Badge key={purok.id} variant="outline" className="justify-start py-2 dark:border-gray-600 dark:text-gray-300">
-                                            <Home className="h-3 w-3 mr-1" />
+                                            <MapPinned className="h-3 w-3 mr-1" />
                                             {purok.name}
                                         </Badge>
                                     ))}
@@ -128,21 +153,24 @@ export const AudienceTab = ({
                                         <Home className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                     </div>
                                     <h3 className="font-medium dark:text-gray-200">
-                                        Target {announcement.audience_type === 'household_members' ? 'Households (All Members)' : 'Households'} 
-                                        ({audience_details.households.length})
+                                        Target Households ({audience_details.households.length})
                                     </h3>
                                 </div>
                                 <div className="grid gap-2 max-h-96 overflow-y-auto pr-2">
                                     {audience_details.households.map((household) => (
-                                        <Card key={household.id} className="dark:bg-gray-900">
+                                        <Card key={household.id} className="dark:bg-gray-900 border dark:border-gray-700">
                                             <CardContent className="p-3">
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
                                                         <Home className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                                         <div>
-                                                            <p className="font-medium dark:text-gray-200">{household.household_number}</p>
+                                                            <p className="font-medium dark:text-gray-200">
+                                                                Household #{household.household_number}
+                                                            </p>
                                                             {household.purok && (
-                                                                <p className="text-xs text-gray-500 dark:text-gray-400">{household.purok.name}</p>
+                                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    Purok: {household.purok.name}
+                                                                </p>
                                                             )}
                                                         </div>
                                                     </div>
@@ -160,20 +188,22 @@ export const AudienceTab = ({
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2">
                                     <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/30">
-                                        <Briefcase className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                        <Building className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                                     </div>
                                     <h3 className="font-medium dark:text-gray-200">Target Businesses ({audience_details.businesses.length})</h3>
                                 </div>
                                 <div className="grid gap-2 max-h-96 overflow-y-auto pr-2">
                                     {audience_details.businesses.map((business) => (
-                                        <Card key={business.id} className="dark:bg-gray-900">
+                                        <Card key={business.id} className="dark:bg-gray-900 border dark:border-gray-700">
                                             <CardContent className="p-3">
-                                                <div className="flex items-center gap-2">
-                                                    <Briefcase className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                    <div>
+                                                <div className="flex items-start gap-2">
+                                                    <Building className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
+                                                    <div className="flex-1">
                                                         <p className="font-medium dark:text-gray-200">{business.business_name}</p>
                                                         {business.owner_name && (
-                                                            <p className="text-xs text-gray-500 dark:text-gray-400">Owner: {business.owner_name}</p>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                                Owner: {business.owner_name}
+                                                            </p>
                                                         )}
                                                     </div>
                                                 </div>
@@ -195,21 +225,21 @@ export const AudienceTab = ({
                                 </div>
                                 <div className="grid gap-2 max-h-96 overflow-y-auto pr-2">
                                     {audience_details.users.map((user) => (
-                                        <Card key={user.id} className="dark:bg-gray-900">
+                                        <Card key={user.id} className="dark:bg-gray-900 border dark:border-gray-700">
                                             <CardContent className="p-3">
-                                                <div className="flex items-start gap-2">
+                                                <div className="flex items-start gap-3">
                                                     <Avatar className="h-8 w-8 dark:bg-gray-700">
                                                         <AvatarFallback className="text-xs dark:bg-gray-600 dark:text-gray-200">
-                                                            {user.first_name[0]}{user.last_name[0]}
+                                                            {getUserInitials(user.first_name, user.last_name)}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div className="flex-1">
                                                         <p className="font-medium dark:text-gray-200">
                                                             {user.first_name} {user.last_name}
                                                         </p>
-                                                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                             <Mail className="h-3 w-3" />
-                                                            {user.email}
+                                                            <span>{user.email}</span>
                                                             {user.role && (
                                                                 <>
                                                                     <span>•</span>
@@ -247,7 +277,9 @@ export const AudienceTab = ({
                                     <Users className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                                     <span className="text-sm font-medium dark:text-gray-300">Estimated Reach</span>
                                 </div>
-                                <span className="text-lg font-bold dark:text-gray-100">{announcement.estimated_reach.toLocaleString()}</span>
+                                <span className="text-lg font-bold dark:text-gray-100">
+                                    {announcement.estimated_reach?.toLocaleString() || 'N/A'}
+                                </span>
                             </div>
                             <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
                                 <div className="flex items-center gap-2">
@@ -255,7 +287,7 @@ export const AudienceTab = ({
                                     <span className="text-sm font-medium dark:text-gray-300">Audience Type</span>
                                 </div>
                                 <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
-                                    {announcement.audience_type_label}
+                                    {getAudienceDisplayName()}
                                 </Badge>
                             </div>
                         </div>
@@ -264,7 +296,9 @@ export const AudienceTab = ({
 
                         <div className="space-y-2">
                             <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Target Summary</p>
-                            <p className="text-sm dark:text-gray-300">{announcement.audience_summary}</p>
+                            <p className="text-sm dark:text-gray-300">
+                                {announcement.audience_summary || `${getAudienceDisplayName()} audience targeting configuration.`}
+                            </p>
                         </div>
                     </CardContent>
                 </Card>

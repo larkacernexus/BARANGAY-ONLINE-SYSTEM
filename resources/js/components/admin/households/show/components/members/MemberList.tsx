@@ -5,84 +5,133 @@ import { route } from 'ziggy-js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Users, UserPlus, Clock, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
-import { HouseholdMember } from '../../types';
-import { MemberCard } from './MemberCard';
-import AddMemberModal from './AddMemberModal';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
+// Import types from shared types file
+import { 
+    HouseholdMember, 
+    Resident, 
+    ExtendedMember
+} from '@/types/admin/households/household.types';
+import { 
+    getFullName, 
+    formatDate, 
+    getRelativeTime, 
+    getRelationshipLabel 
+} from '@/types/admin/households/household.types';
+
+// Import components
+import { MemberCard } from './MemberCard';
+import AddMemberModal from './AddMemberModal';
+
 interface MemberListProps {
-    members: HouseholdMember[];
+    members: (HouseholdMember & {
+        resident?: Resident;
+    })[];
     householdId: number;
-    availableResidents?: any[];
+    availableResidents?: Resident[];
     headId?: number | null;
+}
+
+// Extended Resident type for modal
+interface ExtendedResident extends Resident {
+    full_name: string;
+    household_status: 'none' | 'member' | 'head';
+    status_label: string;
+    status_color: string;
+    can_be_added: boolean;
+    restriction_reason?: string | null;
+    current_household?: {
+        id: number;
+        number: string;
+        is_head: boolean;
+        relationship: string;
+    } | null;
 }
 
 export const MemberList = ({ members, householdId, availableResidents = [], headId }: MemberListProps) => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [showTimeline, setShowTimeline] = useState(false);
     
-    // Fix: Add type predicate to ensure filtered array is number[]
-    const currentMemberIds = members
-        .map(m => m.resident_id)
-        .filter((id): id is number => id !== undefined);
+   // Transform availableResidents to ExtendedResident type for the modal
+const extendedAvailableResidents: ExtendedResident[] = useMemo(() => {
+    return availableResidents.map(resident => {
+        // Determine if this resident is the head of another household
+        // You'll need to check your actual data structure
+        const isHeadOfAnotherHousehold = (resident as any).is_head_of_household === true;
+        const currentHousehold = (resident as any).current_household;
+        
+        // Use let instead of const for household_status
+        let household_status: 'none' | 'member' | 'head' = 'none';
+        
+        if (isHeadOfAnotherHousehold) {
+            household_status = 'head';
+        } else if (currentHousehold) {
+            household_status = 'member';
+        } else {
+            household_status = 'none';
+        }
+        
+        return {
+            ...resident,
+            full_name: getFullName(resident.first_name, resident.last_name, resident.middle_name),
+            household_status,
+            status_label: household_status === 'head' ? 'Head of Another Household' : 
+                          household_status === 'member' ? 'In Another Household' : 'Available',
+            status_color: household_status === 'head' ? 'amber' : 
+                         household_status === 'member' ? 'purple' : 'gray',
+            can_be_added: household_status !== 'head',
+            restriction_reason: household_status === 'head' 
+                ? 'Resident is already head of another household' 
+                : household_status === 'member'
+                ? 'Resident already belongs to another household. Adding will transfer them.'
+                : null,
+            current_household: currentHousehold ? {
+                id: currentHousehold.id,
+                number: currentHousehold.household_number || currentHousehold.number,
+                is_head: currentHousehold.is_head || false,
+                relationship: currentHousehold.relationship || ''
+            } : null
+        };
+    });
+}, [availableResidents]);
+    // Simply cast members to ExtendedMember[] since ExtendedMember extends HouseholdMember
+    const extendedMembers: ExtendedMember[] = useMemo(() => {
+        return members as ExtendedMember[];
+    }, [members]);
 
-    // Fix: Convert undefined to null to match expected prop type
-    const safeHeadId = headId === undefined ? null : headId;
+    // Get current member IDs (filter out undefined)
+    const currentMemberIds = useMemo(() => {
+        return members
+            .map(m => m.resident_id)
+            .filter((id): id is number => id !== undefined);
+    }, [members]);
 
     // Sort members by creation date (newest first)
-    const sortedMembers = [...members].sort((a, b) => {
-        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return dateB - dateA;
-    });
+    const sortedMembers = useMemo(() => {
+        return [...extendedMembers].sort((a, b) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return dateB - dateA;
+        });
+    }, [extendedMembers]);
 
     // Get member addition timeline
-    const getMemberTimeline = () => {
+    const timeline = useMemo(() => {
         return sortedMembers.map(member => ({
             id: member.id,
-            name: member.resident?.first_name + ' ' + member.resident?.last_name,
-            relationship: member.relationship_to_head,
+            name: getFullName(member.first_name, member.last_name, member.middle_name),
+            relationship: getRelationshipLabel(member.relationship),
             addedAt: member.created_at,
             updatedAt: member.updated_at,
-            isHead: member.is_head
+            isHead: member.is_head === true
         }));
-    };
+    }, [sortedMembers]);
 
-    // Format date for display
-    const formatDate = (dateString?: string) => {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
-    // Get relative time (e.g., "2 days ago")
-    const getRelativeTime = (dateString?: string) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-        
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-        if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-        if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-        if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) !== 1 ? 's' : ''} ago`;
-        if (diffDays < 365) return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) !== 1 ? 's' : ''} ago`;
-        return `${Math.floor(diffDays / 365)} year${Math.floor(diffDays / 365) !== 1 ? 's' : ''} ago`;
-    };
-
-    const timeline = getMemberTimeline();
+    // Safe head ID (convert undefined to null)
+    const safeHeadId = headId === undefined ? null : headId;
 
     return (
         <>
@@ -111,11 +160,15 @@ export const MemberList = ({ members, householdId, availableResidents = [], head
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-3">
-                        {members && members.length > 0 ? (
+                        {extendedMembers && extendedMembers.length > 0 ? (
                             <>
                                 {/* Member Cards */}
-                                {members.map((member) => (
-                                    <MemberCard key={member.id} member={member} />
+                                {extendedMembers.map((member) => (
+                                    <MemberCard 
+                                        key={member.id} 
+                                        member={member}
+                                        isHead={member.is_head === true || member.id === safeHeadId}
+                                    />
                                 ))}
 
                                 {/* Timeline Section */}
@@ -169,7 +222,7 @@ export const MemberList = ({ members, householdId, availableResidents = [], head
                                                                 </p>
                                                             </div>
                                                             <div className="text-right">
-                                                                <div className="flex items-center gap-2">
+                                                                <div className="flex items-center gap-2 justify-end">
                                                                     <Calendar className="h-3 w-3 text-gray-400" />
                                                                     <p className="text-xs text-gray-500 dark:text-gray-400">
                                                                         Added {formatDate(item.addedAt)}
@@ -219,7 +272,7 @@ export const MemberList = ({ members, householdId, availableResidents = [], head
             <AddMemberModal
                 open={isAddModalOpen}
                 onOpenChange={setIsAddModalOpen}
-                availableResidents={availableResidents}
+                availableResidents={extendedAvailableResidents}
                 householdId={householdId}
                 currentMemberIds={currentMemberIds}
                 headId={safeHeadId}

@@ -1,3 +1,5 @@
+// components/admin/fees/FeesTableView.tsx
+
 import {
     Table,
     TableBody,
@@ -39,7 +41,7 @@ import {
 } from 'lucide-react';
 import { Link, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
-import { Fee, Filters } from '@/types/fees.types';
+import { Fee, Filters } from '@/types/admin/fees/fees';
 import { format, isAfter } from 'date-fns';
 
 interface FeesTableViewProps {
@@ -59,46 +61,48 @@ interface FeesTableViewProps {
     onClearFilters: () => void;
     statuses: Record<string, string>;
     categories: Record<string, string>;
+    // Additional props passed from parent
+    formatCurrency: (amount: number) => string;
+    getStatusColor: (status: string) => string;
+    getStatusIcon: (status: string) => React.ReactNode;
+    getCategoryColor: (category: string) => string;
+    getCategoryLabel: (category: string) => string;
 }
 
-const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-        style: 'currency',
-        currency: 'PHP',
-        minimumFractionDigits: 2
-    }).format(amount);
-};
-
-const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'MMM dd, yyyy');
-};
-
-const isOverdue = (dueDate: string) => {
-    const due = new Date(dueDate);
-    const today = new Date();
-    return isAfter(today, due);
-};
-
-const getDaysOverdue = (dueDate: string) => {
-    const due = new Date(dueDate);
-    const today = new Date();
-    const diffTime = today.getTime() - due.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
-};
-
-const getStatusIcon = (status: string) => {
-    switch (status) {
-        case 'paid': return <CheckCircle className="h-4 w-4 text-green-500" />;
-        case 'issued': return <FileText className="h-4 w-4 text-blue-500" />;
-        case 'pending': return <Clock className="h-4 w-4 text-amber-500" />;
-        case 'partially_paid': return <CreditCard className="h-4 w-4 text-indigo-500" />;
-        case 'overdue': return <AlertCircle className="h-4 w-4 text-red-500" />;
-        default: return null;
+const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return 'N/A';
+    try {
+        return format(new Date(dateString), 'MMM dd, yyyy');
+    } catch {
+        return 'Invalid date';
     }
 };
 
-const getPayerIcon = (payerType: string) => {
+const isOverdue = (dueDate: string | null | undefined): boolean => {
+    if (!dueDate) return false;
+    try {
+        const due = new Date(dueDate);
+        const today = new Date();
+        return isAfter(today, due);
+    } catch {
+        return false;
+    }
+};
+
+const getDaysOverdue = (dueDate: string | null | undefined): number => {
+    if (!dueDate) return 0;
+    try {
+        const due = new Date(dueDate);
+        const today = new Date();
+        const diffTime = today.getTime() - due.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays > 0 ? diffDays : 0;
+    } catch {
+        return 0;
+    }
+};
+
+const getPayerIcon = (payerType?: string) => {
     switch (payerType) {
         case 'resident': return <User className="h-4 w-4" />;
         case 'household': return <Home className="h-4 w-4" />;
@@ -128,7 +132,12 @@ export default function FeesTableView({
     hasActiveFilters,
     onClearFilters,
     statuses,
-    categories
+    categories,
+    formatCurrency,
+    getStatusColor,
+    getStatusIcon,
+    getCategoryColor,
+    getCategoryLabel
 }: FeesTableViewProps) {
 
     const handleViewClick = (fee: Fee) => {
@@ -148,11 +157,22 @@ export default function FeesTableView({
     };
 
     const handleCopyFeeCode = (fee: Fee) => {
+        const feeCode = fee.fee_code || fee.code || 'N/A';
         if (onCopyToClipboard) {
-            onCopyToClipboard(fee.fee_code, 'Fee Code');
+            onCopyToClipboard(feeCode, 'Fee Code');
         } else {
-            navigator.clipboard.writeText(fee.fee_code);
+            navigator.clipboard.writeText(feeCode);
         }
+    };
+
+    // Check if fee can be edited
+    const canEdit = (status: string) => {
+        return status === 'pending' || status === 'issued';
+    };
+
+    // Check if fee can be deleted
+    const canDelete = (status: string) => {
+        return status === 'pending';
     };
 
     return (
@@ -175,7 +195,7 @@ export default function FeesTableView({
                                     </TableHead>
                                 )}
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[160px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[160px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('fee_code')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -184,7 +204,7 @@ export default function FeesTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('payer_name')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -193,7 +213,7 @@ export default function FeesTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('due_date')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -202,7 +222,7 @@ export default function FeesTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('total_amount')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -211,7 +231,7 @@ export default function FeesTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('status')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -229,6 +249,13 @@ export default function FeesTableView({
                                 const isSelected = selectedFees.includes(fee.id);
                                 const isFeeOverdue = isOverdue(fee.due_date) && fee.status !== 'paid';
                                 const daysOverdue = getDaysOverdue(fee.due_date);
+                                
+                                // Safe amount calculations
+                                const totalAmount = fee.total_amount ?? fee.amount ?? 0;
+                                const amountPaid = fee.amount_paid ?? fee.paid_amount ?? 0;
+                                const balance = fee.balance ?? (totalAmount - amountPaid);
+                                const hasBalance = balance > 0;
+                                const hasPaid = amountPaid > 0;
                                 
                                 return (
                                     <TableRow 
@@ -261,16 +288,16 @@ export default function FeesTableView({
                                         )}
                                         <TableCell className="px-4 py-3 whitespace-nowrap">
                                             <div className="space-y-1">
-                                                <div className="font-medium">
-                                                    {fee.fee_code}
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {fee.fee_code || fee.code}
                                                 </div>
-                                                <div className="text-sm text-gray-500">
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">
                                                     {fee.fee_type?.name || 'Unknown Fee Type'}
                                                 </div>
                                                 {fee.fee_type?.category && (
                                                     <div className="mt-1">
-                                                        <Badge variant="outline">
-                                                            {categories[fee.fee_type.category] || fee.fee_type.category}
+                                                        <Badge variant="outline" className={getCategoryColor(fee.fee_type.category)}>
+                                                            {getCategoryLabel(fee.fee_type.category)}
                                                         </Badge>
                                                     </div>
                                                 )}
@@ -278,15 +305,15 @@ export default function FeesTableView({
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-gray-100 dark:bg-gray-900 rounded-lg">
-                                                    {getPayerIcon(fee.payer_type)}
+                                                <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                                                    {getPayerIcon(fee.payer_type || fee.type)}
                                                 </div>
                                                 <div>
-                                                    <div className="font-medium">
-                                                        {fee.payer_name}
+                                                    <div className="font-medium dark:text-gray-200">
+                                                        {fee.payer_name || fee.resident?.full_name || 'Unknown'}
                                                     </div>
-                                                    <div className="text-sm text-gray-500">
-                                                        {fee.contact_number || 'No contact'}
+                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                        {fee.contact_number || fee.resident?.phone || 'No contact'}
                                                     </div>
                                                     {fee.purok && (
                                                         <div className="text-xs text-gray-400 dark:text-gray-500">
@@ -300,13 +327,13 @@ export default function FeesTableView({
                                             <div className="space-y-2">
                                                 <div className="flex items-center gap-2">
                                                     <Calendar className="h-4 w-4 text-gray-400" />
-                                                    <span className="text-sm">
-                                                        Issued: {formatDate(fee.issue_date)}
+                                                    <span className="text-sm dark:text-gray-300">
+                                                        Issued: {formatDate(fee.created_at || fee.issue_date)}
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Clock className="h-4 w-4 text-gray-400" />
-                                                    <span className={`text-sm ${isFeeOverdue ? 'text-red-600' : ''}`}>
+                                                    <span className={`text-sm ${isFeeOverdue ? 'text-red-600 dark:text-red-400' : 'dark:text-gray-300'}`}>
                                                         Due: {formatDate(fee.due_date)}
                                                         {isFeeOverdue && (
                                                             <span className="ml-1 text-xs">
@@ -319,29 +346,32 @@ export default function FeesTableView({
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
                                             <div className="space-y-1">
-                                                <div className="font-bold text-lg">
-                                                    {formatCurrency(fee.total_amount)}
+                                                <div className="font-bold text-lg dark:text-gray-200">
+                                                    {formatCurrency(totalAmount)}
                                                 </div>
-                                                {fee.amount_paid > 0 && (
-                                                    <div className="text-sm text-green-600 flex items-center gap-1">
+                                                {hasPaid && (
+                                                    <div className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
                                                         <CheckCircle className="h-3 w-3" />
-                                                        Paid: {formatCurrency(fee.amount_paid)}
+                                                        Paid: {formatCurrency(amountPaid)}
                                                     </div>
                                                 )}
-                                                {fee.balance > 0 && (
-                                                    <div className="text-sm text-red-600 font-medium">
-                                                        Balance: {formatCurrency(fee.balance)}
+                                                {hasBalance && (
+                                                    <div className="text-sm text-red-600 dark:text-red-400 font-medium">
+                                                        Balance: {formatCurrency(balance)}
                                                     </div>
                                                 )}
-                                                {fee.amount_paid === 0 && fee.balance === fee.total_amount && (
-                                                    <div className="text-sm text-gray-500">
+                                                {!hasPaid && !hasBalance && (
+                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
                                                         No payments yet
                                                     </div>
                                                 )}
                                             </div>
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
-                                            <Badge variant="outline" className="flex items-center gap-1">
+                                            <Badge 
+                                                variant="outline" 
+                                                className={`flex items-center gap-1 ${getStatusColor(fee.status)}`}
+                                            >
                                                 {getStatusIcon(fee.status)}
                                                 {statuses[fee.status] || fee.status}
                                             </Badge>
@@ -357,48 +387,48 @@ export default function FeesTableView({
                                                         <MoreVertical className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-48">
-                                                    <DropdownMenuItem onClick={() => handleViewClick(fee)}>
+                                                <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
+                                                    <DropdownMenuItem onClick={() => handleViewClick(fee)} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                                         <Eye className="mr-2 h-4 w-4" />
                                                         View Details
                                                     </DropdownMenuItem>
                                                     
-                                                    {(fee.status === 'pending' || fee.status === 'issued') && (
-                                                        <DropdownMenuItem onClick={() => handleEditClick(fee)}>
+                                                    {canEdit(fee.status) && (
+                                                        <DropdownMenuItem onClick={() => handleEditClick(fee)} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                                             <Edit className="mr-2 h-4 w-4" />
                                                             Edit Fee
                                                         </DropdownMenuItem>
                                                     )}
                                                     
-                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                     
-                                                    <DropdownMenuItem onClick={() => handleCopyFeeCode(fee)}>
+                                                    <DropdownMenuItem onClick={() => handleCopyFeeCode(fee)} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                                         <Copy className="mr-2 h-4 w-4" />
                                                         Copy Fee Code
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/admin/fees/${fee.id}/print`}>
+                                                        <Link href={`/admin/fees/${fee.id}/print`} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                                             <Printer className="mr-2 h-4 w-4" />
                                                             Print Invoice
                                                         </Link>
                                                     </DropdownMenuItem>
                                                     
-                                                    {fee.status !== 'paid' && fee.balance > 0 && (
+                                                    {fee.status !== 'paid' && hasBalance && (
                                                         <DropdownMenuItem asChild>
                                                             <Link 
                                                                 href={route('admin.payments.create', { 
                                                                     fee_id: fee.id,
-                                                                    payer_type: fee.payer_type,
+                                                                    payer_type: fee.payer_type || fee.type || 'resident',
                                                                     payer_id: fee.payer_type === 'resident' ? fee.resident_id : fee.household_id,
-                                                                    payer_name: fee.payer_name,
-                                                                    contact_number: fee.contact_number,
+                                                                    payer_name: fee.payer_name || fee.resident?.full_name,
+                                                                    contact_number: fee.contact_number || fee.resident?.phone,
                                                                     address: fee.address,
                                                                     purok: fee.purok,
-                                                                    fee_code: fee.fee_code,
-                                                                    balance: fee.balance
+                                                                    fee_code: fee.fee_code || fee.code,
+                                                                    balance: balance
                                                                 })}
-                                                                className="flex items-center"
+                                                                className="flex items-center dark:text-gray-300 dark:hover:bg-gray-800"
                                                             >
                                                                 <CreditCard className="mr-2 h-4 w-4" />
                                                                 Pay Fee
@@ -408,8 +438,8 @@ export default function FeesTableView({
                                                     
                                                     {isBulkMode && (
                                                         <>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem onClick={() => onItemSelect(fee.id)}>
+                                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                                            <DropdownMenuItem onClick={() => onItemSelect(fee.id)} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                                                 {isSelected ? (
                                                                     <>
                                                                         <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
@@ -425,12 +455,12 @@ export default function FeesTableView({
                                                         </>
                                                     )}
                                                     
-                                                    {fee.status === 'pending' && (
+                                                    {canDelete(fee.status) && (
                                                         <>
-                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                             <DropdownMenuItem 
                                                                 onClick={() => onDelete(fee)}
-                                                                className="text-red-600"
+                                                                className="text-red-600 dark:text-red-400 dark:hover:bg-red-950/50"
                                                             >
                                                                 <Trash2 className="mr-2 h-4 w-4" />
                                                                 Delete Fee

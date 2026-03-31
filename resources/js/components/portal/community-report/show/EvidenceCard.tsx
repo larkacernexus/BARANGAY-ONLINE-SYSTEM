@@ -61,6 +61,18 @@ export const EvidenceCard = ({
         );
     }
 
+    const handleViewEvidence = (fileUrl: string | undefined) => {
+        if (fileUrl) {
+            onViewEvidence(fileUrl);
+        }
+    };
+
+    const handleDownloadEvidence = (fileUrl: string | undefined, fileName: string) => {
+        if (fileUrl) {
+            onDownloadEvidence(fileUrl, fileName);
+        }
+    };
+
     return (
         <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50">
             <CardHeader className="pb-2">
@@ -80,11 +92,11 @@ export const EvidenceCard = ({
                         <div key={evidence.id} className="space-y-2">
                             <EvidenceThumbnail
                                 evidence={evidence}
-                                onView={() => onViewEvidence(evidence.file_url)}
-                                onDownload={() => onDownloadEvidence(evidence.file_url, evidence.file_name)}
+                                onView={() => handleViewEvidence(evidence.file_url)}
+                                onDownload={() => handleDownloadEvidence(evidence.file_url, evidence.file_name)}
                                 onDelete={() => onDeleteEvidence(evidence.id)}
                                 canEdit={canEdit}
-                                isDeleting={deletingEvidenceId === evidence.id}
+                                isDeleting={deletingEvidenceId}
                             />
                             <div className="flex items-center justify-between">
                                 <p className="text-xs font-medium truncate flex-1">

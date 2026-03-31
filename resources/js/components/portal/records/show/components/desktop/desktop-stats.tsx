@@ -2,7 +2,7 @@
 import { ModernCard } from '@/components/residentui/modern-card';
 import { Eye, Download, HardDrive, Calendar, Clock } from 'lucide-react';
 import { formatDate, formatFileSize } from '@/components/residentui/lib/resident-ui-utils';
-import { Document } from '@/types/portal/records/document.types';
+import { Document } from '@/types/portal/records/records';
 
 interface DesktopStatsProps {
     document: Document;

@@ -1,3 +1,5 @@
+// components/admin/households/HouseholdsContent.tsx
+
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -26,7 +28,7 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import HouseholdsTableView from '@/components/admin/households/HouseholdsTableView';
 import HouseholdsGridView from '@/components/admin/households/HouseholdsGridView';
 import HouseholdBulkActions from './HouseholdsBulkActions';
-import { Household, Purok, SelectionStats, SelectionMode, BulkAction } from '@/types';
+import { Household, Purok, SelectionStats, SelectionMode, BulkAction } from '@/types/admin/households/household.types';
 
 interface HouseholdsContentProps {
     households: Household[];
@@ -69,6 +71,8 @@ interface HouseholdsContentProps {
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
+    setShowBulkStatusDialog?: (show: boolean) => void;
+    setShowBulkPurokDialog?: (show: boolean) => void;
     selectionMode: SelectionMode;
 }
 
@@ -106,10 +110,12 @@ export default function HouseholdsContent({
     onSelectAllFiltered,
     onSelectAll,
     setShowBulkDeleteDialog,
+    setShowBulkStatusDialog,
+    setShowBulkPurokDialog,
     selectionMode
 }: HouseholdsContentProps) {
     
-    // Bulk action items configuration (can be customized)
+    // Bulk action items configuration
     const bulkActions = {
         primary: [
             {
@@ -121,7 +127,7 @@ export default function HouseholdsContent({
             {
                 label: 'Edit Status',
                 icon: <Edit className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_status'),
+                onClick: () => setShowBulkStatusDialog?.(true),
                 tooltip: 'Bulk edit status'
             }
         ],
@@ -141,7 +147,7 @@ export default function HouseholdsContent({
             {
                 label: 'Change Purok',
                 icon: <Globe className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_purok'),
+                onClick: () => setShowBulkPurokDialog?.(true),
                 tooltip: 'Change purok for selected households'
             },
             {
@@ -168,6 +174,17 @@ export default function HouseholdsContent({
         ]
     };
 
+    // Toggle bulk mode handler
+    const handleBulkModeToggle = () => {
+        setIsBulkMode(!isBulkMode);
+        if (isBulkMode) {
+            onClearSelection();
+        }
+    };
+
+    // Check if we have any households
+    const hasHouseholds = households && households.length > 0;
+
     return (
         <>
             {/* Enhanced Bulk Actions Bar */}
@@ -179,6 +196,7 @@ export default function HouseholdsContent({
                     isPerformingBulkAction={isPerformingBulkAction}
                     isSelectAll={isSelectAll}
                     isMobile={isMobile}
+                    totalItems={totalItems}
                     onClearSelection={onClearSelection}
                     onSelectAllOnPage={onSelectAllOnPage}
                     onSelectAllFiltered={onSelectAllFiltered}
@@ -191,7 +209,7 @@ export default function HouseholdsContent({
             )}
 
             {/* Floating Select All for Grid View */}
-            {viewMode === 'grid' && households.length > 0 && selectedHouseholds.length < households.length && isBulkMode && (
+            {viewMode === 'grid' && hasHouseholds && selectedHouseholds.length < households.length && isBulkMode && (
                 <SelectAllFloat
                     isSelectAll={isSelectAll}
                     onSelectAll={onSelectAllOnPage}
@@ -224,7 +242,7 @@ export default function HouseholdsContent({
                     </div>
                     <div className="flex items-center gap-3">
                         {/* Grid view select all checkbox */}
-                        {viewMode === 'grid' && isBulkMode && households.length > 0 && (
+                        {viewMode === 'grid' && isBulkMode && hasHouseholds && (
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="select-all-grid"
@@ -247,7 +265,7 @@ export default function HouseholdsContent({
                                             <Switch
                                                 id="bulk-mode"
                                                 checked={isBulkMode}
-                                                onCheckedChange={setIsBulkMode}
+                                                onCheckedChange={handleBulkModeToggle}
                                                 className="data-[state=checked]:bg-blue-600 h-5 w-9 dark:data-[state=checked]:bg-blue-600"
                                             />
                                             <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
@@ -257,6 +275,7 @@ export default function HouseholdsContent({
                                     </TooltipTrigger>
                                     <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                         <p>Toggle bulk selection mode</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Ctrl+Shift+B • Ctrl+A to select</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </div>
@@ -270,7 +289,7 @@ export default function HouseholdsContent({
                 </CardHeader>
                 <CardContent className="p-0 dark:bg-gray-900">
                     {/* Empty State with dark mode */}
-                    {households.length === 0 ? (
+                    {!hasHouseholds ? (
                         <EmptyState
                             icon={<Home className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
                             title="No households found"
@@ -331,6 +350,13 @@ export default function HouseholdsContent({
                                     onSelectAll={onSelectAllOnPage}
                                     onClearSelection={onClearSelection}
                                     className="mt-4 mx-4 dark:text-gray-300"
+                                    extraInfo={
+                                        selectionStats && (
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                Total members: {selectionStats.totalMembers || 0}
+                                            </div>
+                                        )
+                                    }
                                 />
                             )}
 

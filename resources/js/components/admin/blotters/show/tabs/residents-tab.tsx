@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
 import { Users, Edit, User, MapPin, Phone } from 'lucide-react';
-import { Blotter, InvolvedResident } from '@/components/admin/blotters/show/types';
+import { Blotter, InvolvedResident } from '@/types/admin/blotters/blotter';
 import { InvolvedResidentCard } from '@/components/admin/blotters/show/cards/involved-resident-card';
 
 interface ResidentsTabProps {

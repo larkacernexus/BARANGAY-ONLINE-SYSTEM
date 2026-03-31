@@ -30,7 +30,7 @@ import {
     MapPin
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { Blotter } from '../types';
+import { Blotter } from '@/types/admin/blotters/blotter';
 import { getStatusColor, getStatusIcon, getPriorityColor, getPriorityIcon } from '@/components/admin/blotters/show/utils/helpers';
 
 interface BlotterHeaderProps {

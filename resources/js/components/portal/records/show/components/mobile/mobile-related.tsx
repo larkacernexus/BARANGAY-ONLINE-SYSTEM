@@ -6,7 +6,7 @@ import { ModernCard } from '@/components/residentui/modern-card';
 import { Link2, ChevronUp, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getFileIcon, getFileColor } from '@/utils/portal/records/document.utils';
-import {  RelatedDocument } from '@/types/portal/records/document.types';
+import {  RelatedDocument } from '@/types/portal/records/records';
 import { useState } from 'react';
 
 interface MobileRelatedProps {

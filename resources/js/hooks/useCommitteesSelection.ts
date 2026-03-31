@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Committee } from '@/types/committees';
+import { Committee } from '@/types/admin/committees/committees';
 
 export function useCommitteesSelection(
     committees: Committee[],

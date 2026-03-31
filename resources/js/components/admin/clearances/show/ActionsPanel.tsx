@@ -16,7 +16,7 @@ import {
     DollarSign,
     Eye
 } from 'lucide-react';
-import { ClearanceRequest, ClearanceType } from '@/types/clearance';
+import { ClearanceRequest, ClearanceType } from '@/types/admin/clearances/clearance-types';
 
 interface ActionsPanelProps {
     clearance: ClearanceRequest;

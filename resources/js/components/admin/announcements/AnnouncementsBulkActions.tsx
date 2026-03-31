@@ -1,3 +1,5 @@
+// resources/js/components/admin/announcements/AnnouncementsBulkActions.tsx
+
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
@@ -14,6 +16,7 @@ import {
     CheckSquare,
     Square
 } from 'lucide-react';
+import { SelectionMode, SelectionStats, BulkOperation } from '@/types/admin/announcements/announcement.types'; // ← Add BulkOperation import
 
 interface BulkActionItem {
     label: string;
@@ -26,13 +29,8 @@ interface BulkActionItem {
 
 interface AnnouncementsBulkActionsProps {
     selectedAnnouncements: number[];
-    selectionMode: 'page' | 'filtered' | 'all';
-    selectionStats?: {
-        currentlyActiveCount?: number;
-        activeCount?: number;
-        highPriorityCount?: number;
-        expiredCount?: number;
-    };
+    selectionMode: SelectionMode;
+    selectionStats?: SelectionStats;
     isPerformingBulkAction: boolean;
     isSelectAll: boolean;
     isMobile?: boolean;
@@ -43,9 +41,10 @@ interface AnnouncementsBulkActionsProps {
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation, additionalData?: any) => void; // ← CHANGE THIS LINE
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
+    setShowBulkNotifyDialog?: (show: boolean) => void;
     
     // Bulk actions configuration (optional for customization)
     bulkActions?: {
@@ -70,6 +69,7 @@ export default function AnnouncementsBulkActions({
     onBulkOperation,
     onCopySelectedData,
     setShowBulkDeleteDialog,
+    setShowBulkNotifyDialog,
     bulkActions: customBulkActions
 }: AnnouncementsBulkActionsProps) {
     
@@ -79,58 +79,58 @@ export default function AnnouncementsBulkActions({
             {
                 label: 'Export',
                 icon: <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('export'),
+                onClick: () => onBulkOperation('export' as BulkOperation), // ← Add as BulkOperation
                 tooltip: 'Export selected announcements',
                 variant: 'default' as const
             },
             {
                 label: 'Publish',
                 icon: <Send className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('publish'),
+                onClick: () => onBulkOperation('publish' as BulkOperation), // ← Add as BulkOperation
                 tooltip: 'Publish selected announcements',
                 variant: 'default' as const
             },
             {
                 label: 'Print',
                 icon: <Printer className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('print'),
+                onClick: () => onBulkOperation('print' as BulkOperation), // ← Add as BulkOperation
                 tooltip: 'Print selected announcements',
                 variant: 'default' as const
             }
-        ],
+        ] as BulkActionItem[],
         secondary: [
             {
                 label: 'Activate',
                 icon: <Bell className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('activate'),
+                onClick: () => onBulkOperation('activate' as BulkOperation), // ← Add as BulkOperation
                 tooltip: 'Activate selected announcements',
                 variant: 'outline' as const
             },
             {
                 label: 'Deactivate',
                 icon: <Bell className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('deactivate'),
+                onClick: () => onBulkOperation('deactivate' as BulkOperation), // ← Add as BulkOperation
                 tooltip: 'Deactivate selected announcements',
                 variant: 'outline' as const
             },
             {
                 label: 'Archive',
                 icon: <Archive className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('archive'),
+                onClick: () => onBulkOperation('archive' as BulkOperation), // ← Add as BulkOperation
                 tooltip: 'Archive selected announcements',
                 variant: 'outline' as const
             },
             {
                 label: 'Change Status',
                 icon: <Edit className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_status'),
+                onClick: () => onBulkOperation('change_status' as BulkOperation), // ← Add as BulkOperation
                 tooltip: 'Change status for selected announcements',
                 variant: 'outline' as const
             },
             {
                 label: 'Change Type',
                 icon: <AlertCircle className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_type'),
+                onClick: () => onBulkOperation('change_type' as BulkOperation), // ← Add as BulkOperation
                 tooltip: 'Change type for selected announcements',
                 variant: 'outline' as const
             },
@@ -141,7 +141,7 @@ export default function AnnouncementsBulkActions({
                 tooltip: 'Copy selected data to clipboard',
                 variant: 'outline' as const
             }
-        ],
+        ] as BulkActionItem[],
         destructive: [
             {
                 label: 'Delete',
@@ -150,7 +150,7 @@ export default function AnnouncementsBulkActions({
                 tooltip: 'Delete selected announcements',
                 variant: 'destructive' as const
             }
-        ]
+        ] as BulkActionItem[]
     };
 
     const bulkActions = customBulkActions || defaultBulkActions;
@@ -178,31 +178,38 @@ export default function AnnouncementsBulkActions({
                         </div>
                     </div>
                     
-                    {/* Selection Stats */}
+                    {/* Selection Stats using SelectionStats type */}
                     {selectionStats && (
                         <div className="hidden sm:flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                            {selectionStats.currentlyActiveCount && selectionStats.currentlyActiveCount > 0 && (
+                            {selectionStats.active > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                    {selectionStats.currentlyActiveCount} active now
+                                    {selectionStats.active} active
                                 </span>
                             )}
-                            {selectionStats.activeCount && selectionStats.activeCount > 0 && (
-                                <span className="flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                    {selectionStats.activeCount} active
-                                </span>
-                            )}
-                            {selectionStats.highPriorityCount && selectionStats.highPriorityCount > 0 && (
-                                <span className="flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                    {selectionStats.highPriorityCount} high priority
-                                </span>
-                            )}
-                            {selectionStats.expiredCount && selectionStats.expiredCount > 0 && (
+                            {selectionStats.inactive > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-gray-500"></div>
-                                    {selectionStats.expiredCount} expired
+                                    {selectionStats.inactive} inactive
+                                </span>
+                            )}
+                            {selectionStats.expired > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                    {selectionStats.expired} expired
+                                </span>
+                            )}
+                            {selectionStats.upcoming > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                    {selectionStats.upcoming} upcoming
+                                </span>
+                            )}
+                            {/* Show top priority type if available */}
+                            {selectionStats.priorities && Object.keys(selectionStats.priorities).length > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                                    {Object.entries(selectionStats.priorities)[0][1]} high priority
                                 </span>
                             )}
                         </div>
@@ -282,7 +289,7 @@ export default function AnnouncementsBulkActions({
                                         variant={action.variant || 'default'}
                                         size="sm"
                                         onClick={action.onClick}
-                                        disabled={isPerformingBulkAction || action.disabled}
+                                        disabled={isPerformingBulkAction || (action.disabled ?? false)}
                                         className="text-xs h-8"
                                     >
                                         {action.icon}
@@ -313,7 +320,7 @@ export default function AnnouncementsBulkActions({
                                                 key={index}
                                                 onClick={action.onClick}
                                                 className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                                disabled={isPerformingBulkAction || action.disabled}
+                                                disabled={isPerformingBulkAction || (action.disabled ?? false)}
                                             >
                                                 {action.icon}
                                                 {action.label}
@@ -332,7 +339,7 @@ export default function AnnouncementsBulkActions({
                                         variant={action.variant || 'destructive'}
                                         size="sm"
                                         onClick={action.onClick}
-                                        disabled={isPerformingBulkAction || action.disabled}
+                                        disabled={isPerformingBulkAction || (action.disabled ?? false)}
                                         className="text-xs h-8"
                                     >
                                         {action.icon}

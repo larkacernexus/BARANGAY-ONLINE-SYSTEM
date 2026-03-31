@@ -1,4 +1,5 @@
 // resources/js/pages/admin/announcements/index.tsx
+
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
@@ -9,8 +10,9 @@ import {
     AnnouncementStats, 
     PaginationData,
     BulkOperation,
-    SelectionMode 
-} from '@/types';
+    SelectionMode,
+    SelectionStats
+} from '@/types/admin/announcements/announcement.types';
 import { announcementUtils } from '@/admin-utils/announcement-utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -35,7 +37,10 @@ const defaultStats: AnnouncementStats = {
     total: 0,
     active: 0,
     expired: 0,
-    upcoming: 0
+    upcoming: 0,
+    unread: 0,
+    personalized: 0,
+    with_attachments: 0
 };
 
 export default function AnnouncementsIndex({ 
@@ -144,14 +149,26 @@ export default function AnnouncementsIndex({
     }, [announcements.data, search, filtersState]);
 
     // Calculate filtered stats
-    const filteredStats = useMemo(() => {
-        return {
-            total: filteredAnnouncements.length,
-            active: filteredAnnouncements.filter(a => a.is_active && new Date(a.start_date) <= new Date() && new Date(a.end_date) >= new Date()).length,
-            expired: filteredAnnouncements.filter(a => new Date(a.end_date) < new Date()).length,
-            upcoming: filteredAnnouncements.filter(a => new Date(a.start_date) > new Date()).length
-        };
-    }, [filteredAnnouncements]);
+ const filteredStats = useMemo(() => {
+    return {
+        total: filteredAnnouncements.length,
+        active: filteredAnnouncements.filter(a => {
+            // Check if dates exist before creating Date objects
+            if (!a.start_date || !a.end_date) return false;
+            return a.is_active && new Date(a.start_date) <= new Date() && new Date(a.end_date) >= new Date();
+        }).length,
+        expired: filteredAnnouncements.filter(a => {
+            // Check if end_date exists
+            if (!a.end_date) return false;
+            return new Date(a.end_date) < new Date();
+        }).length,
+        upcoming: filteredAnnouncements.filter(a => {
+            // Check if start_date exists
+            if (!a.start_date) return false;
+            return new Date(a.start_date) > new Date();
+        }).length
+    };
+}, [filteredAnnouncements]);
 
     // Pagination
     const totalItems = filteredAnnouncements.length;
@@ -273,12 +290,12 @@ export default function AnnouncementsIndex({
     }, [selectedAnnouncements, filteredAnnouncements]);
 
     // Calculate selection stats
-    const selectionStats = useMemo(() => {
+    const selectionStats: SelectionStats = useMemo(() => {
         return announcementUtils.getSelectionStats(selectedAnnouncementsData);
     }, [selectedAnnouncementsData]);
 
     // Bulk operations
-    const handleBulkOperation = async (operation: BulkOperation) => {
+    const handleBulkOperation = async (operation: BulkOperation, additionalData?: any) => {
         if (selectedAnnouncements.length === 0) {
             toast.error('Please select at least one announcement');
             return;
@@ -529,12 +546,13 @@ export default function AnnouncementsIndex({
         });
     };
 
-    const hasActiveFilters = 
+    const hasActiveFilters: boolean = !!(
         search || 
         filtersState.type !== 'all' || 
         filtersState.status !== 'all' ||
         filtersState.from_date ||
-        filtersState.to_date;
+        filtersState.to_date
+    );
 
     return (
         <AppLayout
@@ -560,7 +578,6 @@ export default function AnnouncementsIndex({
                     />
 
                     <AnnouncementsFilters
-                        // Remove stats prop
                         search={search}
                         setSearch={handleSearchChange}
                         filtersState={filtersState}
@@ -580,7 +597,6 @@ export default function AnnouncementsIndex({
 
                     <AnnouncementsContent
                         announcements={paginatedAnnouncements}
-                        // Remove stats prop - content component shouldn't need stats
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}

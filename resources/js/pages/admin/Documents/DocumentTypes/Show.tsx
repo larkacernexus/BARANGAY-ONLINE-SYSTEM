@@ -1,55 +1,11 @@
 // resources/js/Pages/Admin/DocumentTypes/Show.tsx
+
 import { router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-    TooltipProvider,
-} from '@/components/ui/tooltip';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-    ArrowLeft,
-    AlertTriangle,
-    RefreshCw,
-    FileText,
-    CheckCircle,
-    XCircle,
-    FileCheck,
-    FileX,
-    Folder,
-    ListOrdered,
-    Settings,
-    Zap,
-    BarChart,
-    Info,
-    Trash2,
-    Copy,
-    Link as LinkIcon,
-    Printer,
-    Check,
-    X,
-    Eye,
-    Users,
-    HardDrive,
-    FileCode,
-    Award,
-    Hash,
-    Tag,
-} from 'lucide-react';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { route } from 'ziggy-js';
-import { Progress } from '@/components/ui/progress';
 import { Link } from '@inertiajs/react';
 
 // Import components
@@ -59,12 +15,17 @@ import { StatisticsCards } from '@/components/admin/document-types/show/componen
 import { DocumentTypeTabs } from '@/components/admin/document-types/show/components/document-type-tabs';
 import { DangerZone } from '@/components/admin/document-types/show/components/danger-zone';
 import { DeleteConfirmationDialog } from '@/components/admin/document-types/show/components/delete-confirmation-dialog';
-import { DuplicateConfirmationDialog } from '@/components/admin/document-types/show/components//duplicate-confirmation-dialog';
+import { DuplicateConfirmationDialog } from '@/components/admin/document-types/show/components/duplicate-confirmation-dialog';
 import { StatusToggleDialog } from '@/components/admin/document-types/show/components/status-toggle-dialog';
 import { RequiredToggleDialog } from '@/components/admin/document-types/show/components/required-toggle-dialog';
 
 // Import types and utilities
-import { PageProps } from '@/components/admin/document-types/show/types';
+import type { 
+    DocumentType, 
+    ClearanceType, 
+    RecentApplication,
+    ShowPageProps 
+} from '@/types/admin/document-types/document-types';
 import { 
     formatDate,
     formatDateTime,
@@ -78,9 +39,10 @@ import {
     getRequiredBadge,
     isNew
 } from '@/components/admin/document-types/show/utils/helpers';
+import { CheckCircle, FileCheck, FileX, Folder, ListOrdered } from 'lucide-react';
 
 export default function DocumentTypeShow() {
-    const { props } = usePage<PageProps>();
+    const { props } = usePage<ShowPageProps>();
     const { 
         documentType, 
         requiredClearanceTypes = [], 
@@ -88,14 +50,14 @@ export default function DocumentTypeShow() {
         max_file_size_mb = 0
     } = props;
     
-    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
-    const [showStatusDialog, setShowStatusDialog] = useState(false);
-    const [showRequiredDialog, setShowRequiredDialog] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [isDuplicating, setIsDuplicating] = useState(false);
-    const [copied, setCopied] = useState(false);
-    const [activeTab, setActiveTab] = useState('overview');
+    const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
+    const [showDuplicateDialog, setShowDuplicateDialog] = useState<boolean>(false);
+    const [showStatusDialog, setShowStatusDialog] = useState<boolean>(false);
+    const [showRequiredDialog, setShowRequiredDialog] = useState<boolean>(false);
+    const [isDeleting, setIsDeleting] = useState<boolean>(false);
+    const [isDuplicating, setIsDuplicating] = useState<boolean>(false);
+    const [copied, setCopied] = useState<boolean>(false);
+    const [activeTab, setActiveTab] = useState<'overview' | 'requirements' | 'applications' | 'settings'>('overview');
 
     // Handle back navigation
     const handleBack = () => {

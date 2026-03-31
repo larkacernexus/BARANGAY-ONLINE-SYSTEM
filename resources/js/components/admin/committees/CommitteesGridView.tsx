@@ -7,7 +7,7 @@ import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { Link } from '@inertiajs/react';
 import { Target, Users, Eye, Edit, Trash2, Copy, Calendar, CheckCircle, XCircle } from 'lucide-react';
-import { Committee } from '@/types/committees';
+import { Committee } from '@/types/admin/committees/committees';
 import { truncateText } from '@/lib/committeeutils';
 import { toast } from 'sonner';
 

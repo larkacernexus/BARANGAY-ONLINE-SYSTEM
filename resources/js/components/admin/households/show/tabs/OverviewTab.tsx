@@ -1,23 +1,31 @@
-import { Household } from '../types';
+// resources/js/Pages/Admin/Households/Show/tabs/OverviewTab.tsx
+
+import { Household } from '@/types/admin/households/household.types';
 import { HouseholdInfo } from '../household/HouseholdInfo';
 import { HousingInfo } from '../household/HousingInfo';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin, ExternalLink, FileText, Loader2, ZoomIn, ZoomOut, Satellite, Map } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect } from 'react';
+import { MapPin, ExternalLink, FileText, Loader2, ZoomIn, ZoomOut, Satellite, Map } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 interface OverviewTabProps {
-    household: Household;
+    household: Household & {
+        full_address?: string;
+        latitude?: number | null;
+        longitude?: number | null;
+        google_maps_url?: string | null;
+        remarks?: string | null;
+    };
 }
 
 export const OverviewTab = ({ household }: OverviewTabProps) => {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     const [mapLoading, setMapLoading] = useState(true);
     const [mapError, setMapError] = useState(false);
-    const [zoomLevel, setZoomLevel] = useState(19); // Zoom 19 = house level, shows roof details
-    const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('satellite'); // Default to satellite imagery
-    
-    // Log the coordinates to debug
+    const [zoomLevel, setZoomLevel] = useState(19);
+    const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('satellite');
+
+    // Log coordinates for debugging
     useEffect(() => {
         console.log('Household coordinates:', {
             latitude: household.latitude,
@@ -27,58 +35,83 @@ export const OverviewTab = ({ household }: OverviewTabProps) => {
         });
         setMapLoading(false);
     }, [household]);
-    
-    const getEmbedUrl = (zoom: number = zoomLevel, type: string = mapType) => {
+
+    // Check if location data exists
+    const hasLocation = useMemo(() => {
+        return !!(household.latitude || household.longitude || household.google_maps_url || household.address);
+    }, [household.latitude, household.longitude, household.google_maps_url, household.address]);
+
+    // Get embed URL based on available location data
+    const embedUrl = useMemo(() => {
         if (!apiKey) return null;
         
-        // PRIORITY 1: Use coordinates from table (most accurate with pin)
+        // Priority 1: Use coordinates from table (most accurate with pin)
         if (household.latitude && household.longitude) {
-            console.log('Using coordinates from table:', household.latitude, household.longitude, 'zoom:', zoom, 'type:', type);
-            return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${household.latitude},${household.longitude}&zoom=${zoom}&maptype=${type}`;
+            console.log('Using coordinates from table:', household.latitude, household.longitude, 'zoom:', zoomLevel, 'type:', mapType);
+            return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${household.latitude},${household.longitude}&zoom=${zoomLevel}&maptype=${mapType}`;
         }
         
-        // PRIORITY 2: Use Google Maps URL
+        // Priority 2: Use Google Maps URL
         if (household.google_maps_url) {
             console.log('Using Google Maps URL:', household.google_maps_url);
-            return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(household.google_maps_url)}&zoom=${zoom}&maptype=${type}`;
+            return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(household.google_maps_url)}&zoom=${zoomLevel}&maptype=${mapType}`;
         }
         
-        // PRIORITY 3: Use address (fallback)
+        // Priority 3: Use address (fallback)
         if (household.address) {
             console.log('Using address:', household.address);
-            return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(household.address)}&zoom=${zoom}&maptype=${type}`;
+            return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(household.address)}&zoom=${zoomLevel}&maptype=${mapType}`;
         }
         
         return null;
-    };
-    
-    const embedUrl = getEmbedUrl();
-    const hasLocation = household.latitude || household.longitude || household.google_maps_url || household.address;
+    }, [apiKey, household.latitude, household.longitude, household.google_maps_url, household.address, zoomLevel, mapType]);
 
-    // Handle iframe load error
-    const handleIframeError = () => {
+    // Get Google Maps URL for external link
+    const externalMapsUrl = useMemo(() => {
+        if (household.latitude && household.longitude) {
+            return `https://www.google.com/maps/search/${household.latitude},${household.longitude}`;
+        }
+        if (household.google_maps_url) {
+            return household.google_maps_url;
+        }
+        if (household.address) {
+            return `https://www.google.com/maps/search/${encodeURIComponent(household.address)}`;
+        }
+        return '#';
+    }, [household.latitude, household.longitude, household.google_maps_url, household.address]);
+
+    // Handlers
+    const handleIframeError = useCallback(() => {
         console.error('Map failed to load');
         setMapError(true);
-    };
+    }, []);
 
-    const handleIframeLoad = () => {
+    const handleIframeLoad = useCallback(() => {
         setMapLoading(false);
-    };
+    }, []);
     
-    const handleZoomIn = () => {
-        setZoomLevel(prev => Math.min(prev + 1, 21)); // Max zoom 21 (very detailed)
+    const handleZoomIn = useCallback(() => {
+        setZoomLevel(prev => Math.min(prev + 1, 21));
         setMapLoading(true);
-    };
+    }, []);
     
-    const handleZoomOut = () => {
-        setZoomLevel(prev => Math.max(prev - 1, 15)); // Min zoom 15 for household (shows street/neighborhood)
+    const handleZoomOut = useCallback(() => {
+        setZoomLevel(prev => Math.max(prev - 1, 15));
         setMapLoading(true);
-    };
+    }, []);
     
-    const toggleMapType = () => {
+    const toggleMapType = useCallback(() => {
         setMapType(prev => prev === 'roadmap' ? 'satellite' : 'roadmap');
         setMapLoading(true);
-    };
+    }, []);
+
+    // Get zoom level description
+    const getZoomDescription = useCallback((zoom: number): string => {
+        if (zoom >= 19) return '🏠 House level (roof visible)';
+        if (zoom >= 17) return '🏘️ Street level';
+        if (zoom >= 15) return '🏘️ Neighborhood view';
+        return '🗺️ Area view';
+    }, []);
 
     return (
         <>
@@ -142,12 +175,7 @@ export const OverviewTab = ({ household }: OverviewTabProps) => {
                                 <MapPin className="h-12 w-12 text-gray-400 mb-2" />
                                 <p className="text-sm text-gray-500 dark:text-gray-400">Map could not be loaded</p>
                                 <a 
-                                    href={household.latitude && household.longitude 
-                                        ? `https://www.google.com/maps/search/${household.latitude},${household.longitude}`
-                                        : household.google_maps_url 
-                                            ? household.google_maps_url
-                                            : `https://www.google.com/maps/search/${encodeURIComponent(household.address)}`
-                                    }
+                                    href={externalMapsUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="mt-2"
@@ -160,7 +188,7 @@ export const OverviewTab = ({ household }: OverviewTabProps) => {
                             </div>
                         ) : (
                             <iframe
-                                key={`${zoomLevel}-${mapType}`} // Force re-render when zoom or map type changes
+                                key={`${zoomLevel}-${mapType}`}
                                 width="100%"
                                 height="400"
                                 style={{ border: 0 }}
@@ -184,12 +212,7 @@ export const OverviewTab = ({ household }: OverviewTabProps) => {
                                     </p>
                                 </div>
                                 <a 
-                                    href={household.latitude && household.longitude 
-                                        ? `https://www.google.com/maps/search/${household.latitude},${household.longitude}`
-                                        : household.google_maps_url 
-                                            ? household.google_maps_url
-                                            : `https://www.google.com/maps/search/${encodeURIComponent(household.address)}`
-                                    }
+                                    href={externalMapsUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                 >
@@ -210,18 +233,13 @@ export const OverviewTab = ({ household }: OverviewTabProps) => {
                                 <div className="flex items-center gap-1">
                                     <span className="font-medium">View:</span>
                                     <span className="capitalize">{mapType}</span>
-                                    {mapType === 'satellite' && <span className="text-blue-500">🛰️</span>}
+                                    {mapType === 'satellite' && <span className="text-blue-500 ml-1">🛰️</span>}
                                 </div>
                                 <span className="text-gray-400">|</span>
-                                <span>
-                                    {zoomLevel >= 19 ? '🏠 House level (roof visible)' : 
-                                     zoomLevel >= 17 ? '🏘️ Street level' : 
-                                     zoomLevel >= 15 ? '🏘️ Neighborhood view' : 
-                                     '🗺️ Area view'}
-                                </span>
+                                <span>{getZoomDescription(zoomLevel)}</span>
                             </div>
                             
-                            {/* SHOW COORDINATES FROM TABLE */}
+                            {/* Coordinates Display */}
                             {household.latitude && household.longitude ? (
                                 <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                                     <div className="flex items-center gap-2">
@@ -247,12 +265,24 @@ export const OverviewTab = ({ household }: OverviewTabProps) => {
                                     </p>
                                 </div>
                             ) : household.google_maps_url ? (
-                                <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-                                    📍 Location from Google Maps link
+                                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                    <div className="flex items-center gap-2">
+                                        <MapPin className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Location from Google Maps link</span>
+                                    </div>
+                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                        📍 Using provided Google Maps link
+                                    </p>
                                 </div>
                             ) : household.address ? (
-                                <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-                                    📍 Location from address (approximate)
+                                <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                                    <div className="flex items-center gap-2">
+                                        <MapPin className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Location from Address</span>
+                                    </div>
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                        📍 Approximate location based on address
+                                    </p>
                                 </div>
                             ) : null}
                         </div>

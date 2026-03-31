@@ -1,3 +1,5 @@
+// components/admin/households/HouseholdsTableView.tsx
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Eye, Edit, Trash2, Clipboard, Home, Users, Phone, MapPin, ChevronUp, ChevronDown, Square, CheckSquare, Map as MapIcon, MoreVertical } from 'lucide-react';
+import { Eye, Edit, Trash2, Clipboard, Home, Users, Phone, MapPin, ChevronUp, ChevronDown, Square, CheckSquare, Map as MapIcon, MoreVertical, PlayCircle, PauseCircle } from 'lucide-react';
 import { router } from '@inertiajs/react';
 import { getPurokName, getStatusBadgeVariant, truncateText, truncateAddress, formatContactNumber } from '../../../admin-utils/householdUtils';
 import { SingleHouseholdMapModal } from '@/components/admin/puroks/show/components/SingleHouseholdMapModal';
@@ -25,6 +27,7 @@ interface HouseholdsTableViewProps {
     hasActiveFilters: boolean;
     onClearFilters: () => void;
     onDelete: (household: any) => void;
+    onToggleStatus?: (household: any) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     onSelectAllOnPage: () => void;
     isSelectAll: boolean;
@@ -43,6 +46,7 @@ export default function HouseholdsTableView({
     hasActiveFilters,
     onClearFilters,
     onDelete,
+    onToggleStatus,
     onCopyToClipboard,
     onSelectAllOnPage,
     isSelectAll,
@@ -108,8 +112,6 @@ export default function HouseholdsTableView({
     };
 
     const handleOpenMap = (household: any) => {
-        console.log('Opening map for household:', household);
-        console.log('Coordinates:', household.latitude, household.longitude);
         setSelectedHouseholdForMap(household);
         setMapModalOpen(true);
     };
@@ -120,6 +122,12 @@ export default function HouseholdsTableView({
 
     const handleEdit = (householdId: number) => {
         router.get(`/admin/households/${householdId}/edit`);
+    };
+
+    const handleToggleStatus = (household: any) => {
+        if (onToggleStatus) {
+            onToggleStatus(household);
+        }
     };
 
     return (
@@ -142,7 +150,7 @@ export default function HouseholdsTableView({
                                         </TableHead>
                                     )}
                                     <TableHead 
-                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] sm:min-w-[140px] cursor-pointer hover:bg-gray-100"
+                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] sm:min-w-[140px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                         onClick={() => onSort('household_number')}
                                     >
                                         <div className="flex items-center gap-1">
@@ -151,7 +159,7 @@ export default function HouseholdsTableView({
                                         </div>
                                     </TableHead>
                                     <TableHead 
-                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[130px] sm:min-w-[150px] cursor-pointer hover:bg-gray-100"
+                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[130px] sm:min-w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                         onClick={() => onSort('head_of_family')}
                                     >
                                         <div className="flex items-center gap-1">
@@ -160,7 +168,7 @@ export default function HouseholdsTableView({
                                         </div>
                                     </TableHead>
                                     <TableHead 
-                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] sm:min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] sm:min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                         onClick={() => onSort('member_count')}
                                     >
                                         <div className="flex items-center gap-1">
@@ -177,7 +185,7 @@ export default function HouseholdsTableView({
                                     {!isMobile && (
                                         <>
                                             <TableHead 
-                                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
+                                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                                 onClick={() => onSort('purok')}
                                             >
                                                 <div className="flex items-center gap-1">
@@ -186,7 +194,7 @@ export default function HouseholdsTableView({
                                                 </div>
                                             </TableHead>
                                             <TableHead 
-                                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                                 onClick={() => onSort('status')}
                                             >
                                                 <div className="flex items-center gap-1">
@@ -391,14 +399,14 @@ export default function HouseholdsTableView({
                                                                 <MoreVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                                                             </button>
                                                         </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-48">
+                                                        <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
                                                             <DropdownMenuItem 
                                                                 onClick={(e) => {
                                                                     e.preventDefault();
                                                                     e.stopPropagation();
                                                                     handleViewDetails(household.id);
                                                                 }}
-                                                                className="flex items-center gap-2 cursor-pointer"
+                                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                             >
                                                                 <Eye className="h-4 w-4" />
                                                                 <span>View Details</span>
@@ -410,27 +418,54 @@ export default function HouseholdsTableView({
                                                                     e.stopPropagation();
                                                                     handleEdit(household.id);
                                                                 }}
-                                                                className="flex items-center gap-2 cursor-pointer"
+                                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                             >
                                                                 <Edit className="h-4 w-4" />
                                                                 <span>Edit Household</span>
                                                             </DropdownMenuItem>
 
-                                                            {hasCoordinates && (
-                                                                <DropdownMenuItem 
-                                                                    onClick={(e) => {
-                                                                        e.preventDefault();
-                                                                        e.stopPropagation();
-                                                                        handleOpenMap(household);
-                                                                    }}
-                                                                    className="flex items-center gap-2 cursor-pointer"
-                                                                >
-                                                                    <MapIcon className="h-4 w-4" />
-                                                                    <span>View Map</span>
-                                                                </DropdownMenuItem>
+                                                            {onToggleStatus && (
+                                                                <>
+                                                                    <DropdownMenuItem 
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                            handleToggleStatus(household);
+                                                                        }}
+                                                                        className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
+                                                                    >
+                                                                        {household.status === 'active' ? (
+                                                                            <>
+                                                                                <PauseCircle className="h-4 w-4" />
+                                                                                <span>Deactivate</span>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <PlayCircle className="h-4 w-4" />
+                                                                                <span>Activate</span>
+                                                                            </>
+                                                                        )}
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                                                </>
                                                             )}
-                                                            
-                                                            <DropdownMenuSeparator />
+
+                                                            {hasCoordinates && (
+                                                                <>
+                                                                    <DropdownMenuItem 
+                                                                        onClick={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                            handleOpenMap(household);
+                                                                        }}
+                                                                        className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
+                                                                    >
+                                                                        <MapIcon className="h-4 w-4" />
+                                                                        <span>View Map</span>
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                                                </>
+                                                            )}
                                                             
                                                             <DropdownMenuItem 
                                                                 onClick={(e) => {
@@ -438,7 +473,7 @@ export default function HouseholdsTableView({
                                                                     e.stopPropagation();
                                                                     onCopyToClipboard(household.household_number, 'Household Number');
                                                                 }}
-                                                                className="flex items-center gap-2 cursor-pointer"
+                                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                             >
                                                                 <Clipboard className="h-4 w-4" />
                                                                 <span>Copy Household No.</span>
@@ -451,7 +486,7 @@ export default function HouseholdsTableView({
                                                                         e.stopPropagation();
                                                                         onCopyToClipboard(household.contact_number, 'Contact');
                                                                     }}
-                                                                    className="flex items-center gap-2 cursor-pointer"
+                                                                    className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                                 >
                                                                     <Clipboard className="h-4 w-4" />
                                                                     <span>Copy Contact</span>
@@ -460,14 +495,14 @@ export default function HouseholdsTableView({
                                                             
                                                             {isBulkMode && (
                                                                 <>
-                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                                     <DropdownMenuItem 
                                                                         onClick={(e) => {
                                                                             e.preventDefault();
                                                                             e.stopPropagation();
                                                                             onItemSelect(household.id);
                                                                         }}
-                                                                        className="flex items-center gap-2 cursor-pointer"
+                                                                        className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                                     >
                                                                         {isSelected ? (
                                                                             <>
@@ -486,7 +521,7 @@ export default function HouseholdsTableView({
                                                             
                                                             {household.status !== 'inactive' && (
                                                                 <>
-                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                                     <DropdownMenuItem 
                                                                         onClick={(e) => {
                                                                             e.preventDefault();

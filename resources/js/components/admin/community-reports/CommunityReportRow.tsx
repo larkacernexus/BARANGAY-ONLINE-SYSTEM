@@ -1,3 +1,5 @@
+// resources/js/components/admin/community-reports/CommunityReportRow.tsx
+
 import { TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -5,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Link } from '@inertiajs/react';
-import { CommunityReport } from '@/admin-utils/communityReportTypes';
 import { 
     FileText, 
     MapPin, 
@@ -53,6 +54,9 @@ import {
     formatDateTime
 } from '@/admin-utils/communityReportHelpers';
 
+// Import types from the correct path
+import type { CommunityReport } from '@/types/admin/reports/community-report';
+
 interface CommunityReportRowProps {
     report: CommunityReport;
     isBulkMode: boolean;
@@ -90,6 +94,12 @@ export default function CommunityReportRow({
     const descriptionLength = 45;
     const locationLength = 30;
     const userNameLength = 25;
+    
+    // Safe access to user properties
+    const userName = report.user?.name || report.reporter_name || 'Unknown Reporter';
+    const userPhone = report.user?.phone || report.reporter_contact;
+    const userPurok = report.user?.purok;
+    const userEmail = report.user?.email;
     
     return (
         <>
@@ -190,7 +200,7 @@ export default function CommunityReportRow({
                             </div>
                         </div>
                     </div>
-                    {report.tags && report.tags.length > 0 && (
+                    {report.tags && Array.isArray(report.tags) && report.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                             {report.tags.slice(0, 3).map((tag, index) => (
                                 <Badge 
@@ -310,33 +320,33 @@ export default function CommunityReportRow({
                             <div className="space-y-1">
                                 <div 
                                     className="font-medium truncate dark:text-gray-200"
-                                    title={report.user?.name}
+                                    title={userName}
                                 >
-                                    {truncateText(report.user?.name || 'Unknown Reporter', userNameLength)}
+                                    {truncateText(userName, userNameLength)}
                                 </div>
                                 <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
-                                    {report.user?.phone && (
+                                    {userPhone && (
                                         <div className="flex items-center gap-1">
                                             <Phone className="h-3 w-3" />
-                                            {report.user.phone}
+                                            {userPhone}
                                         </div>
                                     )}
-                                    {report.user?.purok && (
+                                    {userPurok && (
                                         <div className="flex items-center gap-1">
                                             <Home className="h-3 w-3" />
-                                            Purok {report.user.purok}
+                                            Purok {userPurok}
                                         </div>
                                     )}
-                                    {report.user?.email && (
+                                    {userEmail && (
                                         <div className="flex items-center gap-1">
                                             <Mail className="h-3 w-3" />
-                                            {truncateText(report.user.email, 20)}
+                                            {truncateText(userEmail, 20)}
                                         </div>
                                     )}
                                 </div>
                             </div>
                         )}
-                        {report.assigned_to && (
+                        {report.assigned_to && report.assigned_user && (
                             <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded border dark:border-gray-700">
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Assigned To</div>
                                 <div className="flex items-center gap-2">
@@ -344,7 +354,7 @@ export default function CommunityReportRow({
                                         <User className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                                     </div>
                                     <div className="font-medium text-sm dark:text-gray-200">
-                                        {report.assigned_to.name}
+                                        {report.assigned_user.name}
                                     </div>
                                 </div>
                             </div>
@@ -365,7 +375,7 @@ export default function CommunityReportRow({
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => onToggleExpand(report.id)}
-                                    className="h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-900"
+                                    className="h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-800"
                                 >
                                     {isExpanded ? (
                                         <ChevronUp className="h-4 w-4" />
@@ -374,7 +384,7 @@ export default function CommunityReportRow({
                                     )}
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
+                            <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                                 {isExpanded ? 'Collapse details' : 'Expand details'}
                             </TooltipContent>
                         </Tooltip>
@@ -382,7 +392,7 @@ export default function CommunityReportRow({
                             <DropdownMenuTrigger asChild>
                                 <Button 
                                     variant="ghost" 
-                                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-900"
+                                    className="h-8 w-8 p-0 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-800"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     <span className="sr-only">Open menu</span>
@@ -390,7 +400,7 @@ export default function CommunityReportRow({
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
-                                <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-700">
+                                <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-800">
                                     <Link href={`/admin/community-reports/${report.id}`} className="flex items-center cursor-pointer">
                                         <Eye className="mr-2 h-4 w-4" />
                                         <span>View Details</span>
@@ -401,16 +411,16 @@ export default function CommunityReportRow({
                                 
                                 <DropdownMenuItem 
                                     onClick={() => onCopyToClipboard(report.report_number, 'Report ID')}
-                                    className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
+                                    className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-800"
                                 >
                                     <Clipboard className="mr-2 h-4 w-4" />
                                     <span>Copy Report ID</span>
                                 </DropdownMenuItem>
                                 
-                                {report.user?.phone && !report.is_anonymous && (
+                                {userPhone && !report.is_anonymous && (
                                     <DropdownMenuItem 
-                                        onClick={() => onCopyToClipboard(report.user!.phone!, 'Phone Number')}
-                                        className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
+                                        onClick={() => onCopyToClipboard(userPhone!, 'Phone Number')}
+                                        className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-800"
                                     >
                                         <Clipboard className="mr-2 h-4 w-4" />
                                         <span>Copy Contact</span>
@@ -424,13 +434,13 @@ export default function CommunityReportRow({
                                         const url = `${window.location.origin}/admin/community-reports/${report.id}`;
                                         onCopyToClipboard(url, 'Report URL');
                                     }}
-                                    className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
+                                    className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-800"
                                 >
                                     <LinkIcon className="mr-2 h-4 w-4" />
                                     <span>Copy Link</span>
                                 </DropdownMenuItem>
                                 
-                                <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-700">
+                                <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-800">
                                     <Link href={`/admin/community-reports/${report.id}/print`} className="flex items-center cursor-pointer">
                                         <Printer className="mr-2 h-4 w-4" />
                                         <span>Print Details</span>
@@ -442,7 +452,7 @@ export default function CommunityReportRow({
                                         <DropdownMenuSeparator className="dark:bg-gray-700" />
                                         <DropdownMenuItem 
                                             onClick={() => onItemSelect(report.id)}
-                                            className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
+                                            className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-800"
                                         >
                                             {isSelected ? (
                                                 <>

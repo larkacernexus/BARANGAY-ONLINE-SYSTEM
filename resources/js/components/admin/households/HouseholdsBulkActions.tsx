@@ -1,3 +1,5 @@
+// components/admin/households/HouseholdsBulkActions.tsx
+
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
@@ -11,6 +13,7 @@ import {
     CheckSquare,
     Square
 } from 'lucide-react';
+import { BulkAction } from '@/types/admin/households/household.types';
 
 interface BulkActionItem {
     label: string;
@@ -28,17 +31,20 @@ interface HouseholdBulkActionsProps {
         active?: number;
         inactive?: number;
         pending?: number;
+        total?: number;
+        totalMembers?: number;
     };
     isPerformingBulkAction: boolean;
     isSelectAll: boolean;
     isMobile?: boolean;
+    totalItems?: number;
     
     // Actions
     onClearSelection: () => void;
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkAction) => void; // Changed to BulkAction
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     
@@ -57,6 +63,7 @@ export default function HouseholdBulkActions({
     isPerformingBulkAction,
     isSelectAll,
     isMobile = false,
+    totalItems = 0,
     onClearSelection,
     onSelectAllOnPage,
     onSelectAllFiltered,
@@ -73,53 +80,60 @@ export default function HouseholdBulkActions({
             {
                 label: 'Export',
                 icon: <Download className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('export'),
+                onClick: () => onBulkOperation('export' as BulkAction),
                 tooltip: 'Export selected households',
-                variant: 'default' as const
+                variant: 'default' as const,
+                disabled: false
             },
             {
                 label: 'Edit Status',
                 icon: <Edit className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_status'),
+                onClick: () => onBulkOperation('change_status' as BulkAction),
                 tooltip: 'Bulk edit status',
-                variant: 'default' as const
+                variant: 'default' as const,
+                disabled: false
             }
         ],
         secondary: [
             {
                 label: 'Activate',
                 icon: <Users className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('activate'),
+                onClick: () => onBulkOperation('activate' as BulkAction),
                 tooltip: 'Activate selected households',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Deactivate',
                 icon: <Users className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('deactivate'),
+                onClick: () => onBulkOperation('deactivate' as BulkAction),
                 tooltip: 'Deactivate selected households',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Change Purok',
                 icon: <Globe className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_purok'),
+                onClick: () => onBulkOperation('change_purok' as BulkAction),
                 tooltip: 'Change purok for selected households',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Print',
                 icon: <Printer className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('print'),
+                onClick: () => onBulkOperation('print' as BulkAction),
                 tooltip: 'Print selected households',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Copy Data',
                 icon: <Copy className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: onCopySelectedData,
                 tooltip: 'Copy selected data to clipboard',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             }
         ],
         destructive: [
@@ -128,7 +142,8 @@ export default function HouseholdBulkActions({
                 icon: <Trash2 className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => setShowBulkDeleteDialog?.(true),
                 tooltip: 'Delete selected households',
-                variant: 'destructive' as const
+                variant: 'destructive' as const,
+                disabled: false
             }
         ]
     };
@@ -147,7 +162,7 @@ export default function HouseholdBulkActions({
                             </span>
                         </div>
                         <div>
-                            <span className="font-medium text-sm sm:text-base">
+                            <span className="font-medium text-sm sm:text-base dark:text-gray-200">
                                 {selectedHouseholds.length} household(s) selected
                             </span>
                             {selectionMode !== 'page' && (
@@ -161,6 +176,18 @@ export default function HouseholdBulkActions({
                     {/* Selection Stats */}
                     {selectionStats && (
                         <div className="hidden sm:flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                            {selectionStats.total && selectionStats.total > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                    Total: {selectionStats.total}
+                                </span>
+                            )}
+                            {selectionStats.totalMembers && selectionStats.totalMembers > 0 && (
+                                <span className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                                    Members: {selectionStats.totalMembers}
+                                </span>
+                            )}
                             {selectionStats.active && selectionStats.active > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
@@ -171,12 +198,6 @@ export default function HouseholdBulkActions({
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-red-500"></div>
                                     {selectionStats.inactive} inactive
-                                </span>
-                            )}
-                            {selectionStats.pending && selectionStats.pending > 0 && (
-                                <span className="flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                                    {selectionStats.pending} pending
                                 </span>
                             )}
                         </div>
@@ -192,7 +213,7 @@ export default function HouseholdBulkActions({
                             size="sm"
                             onClick={onClearSelection}
                             disabled={isPerformingBulkAction}
-                            className="text-xs h-8"
+                            className="text-xs h-8 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
                             Clear Selection
                         </Button>
@@ -203,7 +224,7 @@ export default function HouseholdBulkActions({
                                 variant="outline"
                                 size="sm"
                                 disabled={isPerformingBulkAction}
-                                className="text-xs h-8"
+                                className="text-xs h-8 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                                 {isSelectAll ? (
                                     <>
@@ -221,7 +242,7 @@ export default function HouseholdBulkActions({
                                 <div className="py-1">
                                     <button
                                         onClick={onSelectAllOnPage}
-                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
                                         disabled={isPerformingBulkAction}
                                     >
                                         {isSelectAll ? '✓ ' : ''}
@@ -229,14 +250,14 @@ export default function HouseholdBulkActions({
                                     </button>
                                     <button
                                         onClick={onSelectAllFiltered}
-                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
                                         disabled={isPerformingBulkAction}
                                     >
-                                        Select All Filtered
+                                        Select All Filtered ({totalItems})
                                     </button>
                                     <button
                                         onClick={onSelectAll}
-                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
                                         disabled={isPerformingBulkAction}
                                     >
                                         Select All Households
@@ -257,13 +278,13 @@ export default function HouseholdBulkActions({
                                         size="sm"
                                         onClick={action.onClick}
                                         disabled={isPerformingBulkAction || action.disabled}
-                                        className="text-xs h-8"
+                                        className="text-xs h-8 dark:border-gray-600 dark:text-gray-300"
                                     >
                                         {action.icon}
                                         {!isMobile && action.label}
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>
+                                <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                                     <p>{action.tooltip}</p>
                                 </TooltipContent>
                             </Tooltip>
@@ -276,7 +297,7 @@ export default function HouseholdBulkActions({
                                     variant="outline"
                                     size="sm"
                                     disabled={isPerformingBulkAction}
-                                    className="text-xs h-8"
+                                    className="text-xs h-8 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                                 >
                                     More...
                                 </Button>
@@ -286,7 +307,7 @@ export default function HouseholdBulkActions({
                                             <button
                                                 key={index}
                                                 onClick={action.onClick}
-                                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
                                                 disabled={isPerformingBulkAction || action.disabled}
                                             >
                                                 {action.icon}
@@ -313,7 +334,7 @@ export default function HouseholdBulkActions({
                                         {!isMobile && action.label}
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>
+                                <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                                     <p>{action.tooltip}</p>
                                 </TooltipContent>
                             </Tooltip>

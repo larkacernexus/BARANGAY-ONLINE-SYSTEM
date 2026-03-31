@@ -5,7 +5,7 @@ import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
 import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Blotter, BlotterFilters, BlotterStats } from '@/components/admin/blotters/blotter';
+import { Blotter, BlotterFilters, BlotterStats } from '@/types/admin/blotters/blotter';
 import { blotterUtils } from '@/admin-utils/blotter-utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 

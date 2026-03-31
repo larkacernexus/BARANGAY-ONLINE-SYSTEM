@@ -1,4 +1,7 @@
+// resources/js/admin-utils/announcement-utils.ts
+
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
+import { Announcement, AnnouncementFilters, SelectionStats } from '@/types/admin/announcements/announcement.types';
 
 export const announcementUtils = {
     truncateText: (text: string, maxLength: number = 50): string => {
@@ -16,7 +19,8 @@ export const announcementUtils = {
         }
     },
 
-    formatDateTime: (dateString: string) => {
+    formatDateTime: (dateString: string | null) => {
+        if (!dateString) return 'No date';
         try {
             return format(parseISO(dateString), 'MMM dd, yyyy HH:mm');
         } catch {
@@ -95,13 +99,25 @@ export const announcementUtils = {
         if (filters.status && filters.status !== 'all') {
             switch (filters.status) {
                 case 'active':
-                    result = result.filter(announcement => announcement.is_active);
+                    result = result.filter(announcement => 
+                        announcement.is_active && 
+                        announcement.start_date && 
+                        announcement.end_date &&
+                        new Date(announcement.start_date) <= new Date() && 
+                        new Date(announcement.end_date) >= new Date()
+                    );
                     break;
                 case 'inactive':
                     result = result.filter(announcement => !announcement.is_active);
                     break;
                 case 'currently_active':
-                    result = result.filter(announcement => announcement.is_currently_active);
+                    result = result.filter(announcement => 
+                        announcement.is_currently_active &&
+                        announcement.start_date &&
+                        announcement.end_date &&
+                        new Date(announcement.start_date) <= new Date() && 
+                        new Date(announcement.end_date) >= new Date()
+                    );
                     break;
                 case 'expired':
                     result = result.filter(announcement => 
@@ -163,6 +179,10 @@ export const announcementUtils = {
                     aValue = a.start_date ? new Date(a.start_date).getTime() : 0;
                     bValue = b.start_date ? new Date(b.start_date).getTime() : 0;
                     break;
+                case 'end_date':
+                    aValue = a.end_date ? new Date(a.end_date).getTime() : 0;
+                    bValue = b.end_date ? new Date(b.end_date).getTime() : 0;
+                    break;
                 default:
                     aValue = new Date(a.created_at).getTime();
                     bValue = new Date(b.created_at).getTime();
@@ -178,20 +198,61 @@ export const announcementUtils = {
         return result;
     },
 
-    getSelectionStats: (announcements: Announcement[]) => {
-        const activeCount = announcements.filter(a => a.is_active).length;
-        const currentlyActiveCount = announcements.filter(a => a.is_currently_active).length;
-        const expiredCount = announcements.filter(a => 
-            a.end_date && isBefore(parseISO(a.end_date), new Date())
-        ).length;
-        const highPriorityCount = announcements.filter(a => a.priority >= 3).length;
+    getSelectionStats: (announcements: Announcement[]): SelectionStats => {
+        const now = new Date();
+        
+        // Count types
+        const types: Record<string, number> = {};
+        const priorities: Record<string, number> = {};
+        
+        announcements.forEach(announcement => {
+            // Count types
+            const type = announcement.type || 'other';
+            types[type] = (types[type] || 0) + 1;
+            
+            // Count priorities
+            const priority = announcement.priority?.toString() || 'normal';
+            priorities[priority] = (priorities[priority] || 0) + 1;
+        });
         
         return {
             total: announcements.length,
-            activeCount,
-            currentlyActiveCount,
-            expiredCount,
-            highPriorityCount
+            active: announcements.filter(a => a.is_active === true).length,
+            inactive: announcements.filter(a => a.is_active === false).length,
+            expired: announcements.filter(a => 
+                a.end_date && isBefore(parseISO(a.end_date), now)
+            ).length,
+            upcoming: announcements.filter(a => 
+                a.start_date && isAfter(parseISO(a.start_date), now)
+            ).length,
+            types,
+            priorities
         };
+    },
+
+    // Helper function to safely check if announcement is currently active
+    isCurrentlyActive: (announcement: Announcement): boolean => {
+        if (!announcement.is_active) return false;
+        if (!announcement.start_date || !announcement.end_date) return false;
+        
+        const now = new Date();
+        const startDate = new Date(announcement.start_date);
+        const endDate = new Date(announcement.end_date);
+        
+        return startDate <= now && endDate >= now;
+    },
+
+    // Helper function to get announcement status
+    getAnnouncementStatus: (announcement: Announcement): string => {
+        if (!announcement.is_active) return 'inactive';
+        if (!announcement.start_date || !announcement.end_date) return 'unknown';
+        
+        const now = new Date();
+        const startDate = new Date(announcement.start_date);
+        const endDate = new Date(announcement.end_date);
+        
+        if (startDate > now) return 'upcoming';
+        if (endDate < now) return 'expired';
+        return 'active';
     }
 };

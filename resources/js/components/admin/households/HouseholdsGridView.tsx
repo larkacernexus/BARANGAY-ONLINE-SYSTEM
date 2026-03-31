@@ -1,3 +1,5 @@
+// components/admin/households/HouseholdsGridView.tsx
+
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +14,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { GridLayout } from '@/components/adminui/grid-layout';
-import { Home, Users, Phone, Eye, Edit, Trash2, Clipboard, MapPin, ChevronDown, ChevronUp, ExternalLink, Copy, User, Calendar, Map as MapIcon, MoreVertical, Square, CheckSquare, QrCode, FileText } from 'lucide-react';
+import { Home, Users, Phone, Eye, Edit, Trash2, Clipboard, MapPin, ChevronDown, ChevronUp, ExternalLink, Copy, User, Calendar, Map as MapIcon, MoreVertical, Square, CheckSquare, QrCode, FileText, PlayCircle, PauseCircle } from 'lucide-react';
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
 import { getPurokName, getStatusBadgeVariant, truncateText, truncateAddress, formatContactNumber } from '../../../admin-utils/householdUtils';
@@ -27,6 +29,7 @@ interface HouseholdsGridViewProps {
     hasActiveFilters: boolean;
     onClearFilters: () => void;
     onDelete: (household: any) => void;
+    onToggleStatus?: (household: any) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     puroks: any[];
     onGenerateQr?: (household: any) => void;
@@ -63,6 +66,7 @@ export default function HouseholdsGridView({
     hasActiveFilters,
     onClearFilters,
     onDelete,
+    onToggleStatus,
     onCopyToClipboard,
     puroks,
     onGenerateQr,
@@ -111,6 +115,14 @@ export default function HouseholdsGridView({
     const handleEdit = (householdId: number, e: React.MouseEvent) => {
         e.stopPropagation();
         router.get(`/admin/households/${householdId}/edit`);
+    };
+
+    // Handle toggle status
+    const handleToggleStatus = (household: any, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onToggleStatus) {
+            onToggleStatus(household);
+        }
     };
 
     // Handle map view
@@ -220,13 +232,13 @@ export default function HouseholdsGridView({
                                                     <MoreVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                                                 </button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-48">
+                                            <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
                                                 <DropdownMenuItem 
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         handleViewDetails(household.id, e);
                                                     }}
-                                                    className="flex items-center gap-2 cursor-pointer"
+                                                    className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                     <span>View Details</span>
@@ -237,33 +249,59 @@ export default function HouseholdsGridView({
                                                         e.preventDefault();
                                                         handleEdit(household.id, e);
                                                     }}
-                                                    className="flex items-center gap-2 cursor-pointer"
+                                                    className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                 >
                                                     <Edit className="h-4 w-4" />
                                                     <span>Edit Household</span>
                                                 </DropdownMenuItem>
 
-                                                {hasCoordinates && (
-                                                    <DropdownMenuItem 
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            handleViewMap(household, e);
-                                                        }}
-                                                        className="flex items-center gap-2 cursor-pointer"
-                                                    >
-                                                        <MapIcon className="h-4 w-4" />
-                                                        <span>View on Map</span>
-                                                    </DropdownMenuItem>
+                                                {onToggleStatus && (
+                                                    <>
+                                                        <DropdownMenuItem 
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                handleToggleStatus(household, e);
+                                                            }}
+                                                            className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
+                                                        >
+                                                            {household.status === 'active' ? (
+                                                                <>
+                                                                    <PauseCircle className="h-4 w-4" />
+                                                                    <span>Deactivate</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <PlayCircle className="h-4 w-4" />
+                                                                    <span>Activate</span>
+                                                                </>
+                                                            )}
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                                    </>
                                                 )}
-                                                
-                                                <DropdownMenuSeparator />
+
+                                                {hasCoordinates && (
+                                                    <>
+                                                        <DropdownMenuItem 
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                handleViewMap(household, e);
+                                                            }}
+                                                            className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
+                                                        >
+                                                            <MapIcon className="h-4 w-4" />
+                                                            <span>View on Map</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                                    </>
+                                                )}
                                                 
                                                 <DropdownMenuItem 
                                                     onClick={(e) => {
                                                         e.preventDefault();
                                                         onCopyToClipboard(household.household_number, 'Household Number');
                                                     }}
-                                                    className="flex items-center gap-2 cursor-pointer"
+                                                    className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                 >
                                                     <Clipboard className="h-4 w-4" />
                                                     <span>Copy Household No.</span>
@@ -276,7 +314,7 @@ export default function HouseholdsGridView({
                                                                 e.preventDefault();
                                                                 window.location.href = `tel:${household.contact_number}`;
                                                             }}
-                                                            className="flex items-center gap-2 cursor-pointer"
+                                                            className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                         >
                                                             <Phone className="h-4 w-4" />
                                                             <span>Call Household</span>
@@ -287,7 +325,7 @@ export default function HouseholdsGridView({
                                                                 e.preventDefault();
                                                                 onCopyToClipboard(household.contact_number, 'Contact');
                                                             }}
-                                                            className="flex items-center gap-2 cursor-pointer"
+                                                            className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                         >
                                                             <Clipboard className="h-4 w-4" />
                                                             <span>Copy Contact</span>
@@ -298,7 +336,7 @@ export default function HouseholdsGridView({
                                                 {onGenerateQr && (
                                                     <DropdownMenuItem 
                                                         onClick={(e) => handleGenerateQr(household, e)}
-                                                        className="flex items-center gap-2 cursor-pointer"
+                                                        className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                     >
                                                         <QrCode className="h-4 w-4" />
                                                         <span>Generate QR Code</span>
@@ -311,7 +349,7 @@ export default function HouseholdsGridView({
                                                             e.preventDefault();
                                                             handleCreateClearance(household, e);
                                                         }}
-                                                        className="flex items-center gap-2 cursor-pointer"
+                                                        className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                     >
                                                         <FileText className="h-4 w-4" />
                                                         <span>Create Clearance</span>
@@ -320,13 +358,13 @@ export default function HouseholdsGridView({
 
                                                 {isBulkMode && (
                                                     <>
-                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                         <DropdownMenuItem 
                                                             onClick={(e) => {
                                                                 e.preventDefault();
                                                                 onItemSelect(household.id);
                                                             }}
-                                                            className="flex items-center gap-2 cursor-pointer"
+                                                            className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                         >
                                                             {isSelected ? (
                                                                 <>
@@ -345,7 +383,7 @@ export default function HouseholdsGridView({
                                                 
                                                 {household.status !== 'inactive' && (
                                                     <>
-                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                         <DropdownMenuItem 
                                                             onClick={(e) => {
                                                                 e.preventDefault();

@@ -15,7 +15,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { DocumentType } from '@/types/document-types';
+import { DocumentType } from '@/types/admin/document-types/document-types';
 import { Link } from '@inertiajs/react';
 import {
     CheckCircle,

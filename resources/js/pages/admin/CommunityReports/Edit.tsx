@@ -6,7 +6,7 @@ import { route } from 'ziggy-js';
 import AdminLayout from '@/layouts/admin-app-layout';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Save, Send, ArrowRight, Eye, FileText, UserPlus, Trash2 } from 'lucide-react';
-import { PageProps, ReportType, FileWithPreview, CommunityReportFormData } from '@/types/admin/community-report';
+import { PageProps, ReportType, FileWithPreview, CommunityReportFormData } from '@/types/admin/reports/community-report';
 
 // Import components
 import { PreviewModal } from '@/components/admin/community-reports/create/components/PreviewModal';

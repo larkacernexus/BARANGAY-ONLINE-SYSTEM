@@ -1,3 +1,5 @@
+// components/admin/forms/FormsBulkActions.tsx
+
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
@@ -10,10 +12,10 @@ import {
     ArchiveRestore,
     Folder,
     FileDown,
-    Checkbox,
     CheckSquare,
     Square
 } from 'lucide-react';
+import { BulkOperation } from '@/types/admin/forms/forms.types';
 
 interface BulkActionItem {
     label: string;
@@ -43,7 +45,7 @@ interface FormsBulkActionsProps {
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     
@@ -73,66 +75,74 @@ export default function FormsBulkActions({
     bulkActions: customBulkActions
 }: FormsBulkActionsProps) {
     
-    // Default bulk actions for forms
+    // Default bulk actions for forms - ADD disabled: false to all
     const defaultBulkActions = {
         primary: [
             {
                 label: 'Export',
                 icon: <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('export'),
+                onClick: () => onBulkOperation('export' as BulkOperation),
                 tooltip: 'Export selected forms',
-                variant: 'default' as const
+                variant: 'default' as const,
+                disabled: false
             },
             {
                 label: 'Download',
                 icon: <Download className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('download'),
+                onClick: () => onBulkOperation('download' as BulkOperation),
                 tooltip: 'Download selected forms',
-                variant: 'default' as const
+                variant: 'default' as const,
+                disabled: false
             }
         ],
         secondary: [
             {
                 label: 'Activate',
                 icon: <ArchiveRestore className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('activate'),
+                onClick: () => onBulkOperation('activate' as BulkOperation),
                 tooltip: 'Activate selected forms',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Deactivate',
                 icon: <Archive className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('deactivate'),
+                onClick: () => onBulkOperation('deactivate' as BulkOperation),
                 tooltip: 'Deactivate selected forms',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Change Status',
                 icon: <Edit className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_status'),
+                onClick: () => onBulkOperation('change_status' as BulkOperation),
                 tooltip: 'Change status for selected forms',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Change Category',
                 icon: <Folder className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_category'),
+                onClick: () => onBulkOperation('change_category' as BulkOperation),
                 tooltip: 'Change category for selected forms',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Export CSV',
                 icon: <FileDown className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('export_csv'),
+                onClick: () => onBulkOperation('export_csv' as BulkOperation),
                 tooltip: 'Export as CSV',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Copy Data',
                 icon: <Copy className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: onCopySelectedData,
                 tooltip: 'Copy selected data to clipboard',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             }
         ],
         destructive: [
@@ -141,7 +151,8 @@ export default function FormsBulkActions({
                 icon: <Trash2 className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => setShowBulkDeleteDialog?.(true),
                 tooltip: 'Delete selected forms',
-                variant: 'destructive' as const
+                variant: 'destructive' as const,
+                disabled: false
             }
         ]
     };
@@ -160,7 +171,7 @@ export default function FormsBulkActions({
                             </span>
                         </div>
                         <div>
-                            <span className="font-medium text-sm sm:text-base">
+                            <span className="font-medium text-sm sm:text-base dark:text-gray-200">
                                 {selectedForms.length} form(s) selected
                             </span>
                             {selectionMode !== 'page' && (
@@ -211,7 +222,7 @@ export default function FormsBulkActions({
                             size="sm"
                             onClick={onClearSelection}
                             disabled={isPerformingBulkAction}
-                            className="text-xs h-8"
+                            className="text-xs h-8 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
                             Clear Selection
                         </Button>
@@ -222,7 +233,7 @@ export default function FormsBulkActions({
                                 variant="outline"
                                 size="sm"
                                 disabled={isPerformingBulkAction}
-                                className="text-xs h-8"
+                                className="text-xs h-8 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                                 {isSelectAll ? (
                                     <>
@@ -240,22 +251,21 @@ export default function FormsBulkActions({
                                 <div className="py-1">
                                     <button
                                         onClick={onSelectAllOnPage}
-                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
                                         disabled={isPerformingBulkAction}
                                     >
-                                        {isSelectAll ? '✓ ' : ''}
-                                        {isSelectAll ? 'Deselect Page' : 'Select Page'}
+                                        Select Page
                                     </button>
                                     <button
                                         onClick={onSelectAllFiltered}
-                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
                                         disabled={isPerformingBulkAction}
                                     >
                                         Select All Filtered ({totalItems})
                                     </button>
                                     <button
                                         onClick={onSelectAll}
-                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
                                         disabled={isPerformingBulkAction}
                                     >
                                         Select All Forms
@@ -276,13 +286,13 @@ export default function FormsBulkActions({
                                         size="sm"
                                         onClick={action.onClick}
                                         disabled={isPerformingBulkAction || action.disabled}
-                                        className="text-xs h-8"
+                                        className="text-xs h-8 dark:border-gray-600 dark:text-gray-300"
                                     >
                                         {action.icon}
                                         {!isMobile && action.label}
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>
+                                <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                                     <p>{action.tooltip}</p>
                                 </TooltipContent>
                             </Tooltip>
@@ -295,7 +305,7 @@ export default function FormsBulkActions({
                                     variant="outline"
                                     size="sm"
                                     disabled={isPerformingBulkAction}
-                                    className="text-xs h-8"
+                                    className="text-xs h-8 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                                 >
                                     More...
                                 </Button>
@@ -305,7 +315,7 @@ export default function FormsBulkActions({
                                             <button
                                                 key={index}
                                                 onClick={action.onClick}
-                                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
                                                 disabled={isPerformingBulkAction || action.disabled}
                                             >
                                                 {action.icon}
@@ -332,7 +342,7 @@ export default function FormsBulkActions({
                                         {!isMobile && action.label}
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>
+                                <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                                     <p>{action.tooltip}</p>
                                 </TooltipContent>
                             </Tooltip>

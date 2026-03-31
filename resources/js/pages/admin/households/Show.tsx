@@ -2,28 +2,8 @@
 
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, router } from '@inertiajs/react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { TooltipProvider } from '@/components/ui/tooltip';
-
-import { PageProps } from '@/components/admin/households/show/types';
-import { isNew } from '@/components/admin/households/show/utils/helpers';
-
-import { HouseholdHeader } from '@/components/admin/households/show/household/HouseholdHeader';
-import { HouseholdSidebar } from '@/components/admin/households/show/household/HouseholdSidebar';
-import { StatusAlert } from '@/components/admin/households/show/alerts/StatusAlert';
-import { ExpiringPrivilegesAlert } from '@/components/admin/households/show/alerts/ExpiringPrivilegesAlert';
-import { DeleteConfirmationDialog } from '@/components/admin/households/show/dialogs/DeleteConfirmationDialog';
-
-import { OverviewTab } from '@/components/admin/households/show/tabs/OverviewTab';
-import { MembersTab } from '@/components/admin/households/show/tabs/MembersTab';
-import { PrivilegesTab } from '@/components/admin/households/show/tabs/PrivilegesTab';
-import { StatisticsTab } from '@/components/admin/households/show/tabs/StatisticsTab';
-import { FeesTab } from '@/components/admin/households/show/tabs/FeesTab';
-import { ClearancesTab } from '@/components/admin/households/show/tabs/ClearancesTab';
-import { PaymentsTab } from '@/components/admin/households/show/tabs/PaymentsTab';
-import { ActivityLogTab } from '@/components/admin/households/show/tabs/ActivityLogTab';
-import { ResidentDocumentsTab } from '@/components/admin/households/show/tabs/ResidentDocumentsTab';
-
 import { route } from 'ziggy-js';
 import { 
     Home, 
@@ -43,15 +23,65 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
-// Extend the PageProps interface to include availableResidents and headId
+// Import types from the shared types file
+import { 
+    PageProps, 
+    Household, 
+    HouseholdMember,
+    Privilege,
+    Fee,
+    Payment,
+    Clearance,
+    ResidentDocument,
+    ActivityLog
+} from '@/types/admin/households/household.types';
+
+// Import components
+import { HouseholdHeader } from '@/components/admin/households/show/household/HouseholdHeader';
+import { HouseholdSidebar } from '@/components/admin/households/show/household/HouseholdSidebar';
+import { StatusAlert } from '@/components/admin/households/show/alerts/StatusAlert';
+import { ExpiringPrivilegesAlert } from '@/components/admin/households/show/alerts/ExpiringPrivilegesAlert';
+import { DeleteConfirmationDialog } from '@/components/admin/households/show/dialogs/DeleteConfirmationDialog';
+
+import { OverviewTab } from '@/components/admin/households/show/tabs/OverviewTab';
+import { MembersTab } from '@/components/admin/households/show/tabs/MembersTab';
+import { PrivilegesTab } from '@/components/admin/households/show/tabs/PrivilegesTab';
+import { StatisticsTab } from '@/components/admin/households/show/tabs/StatisticsTab';
+import { FeesTab } from '@/components/admin/households/show/tabs/FeesTab';
+import { ClearancesTab } from '@/components/admin/households/show/tabs/ClearancesTab';
+import { PaymentsTab } from '@/components/admin/households/show/tabs/PaymentsTab';
+import { ActivityLogTab } from '@/components/admin/households/show/tabs/ActivityLogTab';
+import { ResidentDocumentsTab } from '@/components/admin/households/show/tabs/ResidentDocumentsTab';
+
+// Import utilities from types file
+import { getStatusColor, getStatusLabel, formatDate } from '@/types/admin/households/household.types';
+
+// Extended props interface using imported types
 interface ExtendedPageProps extends PageProps {
+    household: Household & {
+        household_members?: (HouseholdMember & {
+            resident: {
+                id: number;
+                first_name: string;
+                last_name: string;
+                middle_name?: string;
+                privileges_list?: Privilege[];
+                photo_url?: string;
+            };
+        })[];
+    };
     availableResidents?: any[];
     headId?: number | null;
-    fees?: any[];
-    payments?: any[];
-    clearances?: any[];
-    activities?: any[];
-    residentDocuments?: any[];
+    fees?: Fee[];
+    payments?: Payment[];
+    clearances?: Clearance[];
+    activities?: ActivityLog[];
+    residentDocuments?: ResidentDocument[];
+}
+
+// Type for privilege counts
+interface PrivilegeCounts {
+    [code: string]: number;
 }
 
 export default function ShowHousehold({ 
@@ -70,6 +100,100 @@ export default function ShowHousehold({
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
     const [showMoreDetails, setShowMoreDetails] = useState(false);
+
+    // Memoized privilege calculations
+    const {
+        allPrivileges,
+        totalPrivileges,
+        activePrivileges,
+        expiringSoonPrivileges,
+        expiredPrivileges,
+        pendingPrivileges,
+        membersWithPrivileges,
+        privilegeCounts
+    } = useMemo(() => {
+        const privileges = household.household_members?.flatMap(m => m.resident.privileges_list || []) || [];
+        
+        return {
+            allPrivileges: privileges,
+            totalPrivileges: privileges.length,
+            activePrivileges: privileges.filter(p => p.status === 'active').length,
+            expiringSoonPrivileges: privileges.filter(p => p.status === 'expiring_soon').length,
+            expiredPrivileges: privileges.filter(p => p.status === 'expired').length,
+            pendingPrivileges: privileges.filter(p => p.status === 'pending').length,
+            membersWithPrivileges: household.household_members?.filter(m => 
+                m.resident.privileges_list && m.resident.privileges_list.length > 0
+            ).length || 0,
+            privilegeCounts: privileges.reduce((counts: PrivilegeCounts, p) => {
+                if (p.status === 'active' || p.status === 'expiring_soon') {
+                    counts[p.code] = (counts[p.code] || 0) + 1;
+                }
+                return counts;
+            }, {})
+        };
+    }, [household.household_members]);
+
+    // Memoized fee calculations
+    const feeStats = useMemo(() => ({
+        totalFees: fees.length,
+        paidFees: fees.filter(f => f.status === 'paid').length,
+        pendingFees: fees.filter(f => f.status === 'pending' || f.status === 'issued').length,
+        overdueFees: fees.filter(f => f.status === 'overdue').length,
+        totalAmount: fees.reduce((sum, f) => sum + (f.total_amount || 0), 0),
+        totalPaid: fees.reduce((sum, f) => sum + (f.amount_paid || 0), 0)
+    }), [fees]);
+
+    // Memoized payment calculations
+    const paymentStats = useMemo(() => ({
+        totalPayments: payments.length,
+        totalAmount: payments.reduce((sum, p) => sum + (p.total_amount || 0), 0),
+        cashPayments: payments.filter(p => p.payment_method === 'cash').length,
+        onlinePayments: payments.filter(p => ['gcash', 'maya', 'online'].includes(p.payment_method)).length
+    }), [payments]);
+
+    // Memoized clearance calculations
+    const clearanceStats = useMemo(() => ({
+        totalClearances: clearances.length,
+        pendingClearances: clearances.filter(c => c.status === 'pending').length,
+        approvedClearances: clearances.filter(c => c.status === 'approved').length,
+        releasedClearances: clearances.filter(c => c.status === 'released').length
+    }), [clearances]);
+
+    // Memoized document calculations
+    const documentStats = useMemo(() => ({
+        totalDocuments: residentDocuments.length,
+        activeDocuments: residentDocuments.filter(d => d.status === 'active').length,
+        expiredDocuments: residentDocuments.filter(d => d.status === 'expired').length
+    }), [residentDocuments]);
+
+    // Handlers
+    const handleCopyLink = useCallback(() => {
+        const link = window.location.href;
+        navigator.clipboard.writeText(link).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    }, []);
+
+    const handleDelete = useCallback(() => {
+        setIsDeleting(true);
+        router.delete(route('admin.households.destroy', household.id), {
+            preserveScroll: false,
+            onFinish: () => setIsDeleting(false),
+        });
+    }, [household.id]);
+
+    const handlePrint = useCallback(() => {
+        window.print();
+    }, []);
+
+    const handleTabChange = useCallback((tabId: string) => {
+        setActiveTab(tabId);
+    }, []);
+
+    const handleShowMoreToggle = useCallback(() => {
+        setShowMoreDetails(prev => !prev);
+    }, []);
 
     // Null check
     if (!household) {
@@ -101,83 +225,15 @@ export default function ShowHousehold({
         );
     }
 
-    // Calculate privilege statistics
-    const allPrivileges = household.household_members?.flatMap(m => m.resident.privileges_list || []) || [];
-    const totalPrivileges = allPrivileges.length;
-    const activePrivileges = allPrivileges.filter(p => p.status === 'active').length;
-    const expiringSoonPrivileges = allPrivileges.filter(p => p.status === 'expiring_soon').length;
-    const expiredPrivileges = allPrivileges.filter(p => p.status === 'expired').length;
-    const pendingPrivileges = allPrivileges.filter(p => p.status === 'pending').length;
-    const membersWithPrivileges = household.household_members?.filter(m => 
-        m.resident.privileges_list && m.resident.privileges_list.length > 0
-    ).length || 0;
-
-    // Count privileges by code
-    const privilegeCounts = useMemo(() => {
-        const counts: Record<string, number> = {};
-        allPrivileges.forEach(p => {
-            if (p.status === 'active' || p.status === 'expiring_soon') {
-                counts[p.code] = (counts[p.code] || 0) + 1;
-            }
-        });
-        return counts;
-    }, [allPrivileges]);
-
-    // Calculate fee statistics
-    const totalFees = fees.length;
-    const paidFees = fees.filter(f => f.status === 'paid').length;
-    const pendingFees = fees.filter(f => f.status === 'pending' || f.status === 'issued').length;
-    const overdueFees = fees.filter(f => f.status === 'overdue').length;
-    const totalFeeAmount = fees.reduce((sum, f) => sum + (f.total_amount || 0), 0);
-    const totalPaidAmount = fees.reduce((sum, f) => sum + (f.amount_paid || 0), 0);
-
-    // Calculate payment statistics
-    const totalPayments = payments.length;
-    const totalPaymentAmount = payments.reduce((sum, p) => sum + (p.total_amount || 0), 0);
-    const cashPayments = payments.filter(p => p.payment_method === 'cash').length;
-    const onlinePayments = payments.filter(p => ['gcash', 'maya', 'online'].includes(p.payment_method)).length;
-
-    // Calculate clearance statistics
-    const totalClearances = clearances.length;
-    const pendingClearances = clearances.filter(c => c.status === 'pending').length;
-    const approvedClearances = clearances.filter(c => c.status === 'approved').length;
-    const releasedClearances = clearances.filter(c => c.status === 'released').length;
-
-    // Calculate document statistics
-    const totalDocuments = residentDocuments.length;
-    const activeDocuments = residentDocuments.filter(d => d.status === 'active').length;
-    const expiredDocuments = residentDocuments.filter(d => d.status === 'expired').length;
-
-    // Handlers
-    const handleCopyLink = () => {
-        const link = window.location.href;
-        navigator.clipboard.writeText(link).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        });
-    };
-
-    const handleDelete = () => {
-        setIsDeleting(true);
-        router.delete(route('admin.households.destroy', household.id), {
-            preserveScroll: false,
-            onFinish: () => setIsDeleting(false),
-        });
-    };
-
-    const handlePrint = () => {
-        window.print();
-    };
-
     // Tabs configuration with counts
     const tabs = [
         { id: 'overview', label: 'Overview', icon: <Home className="h-4 w-4" />, count: null },
         { id: 'members', label: 'Members', icon: <Users className="h-4 w-4" />, count: household.member_count },
         { id: 'privileges', label: 'Privileges', icon: <Award className="h-4 w-4" />, count: activePrivileges },
-        { id: 'fees', label: 'Fees', icon: <Receipt className="h-4 w-4" />, count: pendingFees },
-        { id: 'payments', label: 'Payments', icon: <CreditCard className="h-4 w-4" />, count: totalPayments },
-        { id: 'clearances', label: 'Clearances', icon: <Calendar className="h-4 w-4" />, count: pendingClearances },
-        { id: 'documents', label: 'Documents', icon: <FileText className="h-4 w-4" />, count: totalDocuments },
+        { id: 'fees', label: 'Fees', icon: <Receipt className="h-4 w-4" />, count: feeStats.pendingFees },
+        { id: 'payments', label: 'Payments', icon: <CreditCard className="h-4 w-4" />, count: paymentStats.totalPayments },
+        { id: 'clearances', label: 'Clearances', icon: <Calendar className="h-4 w-4" />, count: clearanceStats.pendingClearances },
+        { id: 'documents', label: 'Documents', icon: <FileText className="h-4 w-4" />, count: documentStats.totalDocuments },
         { id: 'statistics', label: 'Statistics', icon: <BarChart3 className="h-4 w-4" />, count: null },
         { id: 'history', label: 'Activity Log', icon: <History className="h-4 w-4" />, count: activities.length },
     ];
@@ -212,7 +268,7 @@ export default function ShowHousehold({
 
                     <ExpiringPrivilegesAlert 
                         count={expiringSoonPrivileges}
-                        onReview={() => setActiveTab('privileges')}
+                        onReview={() => handleTabChange('privileges')}
                     />
 
                     {/* Tabs */}
@@ -221,9 +277,9 @@ export default function ShowHousehold({
                             {tabs.map((tab) => (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
+                                    onClick={() => handleTabChange(tab.id)}
                                     className={`
-                                        inline-flex items-center px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap
+                                        inline-flex items-center px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition-colors
                                         ${activeTab === tab.id
                                             ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600'
@@ -275,48 +331,48 @@ export default function ShowHousehold({
                                 <FeesTab 
                                     householdId={household.id}
                                     fees={fees}
-                                    totalFees={totalFees}
-                                    paidFees={paidFees}
-                                    pendingFees={pendingFees}
-                                    overdueFees={overdueFees}
-                                    totalAmount={totalFeeAmount}
-                                    totalPaid={totalPaidAmount}
+                                    totalFees={feeStats.totalFees}
+                                    paidFees={feeStats.paidFees}
+                                    pendingFees={feeStats.pendingFees}
+                                    overdueFees={feeStats.overdueFees}
+                                    totalAmount={feeStats.totalAmount}
+                                    totalPaid={feeStats.totalPaid}
                                 />
                             )}
                             {activeTab === 'payments' && (
                                 <PaymentsTab 
                                     householdId={household.id}
                                     payments={payments}
-                                    totalPayments={totalPayments}
-                                    totalAmount={totalPaymentAmount}
-                                    cashPayments={cashPayments}
-                                    onlinePayments={onlinePayments}
+                                    totalPayments={paymentStats.totalPayments}
+                                    totalAmount={paymentStats.totalAmount}
+                                    cashPayments={paymentStats.cashPayments}
+                                    onlinePayments={paymentStats.onlinePayments}
                                 />
                             )}
                             {activeTab === 'clearances' && (
                                 <ClearancesTab 
                                     householdId={household.id}
                                     clearances={clearances}
-                                    totalClearances={totalClearances}
-                                    pendingClearances={pendingClearances}
-                                    approvedClearances={approvedClearances}
-                                    releasedClearances={releasedClearances}
+                                    totalClearances={clearanceStats.totalClearances}
+                                    pendingClearances={clearanceStats.pendingClearances}
+                                    approvedClearances={clearanceStats.approvedClearances}
+                                    releasedClearances={clearanceStats.releasedClearances}
                                 />
                             )}
                             {activeTab === 'documents' && (
                                 <ResidentDocumentsTab 
                                     householdId={household.id}
                                     documents={residentDocuments}
-                                    totalDocuments={totalDocuments}
-                                    activeDocuments={activeDocuments}
-                                    expiredDocuments={expiredDocuments}
+                                    totalDocuments={documentStats.totalDocuments}
+                                    activeDocuments={documentStats.activeDocuments}
+                                    expiredDocuments={documentStats.expiredDocuments}
                                 />
                             )}
                             {activeTab === 'statistics' && (
                                 <StatisticsTab 
                                     household={household}
                                     membersWithPrivileges={membersWithPrivileges}
-                                    onShowMore={() => setShowMoreDetails(!showMoreDetails)}
+                                    onShowMore={handleShowMoreToggle}
                                     showMore={showMoreDetails}
                                 />
                             )}
@@ -336,7 +392,7 @@ export default function ShowHousehold({
                             onCopyLink={handleCopyLink}
                             onPrint={handlePrint}
                             onDelete={() => setShowDeleteDialog(true)}
-                            onShowMore={() => setShowMoreDetails(!showMoreDetails)}
+                            onShowMore={handleShowMoreToggle}
                             showMore={showMoreDetails}
                         />
                     </div>

@@ -53,10 +53,7 @@ interface Props {
     onExport?: () => void;
     togglingStatus: boolean;
     getStatusIcon: (isActive: boolean) => React.ReactNode;
-    /** * Fixed: Updated return type from 'string' to literal badge variants 
-     * to satisfy TypeScript's strict type checking for the Badge component.
-     */
-    getStatusVariant: (isActive: boolean) => "default" | "secondary" | "destructive" | "outline" | null | undefined;
+    getStatusVariant: (isActive: boolean) => "default" | "secondary" | "destructive" | "outline";
     getCategoryColor: (category: string) => string;
     getCategoryLabel: (category: string) => string;
 }
@@ -121,8 +118,11 @@ export const FeeTypeHeader = ({
                                 {feeType.name}
                             </h1>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                {/* Status Badge */}
-                                <Badge variant="outline" className={getStatusBadgeColor(feeType.is_active)}>
+                                {/* Status Badge - Using Badge component with variant */}
+                                <Badge 
+                                    variant={getStatusVariant(feeType.is_active)}
+                                    className={getStatusBadgeColor(feeType.is_active)}
+                                >
                                     {getStatusIcon(feeType.is_active)}
                                     <span className="ml-1">{feeType.is_active ? 'Active' : 'Inactive'}</span>
                                 </Badge>

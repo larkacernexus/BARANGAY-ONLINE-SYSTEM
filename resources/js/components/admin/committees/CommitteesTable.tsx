@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link, router } from '@inertiajs/react';
-import { Committee } from '@/types/committees';
+import { Committee } from '@/types/admin/committees/committees';
 import { 
     MoreVertical, 
     Eye, 

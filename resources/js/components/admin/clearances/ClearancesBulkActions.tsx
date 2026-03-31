@@ -1,3 +1,5 @@
+// components/admin/clearances/ClearancesBulkActions.tsx
+
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
@@ -13,15 +15,9 @@ import {
     CheckSquare,
     Square
 } from 'lucide-react';
+import { BulkOperation, BulkActionItem } from '@/types/portal/clearances/clearance.types';
 
-interface BulkActionItem {
-    label: string;
-    icon: React.ReactNode;
-    onClick: () => void;
-    tooltip: string;
-    variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-    disabled?: boolean;
-}
+
 
 interface ClearancesBulkActionsProps {
     selectedClearances: number[];
@@ -42,7 +38,7 @@ interface ClearancesBulkActionsProps {
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: string, customData?: any) => Promise<void>;
+    onBulkOperation: (operation: BulkOperation, customData?: any) => Promise<void>;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     
@@ -78,53 +74,60 @@ export default function ClearancesBulkActions({
             {
                 label: 'Export',
                 icon: <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('export'),
+                onClick: () => onBulkOperation('export' as BulkOperation),
                 tooltip: 'Export selected clearances',
-                variant: 'default' as const
+                variant: 'default' as const,
+                disabled: false // Add disabled property
             },
             {
                 label: 'Print',
                 icon: <Printer className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('print'),
+                onClick: () => onBulkOperation('print' as BulkOperation),
                 tooltip: 'Print selected clearances',
-                variant: 'default' as const
+                variant: 'default' as const,
+                disabled: false
             }
         ],
         secondary: [
             {
                 label: 'Mark as Processing',
                 icon: <PlayCircle className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('mark_processing'),
+                onClick: () => onBulkOperation('process' as BulkOperation),
                 tooltip: 'Mark selected as processing',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Approve',
                 icon: <CheckCircle className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('approve'),
+                onClick: () => onBulkOperation('approve' as BulkOperation),
                 tooltip: 'Approve selected clearances',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Issue',
                 icon: <FileText className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('issue'),
+                onClick: () => onBulkOperation('issue' as BulkOperation),
                 tooltip: 'Issue selected clearances',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Export CSV',
                 icon: <Download className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('export_csv'),
+                onClick: () => onBulkOperation('export' as BulkOperation),
                 tooltip: 'Export as CSV',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             },
             {
                 label: 'Copy Data',
                 icon: <Copy className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: onCopySelectedData,
                 tooltip: 'Copy selected data to clipboard',
-                variant: 'outline' as const
+                variant: 'outline' as const,
+                disabled: false
             }
         ],
         destructive: [
@@ -133,7 +136,8 @@ export default function ClearancesBulkActions({
                 icon: <Trash2 className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => setShowBulkDeleteDialog?.(true),
                 tooltip: 'Delete selected clearances',
-                variant: 'destructive' as const
+                variant: 'destructive' as const,
+                disabled: false
             }
         ]
     };

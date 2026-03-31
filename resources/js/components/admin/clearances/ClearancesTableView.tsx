@@ -1,3 +1,5 @@
+// components/admin/clearances/ClearancesTableView.tsx
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +17,7 @@ import {
     Eye, Edit, Printer, Trash2, Copy, MoreVertical,
     ArrowUpDown, CreditCard, Home, Building
 } from 'lucide-react';
-import { ClearanceRequest, ClearanceType, Resident, StatusOption } from '@/types/clearances';
+import { ClearanceRequest, ClearanceType, Resident, StatusOption } from '@/types/admin/clearances/clearance-types';
 import { toast } from 'sonner';
 import { JSX } from 'react';
 
@@ -133,8 +135,10 @@ export default function ClearancesTableView({
     };
 
     const getContactNumber = (clearance: ClearanceRequest): string => {
-        if (clearance.contact_number && typeof clearance.contact_number === 'string') {
-            return clearance.contact_number;
+        // Try clearance-level contact number first (if exists in extended type)
+        const anyClearance = clearance as any;
+        if (anyClearance.contact_number && typeof anyClearance.contact_number === 'string') {
+            return anyClearance.contact_number;
         }
         if (clearance.resident?.contact_number && typeof clearance.resident.contact_number === 'string') {
             return clearance.resident.contact_number;
@@ -143,8 +147,9 @@ export default function ClearancesTableView({
     };
 
     const getAddress = (clearance: ClearanceRequest): string => {
-        if (clearance.contact_address && typeof clearance.contact_address === 'string') {
-            return clearance.contact_address;
+        const anyClearance = clearance as any;
+        if (anyClearance.contact_address && typeof anyClearance.contact_address === 'string') {
+            return anyClearance.contact_address;
         }
         if (clearance.resident?.address && typeof clearance.resident.address === 'string') {
             return clearance.resident.address;
@@ -153,11 +158,12 @@ export default function ClearancesTableView({
     };
 
     const getPurok = (clearance: ClearanceRequest): string => {
-        if (clearance.contact_purok && typeof clearance.contact_purok === 'string') {
-            return clearance.contact_purok;
+        const anyClearance = clearance as any;
+        if (anyClearance.contact_purok && typeof anyClearance.contact_purok === 'string') {
+            return anyClearance.contact_purok;
         }
-        if (clearance.resident?.purok && typeof clearance.resident.purok === 'string') {
-            return clearance.resident.purok;
+        if (clearance.resident && (clearance.resident as any).purok && typeof (clearance.resident as any).purok === 'string') {
+            return (clearance.resident as any).purok;
         }
         return '';
     };
@@ -175,7 +181,7 @@ export default function ClearancesTableView({
 
     const getBusinessName = (business: any): string => {
         if (!business || typeof business !== 'object') return '';
-        if (business && typeof business === 'object' && 'business_name' in business) {
+        if (business && 'business_name' in business) {
             const businessName = (business as any).business_name;
             if (typeof businessName === 'string') return businessName;
         }
@@ -184,69 +190,73 @@ export default function ClearancesTableView({
 
     const getHouseholdName = (household: any): string => {
         if (!household || typeof household !== 'object') return '';
-        if (household && typeof household === 'object') {
-            if ('head_name' in household && typeof (household as any).head_name === 'string') {
-                return (household as any).head_name;
-            }
-            if ('household_number' in household && (household as any).household_number) {
-                return `Household ${(household as any).household_number}`;
-            }
+        if ('head_name' in household && typeof (household as any).head_name === 'string') {
+            return (household as any).head_name;
+        }
+        if ('household_number' in household && (household as any).household_number) {
+            return `Household ${(household as any).household_number}`;
         }
         return '';
     };
 
     const getPayerName = (clearance: ClearanceRequest): string => {
+        const anyClearance = clearance as any;
+        
         // First check if we have payer_name from the clearance
-        if (clearance.payer_name && typeof clearance.payer_name === 'string') {
-            return clearance.payer_name;
+        if (anyClearance.payer_name && typeof anyClearance.payer_name === 'string') {
+            return anyClearance.payer_name;
         }
         
         // Check based on payer_type
-        if (clearance.payer_type === 'resident') {
+        if (anyClearance.payer_type === 'resident') {
             return getResidentName(clearance.resident);
         }
         
-        if (clearance.payer_type === 'household') {
-            const householdName = getHouseholdName(clearance.household);
+        if (anyClearance.payer_type === 'household') {
+            const householdName = getHouseholdName(anyClearance.household);
             if (householdName) return householdName;
         }
         
-        if (clearance.payer_type === 'business') {
-            const businessName = getBusinessName(clearance.business);
+        if (anyClearance.payer_type === 'business') {
+            const businessName = getBusinessName(anyClearance.business);
             if (businessName) return businessName;
         }
         
         // Fallback to contact name
-        if (clearance.contact_name && typeof clearance.contact_name === 'string') {
-            return clearance.contact_name;
+        if (anyClearance.contact_name && typeof anyClearance.contact_name === 'string') {
+            return anyClearance.contact_name;
         }
         
         return getResidentName(clearance.resident) || 'N/A';
     };
 
     const getPayerId = (clearance: ClearanceRequest): string => {
-        if (clearance.payer_id) {
-            return clearance.payer_id.toString();
+        const anyClearance = clearance as any;
+        
+        if (anyClearance.payer_id) {
+            return anyClearance.payer_id.toString();
         }
-        if (clearance.payer_type === 'resident' && clearance.resident_id) {
-            return clearance.resident_id.toString();
+        if (anyClearance.payer_type === 'resident' && anyClearance.resident_id) {
+            return anyClearance.resident_id.toString();
         }
-        if (clearance.payer_type === 'household' && clearance.household_id) {
-            return clearance.household_id.toString();
+        if (anyClearance.payer_type === 'household' && anyClearance.household_id) {
+            return anyClearance.household_id.toString();
         }
-        if (clearance.payer_type === 'business' && clearance.business_id) {
-            return clearance.business_id.toString();
+        if (anyClearance.payer_type === 'business' && anyClearance.business_id) {
+            return anyClearance.business_id.toString();
         }
         return '';
     };
 
     const getBalance = (clearance: ClearanceRequest): number => {
-        if (clearance.balance !== undefined && clearance.balance !== null) {
-            return Number(clearance.balance);
+        const anyClearance = clearance as any;
+        
+        if (anyClearance.balance !== undefined && anyClearance.balance !== null) {
+            return Number(anyClearance.balance);
         }
         // If balance not provided, calculate from fee_amount and amount_paid
         const fee = Number(clearance.fee_amount) || 0;
-        const paid = Number(clearance.amount_paid) || 0;
+        const paid = Number(anyClearance.amount_paid) || 0;
         return Math.max(0, fee - paid);
     };
 
@@ -254,49 +264,27 @@ export default function ClearancesTableView({
         return urgency === 'express' || urgency === 'rush';
     };
 
-    // ===== REVISED: Handle Record Payment to go directly to Step 2 (Payment Page) =====
+    // Handle Record Payment to go directly to Step 2 (Payment Page)
     const handlePaymentClick = (clearance: ClearanceRequest) => {
-        console.log('=== RECORD PAYMENT CLICKED - GOING TO STEP 2 ===');
-        console.log('Clearance:', {
-            id: clearance.id,
-            reference: clearance.reference_number,
-            fee_amount: clearance.fee_amount,
-            status: clearance.status,
-            payment_status: clearance.payment_status,
-            payer_type: clearance.payer_type,
-            resident: clearance.resident?.full_name
-        });
-
-        // Build parameters - MATCHING what Create.tsx expects
+        const anyClearance = clearance as any;
+        
+        // Build parameters
         const params: Record<string, string> = {
-            // PRIMARY IDENTIFIER - this is what Create.tsx uses to pre-fill
             clearance_request_id: clearance.id.toString(),
-            
-            // Payer info (for the form)
-            payer_type: clearance.payer_type || 'resident',
+            payer_type: anyClearance.payer_type || 'resident',
             payer_id: getPayerId(clearance),
             payer_name: getPayerName(clearance),
-            
-            // Contact details (for display and pre-filling)
             contact_number: getContactNumber(clearance),
             address: getAddress(clearance),
             purok: getPurok(clearance),
-            
-            // Clearance details that Create.tsx uses
             clearance_type: clearance.clearance_type?.name || 'Clearance',
             clearance_type_id: clearance.clearance_type_id?.toString() || '',
             purpose: clearance.purpose || '',
             fee_amount: (clearance.fee_amount || 0).toString(),
             balance: getBalance(clearance).toString(),
-            
-            // Source flags
             from_clearance: 'true',
             source: 'clearance',
-            
-            // Additional context for the payment page
             reference_number: clearance.reference_number || '',
-            
-            // Timestamp to prevent caching
             _t: Date.now().toString()
         };
 
@@ -305,16 +293,9 @@ export default function ClearancesTableView({
             Object.entries(params).filter(([_, value]) => value !== '')
         );
 
-        // Use the correct URL path - MATCHING the route in Create.tsx
         const url = `/payments/payments/create?${new URLSearchParams(filteredParams).toString()}`;
         
-        console.log('✅ GOING TO STEP 2 - Payment URL:', url);
-        console.log('Params being sent:', filteredParams);
-        
-        // Show loading toast
         toast.info('Redirecting to payment page...');
-        
-        // Navigate directly to payment page (Step 2)
         window.location.href = url;
     };
 
@@ -357,6 +338,7 @@ export default function ClearancesTableView({
                 </TableHeader>
                 <TableBody>
                     {clearances.map((clearance) => {
+                        const anyClearance = clearance as any;
                         const isSelected = selectedClearances.includes(clearance.id);
                         const isPriority = isPriorityUrgency(clearance.urgency);
                         
@@ -404,14 +386,14 @@ export default function ClearancesTableView({
                                 </TableCell>
                                 <TableCell className="px-4">
                                     <div className="flex items-center gap-2">
-                                        {getPayerIcon(clearance.payer_type)}
+                                        {getPayerIcon(anyClearance.payer_type)}
                                         <div className="min-w-0">
                                             <div className="truncate">
                                                 {getPayerName(clearance)}
                                             </div>
-                                            {clearance.payer_type && (
+                                            {anyClearance.payer_type && (
                                                 <div className="text-xs text-gray-500 truncate">
-                                                    {clearance.payer_type.charAt(0).toUpperCase() + clearance.payer_type.slice(1)}
+                                                    {anyClearance.payer_type.charAt(0).toUpperCase() + anyClearance.payer_type.slice(1)}
                                                 </div>
                                             )}
                                         </div>
@@ -522,7 +504,7 @@ export default function ClearancesTableView({
                                                             e.stopPropagation();
                                                             handlePaymentClick(clearance);
                                                         }}
-                                                        className="flex items-center w-full px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900 rounded-md cursor-pointer"
+                                                        className="flex items-center cursor-pointer"
                                                     >
                                                         <CreditCard className="mr-2 h-4 w-4 text-green-600" />
                                                         <span className="text-green-600 font-medium">Record Payment</span>

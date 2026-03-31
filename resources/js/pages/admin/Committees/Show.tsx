@@ -100,7 +100,7 @@ import {
     ZoomOut
 } from 'lucide-react';
 import { Head, Link, router } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { PageProps } from '@/types/admin/committees/committees';
 import { useState, useMemo } from 'react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 

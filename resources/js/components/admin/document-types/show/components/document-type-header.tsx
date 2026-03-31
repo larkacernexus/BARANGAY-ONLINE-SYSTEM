@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/DocumentTypes/components/document-type-header.tsx
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,10 +38,13 @@ import {
     Clock,
     Tag
 } from 'lucide-react';
-import { DocumentType } from '../types';
+
+// Import types from the correct path
+import type { DocumentType } from '@/types/admin/document-types/document-types';
 
 interface Props {
     documentType: DocumentType;
+    copied?: boolean; // Add copied as optional prop
     isNew: boolean;
     onBack: () => void;
     onCopyLink: () => void;
@@ -76,6 +80,7 @@ const getRequiredBadgeColor = (isRequired: boolean): string => {
 
 export const DocumentTypeHeader = ({
     documentType,
+    copied: externalCopied,
     isNew,
     onBack,
     onCopyLink,
@@ -92,12 +97,17 @@ export const DocumentTypeHeader = ({
     getStatusBadge,
     getRequiredBadge
 }: Props) => {
-    const [copied, setCopied] = useState(false);
+    const [internalCopied, setInternalCopied] = useState(false);
+    
+    // Use external copied if provided, otherwise use internal state
+    const copied = externalCopied !== undefined ? externalCopied : internalCopied;
 
     const handleCopyLink = () => {
         onCopyLink();
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        if (externalCopied === undefined) {
+            setInternalCopied(true);
+            setTimeout(() => setInternalCopied(false), 2000);
+        }
     };
 
     const handlePrint = () => {
@@ -187,12 +197,12 @@ export const DocumentTypeHeader = ({
                                 </Tooltip>
 
                                 {/* Processing Time Badge - if available */}
-                                {documentType.processing_days && (
+                                {(documentType as any).processing_days && (
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <div className="flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 rounded-full cursor-default">
                                                 <Clock className="h-3 w-3" />
-                                                <span className="text-sm font-medium">{documentType.processing_days} days</span>
+                                                <span className="text-sm font-medium">{(documentType as any).processing_days} days</span>
                                             </div>
                                         </TooltipTrigger>
                                         <TooltipContent>Processing time</TooltipContent>

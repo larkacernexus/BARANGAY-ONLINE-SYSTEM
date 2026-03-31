@@ -15,7 +15,7 @@ import {
     ChevronDown,
     AlertCircle
 } from 'lucide-react';
-import { BlotterFilters } from '@/components/admin/blotters/blotter';
+import { BlotterFilters } from '@/types/admin/blotters/blotter';
 import { BLOTTER_INCIDENT_TYPES, getCategories } from '@/data/blotterIncidentTypes';
 
 interface BlottersFiltersProps {

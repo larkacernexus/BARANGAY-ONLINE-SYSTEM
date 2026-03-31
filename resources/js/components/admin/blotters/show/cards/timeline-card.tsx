@@ -8,7 +8,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Calendar, Clock, RefreshCw, CheckCircle } from 'lucide-react';
-import { Blotter } from '@/components/admin/blotters/show/types';
+import { Blotter } from '@/types/admin/blotters/blotter';
 import { formatDateTime } from '@/components/admin/blotters/show/utils/helpers';
 
 interface TimelineCardProps {

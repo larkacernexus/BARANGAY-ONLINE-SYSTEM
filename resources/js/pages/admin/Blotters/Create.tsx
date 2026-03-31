@@ -1,5 +1,6 @@
-// pages/admin/Blotters/Create.tsx (Refactored)
-import { useState, useMemo } from 'react';
+// pages/admin/Blotters/Create.tsx (Complete Fixed Version)
+
+import { useState, useMemo, ChangeEvent, FormEvent } from 'react';
 import { Link, useForm } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
 import { Button } from '@/components/ui/button';
@@ -17,8 +18,9 @@ import { AdditionalInfoCard } from '@/components/admin/blotters/create/component
 import { InvolvedResidentsCard } from '@/components/admin/blotters/create/components/InvolvedResidentsCard';
 import { ReviewCard } from '@/components/admin/blotters/create/components/ReviewCard';
 import { ProgressSidebar } from '@/components/admin/blotters/create/components/ProgressSidebar';
-import { Resident, IncidentType } from '@/components/admin/blotters/create/components/BlotterTypes';
 
+// Import types
+import type { Resident, IncidentType } from '@/types/admin/blotters/blotter';
 interface Props {
     residents: Resident[];
     barangayName?: string;
@@ -31,7 +33,7 @@ const steps = [
 ];
 
 export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Props) {
-    const [activeStep, setActiveStep] = useState(1);
+    const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
     const [selectedType, setSelectedType] = useState<IncidentType | null>(null);
     const [selectedResidents, setSelectedResidents] = useState<Resident[]>([]);
     const [attachmentPreviews, setAttachmentPreviews] = useState<string[]>([]);
@@ -58,7 +60,7 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
         evidence: '',
         priority: 'medium',
         involved_residents: [] as number[],
-        attachments: [] as File[],
+        attachments: [] as File[], // Using browser File type
     });
 
     // Filter incident types
@@ -92,41 +94,41 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
     }).length;
     const totalProgress = Math.round((completedRequired / requiredFields.length) * 100);
 
-    const isStepValid = () => {
+    const isStepValid = (): boolean => {
         if (activeStep === 1) {
-            return data.incident_type && data.incident_datetime && data.location && data.incident_description;
+            return !!(data.incident_type && data.incident_datetime && data.location && data.incident_description);
         }
         if (activeStep === 2) {
-            return (data.reporter_name || data.reporter_resident_id) ? true : false;
+            return !!(data.reporter_name || data.reporter_resident_id);
         }
         return true;
     };
 
     // Navigation
-    const goToStep = (step: number) => {
+    const goToStep = (step: number): void => {
         if (step >= 1 && step <= 3) {
-            setActiveStep(step);
+            setActiveStep(step as 1 | 2 | 3);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
-    const nextStep = () => {
+    const nextStep = (): void => {
         if (activeStep === 1 && !isStepValid()) return;
         if (activeStep < 3) {
-            setActiveStep(prev => prev + 1);
+            setActiveStep(prev => (prev + 1) as 1 | 2 | 3);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
-    const prevStep = () => {
+    const prevStep = (): void => {
         if (activeStep > 1) {
-            setActiveStep(prev => prev - 1);
+            setActiveStep(prev => (prev - 1) as 1 | 2 | 3);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
     // Event handlers
-    const handleIncidentTypeSelect = (type: IncidentType) => {
+    const handleIncidentTypeSelect = (type: IncidentType): void => {
         setSelectedType(type);
         setData('incident_type', type.code);
         
@@ -138,13 +140,13 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
         setIncidentSearchTerm(type.name);
     };
 
-    const handleIncidentTypeClear = () => {
+    const handleIncidentTypeClear = (): void => {
         setSelectedType(null);
         setData('incident_type', '');
         setIncidentSearchTerm('');
     };
 
-    const handleReporterResidentSelect = (resident: Resident) => {
+    const handleReporterResidentSelect = (resident: Resident): void => {
         setSelectedReporterResident(resident);
         setData('reporter_name', resident.name);
         setData('reporter_contact', resident.contact_number || '');
@@ -152,7 +154,7 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
         setData('reporter_resident_id', resident.id);
     };
 
-    const handleReporterResidentClear = () => {
+    const handleReporterResidentClear = (): void => {
         setSelectedReporterResident(null);
         setData('reporter_name', '');
         setData('reporter_contact', '');
@@ -160,26 +162,30 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
         setData('reporter_resident_id', null);
     };
 
-    const handleRespondentResidentSelect = (resident: Resident) => {
+    const handleRespondentResidentSelect = (resident: Resident): void => {
         setSelectedRespondentResident(resident);
         setData('respondent_name', resident.name);
         setData('respondent_address', resident.address || '');
         setData('respondent_resident_id', resident.id);
     };
 
-    const handleRespondentResidentClear = () => {
+    const handleRespondentResidentClear = (): void => {
         setSelectedRespondentResident(null);
         setData('respondent_name', '');
         setData('respondent_address', '');
         setData('respondent_resident_id', null);
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const files = Array.from(e.target.files);
-            setData('attachments', [...data.attachments, ...files]);
+    // FIXED: Properly typed file change handler
+    const handleFileChange = (e: ChangeEvent<HTMLInputElement>): void => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            const fileArray: File[] = Array.from(files);
+            const currentAttachments = [...data.attachments];
+            setData('attachments', [...currentAttachments, ...fileArray]);
             
-            files.forEach(file => {
+            // Generate previews for image files
+            fileArray.forEach((file: File) => {
                 if (file.type.startsWith('image/')) {
                     const reader = new FileReader();
                     reader.onloadend = () => {
@@ -193,12 +199,16 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
         }
     };
 
-    const removeFile = (index: number) => {
-        setData('attachments', data.attachments.filter((_, i) => i !== index));
-        setAttachmentPreviews(prev => prev.filter((_, i) => i !== index));
+    // FIXED: removeFile accepts index parameter
+    const handleRemoveNewFile = (index: number): void => {
+        const updatedAttachments = data.attachments.filter((_, i) => i !== index);
+        setData('attachments', updatedAttachments);
+        
+        const updatedPreviews = attachmentPreviews.filter((_, i) => i !== index);
+        setAttachmentPreviews(updatedPreviews);
     };
 
-    const toggleResident = (resident: Resident) => {
+    const toggleResident = (resident: Resident): void => {
         const isSelected = selectedResidents.some(r => r.id === resident.id);
         if (isSelected) {
             setSelectedResidents(selectedResidents.filter(r => r.id !== resident.id));
@@ -209,10 +219,30 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    // FIXED: Proper FormData handling
+    const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
         e.preventDefault();
         if (!isStepValid()) return;
-        post('/admin/blotters');
+        
+        // Create FormData for file uploads
+        const formData = new FormData();
+        
+        // Append all form fields
+        Object.entries(data).forEach(([key, value]) => {
+            if (key === 'attachments' && Array.isArray(value)) {
+                // Append each file individually
+                (value as File[]).forEach((file: File, index: number) => {
+                    formData.append(`attachments[${index}]`, file);
+                });
+            } else if (value !== null && value !== undefined && value !== '') {
+                formData.append(key, value.toString());
+            }
+        });
+        
+        post('/admin/blotters', {
+            data: formData,
+            forceFormData: true,
+        });
     };
 
     // Helper functions
@@ -255,7 +285,7 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                 { title: 'File Blotter', href: '/admin/blotters/create' }
             ]}
         >
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} encType="multipart/form-data">
                 <div className="space-y-6 p-4 md:p-6">
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -339,10 +369,12 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                                         getPriorityDescription={getPriorityDescription}
                                     />
                                     <AttachmentsCard
-                                        attachments={data.attachments}
+                                        newAttachments={data.attachments}
+                                        existingAttachments={[]}
                                         previews={attachmentPreviews}
                                         onFileChange={handleFileChange}
-                                        onRemoveFile={removeFile}
+                                        onRemoveNewFile={handleRemoveNewFile}
+                                        isEditMode={false}
                                     />
                                 </>
                             )}
@@ -381,6 +413,7 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                                         evidence={data.evidence}
                                         onWitnessesChange={(val) => setData('witnesses', val)}
                                         onEvidenceChange={(val) => setData('evidence', val)}
+                                        showTips={true}
                                     />
                                     <InvolvedResidentsCard
                                         residents={residents}

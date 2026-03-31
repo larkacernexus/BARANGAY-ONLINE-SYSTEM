@@ -1,4 +1,5 @@
 // components/ui/filter-bar.tsx
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, X, Filter, FilterX, Loader2 } from 'lucide-react';
@@ -18,7 +19,7 @@ interface FilterBarProps {
     startIndex?: number;
     endIndex?: number;
     isLoading?: boolean;
-    searchInputRef?: React.RefObject<HTMLInputElement>;
+    searchInputRef?: React.RefObject<HTMLInputElement | null>; // Changed to accept nullable ref
     children?: ReactNode;
     className?: string;
 }

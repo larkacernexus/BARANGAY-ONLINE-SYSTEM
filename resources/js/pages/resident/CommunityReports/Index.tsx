@@ -49,6 +49,16 @@ interface PageProps extends Record<string, any> {
     error?: string;
 }
 
+// Type transformation function to convert CommunityReport to ReportForPrint
+// This handles the type mismatch where incident_time is string | null in CommunityReport
+// but ReportForPrint expects string | undefined
+const transformToReportForPrint = (report: CommunityReport) => {
+    return {
+        ...report,
+        incident_time: report.incident_time ?? undefined, // Convert null to undefined
+    };
+};
+
 export default function CommunityReports() {
     const page = usePage<PageProps>();
     const pageProps = page.props;
@@ -311,18 +321,22 @@ export default function CommunityReports() {
         );
     }, [filters]);
     
+    // Fixed handlePrint with type transformation
     const handlePrint = () => {
+        const transformedReports = reports.data.map(transformToReportForPrint);
         printReportsList(
-            reports.data,
+            transformedReports,
             statusFilter,
             currentResident,
             (date: string) => formatDate(date, false)
         );
     };
     
+    // Fixed handleExport with type transformation
     const handleExport = () => {
+        const transformedReports = reports.data.map(transformToReportForPrint);
         exportReportsToCSV(
-            reports.data,
+            transformedReports,
             statusFilter,
             (date: string) => formatDate(date, false),
             setIsExporting,
@@ -349,293 +363,293 @@ export default function CommunityReports() {
         updateFilters({ page: page.toString() });
     };
     
-const renderTabContent = () => {
-    const currentReports = getCurrentTabReports();
-    const tabHasData = currentReports.length > 0;
-    
-    const displayStatus = statusFilter === 'all' ? 'All' : statusFilter.replace('_', ' ');
-    
-    return (
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
-            <CardContent className="p-4 md:p-6">
-                <ModernSelectionBanner
-                    selectedCount={selectedReports.length}
-                    totalCount={currentReports.length}
-                    onSelectAll={selectAllReports}
-                    onDeselectAll={() => setSelectedReports([])}
-                    onCancel={() => {
-                        setSelectMode(false);
-                        setSelectedReports([]);
-                    }}
-                    onDelete={handleDeleteSelected}
-                    deleteLabel="Delete Selected"
-                />
-                
-                <TabHeader
-                    displayStatus={displayStatus}
-                    count={currentReports.length}
-                    selectMode={selectMode}
-                    selectedCount={selectedReports.length}
-                    hasFilters={typeFilter !== 'all' || urgencyFilter !== 'all' || categoryFilter !== 'all' || !!search}
-                    viewMode={viewMode}
-                    setViewMode={setViewMode}
-                    onToggleSelectMode={toggleSelectMode}
-                    tabHasData={tabHasData}
-                />
-                    
-                    {!tabHasData ? (
-                        <ModernEmptyState
-                            status={statusFilter}
-                            hasFilters={hasActiveFilters}
-                            onClearFilters={handleClearFilters}
-                            icon={statusFilter === 'all' ? AlertCircle : 
-                                  statusFilter === 'pending' ? Clock :
-                                  statusFilter === 'under_review' ? Loader2 :
-                                  statusFilter === 'in_progress' ? TrendingUp :
-                                  statusFilter === 'resolved' ? CheckCircle :
-                                  statusFilter === 'rejected' ? XCircle : AlertCircle}
-                        />
-                    ) : (
-                        <>
-                            {isMobile && tabHasData && !selectMode && (
-                                <MobileViewModeToggle
-                                    viewMode={viewMode}
-                                    setViewMode={setViewMode}
-                                    onToggleSelectMode={toggleSelectMode}
-                                />
-                            )}
-                            
-                            {viewMode === 'grid' && (
-                                <>
-                                    {isMobile && (
-                                        <div className="pb-4">
-                                            {currentReports.map((report) => (
-                                                <ModernReportCard
-                                                    key={report.id}
-                                                    report={report}
-                                                    selectMode={selectMode}
-                                                    selectedReports={selectedReports}
-                                                    toggleSelectReport={toggleSelectReport}
-                                                    formatDate={(date) => formatDate(date, isMobile)}
-                                                    onViewDetails={handleViewDetails}
-                                                    onCopyReportNumber={handleCopyReportNumber}
-                                                    onGenerateReport={handleGenerateReport}
-                                                    isMobile={isMobile}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                    
-                                    {!isMobile && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {currentReports.map((report) => (
-                                                <ModernReportGridCard
-                                                    key={report.id}
-                                                    report={report}
-                                                    selectMode={selectMode}
-                                                    selectedReports={selectedReports}
-                                                    toggleSelectReport={toggleSelectReport}
-                                                    formatDate={(date) => formatDate(date, isMobile)}
-                                                    onViewDetails={handleViewDetails}
-                                                    onCopyReportNumber={handleCopyReportNumber}
-                                                    onGenerateReport={handleGenerateReport}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                            
-                            {viewMode === 'list' && !isMobile && (
-                                <ModernReportTable
-                                    reports={currentReports}
-                                    selectMode={selectMode}
-                                    selectedReports={selectedReports}
-                                    toggleSelectReport={toggleSelectReport}
-                                    selectAllReports={selectAllReports}
-                                    formatDate={(date) => formatDate(date, isMobile)}
-                                    onViewDetails={handleViewDetails}
-                                    onCopyReportNumber={handleCopyReportNumber}
-                                    onGenerateReport={handleGenerateReport}
-                                />
-                            )}
-                            
-                            {reports.last_page > 1 && (
-                                <div className="mt-6">
-                                    <ModernPagination
-                                        currentPage={reports.current_page}
-                                        lastPage={reports.last_page}
-                                        onPageChange={handlePageChange}
-                                        loading={loading}
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </CardContent>
-            </Card>
-        );
-    };
-    
-    if (pageProps.error) {
+    const renderTabContent = () => {
+        const currentReports = getCurrentTabReports();
+        const tabHasData = currentReports.length > 0;
+        
+        const displayStatus = statusFilter === 'all' ? 'All' : statusFilter.replace('_', ' ');
+        
         return (
-            <ResidentLayout
-                breadcrumbs={[
-                    { title: 'Dashboard', href: '/portal/dashboard' },
-                    { title: 'Community Reports', href: '/portal/community-reports' }
-                ]}
-            >
-                <Head title="Community Reports" />
-                <div className="min-h-[50vh] flex items-center justify-center px-4">
-                    <Card className="w-full max-w-md border-0 shadow-xl bg-white dark:bg-gray-900">
-                        <CardContent className="pt-6 text-center">
-                            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl flex items-center justify-center mb-4">
-                                <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
-                            </div>
-                            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Error</h3>
-                            <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                {pageProps.error}
-                            </p>
-                            <Button 
-                                onClick={() => window.location.href = '/portal/dashboard'}
-                                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white"
-                            >
-                                Go to Dashboard
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </div>
-            </ResidentLayout>
-        );
-    }
-    
-    return (
-        <>
-            <Head title="Community Reports" />
-            
-            <ResidentLayout
-                breadcrumbs={[
-                    { title: 'Dashboard', href: '/portal/dashboard' },
-                    { title: 'Community Reports', href: '/portal/community-reports' }
-                ]}
-            >
-                <div className="space-y-4 md:space-y-6 pb-28 md:pb-6">
-                    {isMobile ? (
-                        <MobileHeader
-                            statsTotal={stats.total}
-                            showStats={showStats}
-                            setShowStats={setShowStats}
-                            hasActiveFilters={hasActiveFilters}
-                            setShowMobileFilters={setShowMobileFilters}
-                        />
-                    ) : (
-                        <DesktopHeader
-                            onPrint={handlePrint}
-                            onExport={handleExport}
-                            isExporting={isExporting}
-                        />
-                    )}
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
+                <CardContent className="p-4 md:p-6">
+                    <ModernSelectionBanner
+                        selectedCount={selectedReports.length}
+                        totalCount={currentReports.length}
+                        onSelectAll={selectAllReports}
+                        onDeselectAll={() => setSelectedReports([])}
+                        onCancel={() => {
+                            setSelectMode(false);
+                            setSelectedReports([]);
+                        }}
+                        onDelete={handleDeleteSelected}
+                        deleteLabel="Delete Selected"
+                    />
                     
-                    {showStats && (
-                        <div className="animate-slide-down">
-                            <CollapsibleStats
+                    <TabHeader
+                        displayStatus={displayStatus}
+                        count={currentReports.length}
+                        selectMode={selectMode}
+                        selectedCount={selectedReports.length}
+                        hasFilters={typeFilter !== 'all' || urgencyFilter !== 'all' || categoryFilter !== 'all' || !!search}
+                        viewMode={viewMode}
+                        setViewMode={setViewMode}
+                        onToggleSelectMode={toggleSelectMode}
+                        tabHasData={tabHasData}
+                    />
+                        
+                        {!tabHasData ? (
+                            <ModernEmptyState
+                                status={statusFilter}
+                                hasFilters={hasActiveFilters}
+                                onClearFilters={handleClearFilters}
+                                icon={statusFilter === 'all' ? AlertCircle : 
+                                      statusFilter === 'pending' ? Clock :
+                                      statusFilter === 'under_review' ? Loader2 :
+                                      statusFilter === 'in_progress' ? TrendingUp :
+                                      statusFilter === 'resolved' ? CheckCircle :
+                                      statusFilter === 'rejected' ? XCircle : AlertCircle}
+                            />
+                        ) : (
+                            <>
+                                {isMobile && tabHasData && !selectMode && (
+                                    <MobileViewModeToggle
+                                        viewMode={viewMode}
+                                        setViewMode={setViewMode}
+                                        onToggleSelectMode={toggleSelectMode}
+                                    />
+                                )}
+                                
+                                {viewMode === 'grid' && (
+                                    <>
+                                        {isMobile && (
+                                            <div className="pb-4">
+                                                {currentReports.map((report) => (
+                                                    <ModernReportCard
+                                                        key={report.id}
+                                                        report={report}
+                                                        selectMode={selectMode}
+                                                        selectedReports={selectedReports}
+                                                        toggleSelectReport={toggleSelectReport}
+                                                        formatDate={(date) => formatDate(date, isMobile)}
+                                                        onViewDetails={handleViewDetails}
+                                                        onCopyReportNumber={handleCopyReportNumber}
+                                                        onGenerateReport={handleGenerateReport}
+                                                        isMobile={isMobile}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
+                                        
+                                        {!isMobile && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                {currentReports.map((report) => (
+                                                    <ModernReportGridCard
+                                                        key={report.id}
+                                                        report={report}
+                                                        selectMode={selectMode}
+                                                        selectedReports={selectedReports}
+                                                        toggleSelectReport={toggleSelectReport}
+                                                        formatDate={(date) => formatDate(date, isMobile)}
+                                                        onViewDetails={handleViewDetails}
+                                                        onCopyReportNumber={handleCopyReportNumber}
+                                                        onGenerateReport={handleGenerateReport}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                                
+                                {viewMode === 'list' && !isMobile && (
+                                    <ModernReportTable
+                                        reports={currentReports}
+                                        selectMode={selectMode}
+                                        selectedReports={selectedReports}
+                                        toggleSelectReport={toggleSelectReport}
+                                        selectAllReports={selectAllReports}
+                                        formatDate={(date) => formatDate(date, isMobile)}
+                                        onViewDetails={handleViewDetails}
+                                        onCopyReportNumber={handleCopyReportNumber}
+                                        onGenerateReport={handleGenerateReport}
+                                    />
+                                )}
+                                
+                                {reports.last_page > 1 && (
+                                    <div className="mt-6">
+                                        <ModernPagination
+                                            currentPage={reports.current_page}
+                                            lastPage={reports.last_page}
+                                            onPageChange={handlePageChange}
+                                            loading={loading}
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </CardContent>
+                </Card>
+            );
+        };
+        
+        if (pageProps.error) {
+            return (
+                <ResidentLayout
+                    breadcrumbs={[
+                        { title: 'Dashboard', href: '/portal/dashboard' },
+                        { title: 'Community Reports', href: '/portal/community-reports' }
+                    ]}
+                >
+                    <Head title="Community Reports" />
+                    <div className="min-h-[50vh] flex items-center justify-center px-4">
+                        <Card className="w-full max-w-md border-0 shadow-xl bg-white dark:bg-gray-900">
+                            <CardContent className="pt-6 text-center">
+                                <div className="mx-auto w-16 h-16 bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 rounded-2xl flex items-center justify-center mb-4">
+                                    <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Error</h3>
+                                <p className="text-gray-500 dark:text-gray-400 mb-4">
+                                    {pageProps.error}
+                                </p>
+                                <Button 
+                                    onClick={() => window.location.href = '/portal/dashboard'}
+                                    className="bg-gradient-to-r from-blue-500 to-blue-600 text-white"
+                                >
+                                    Go to Dashboard
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </ResidentLayout>
+            );
+        }
+        
+        return (
+            <>
+                <Head title="Community Reports" />
+                
+                <ResidentLayout
+                    breadcrumbs={[
+                        { title: 'Dashboard', href: '/portal/dashboard' },
+                        { title: 'Community Reports', href: '/portal/community-reports' }
+                    ]}
+                >
+                    <div className="space-y-4 md:space-y-6 pb-28 md:pb-6">
+                        {isMobile ? (
+                            <MobileHeader
+                                statsTotal={stats.total}
                                 showStats={showStats}
                                 setShowStats={setShowStats}
-                                stats={stats}
-                                formatCurrency={formatCurrency}
+                                hasActiveFilters={hasActiveFilters}
+                                setShowMobileFilters={setShowMobileFilters}
                             />
-                            <DesktopStats
-                                stats={stats}
-                                formatCurrency={formatCurrency}
+                        ) : (
+                            <DesktopHeader
+                                onPrint={handlePrint}
+                                onExport={handleExport}
+                                isExporting={isExporting}
                             />
-                        </div>
-                    )}
-                    
-                    <ModernFilterModal
-                        isOpen={showMobileFilters}
-                        onClose={() => setShowMobileFilters(false)}
-                        title="Filter Reports"
-                        description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
-                        search={search}
-                        onSearchChange={setSearch}
-                        onSearchSubmit={handleSearchSubmit}
-                        onSearchClear={handleSearchClear}
-                        loading={loading}
-                        hasActiveFilters={hasActiveFilters}
-                        onClearFilters={handleClearFilters}
-                    >
-                        <FilterModalContent
-                            selectedStatus={statusFilter}
-                            onStatusChange={handleStatusChange}
-                            selectedUrgency={urgencyFilter}
-                            onUrgencyChange={handleUrgencyChange}
-                            selectedCategory={categoryFilter}
-                            onCategoryChange={handleCategoryChange}
-                            selectedType={typeFilter}
-                            onTypeChange={handleTypeChange}
-                            loading={loading}
-                            filterOptions={filterOptions}
-                        />
-                    </ModernFilterModal>
-                    
-                    {!isMobile && (
-                        <ModernReportFilters
+                        )}
+                        
+                        {showStats && (
+                            <div className="animate-slide-down">
+                                <CollapsibleStats
+                                    showStats={showStats}
+                                    setShowStats={setShowStats}
+                                    stats={stats}
+                                    formatCurrency={formatCurrency}
+                                />
+                                <DesktopStats
+                                    stats={stats}
+                                    formatCurrency={formatCurrency}
+                                />
+                            </div>
+                        )}
+                        
+                        <ModernFilterModal
+                            isOpen={showMobileFilters}
+                            onClose={() => setShowMobileFilters(false)}
+                            title="Filter Reports"
+                            description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
                             search={search}
-                            setSearch={setSearch}
-                            handleSearchSubmit={handleSearchSubmit}
-                            handleSearchClear={handleSearchClear}
-                            statusFilter={statusFilter}
-                            handleStatusChange={handleStatusChange}
-                            urgencyFilter={urgencyFilter}
-                            handleUrgencyChange={handleUrgencyChange}
-                            typeFilter={typeFilter}
-                            handleTypeChange={handleTypeChange}
-                            categoryFilter={categoryFilter}
-                            handleCategoryChange={handleCategoryChange}
+                            onSearchChange={setSearch}
+                            onSearchSubmit={handleSearchSubmit}
+                            onSearchClear={handleSearchClear}
                             loading={loading}
-                            filterOptions={filterOptions}
-                            printReports={handlePrint}
-                            exportToCSV={handleExport}
-                            isExporting={isExporting}
                             hasActiveFilters={hasActiveFilters}
-                            handleClearFilters={handleClearFilters}
-                            onCopySummary={handleCopySummary}
-                        />
-                    )}
-                    
-                    <div className="mt-4">
-                        <CustomTabs
-                            statusFilter={statusFilter}
-                            handleTabChange={handleTabChange}
-                            getStatusCount={(status) => getStatusCount(stats, status)}
-                            tabsConfig={REPORT_TABS}
-                        />
+                            onClearFilters={handleClearFilters}
+                        >
+                            <FilterModalContent
+                                selectedStatus={statusFilter}
+                                onStatusChange={handleStatusChange}
+                                selectedUrgency={urgencyFilter}
+                                onUrgencyChange={handleUrgencyChange}
+                                selectedCategory={categoryFilter}
+                                onCategoryChange={handleCategoryChange}
+                                selectedType={typeFilter}
+                                onTypeChange={handleTypeChange}
+                                loading={loading}
+                                filterOptions={filterOptions}
+                            />
+                        </ModernFilterModal>
+                        
+                        {!isMobile && (
+                            <ModernReportFilters
+                                search={search}
+                                setSearch={setSearch}
+                                handleSearchSubmit={handleSearchSubmit}
+                                handleSearchClear={handleSearchClear}
+                                statusFilter={statusFilter}
+                                handleStatusChange={handleStatusChange}
+                                urgencyFilter={urgencyFilter}
+                                handleUrgencyChange={handleUrgencyChange}
+                                typeFilter={typeFilter}
+                                handleTypeChange={handleTypeChange}
+                                categoryFilter={categoryFilter}
+                                handleCategoryChange={handleCategoryChange}
+                                loading={loading}
+                                filterOptions={filterOptions}
+                                printReports={handlePrint}
+                                exportToCSV={handleExport}
+                                isExporting={isExporting}
+                                hasActiveFilters={hasActiveFilters}
+                                handleClearFilters={handleClearFilters}
+                                onCopySummary={handleCopySummary}
+                            />
+                        )}
                         
                         <div className="mt-4">
-                            {renderTabContent()}
+                            <CustomTabs
+                                statusFilter={statusFilter}
+                                handleTabChange={handleTabChange}
+                                getStatusCount={(status) => getStatusCount(stats, status)}
+                                tabsConfig={REPORT_TABS}
+                            />
+                            
+                            <div className="mt-4">
+                                {renderTabContent()}
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                {isMobile && !showMobileFilters && (
-                    <div className="fixed bottom-20 right-6 z-50 animate-scale-in">
-                        <Link href="/portal/community-reports/create">
-                            <Button 
-                                size="lg" 
-                                className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
-                            >
-                                <Plus className="h-6 w-6" />
-                            </Button>
-                        </Link>
+                    
+                    {isMobile && !showMobileFilters && (
+                        <div className="fixed bottom-20 right-6 z-50 animate-scale-in">
+                            <Link href="/portal/community-reports/create">
+                                <Button 
+                                    size="lg" 
+                                    className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                                >
+                                    <Plus className="h-6 w-6" />
+                                </Button>
+                            </Link>
+                        </div>
+                    )}
+                    
+                    <div className="md:hidden">
+                        <ResidentMobileFooter />
                     </div>
-                )}
-                
-                <div className="md:hidden">
-                    <ResidentMobileFooter />
-                </div>
-                
-                <ModernLoadingOverlay loading={loading} message="Loading reports..." />
-            </ResidentLayout>
-        </>
-    );
-}
+                    
+                    <ModernLoadingOverlay loading={loading} message="Loading reports..." />
+                </ResidentLayout>
+            </>
+        );
+    }

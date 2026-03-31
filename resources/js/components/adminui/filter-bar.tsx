@@ -1,4 +1,5 @@
 // components/ui/filter-bar.tsx
+
 import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,7 @@ interface FilterBarProps {
     startIndex?: number;
     endIndex?: number;
     isLoading?: boolean;
-    searchInputRef?: React.RefObject<HTMLInputElement>;
+    searchInputRef?: React.RefObject<HTMLInputElement | null>;  // Allow null
     children?: React.ReactNode;
     className?: string;
 }

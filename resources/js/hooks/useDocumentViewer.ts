@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
-import { Document } from '@/types/clearance';
+import { ClearanceDocument } from '@/types/admin/clearances/clearance-types'; // Change this import
 
-export function useDocumentViewer(documents: Document[] = []) {
-    const [viewedDocument, setViewedDocument] = useState<Document | null>(null);
+export function useDocumentViewer(documents: ClearanceDocument[] = []) { // Change the type here
+    const [viewedDocument, setViewedDocument] = useState<ClearanceDocument | null>(null); // Change here
     const [isViewerOpen, setIsViewerOpen] = useState(false);
     const [currentDocumentIndex, setCurrentDocumentIndex] = useState<number>(-1);
 
-    const openDocument = (document: Document, index: number) => {
+    const openDocument = (document: ClearanceDocument, index: number) => { // Change here
         setViewedDocument(document);
         setCurrentDocumentIndex(index);
         setIsViewerOpen(true);
@@ -34,15 +34,14 @@ export function useDocumentViewer(documents: Document[] = []) {
         }
     };
 
-    const handleVerifyDocument = (documentId: number, onSuccess?: (doc: Document) => void) => {
+    const handleVerifyDocument = (documentId: number, onSuccess?: (doc: ClearanceDocument) => void) => { // Change here
         if (confirm('Verify this document?')) {
             router.post(`/documents/${documentId}/verify`, {}, {
                 onSuccess: () => {
                     if (viewedDocument && onSuccess) {
                         onSuccess({ 
                             ...viewedDocument, 
-                            is_verified: true,
-                            status: 'verified',
+                            verification_status: 'verified', // Change from is_verified/status to verification_status
                             verified_at: new Date().toISOString() 
                         });
                     }
@@ -51,14 +50,14 @@ export function useDocumentViewer(documents: Document[] = []) {
         }
     };
 
-    const handleRejectDocument = (documentId: number, notes: string, onSuccess?: (doc: Document) => void) => {
+    const handleRejectDocument = (documentId: number, notes: string, onSuccess?: (doc: ClearanceDocument) => void) => { // Change here
         router.post(`/documents/${documentId}/reject`, { notes }, {
             onSuccess: () => {
                 if (viewedDocument && onSuccess) {
                     onSuccess({ 
                         ...viewedDocument, 
-                        is_verified: false,
-                        status: 'rejected' 
+                        verification_status: 'rejected', // Change from is_verified/status to verification_status
+                        rejection_reason: notes
                     });
                 }
             }
@@ -67,6 +66,7 @@ export function useDocumentViewer(documents: Document[] = []) {
 
     return {
         viewedDocument,
+        setViewedDocument,
         isViewerOpen,
         currentDocumentIndex,
         openDocument,

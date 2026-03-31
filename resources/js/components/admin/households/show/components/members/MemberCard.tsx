@@ -16,59 +16,90 @@ import {
     ExternalLink,
     CheckCircle,
     Clock,
-    AlertCircle
+    AlertCircle,
+    Crown
 } from 'lucide-react';
 import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+// Import types from shared types file
+import { HouseholdMember, Resident, Privilege } from '@/types/admin/households/household.types';
+import { 
+    getFullName, 
+    getPhotoUrl, 
+    calculateAge, 
+    getGenderLabel, 
+    getCivilStatusLabel,
+    formatDate,
+    getRelativeTime,
+    getRelationshipLabel,
+    ExtendedMember
+} from '@/types/admin/households/household.types';
+
+// Import modal component
 import { ResidentDetailsModal } from './ResidentDetailsModal';
 
-interface ResidentPrivilege {
-    id: number;
-    name: string;
-    code: string;
-    status: 'active' | 'expiring_soon' | 'expired' | 'pending';
-    id_number?: string;
-    expires_at?: string;
-    discount_percentage?: number;
-}
-
-interface Member {
-    id: number;
-    resident_id: number;
-    relationship_to_head: string;
-    is_head: boolean;
-    created_at?: string;
-    updated_at?: string;
-    resident: {
-        id: number;
-        first_name: string;
-        last_name: string;
-        full_name: string;
-        age?: number;
-        gender?: string;
-        civil_status?: string;
-        contact_number?: string;
-        email?: string;
-        address?: string;
-        occupation?: string;
-        education?: string;
-        religion?: string;
-        is_voter?: boolean;
-        place_of_birth?: string;
-        remarks?: string;
-        photo_url?: string;
-        privileges_list?: ResidentPrivilege[];
-    };
-}
-
 interface MemberCardProps {
-    member: Member;
+    member: ExtendedMember;
+    isHead?: boolean;
     onViewResident?: (residentId: number) => void;
 }
 
-export const MemberCard = ({ member, onViewResident }: MemberCardProps) => {
+export const MemberCard = ({ member, isHead = false, onViewResident }: MemberCardProps) => {
     const [showResidentDetails, setShowResidentDetails] = useState(false);
     const resident = member.resident;
+
+    // If no resident data, show a placeholder
+    if (!resident) {
+        return (
+            <Card className="hover:shadow-md transition-shadow dark:bg-gray-900">
+                <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12 flex-shrink-0">
+                            <AvatarFallback className="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                <User className="h-6 w-6" />
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold dark:text-gray-100">
+                                    {member.name || 'Unknown Member'}
+                                </h3>
+                                {isHead && (
+                                    <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300">
+                                        <Crown className="h-3 w-3 mr-1" />
+                                        Head of Household
+                                    </Badge>
+                                )}
+                                <Badge variant="outline" className="dark:border-gray-700">
+                                    {member.relationship_to_head || getRelationshipLabel(member.relationship)}
+                                </Badge>
+                            </div>
+                            <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                Resident data not available
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    // Get full name using shared utility
+    const fullName = resident.full_name || getFullName(resident.first_name, resident.last_name, resident.middle_name);
+    
+    // Get photo URL using shared utility
+    const photoUrl = getPhotoUrl(resident.photo_path, resident.photo_url);
+    
+    // Calculate age if not provided
+    const age = resident.age || (resident.date_of_birth ? calculateAge(resident.date_of_birth) : undefined);
+    
+    // Get avatar initials
+    const getInitials = () => {
+        const first = resident.first_name?.[0] || '';
+        const last = resident.last_name?.[0] || '';
+        return (first + last).toUpperCase();
+    };
 
     const getPrivilegeIcon = (status: string) => {
         switch (status) {
@@ -101,46 +132,53 @@ export const MemberCard = ({ member, onViewResident }: MemberCardProps) => {
             <Card className="hover:shadow-md transition-shadow dark:bg-gray-900">
                 <CardContent className="p-4">
                     <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3 flex-1">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
                             {/* Avatar */}
-                            <Avatar className="h-12 w-12">
-                                {resident.photo_url ? (
-                                    <AvatarImage src={resident.photo_url} alt={resident.full_name} />
+                            <Avatar className="h-12 w-12 flex-shrink-0">
+                                {photoUrl ? (
+                                    <AvatarImage src={photoUrl} alt={fullName} />
                                 ) : (
                                     <AvatarFallback className="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                                        {resident.first_name?.[0]}{resident.last_name?.[0]}
+                                        {getInitials()}
                                     </AvatarFallback>
                                 )}
                             </Avatar>
 
                             {/* Resident Info */}
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className="font-semibold dark:text-gray-100">
-                                        {resident.full_name}
+                                    <h3 className="font-semibold dark:text-gray-100 truncate">
+                                        {fullName}
                                     </h3>
-                                    {member.is_head && (
-                                        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                    {isHead && (
+                                        <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 flex-shrink-0">
+                                            <Crown className="h-3 w-3 mr-1" />
                                             Head of Household
                                         </Badge>
                                     )}
-                                    <Badge variant="outline" className="dark:border-gray-700">
-                                        {member.relationship_to_head}
+                                    <Badge variant="outline" className="dark:border-gray-700 flex-shrink-0">
+                                        {member.relationship_to_head || getRelationshipLabel(member.relationship)}
                                     </Badge>
                                 </div>
 
                                 <div className="flex items-center gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400 flex-wrap">
-                                    {resident.age && (
+                                    {age && (
                                         <div className="flex items-center gap-1">
                                             <Calendar className="h-3 w-3" />
-                                            <span>{resident.age} years old</span>
+                                            <span>{age} years old</span>
                                         </div>
                                     )}
                                     {resident.gender && (
-                                        <span>{resident.gender}</span>
+                                        <>
+                                            <span className="text-gray-300 dark:text-gray-600">•</span>
+                                            <span>{getGenderLabel(resident.gender)}</span>
+                                        </>
                                     )}
                                     {resident.civil_status && (
-                                        <span>• {resident.civil_status}</span>
+                                        <>
+                                            <span className="text-gray-300 dark:text-gray-600">•</span>
+                                            <span>{getCivilStatusLabel(resident.civil_status)}</span>
+                                        </>
                                     )}
                                 </div>
 
@@ -148,30 +186,37 @@ export const MemberCard = ({ member, onViewResident }: MemberCardProps) => {
                                 <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
                                     {resident.contact_number && (
                                         <div className="flex items-center gap-1">
-                                            <Phone className="h-3 w-3" />
+                                            <Phone className="h-3 w-3 flex-shrink-0" />
                                             <span>{resident.contact_number}</span>
                                         </div>
                                     )}
                                     {resident.email && (
-                                        <div className="flex items-center gap-1">
-                                            <Mail className="h-3 w-3" />
-                                            <span className="truncate max-w-[200px]">{resident.email}</span>
+                                        <div className="flex items-center gap-1 min-w-0">
+                                            <Mail className="h-3 w-3 flex-shrink-0" />
+                                            <span className="truncate">{resident.email}</span>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Address */}
                                 {resident.address && (
-                                    <div className="flex items-center gap-1 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                        <MapPin className="h-3 w-3" />
+                                    <div className="flex items-center gap-1 mt-2 text-xs text-gray-500 dark:text-gray-400 min-w-0">
+                                        <MapPin className="h-3 w-3 flex-shrink-0" />
                                         <span className="truncate">{resident.address}</span>
+                                    </div>
+                                )}
+
+                                {/* Occupation */}
+                                {resident.occupation && (
+                                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        Occupation: {resident.occupation}
                                     </div>
                                 )}
 
                                 {/* Privileges */}
                                 {resident.privileges_list && resident.privileges_list.length > 0 && (
                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                        <Award className="h-3 w-3 text-gray-400" />
+                                        <Award className="h-3 w-3 text-gray-400 flex-shrink-0" />
                                         {resident.privileges_list.slice(0, 3).map((privilege) => (
                                             <Badge 
                                                 key={privilege.id} 
@@ -179,6 +224,11 @@ export const MemberCard = ({ member, onViewResident }: MemberCardProps) => {
                                             >
                                                 {getPrivilegeIcon(privilege.status)}
                                                 {privilege.name}
+                                                {privilege.id_number && (
+                                                    <span className="ml-1 text-[10px] opacity-75">
+                                                        #{privilege.id_number}
+                                                    </span>
+                                                )}
                                             </Badge>
                                         ))}
                                         {resident.privileges_list.length > 3 && (
@@ -192,12 +242,13 @@ export const MemberCard = ({ member, onViewResident }: MemberCardProps) => {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setShowResidentDetails(true)}
                                 className="h-8 px-2"
+                                title="View Details"
                             >
                                 <Eye className="h-4 w-4" />
                                 <span className="sr-only">View Details</span>
@@ -207,6 +258,7 @@ export const MemberCard = ({ member, onViewResident }: MemberCardProps) => {
                                     variant="ghost"
                                     size="sm"
                                     className="h-8 px-2"
+                                    title="Open Profile"
                                 >
                                     <ExternalLink className="h-4 w-4" />
                                     <span className="sr-only">Open Profile</span>
@@ -218,18 +270,20 @@ export const MemberCard = ({ member, onViewResident }: MemberCardProps) => {
                     {/* Show when member was added */}
                     {member.created_at && (
                         <div className="mt-3 pt-2 border-t dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500">
-                            Added {new Date(member.created_at).toLocaleDateString()}
+                            Added {formatDate(member.created_at)} • {getRelativeTime(member.created_at)}
                         </div>
                     )}
                 </CardContent>
             </Card>
 
-            {/* Resident Details Modal */}
-            <ResidentDetailsModal
-                open={showResidentDetails}
-                onOpenChange={setShowResidentDetails}
-                member={member}
-            />
+            {/* Resident Details Modal - only show if resident exists */}
+            {resident && (
+                <ResidentDetailsModal
+                    open={showResidentDetails}
+                    onOpenChange={setShowResidentDetails}
+                    member={member}
+                />
+            )}
         </>
     );
 };

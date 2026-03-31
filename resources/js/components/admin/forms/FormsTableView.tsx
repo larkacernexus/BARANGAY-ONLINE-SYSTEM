@@ -1,3 +1,5 @@
+// components/admin/forms/FormsTableView.tsx
+
 import {
     Table,
     TableBody,
@@ -19,7 +21,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Form, Filters } from '@/types';
+import { Form, Filters } from '@/types/admin/forms/forms.types';
 import { formUtils } from '@/admin-utils/form-utils';
 import { useState, useEffect, MouseEvent } from 'react';
 
@@ -38,6 +40,10 @@ interface FormsTableViewProps {
     onDownload: (form: Form) => void;
     onSelectAllOnPage: () => void;
     isSelectAll: boolean;
+    // Add missing props
+    formatFileSize?: (bytes: number) => string;
+    categories?: string[];
+    agencies?: string[];
 }
 
 export default function FormsTableView({
@@ -62,7 +68,10 @@ export default function FormsTableView({
     onToggleStatus,
     onDownload,
     onSelectAllOnPage,
-    isSelectAll
+    isSelectAll,
+    formatFileSize = formUtils.formatFileSize, // Default to formUtils if not provided
+    categories = [],
+    agencies = []
 }: FormsTableViewProps) {
     // Add local state for window width to prevent hydration issues
     const [windowWidth, setWindowWidth] = useState<number>(0);
@@ -143,19 +152,18 @@ export default function FormsTableView({
                 )}
                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3 whitespace-nowrap">
                     <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                            <FileText className="h-4 w-4 text-gray-600" />
+                        <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+                            <FileText className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                         </div>
                         <div className="min-w-0">
                             <div className="font-medium text-gray-900 dark:text-white truncate">
                                 {formUtils.truncateText(form.title || 'Untitled', titleLength)}
                             </div>
-                            <div className="text-xs text-gray-500 mt-0.5">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                 {formUtils.truncateText(form.description || '', descLength)}
                             </div>
-                            <div className="text-xs text-gray-400 mt-1">
+                            <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                 {formUtils.formatDateTime(form.created_at)}
-                                {form.created_by?.name && ` by ${form.created_by.name}`}
                             </div>
                         </div>
                     </div>
@@ -169,8 +177,8 @@ export default function FormsTableView({
                 </TableCell>
                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3">
                     <div className="flex items-center gap-2">
-                        <Building className="h-4 w-4 text-gray-400" />
-                        <div className="truncate" title={form.issuing_agency || 'Unknown'}>
+                        <Building className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                        <div className="truncate dark:text-gray-300" title={form.issuing_agency || 'Unknown'}>
                             {formUtils.truncateText(form.issuing_agency || 'Unknown', agencyLength)}
                         </div>
                     </div>
@@ -184,13 +192,13 @@ export default function FormsTableView({
                     <TableCell className="px-4 py-3">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                                <FileText className="h-3 w-3 text-gray-400" />
-                                <div className="text-sm truncate" title={form.file_name || 'Unknown'}>
+                                <FileText className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                                <div className="text-sm truncate dark:text-gray-300" title={form.file_name || 'Unknown'}>
                                     {formUtils.truncateText(form.file_name || 'Unknown', 20)}
                                 </div>
                             </div>
-                            <div className="text-xs text-gray-500">
-                                {formUtils.formatFileSize(form.file_size || 0)}
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {formatFileSize(form.file_size || 0)}
                             </div>
                         </div>
                     </TableCell>
@@ -215,16 +223,16 @@ export default function FormsTableView({
                                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                <MoreVertical className="h-4 w-4 text-gray-500" />
+                                <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
                             <DropdownMenuItem 
                                 onClick={(e) => {
                                     e.preventDefault();
                                     handleViewDetails(form.id, e);
                                 }}
-                                className="flex items-center gap-2 cursor-pointer"
+                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                                 <Eye className="h-4 w-4" />
                                 <span>View Details</span>
@@ -235,7 +243,7 @@ export default function FormsTableView({
                                     e.preventDefault();
                                     handleEdit(form.id, e);
                                 }}
-                                className="flex items-center gap-2 cursor-pointer"
+                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                                 <Edit className="h-4 w-4" />
                                 <span>Edit Form</span>
@@ -246,20 +254,20 @@ export default function FormsTableView({
                                     e.preventDefault();
                                     onDownload(form);
                                 }}
-                                className="flex items-center gap-2 cursor-pointer"
+                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                                 <DownloadIcon className="h-4 w-4" />
                                 <span>Download File</span>
                             </DropdownMenuItem>
                             
-                            <DropdownMenuSeparator />
+                            <DropdownMenuSeparator className="dark:bg-gray-700" />
                             
                             <DropdownMenuItem 
                                 onClick={(e) => {
                                     e.preventDefault();
                                     onToggleStatus(form);
                                 }}
-                                className="flex items-center gap-2 cursor-pointer"
+                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                                 {form.is_active ? (
                                     <>
@@ -279,7 +287,7 @@ export default function FormsTableView({
                                     e.preventDefault();
                                     navigator.clipboard.writeText(form.id.toString());
                                 }}
-                                className="flex items-center gap-2 cursor-pointer"
+                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                                 <Copy className="h-4 w-4" />
                                 <span>Copy Form ID</span>
@@ -291,7 +299,7 @@ export default function FormsTableView({
                                         e.preventDefault();
                                         navigator.clipboard.writeText(form.file_name);
                                     }}
-                                    className="flex items-center gap-2 cursor-pointer"
+                                    className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                 >
                                     <FileText className="h-4 w-4" />
                                     <span>Copy Filename</span>
@@ -300,13 +308,13 @@ export default function FormsTableView({
 
                             {isBulkMode && (
                                 <>
-                                    <DropdownMenuSeparator />
+                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                     <DropdownMenuItem 
                                         onClick={(e) => {
                                             e.preventDefault();
                                             onItemSelect(form.id);
                                         }}
-                                        className="flex items-center gap-2 cursor-pointer"
+                                        className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                     >
                                         {isSelected ? (
                                             <>
@@ -323,7 +331,7 @@ export default function FormsTableView({
                                 </>
                             )}
                             
-                            <DropdownMenuSeparator />
+                            <DropdownMenuSeparator className="dark:bg-gray-700" />
                             
                             <DropdownMenuItem 
                                 onClick={(e) => {
@@ -367,7 +375,7 @@ export default function FormsTableView({
                                     </TableHead>
                                 )}
                                 <TableHead 
-                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] sm:min-w-[200px] cursor-pointer hover:bg-gray-100"
+                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] sm:min-w-[200px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('title')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -376,7 +384,7 @@ export default function FormsTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] sm:min-w-[120px] cursor-pointer hover:bg-gray-100"
+                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] sm:min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('category')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -385,7 +393,7 @@ export default function FormsTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] sm:min-w-[120px] cursor-pointer hover:bg-gray-100"
+                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] sm:min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('agency')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -394,7 +402,7 @@ export default function FormsTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] sm:min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] sm:min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('downloads')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -408,7 +416,7 @@ export default function FormsTableView({
                                     </TableHead>
                                 )}
                                 <TableHead 
-                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] sm:min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] sm:min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('status')}
                                 >
                                     <div className="flex items-center gap-1">

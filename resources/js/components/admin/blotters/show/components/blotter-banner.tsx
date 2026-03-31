@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
 import { Clock, Edit } from 'lucide-react';
-import { Blotter } from '../types';
+import { Blotter } from '@/types/admin/blotters/blotter';
 
 interface BlotterBannerProps {
     blotter: Blotter;

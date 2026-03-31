@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ModernCard } from '@/components/residentui/modern-card';
 import { Shield, ChevronUp, ChevronDown, Lock, Globe, Fingerprint, FileLock, Download, Printer, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {  Document } from '@/types/portal/records/document.types';
+import {  Document } from '@/types/portal/records/records';
 
 interface MobileSecurityProps {
     document: Document;

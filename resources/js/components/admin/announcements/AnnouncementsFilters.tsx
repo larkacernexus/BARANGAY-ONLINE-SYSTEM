@@ -4,13 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FilterBar } from '@/components/adminui/filter-bar';
 import { AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { AnnouncementFilters } from '@/types/admin/announcements/announcement.types';
+import { RefObject } from 'react';
 
 interface AnnouncementsFiltersProps {
     search: string;
     setSearch: (value: string) => void;
-    filtersState: any;
-    updateFilter: (key: string, value: string) => void;
+    filtersState: AnnouncementFilters;
+    updateFilter: (key: keyof AnnouncementFilters, value: string) => void;
     showAdvancedFilters: boolean;
     setShowAdvancedFilters: (value: boolean) => void;
     handleClearFilters: () => void;
@@ -20,12 +21,11 @@ interface AnnouncementsFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef?: React.RefObject<HTMLInputElement>;
+    searchInputRef?: RefObject<HTMLInputElement | null>;
     isLoading?: boolean;
 }
 
 export default function AnnouncementsFilters({
-    // Remove stats from props
     search,
     setSearch,
     filtersState,
@@ -66,7 +66,7 @@ export default function AnnouncementsFilters({
                     startIndex={startIndex}
                     endIndex={endIndex}
                     isLoading={isLoading}
-                    searchInputRef={searchInputRef}
+                    searchInputRef={searchInputRef as RefObject<HTMLInputElement>}
                 >
                     <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                         <div className="flex items-center gap-1 sm:gap-2">
@@ -149,6 +149,11 @@ export default function AnnouncementsFilters({
                                     Search: "{search.length > 15 ? search.substring(0, 15) + '...' : search}"
                                 </span>
                             )}
+                            {filtersState.priority && filtersState.priority !== 'all' && (
+                                <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-full">
+                                    Priority: {filtersState.priority}
+                                </span>
+                            )}
                             {filtersState.from_date && (
                                 <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-full">
                                     From: {filtersState.from_date}
@@ -194,14 +199,31 @@ export default function AnnouncementsFilters({
                                     </div>
                                 </div>
 
-                                {/* Quick Filters */}
+                                {/* Priority Filter */}
                                 <div className="space-y-1 sm:space-y-2">
+                                    <label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
+                                    <select
+                                        className="border rounded px-2 py-1.5 text-xs sm:text-sm w-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                        value={filtersState.priority || 'all'}
+                                        onChange={(e) => updateFilter('priority', e.target.value)}
+                                        disabled={isLoading}
+                                    >
+                                        <option value="all">All Priorities</option>
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                        <option value="urgent">Urgent</option>
+                                    </select>
+                                </div>
+
+                                {/* Quick Filters */}
+                                <div className="space-y-1 sm:space-y-2 sm:col-span-2">
                                     <label className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Quick Filters</label>
-                                    <div className="flex flex-wrap gap-1">
+                                    <div className="flex flex-wrap gap-2">
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className={`h-6 text-xs ${
+                                            className={`h-7 text-xs ${
                                                 filtersState.status === 'active' 
                                                 ? 'bg-green-50 text-green-700 dark:bg-green-950/50 dark:text-green-400 border-green-200 dark:border-green-800' 
                                                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -217,7 +239,7 @@ export default function AnnouncementsFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className={`h-6 text-xs ${
+                                            className={`h-7 text-xs ${
                                                 filtersState.status === 'expired' 
                                                 ? 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400 border-red-200 dark:border-red-800' 
                                                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -233,7 +255,7 @@ export default function AnnouncementsFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className={`h-6 text-xs ${
+                                            className={`h-7 text-xs ${
                                                 filtersState.status === 'upcoming' 
                                                 ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400 border-blue-200 dark:border-blue-800' 
                                                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -245,6 +267,22 @@ export default function AnnouncementsFilters({
                                             disabled={isLoading}
                                         >
                                             Upcoming
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className={`h-7 text-xs ${
+                                                filtersState.priority === 'high' || filtersState.priority === 'urgent'
+                                                ? 'bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-400 border-orange-200 dark:border-orange-800' 
+                                                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                            }`}
+                                            onClick={() => {
+                                                updateFilter('priority', filtersState.priority === 'high' ? 'all' : 'high');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            High Priority
                                         </Button>
                                     </div>
                                 </div>

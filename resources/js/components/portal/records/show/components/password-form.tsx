@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ModernCard } from '@/components/residentui/modern-card';
 import { Lock, ShieldCheck, Eye, EyeOff, ArrowLeft, ArrowRight, AlertCircle } from 'lucide-react';
-import {  Document } from '@/types/portal/records/document.types';
+import {  Document } from '@/types/portal/records/records';
 
 interface PasswordFormProps {
     document: Document;

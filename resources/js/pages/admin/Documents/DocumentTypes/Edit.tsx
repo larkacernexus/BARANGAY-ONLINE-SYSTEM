@@ -1,4 +1,5 @@
-// app/pages/admin/document-types/edit.tsx
+// pages/admin/document-types/edit.tsx
+
 import { router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -59,46 +60,22 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-interface DocumentType {
-    id: number;
-    code: string;
-    name: string;
-    description: string | null;
-    document_category_id: number;
-    is_required: boolean;
-    is_active: boolean;
-    accepted_formats: string[];
-    max_file_size: number;
-    max_file_size_mb: number;
-    sort_order: number;
-    created_at: string;
-    updated_at: string;
-    category?: {
-        id: number;
-        name: string;
-        slug: string;
-    };
-}
+// Import types from centralized location
+import type { 
+    DocumentType, 
+    CategoryOption,
+    DocumentCategory 
+} from '@/types/admin/document-types/document-types';
 
-interface Category {
-    id: number;
-    name: string;
-    slug: string;
-    description: string | null;
-}
-
-interface CommonFormat {
-    [key: string]: string;
-}
-
-interface PageProps {
+// Extend PageProps with index signature to satisfy Inertia's constraint
+interface EditPageProps extends Record<string, any> {
     documentType: DocumentType;
-    categories: Category[];
-    commonFormats: CommonFormat;
+    categories: CategoryOption[];
+    commonFormats: Record<string, string>;
 }
 
 export default function DocumentTypeEdit() {
-    const { props } = usePage<PageProps>();
+    const { props } = usePage<EditPageProps>();
     const { documentType, categories = [], commonFormats = {} } = props;
 
     // Form state
@@ -265,7 +242,7 @@ export default function DocumentTypeEdit() {
         return Object.keys(newErrors).length === 0;
     };
 
-    // Handle form submit - ONLY triggered by button click
+    // Handle form submit
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         
@@ -371,7 +348,7 @@ export default function DocumentTypeEdit() {
                                 size="icon"
                                 onClick={handleCancel}
                                 type="button"
-                                className="h-8 w-8 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
+                                className="h-8 w-8 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800"
                             >
                                 <ArrowLeft className="h-4 w-4" />
                             </Button>
@@ -390,7 +367,7 @@ export default function DocumentTypeEdit() {
                                 onClick={() => router.visit(route('admin.document-types.show', documentType.id))}
                                 disabled={isSubmitting}
                                 type="button"
-                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+                                className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700"
                             >
                                 <Eye className="h-4 w-4 mr-2" />
                                 View
@@ -401,7 +378,7 @@ export default function DocumentTypeEdit() {
                                 onClick={() => setShowHistory(true)}
                                 disabled={isSubmitting}
                                 type="button"
-                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+                                className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700"
                             >
                                 <History className="h-4 w-4 mr-2" />
                                 History
@@ -412,7 +389,7 @@ export default function DocumentTypeEdit() {
                                 onClick={handleCancel}
                                 disabled={isSubmitting}
                                 type="button"
-                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+                                className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700"
                             >
                                 <X className="h-4 w-4 mr-2" />
                                 Cancel
@@ -451,7 +428,7 @@ export default function DocumentTypeEdit() {
                         </Alert>
                     )}
 
-                    {/* SINGLE FORM WRAPPER - contains all tabs */}
+                    {/* Form */}
                     <form 
                         id="document-type-form" 
                         onSubmit={handleSubmit}
@@ -463,16 +440,16 @@ export default function DocumentTypeEdit() {
                         }}
                     >
                         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                            <TabsList className="grid w-full grid-cols-3 lg:w-auto ">
-                                <TabsTrigger value="basic" className="gap-2 " type="button">
+                            <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+                                <TabsTrigger value="basic" className="gap-2" type="button">
                                     <FileText className="h-4 w-4" />
                                     <span className="hidden sm:inline">Basic Information</span>
                                 </TabsTrigger>
-                                <TabsTrigger value="specs" className="gap-2 " type="button">
+                                <TabsTrigger value="specs" className="gap-2" type="button">
                                     <HardDrive className="h-4 w-4" />
                                     <span className="hidden sm:inline">File Specifications</span>
                                 </TabsTrigger>
-                                <TabsTrigger value="settings" className="gap-2 " type="button">
+                                <TabsTrigger value="settings" className="gap-2" type="button">
                                     <ListOrdered className="h-4 w-4" />
                                     <span className="hidden sm:inline">Settings</span>
                                 </TabsTrigger>
@@ -480,7 +457,7 @@ export default function DocumentTypeEdit() {
 
                             {/* Basic Information Tab */}
                             <TabsContent value="basic">
-                                <Card className="dark:bg-gray-900 dark:border-gray-700">
+                                <Card className="dark:bg-gray-900 dark:border-gray-800">
                                     <CardHeader>
                                         <CardTitle className="dark:text-white">Basic Information</CardTitle>
                                         <CardDescription className="dark:text-gray-400">
@@ -498,7 +475,7 @@ export default function DocumentTypeEdit() {
                                                             <TooltipTrigger asChild>
                                                                 <HelpCircle className="h-4 w-4 text-muted-foreground dark:text-gray-500 cursor-help" />
                                                             </TooltipTrigger>
-                                                            <TooltipContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                            <TooltipContent className="dark:bg-gray-800 dark:border-gray-700">
                                                                 <p className="dark:text-gray-300">Unique identifier (uppercase letters, numbers, underscores)</p>
                                                             </TooltipContent>
                                                         </Tooltip>
@@ -511,7 +488,7 @@ export default function DocumentTypeEdit() {
                                                         value={formData.code}
                                                         onChange={handleInputChange}
                                                         placeholder="e.g., BARANGAY_CLEARANCE"
-                                                        className={`${errors.code ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
+                                                        className={`${errors.code ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-800 dark:border-gray-700 dark:text-white`}
                                                         disabled={isSubmitting}
                                                     />
                                                     <Button
@@ -521,7 +498,7 @@ export default function DocumentTypeEdit() {
                                                         onClick={generateCode}
                                                         disabled={!formData.name || isSubmitting}
                                                         title="Generate from name"
-                                                        className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+                                                        className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700"
                                                     >
                                                         <Sparkles className="h-4 w-4" />
                                                     </Button>
@@ -539,7 +516,7 @@ export default function DocumentTypeEdit() {
                                                     value={formData.name}
                                                     onChange={handleInputChange}
                                                     placeholder="e.g., Barangay Clearance"
-                                                    className={`${errors.name ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
+                                                    className={`${errors.name ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-800 dark:border-gray-700 dark:text-white`}
                                                     disabled={isSubmitting}
                                                 />
                                                 {errors.name && (
@@ -558,7 +535,7 @@ export default function DocumentTypeEdit() {
                                                 onChange={handleInputChange}
                                                 placeholder="Enter a description for this document type"
                                                 rows={4}
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                                className="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                                                 disabled={isSubmitting}
                                             />
                                         </div>
@@ -571,10 +548,10 @@ export default function DocumentTypeEdit() {
                                                 onValueChange={(value) => handleSelectChange('document_category_id', value)}
                                                 disabled={isSubmitting}
                                             >
-                                                <SelectTrigger className={`${errors.document_category_id ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
+                                                <SelectTrigger className={`${errors.document_category_id ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-800 dark:border-gray-700 dark:text-white`}>
                                                     <SelectValue placeholder="Select a category" />
                                                 </SelectTrigger>
-                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
                                                     {categories.map((category) => (
                                                         <SelectItem key={category.id} value={category.id.toString()} className="dark:text-white dark:focus:bg-gray-700">
                                                             <div className="flex items-center gap-2">
@@ -595,7 +572,7 @@ export default function DocumentTypeEdit() {
 
                             {/* File Specifications Tab */}
                             <TabsContent value="specs">
-                                <Card className="dark:bg-gray-900 dark:border-gray-700">
+                                <Card className="dark:bg-gray-900 dark:border-gray-800">
                                     <CardHeader>
                                         <CardTitle className="dark:text-white">File Specifications</CardTitle>
                                         <CardDescription className="dark:text-gray-400">
@@ -613,7 +590,7 @@ export default function DocumentTypeEdit() {
                                                     size="sm"
                                                     onClick={() => setShowCustomFormatInput(true)}
                                                     disabled={showCustomFormatInput || isSubmitting}
-                                                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+                                                    className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700"
                                                 >
                                                     <Plus className="h-4 w-4 mr-2" />
                                                     Add Custom Format
@@ -633,7 +610,7 @@ export default function DocumentTypeEdit() {
                                                         className={`justify-start ${
                                                             selectedFormats.includes(format) 
                                                                 ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
-                                                                : 'dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600'
+                                                                : 'dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700'
                                                         }`}
                                                     >
                                                         <FileCode className="h-4 w-4 mr-2" />
@@ -652,7 +629,7 @@ export default function DocumentTypeEdit() {
                                                         value={customFormat}
                                                         onChange={(e) => setCustomFormat(e.target.value)}
                                                         placeholder="Enter format (e.g., psd, ai)"
-                                                        className="flex-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                                        className="flex-1 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                                                         disabled={isSubmitting}
                                                     />
                                                     <Button
@@ -687,7 +664,7 @@ export default function DocumentTypeEdit() {
                                                     <Label className="dark:text-gray-300">Selected Formats</Label>
                                                     <div className="flex flex-wrap gap-2">
                                                         {selectedFormats.map((format) => (
-                                                            <Badge key={format} variant="secondary" className="gap-1 dark:bg-gray-700 dark:text-gray-300">
+                                                            <Badge key={format} variant="secondary" className="gap-1 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700">
                                                                 {format.toUpperCase()}
                                                                 <button
                                                                     type="button"
@@ -717,7 +694,7 @@ export default function DocumentTypeEdit() {
                                                         max={fileSizeUnit === 'MB' ? '10' : '10240'}
                                                         value={fileSizeValue}
                                                         onChange={(e) => handleFileSizeChange(parseInt(e.target.value) || 0)}
-                                                        className={`${errors.max_file_size ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
+                                                        className={`${errors.max_file_size ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-800 dark:border-gray-700 dark:text-white`}
                                                         disabled={isSubmitting}
                                                     />
                                                 </div>
@@ -726,10 +703,10 @@ export default function DocumentTypeEdit() {
                                                     onValueChange={(value: 'KB' | 'MB') => setFileSizeUnit(value)}
                                                     disabled={isSubmitting}
                                                 >
-                                                    <SelectTrigger className="w-24 dark:bg-gray-900 dark:border-gray-700 dark:text-white">
+                                                    <SelectTrigger className="w-24 dark:bg-gray-800 dark:border-gray-700 dark:text-white">
                                                         <SelectValue />
                                                     </SelectTrigger>
-                                                    <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                    <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
                                                         <SelectItem value="KB" className="dark:text-white dark:focus:bg-gray-700">KB</SelectItem>
                                                         <SelectItem value="MB" className="dark:text-white dark:focus:bg-gray-700">MB</SelectItem>
                                                     </SelectContent>
@@ -748,7 +725,7 @@ export default function DocumentTypeEdit() {
 
                             {/* Settings Tab */}
                             <TabsContent value="settings">
-                                <Card className="dark:bg-gray-900 dark:border-gray-700">
+                                <Card className="dark:bg-gray-900 dark:border-gray-800">
                                     <CardHeader>
                                         <CardTitle className="dark:text-white">Document Type Settings</CardTitle>
                                         <CardDescription className="dark:text-gray-400">
@@ -766,7 +743,7 @@ export default function DocumentTypeEdit() {
                                                 min="0"
                                                 value={formData.sort_order}
                                                 onChange={handleInputChange}
-                                                className={`${errors.sort_order ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
+                                                className={`${errors.sort_order ? 'border-destructive dark:border-red-800' : ''} dark:bg-gray-800 dark:border-gray-700 dark:text-white`}
                                                 disabled={isSubmitting}
                                             />
                                             {errors.sort_order && (
@@ -850,7 +827,7 @@ export default function DocumentTypeEdit() {
 
             {/* Delete Confirmation Dialog */}
             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <DialogContent className="dark:bg-gray-900 dark:border-gray-700">
+                <DialogContent className="dark:bg-gray-900 dark:border-gray-800">
                     <DialogHeader>
                         <DialogTitle className="dark:text-white">Delete Document Type</DialogTitle>
                         <DialogDescription className="dark:text-gray-400">
@@ -863,7 +840,7 @@ export default function DocumentTypeEdit() {
                             onClick={() => setShowDeleteDialog(false)}
                             disabled={isSubmitting}
                             type="button"
-                            className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+                            className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700"
                         >
                             Cancel
                         </Button>
@@ -882,7 +859,7 @@ export default function DocumentTypeEdit() {
 
             {/* History Dialog */}
             <Dialog open={showHistory} onOpenChange={setShowHistory}>
-                <DialogContent className="sm:max-w-[425px] dark:bg-gray-900 dark:border-gray-700">
+                <DialogContent className="sm:max-w-[425px] dark:bg-gray-900 dark:border-gray-800">
                     <DialogHeader>
                         <DialogTitle className="dark:text-white">Document Type History</DialogTitle>
                         <DialogDescription className="dark:text-gray-400">
@@ -910,7 +887,7 @@ export default function DocumentTypeEdit() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button onClick={() => setShowHistory(false)} type="button" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">Close</Button>
+                        <Button onClick={() => setShowHistory(false)} type="button" className="dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700">Close</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

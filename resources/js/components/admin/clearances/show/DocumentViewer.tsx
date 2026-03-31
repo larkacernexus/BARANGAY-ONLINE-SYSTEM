@@ -18,10 +18,10 @@ import {
     File,
     AlertCircle
 } from 'lucide-react';
-import { Document } from '@/types/clearance';
+import { ClearanceDocument } from '@/types/admin/clearances/clearance-types'; // Fix import
 
 interface DocumentViewerProps {
-    document: Document | null;
+    document: ClearanceDocument | null; // Change from Document to ClearanceDocument
     isOpen: boolean;
     onClose: () => void;
     onNext?: () => void;
@@ -98,7 +98,8 @@ export function DocumentViewer({
 
     if (!isOpen || !doc) return null;
 
-    const isImage = doc.mime_type?.startsWith('image/') || 
+    const isImage = doc.is_image || 
+                   doc.mime_type?.startsWith('image/') || 
                    doc.file_name?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
     const isPDF = doc.mime_type === 'application/pdf' || 
                   doc.file_name?.match(/\.pdf$/i);
@@ -121,7 +122,7 @@ export function DocumentViewer({
 
     const handleDownload = () => {
         const link = window.document.createElement('a');
-        link.href = doc.url || '#';
+        link.href = doc.file_path || '#';
         link.download = doc.file_name || 'document';
         link.target = '_blank';
         link.click();
@@ -169,8 +170,13 @@ export function DocumentViewer({
     };
 
     const getDocumentStatus = () => {
-        if (doc.is_verified) return 'verified';
-        return doc.status || 'pending';
+        if (doc.verification_status === 'verified') return 'verified';
+        if (doc.verification_status === 'rejected') return 'rejected';
+        return 'pending';
+    };
+
+    const getDocumentName = (): string => {
+        return doc.original_name || doc.file_name || 'Document';
     };
 
     const documentStatus = getDocumentStatus();
@@ -183,7 +189,7 @@ export function DocumentViewer({
                     <div className="flex items-center gap-3">
                         {getFileIcon()}
                         <div className="truncate max-w-xl">
-                            <h3 className="font-medium">{doc.name || doc.original_name || doc.file_name}</h3>
+                            <h3 className="font-medium">{getDocumentName()}</h3>
                             <div className="flex items-center gap-2 text-sm text-gray-400">
                                 <span>{doc.description || 'Document'}</span>
                                 {doc.file_size && (
@@ -192,10 +198,10 @@ export function DocumentViewer({
                                         <span>{formatFileSize(doc.file_size)}</span>
                                     </>
                                 )}
-                                {doc.uploaded_at && (
+                                {doc.created_at && (
                                     <>
                                         <span>•</span>
-                                        <span>Uploaded {new Date(doc.uploaded_at).toLocaleDateString()}</span>
+                                        <span>Uploaded {new Date(doc.created_at).toLocaleDateString()}</span>
                                     </>
                                 )}
                             </div>
@@ -377,8 +383,8 @@ export function DocumentViewer({
                     <div className="flex items-center justify-center h-full">
                         {isImage ? (
                             <img
-                                src={doc.url}
-                                alt={doc.name || 'Document image'}
+                                src={doc.file_path}
+                                alt={getDocumentName()}
                                 className="max-w-full max-h-full object-contain transition-all duration-200 select-none"
                                 style={{
                                     transform: `scale(${zoom}) rotate(${rotation}deg)`,
@@ -389,9 +395,9 @@ export function DocumentViewer({
                         ) : isPDF ? (
                             <div className="w-full h-full bg-white rounded-lg overflow-hidden">
                                 <iframe
-                                    src={doc.url}
+                                    src={doc.file_path}
                                     className="w-full h-full border-0"
-                                    title={doc.name || 'PDF Document'}
+                                    title={getDocumentName()}
                                     loading="lazy"
                                 />
                             </div>
@@ -400,7 +406,7 @@ export function DocumentViewer({
                                 <div className="text-center">
                                     {getFileIcon()}
                                     <h4 className="text-xl font-semibold mt-4 mb-2">
-                                        {doc.name || doc.file_name}
+                                        {getDocumentName()}
                                     </h4>
                                     <p className="text-gray-600 mb-4">
                                         This document type cannot be previewed directly. Please download to view.
@@ -426,7 +432,7 @@ export function DocumentViewer({
                                         <div className="space-y-1">
                                             <p className="font-medium">Uploaded:</p>
                                             <p className="text-gray-600">
-                                                {doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : 'Unknown'}
+                                                {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Unknown'}
                                             </p>
                                         </div>
                                     </div>

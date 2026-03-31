@@ -25,7 +25,7 @@ import {
     Archive,
     FileText
 } from 'lucide-react';
-import { Blotter } from '@/components/admin/blotters/blotter';
+import { Blotter } from '@/types/admin/blotters/blotter';
 
 interface BlottersGridViewProps {
     blotters: Blotter[];

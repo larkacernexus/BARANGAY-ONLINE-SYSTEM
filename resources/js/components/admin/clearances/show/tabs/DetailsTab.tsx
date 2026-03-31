@@ -1,4 +1,3 @@
-// components/admin/clearances/show/tabs/DetailsTab.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -19,7 +18,7 @@ import {
     CheckCircle,
     XCircle
 } from 'lucide-react';
-import { ClearanceRequest, ClearanceType, Resident } from '@/types/clearance';
+import { ClearanceRequest, ClearanceType, Resident } from '@/types/admin/clearances/clearance-types'; // Fix import
 
 interface DetailsTabProps {
     clearance: ClearanceRequest;
@@ -41,12 +40,60 @@ export function DetailsTab({
     
     const getStatusColor = (status: string): string => {
         const colors: Record<string, string> = {
+            'completed': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
             'paid': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+            'pending': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+            'pending_payment': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+            'failed': 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+            'refunded': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700',
             'unpaid': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700',
             'partially_paid': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
-            'pending': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
         };
         return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
+    };
+
+    const getPaymentStatusDisplay = () => {
+        // Check if payment exists and has status
+        if (clearance.payment?.status) {
+            const statusMap: Record<string, string> = {
+                'completed': 'Paid',
+                'pending': 'Pending',
+                'failed': 'Failed',
+                'refunded': 'Refunded'
+            };
+            return statusMap[clearance.payment.status] || clearance.payment.status;
+        }
+        
+        // Fallback to payment_status property
+        if (clearance.payment_status) {
+            const statusMap: Record<string, string> = {
+                'completed': 'Paid',
+                'pending': 'Pending',
+                'failed': 'Failed',
+                'refunded': 'Refunded',
+                'paid': 'Paid',
+                'unpaid': 'Unpaid',
+                'partially_paid': 'Partially Paid'
+            };
+            return statusMap[clearance.payment_status] || clearance.payment_status;
+        }
+        
+        return 'Unpaid';
+    };
+
+    const getPaymentStatus = () => {
+        if (clearance.payment?.status) return clearance.payment.status;
+        if (clearance.payment_status) return clearance.payment_status;
+        return 'unpaid';
+    };
+
+    const getUrgencyDisplay = (urgency: string): string => {
+        const urgencyMap: Record<string, string> = {
+            'normal': 'Normal',
+            'rush': 'Rush',
+            'express': 'Express'
+        };
+        return urgencyMap[urgency] || urgency;
     };
 
     return (
@@ -101,7 +148,7 @@ export function DetailsTab({
                                 clearance.urgency === 'rush' ? 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' :
                                 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
                             }>
-                                {clearance.urgency_display || clearance.urgency}
+                                {getUrgencyDisplay(clearance.urgency)}
                             </Badge>
                         </div>
                     </div>
@@ -174,11 +221,16 @@ export function DetailsTab({
                         </div>
                         <div className="space-y-2">
                             <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Status</p>
-                            <Badge variant="outline" className={getStatusColor(clearance.payment_status || 'unpaid')}>
-                                {clearance.payment_status === 'paid' && <CheckCircle className="h-3 w-3 mr-1" />}
-                                {clearance.payment_status === 'unpaid' && <Clock className="h-3 w-3 mr-1" />}
-                                {clearance.payment_status === 'partially_paid' && <AlertCircle className="h-3 w-3 mr-1" />}
-                                {clearance.payment_status_display || clearance.payment_status || 'Unpaid'}
+                            <Badge variant="outline" className={getStatusColor(getPaymentStatus())}>
+                                {getPaymentStatus() === 'completed' && <CheckCircle className="h-3 w-3 mr-1" />}
+                                {getPaymentStatus() === 'paid' && <CheckCircle className="h-3 w-3 mr-1" />}
+                                {getPaymentStatus() === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                                {getPaymentStatus() === 'pending_payment' && <Clock className="h-3 w-3 mr-1" />}
+                                {getPaymentStatus() === 'failed' && <XCircle className="h-3 w-3 mr-1" />}
+                                {getPaymentStatus() === 'refunded' && <AlertCircle className="h-3 w-3 mr-1" />}
+                                {getPaymentStatus() === 'unpaid' && <Clock className="h-3 w-3 mr-1" />}
+                                {getPaymentStatus() === 'partially_paid' && <AlertCircle className="h-3 w-3 mr-1" />}
+                                {getPaymentStatusDisplay()}
                             </Badge>
                         </div>
                     </div>
@@ -196,20 +248,28 @@ export function DetailsTab({
                         </>
                     )}
 
-                    {/* Requirements Met */}
-                    {clearance.requirements_met && clearance.requirements_met.length > 0 && (
+                    {/* Rejection Reason */}
+                    {clearance.rejection_reason && (
                         <>
                             <Separator className="dark:bg-gray-700" />
                             <div className="space-y-2">
-                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Requirements Met</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {clearance.requirements_met.map((req: string, index: number) => (
-                                        <Badge key={index} variant="outline" className="flex items-center gap-1 bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
-                                            <FileCheck className="h-3 w-3" />
-                                            {req}
-                                        </Badge>
-                                    ))}
-                                </div>
+                                <p className="text-sm font-medium text-red-600 dark:text-red-400">Rejection Reason</p>
+                                <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800">
+                                    {clearance.rejection_reason}
+                                </p>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Remarks */}
+                    {clearance.remarks && (
+                        <>
+                            <Separator className="dark:bg-gray-700" />
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Remarks</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    {clearance.remarks}
+                                </p>
                             </div>
                         </>
                     )}
@@ -231,9 +291,9 @@ export function DetailsTab({
                         <div className="space-y-6">
                             {/* Resident Header */}
                             <div className="flex items-start gap-4">
-                                {resident.photo_path ? (
+                                {resident.profile_photo ? (
                                     <img
-                                        src={resident.photo_path}
+                                        src={resident.profile_photo}
                                         alt={resident.full_name}
                                         className="h-16 w-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700"
                                     />
@@ -273,69 +333,12 @@ export function DetailsTab({
                                             <p className="text-sm dark:text-gray-300">{resident.address || 'No address provided'}</p>
                                         </div>
                                     </div>
-                                    
-                                    {resident.purok && (
-                                        <div className="flex items-start gap-2">
-                                            <Home className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Purok</p>
-                                                <p className="text-sm dark:text-gray-300">{resident.purok.name}</p>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
 
                                 <div className="space-y-4">
-                                    {resident.birth_date && (
-                                        <div className="flex items-start gap-2">
-                                            <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Date of Birth</p>
-                                                <p className="text-sm dark:text-gray-300">{formatDate(resident.birth_date)}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {resident.gender && (
-                                            <div>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">Gender</p>
-                                                <p className="text-sm capitalize dark:text-gray-300">{resident.gender}</p>
-                                            </div>
-                                        )}
-                                        {resident.civil_status && (
-                                            <div>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">Civil Status</p>
-                                                <p className="text-sm capitalize dark:text-gray-300">{resident.civil_status}</p>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {resident.occupation && (
-                                        <div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">Occupation</p>
-                                            <p className="text-sm dark:text-gray-300">{resident.occupation}</p>
-                                        </div>
-                                    )}
+                                    {/* Add any other resident fields here if they exist in your Resident type */}
                                 </div>
                             </div>
-
-                            {/* Household Information */}
-                            {resident.household && (
-                                <>
-                                    <Separator className="dark:bg-gray-700" />
-                                    <div className="flex items-center gap-2">
-                                        <Home className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Household</p>
-                                            <p className="text-sm dark:text-gray-300">
-                                                House #{resident.household.household_number}
-                                                {resident.household.address && ` • ${resident.household.address}`}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
                         </div>
                     ) : (
                         <div className="text-center py-8">

@@ -1,3 +1,5 @@
+// pages/admin/DocumentTypes/Index.tsx
+
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -33,56 +35,10 @@ import {
     BulkEditField, 
     SelectionMode, 
     FilterState, 
-    SelectionStats 
-} from '@/types/document-types';
-
-interface PageProps {
-    documentTypes: DocumentType[] | null;
-    filters: {
-        search?: string;
-        status?: string;
-        category?: string;
-        required?: string;
-    } | null;
-    stats: {
-        total: number;
-        active: number;
-        required: number;
-        optional: number;
-        max_file_size_mb: number;
-        has_formats: number;
-    } | null;
-    categories: {
-        id: number;
-        name: string;
-        slug: string;
-    }[] | null;
-}
-
-declare module '@inertiajs/react' {
-    interface PageProps {
-        documentTypes: DocumentType[] | null;
-        filters: {
-            search?: string;
-            status?: string;
-            category?: string;
-            required?: string;
-        } | null;
-        stats: {
-            total: number;
-            active: number;
-            required: number;
-            optional: number;
-            max_file_size_mb: number;
-            has_formats: number;
-        } | null;
-        categories: {
-            id: number;
-            name: string;
-            slug: string;
-        }[] | null;
-    }
-}
+    SelectionStats, 
+    PageProps,
+    DocumentCategory
+} from '@/types/admin/document-types/document-types';
 
 export default function DocumentTypesIndex() {
     const { props } = usePage<PageProps>();
@@ -94,7 +50,7 @@ export default function DocumentTypesIndex() {
     } = props;
     
     // Safe defaults for optional props
-    const safeDocumentTypes = Array.isArray(documentTypes) ? documentTypes : [];
+    const safeDocumentTypes: DocumentType[] = Array.isArray(documentTypes) ? documentTypes : [];
     const safeFilters = filters || {};
     const safeStats = stats || {
         total: 0,
@@ -104,10 +60,10 @@ export default function DocumentTypesIndex() {
         max_file_size_mb: 0,
         has_formats: 0
     };
-    const safeCategories = Array.isArray(categories) ? categories : [];
+    const safeCategories: DocumentCategory[] = Array.isArray(categories) ? categories : [];
     
     // State management
-    const [search, setSearch] = useState(safeFilters.search || '');
+    const [search, setSearch] = useState<string>(safeFilters.search || '');
     const [filtersState, setFiltersState] = useState<FilterState>({
         search: safeFilters.search || '',
         status: safeFilters.status || 'all',
@@ -120,22 +76,30 @@ export default function DocumentTypesIndex() {
     
     // Bulk selection states
     const [selectedDocumentTypes, setSelectedDocumentTypes] = useState<number[]>([]);
-    const [isBulkMode, setIsBulkMode] = useState(false);
-    const [isSelectAll, setIsSelectAll] = useState(false);
+    const [isBulkMode, setIsBulkMode] = useState<boolean>(false);
+    const [isSelectAll, setIsSelectAll] = useState<boolean>(false);
     const [selectionMode, setSelectionMode] = useState<SelectionMode>('page');
     
     // Dialog states
-    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-    const [showBulkActivateDialog, setShowBulkActivateDialog] = useState(false);
-    const [showBulkDeactivateDialog, setShowBulkDeactivateDialog] = useState(false);
-    const [showBulkRequiredDialog, setShowBulkRequiredDialog] = useState(false);
-    const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
+    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState<boolean>(false);
+    const [showBulkActivateDialog, setShowBulkActivateDialog] = useState<boolean>(false);
+    const [showBulkDeactivateDialog, setShowBulkDeactivateDialog] = useState<boolean>(false);
+    const [showBulkRequiredDialog, setShowBulkRequiredDialog] = useState<boolean>(false);
+    const [isPerformingBulkAction, setIsPerformingBulkAction] = useState<boolean>(false);
     const [bulkEditValue, setBulkEditValue] = useState<string>('');
     const [bulkEditField, setBulkEditField] = useState<BulkEditField>('status');
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-   
+    // Debounced search function
+    const debouncedSearch = useMemo(
+        () => debounce((value: string) => {
+            setFiltersState(prev => ({ ...prev, search: value }));
+            updateFilter('search', value);
+        }, 300),
+        []
+    );
+
     // Handle window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -162,12 +126,17 @@ export default function DocumentTypesIndex() {
         }
     }, [isBulkMode]);
 
+    // Handle search input change
+    const handleSearchChange = (value: string) => {
+        setSearch(value);
+        debouncedSearch(value);
+    };
+
     // Keyboard shortcuts
     useEffect(() => {
         if (isMobile) return;
         
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
             if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
                 e.preventDefault();
                 if (e.shiftKey) {
@@ -176,7 +145,6 @@ export default function DocumentTypesIndex() {
                     handleSelectAllOnPage();
                 }
             }
-            // Escape key
             if (e.key === 'Escape') {
                 if (isBulkMode) {
                     if (selectedDocumentTypes.length > 0) {
@@ -186,17 +154,14 @@ export default function DocumentTypesIndex() {
                     }
                 }
             }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
                 e.preventDefault();
                 setIsBulkMode(!isBulkMode);
             }
-            // Ctrl/Cmd + F to focus search
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             }
-            // Delete key for bulk delete
             if (e.key === 'Delete' && isBulkMode && selectedDocumentTypes.length > 0) {
                 e.preventDefault();
                 setShowBulkDeleteDialog(true);
@@ -212,24 +177,29 @@ export default function DocumentTypesIndex() {
         return filterDocumentTypes(
             safeDocumentTypes,
             safeCategories,
-            search,
+            filtersState.search,
             filtersState,
             'name',
             'asc'
         );
-    }, [safeDocumentTypes, safeCategories, search, filtersState]);
+    }, [safeDocumentTypes, safeCategories, filtersState]);
 
     // Calculate pagination
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [itemsPerPage] = useState<number>(10);
     const totalItems = filteredDocumentTypes.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
     const paginatedDocumentTypes = filteredDocumentTypes.slice(startIndex, endIndex);
 
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filtersState]);
+
     // Selection handlers
-    const handleSelectAllOnPage = () => {
+    const handleSelectAllOnPage = useCallback(() => {
         const pageIds = paginatedDocumentTypes.map(type => type.id);
         if (isSelectAll) {
             setSelectedDocumentTypes(prev => prev.filter(id => !pageIds.includes(id)));
@@ -239,9 +209,9 @@ export default function DocumentTypesIndex() {
         }
         setIsSelectAll(!isSelectAll);
         setSelectionMode('page');
-    };
+    }, [paginatedDocumentTypes, isSelectAll, selectedDocumentTypes]);
 
-    const handleSelectAllFiltered = () => {
+    const handleSelectAllFiltered = useCallback(() => {
         const allIds = filteredDocumentTypes.map(type => type.id);
         if (selectedDocumentTypes.length === allIds.length && allIds.every(id => selectedDocumentTypes.includes(id))) {
             setSelectedDocumentTypes(prev => prev.filter(id => !allIds.includes(id)));
@@ -250,17 +220,17 @@ export default function DocumentTypesIndex() {
             setSelectedDocumentTypes(newSelected);
             setSelectionMode('filtered');
         }
-    };
+    }, [filteredDocumentTypes, selectedDocumentTypes]);
 
-    const handleSelectAll = () => {
+    const handleSelectAll = useCallback(() => {
         if (confirm(`This will select ALL ${safeDocumentTypes.length} document types. This action may take a moment.`)) {
-            const pageIds = paginatedDocumentTypes.map(type => type.id);
-            setSelectedDocumentTypes(pageIds);
+            const allIds = filteredDocumentTypes.map(type => type.id);
+            setSelectedDocumentTypes(allIds);
             setSelectionMode('all');
         }
-    };
+    }, [safeDocumentTypes.length, filteredDocumentTypes]);
 
-    const handleItemSelect = (id: number) => {
+    const handleItemSelect = useCallback((id: number) => {
         setSelectedDocumentTypes(prev => {
             if (prev.includes(id)) {
                 return prev.filter(itemId => itemId !== id);
@@ -268,7 +238,7 @@ export default function DocumentTypesIndex() {
                 return [...prev, id];
             }
         });
-    };
+    }, []);
 
     // Check if all items on current page are selected
     useEffect(() => {
@@ -283,7 +253,7 @@ export default function DocumentTypesIndex() {
     }, [selectedDocumentTypes, filteredDocumentTypes]);
 
     // Calculate selection stats
-    const selectionStats = useMemo(() => {
+    const selectionStats = useMemo((): SelectionStats => {
         return getSelectionStats(selectedDocumentTypesData);
     }, [selectedDocumentTypesData]);
 
@@ -297,6 +267,24 @@ export default function DocumentTypesIndex() {
         });
         return counts;
     }, [filteredDocumentTypes, safeCategories]);
+
+    // Update filter function
+    const updateFilter = (key: keyof FilterState, value: string) => {
+        const params: Record<string, any> = {};
+        
+        const newFilters = { ...filtersState, [key]: value };
+        Object.entries(newFilters).forEach(([k, v]) => {
+            if (v && v !== 'all') {
+                params[k] = v;
+            }
+        });
+        
+        router.get(route('admin.document-types.index'), params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
 
     // Bulk operations
     const handleBulkOperation = async (operation: BulkOperation) => {
@@ -457,27 +445,7 @@ export default function DocumentTypesIndex() {
     };
 
     const handleSort = (column: string) => {
-        // For client-side sorting, we could implement it here
-        // For server-side sorting, we would update filters
         toast.info(`Sort by ${column} - to be implemented`);
-    };
-
-    const updateFilter = (key: keyof FilterState, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
-        
-        const params = { ...filtersState, [key]: value };
-        Object.keys(params).forEach(k => {
-            const key = k as keyof typeof params;
-            if (!params[key] || params[key] === 'all') {
-                delete params[key];
-            }
-        });
-        
-        router.get(route('admin.document-types.index'), params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
     };
 
     const handleClearFilters = () => {
@@ -506,7 +474,7 @@ export default function DocumentTypesIndex() {
     };
 
     const hasActiveFilters = 
-        search || 
+        search !== '' || 
         filtersState.status !== 'all' || 
         filtersState.category !== 'all' ||
         filtersState.required !== 'all';
@@ -562,7 +530,7 @@ export default function DocumentTypesIndex() {
 
                     <DocumentTypesFilters
                         search={search}
-                        setSearch={setSearch}
+                        setSearch={handleSearchChange}
                         filtersState={filtersState}
                         updateFilter={updateFilter}
                         handleClearFilters={handleClearFilters}
@@ -617,17 +585,17 @@ export default function DocumentTypesIndex() {
 
                     {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
-                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border dark:border-gray-700">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <KeyRound className="h-4 w-4 text-gray-500" />
-                                    <span className="text-sm font-medium">Keyboard Shortcuts</span>
+                                    <KeyRound className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                    <span className="text-sm font-medium dark:text-gray-200">Keyboard Shortcuts</span>
                                 </div>
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => setIsBulkMode(false)}
-                                    className="h-7 text-xs"
+                                    className="h-7 text-xs dark:text-gray-300 dark:hover:bg-gray-800"
                                     disabled={isPerformingBulkAction}
                                 >
                                     Exit Bulk Mode
@@ -635,19 +603,19 @@ export default function DocumentTypesIndex() {
                             </div>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
                                 <div className="flex items-center gap-1">
-                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+A</kbd>
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200">Ctrl+A</kbd>
                                     <span>Select page</span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Shift+Ctrl+A</kbd>
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200">Shift+Ctrl+A</kbd>
                                     <span>Select filtered</span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Delete</kbd>
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200">Delete</kbd>
                                     <span>Delete selected</span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-gray-800 dark:text-gray-200">Esc</kbd>
                                     <span>Exit/clear</span>
                                 </div>
                             </div>
@@ -677,4 +645,3 @@ export default function DocumentTypesIndex() {
         </AppLayout>
     );
 }
-

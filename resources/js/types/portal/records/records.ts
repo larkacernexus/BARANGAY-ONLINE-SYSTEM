@@ -100,6 +100,9 @@ export interface Household {
 
 // ========== DOCUMENT ==========
 export interface Document {
+    uploaded_by_user: any;
+    security_options: any;
+    preview_url: any;
     id: number;
     name: string;
     description?: string;
@@ -227,6 +230,57 @@ export interface PaginatedDocuments {
         active: boolean;
     }>;
 }
+
+
+export interface FormData {
+    is_public: boolean | undefined;
+    requires_password: boolean | undefined;
+    password: string | number | readonly string[] | undefined;
+    confirm_password: string | number | readonly string[] | undefined;
+    name: string | number | readonly string[] | undefined;
+    description: string | number | readonly string[] | undefined;
+    issue_date: string | number | readonly string[] | undefined;
+    expiry_date: string | number | readonly string[] | undefined;
+    reference_number: string | number | readonly string[] | undefined;
+    clearance_type_id: string;
+    purpose: string;
+    purpose_custom: string;
+    specific_purpose: string;
+    needed_date: string;
+    additional_notes: string;
+    resident_id: string;
+    documents: File[];
+    descriptions: string[];
+    document_type_ids: number[];
+}
+
+export interface RelatedDocument {
+    id: number;
+    name: string;
+    file_extension?: string;
+    file_size_human?: string;
+    file_size?: number;
+    created_at?: string;
+    updated_at?: string;
+    category?: {
+        id: number;
+        name: string;
+        slug?: string;
+        icon?: string;
+        color?: string;
+    };
+    category_id?: number;
+    resident_id?: number;
+    resident_name?: string;
+    reference_number?: string;
+    requires_password?: boolean;
+    is_public?: boolean;
+    preview_url?: string;
+    thumbnail_url?: string;
+    relationship_type?: 'same_category' | 'same_resident' | 'related_by_tags' | 'custom';
+    relationship_strength?: number;
+}
+
 
 // ========== PAGE PROPS ==========
 export interface RecordsPageProps {

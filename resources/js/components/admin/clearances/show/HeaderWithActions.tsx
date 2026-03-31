@@ -34,7 +34,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ClearanceRequest } from '@/types/clearance';
+import { ClearanceRequest } from '@/types/admin/clearances/clearance-types';
 import { JSX, useState } from 'react';
 
 interface HeaderWithActionsProps {

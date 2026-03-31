@@ -1,28 +1,29 @@
+// components/admin/document-types/DocumentTypesFilters.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Download, FilterX, Search, X, AlertCircle } from 'lucide-react';
 import { route } from 'ziggy-js';
+import { RefObject } from 'react';
+
+// Import types
+import type { CategoryOption, FilterState } from '@/types/admin/document-types/document-types';
 
 interface DocumentTypesFiltersProps {
     search: string;
     setSearch: (value: string) => void;
-    filtersState: {
-        search: string;
-        status: string;
-        category: string;
-        required: string;
-    };
-    updateFilter: (key: string, value: string) => void;
+    filtersState: FilterState;
+    updateFilter: (key: keyof FilterState, value: string) => void;
     handleClearFilters: () => void;
     hasActiveFilters: boolean;
     isMobile: boolean;
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef: React.RefObject<HTMLInputElement>;
-    categories: Array<{ id: number; name: string }>;
+    searchInputRef: RefObject<HTMLInputElement | null>;
+    categories: CategoryOption[];
     isLoading?: boolean;
 }
 
@@ -46,6 +47,21 @@ export default function DocumentTypesFilters({
         if (categoryId === 'all') return '';
         const category = categories.find(c => c.id.toString() === categoryId);
         return category?.name || categoryId;
+    };
+
+    // Handler for status change
+    const handleStatusChange = (value: string) => {
+        updateFilter('status', value);
+    };
+
+    // Handler for category change
+    const handleCategoryChange = (value: string) => {
+        updateFilter('category', value);
+    };
+
+    // Handler for required change
+    const handleRequiredChange = (value: string) => {
+        updateFilter('required', value);
     };
 
     return (
@@ -97,7 +113,7 @@ export default function DocumentTypesFilters({
                                         <span className="hidden sm:inline">Export</span>
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
+                                <TooltipContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-200">
                                     <p>Export filtered results</p>
                                 </TooltipContent>
                             </Tooltip>
@@ -160,7 +176,7 @@ export default function DocumentTypesFilters({
                             <select
                                 className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={filtersState.status}
-                                onChange={(e) => updateFilter('status', e.target.value)}
+                                onChange={(e) => handleStatusChange(e.target.value)}
                                 disabled={isLoading}
                             >
                                 <option value="all" className="bg-white dark:bg-gray-900">All Status</option>
@@ -174,7 +190,7 @@ export default function DocumentTypesFilters({
                             <select
                                 className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={filtersState.category}
-                                onChange={(e) => updateFilter('category', e.target.value)}
+                                onChange={(e) => handleCategoryChange(e.target.value)}
                                 disabled={isLoading}
                             >
                                 <option value="all" className="bg-white dark:bg-gray-900">All Categories</option>
@@ -191,7 +207,7 @@ export default function DocumentTypesFilters({
                             <select
                                 className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={filtersState.required}
-                                onChange={(e) => updateFilter('required', e.target.value)}
+                                onChange={(e) => handleRequiredChange(e.target.value)}
                                 disabled={isLoading}
                             >
                                 <option value="all" className="bg-white dark:bg-gray-900">All Types</option>

@@ -10,7 +10,7 @@ import {
     Timer 
 } from 'lucide-react';
 import { StatCard } from '@/components/adminui/stats-grid';
-import { Stats } from '@/admin-utils/communityReportTypes';
+import { Stats } from '@/types/communityReportTypes';
 
 interface CommunityReportsStatsProps {
     stats: Stats;

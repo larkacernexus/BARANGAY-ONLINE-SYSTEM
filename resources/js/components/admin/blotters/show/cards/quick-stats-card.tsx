@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, FileText, Users } from 'lucide-react';
-import { Blotter } from '@/components/admin/blotters/show/types';
+import { Blotter } from '@/types/admin/blotters/blotter';
 import { getStatusColor, getStatusIcon, getPriorityColor, getPriorityIcon } from '@/components/admin/blotters/show/utils/helpers';
 
 interface QuickStatsCardProps {

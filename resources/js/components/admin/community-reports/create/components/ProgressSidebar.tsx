@@ -5,7 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, Megaphone, Camera, UserPlus, Calendar, Clock } from 'lucide-react';
-import { ReportType } from '@/types/admin/community-report';
+import { ReportType } from '@/types/admin/reports/community-report';
 
 interface ProgressSidebarProps {
     completedRequired: number;

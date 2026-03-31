@@ -1,6 +1,6 @@
 // resources/js/admin-utils/blotter-utils.ts
 
-import { Blotter, BlotterFilters } from '@/components/admin/blotters/blotter';
+import { Blotter, BlotterFilters } from '@/types/admin/blotters/blotter';
 import { BLOTTER_INCIDENT_TYPES } from '@/data/blotterIncidentTypes';
 
 interface FilterBlottersParams {

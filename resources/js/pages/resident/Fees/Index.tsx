@@ -28,74 +28,17 @@ import { useFilters } from '@/components/residentui/hooks/use-filters';
 import { useMobile } from '@/components/residentui/hooks/use-mobile';
 import { useSelection } from '@/components/residentui/hooks/use-selection';
 import { Receipt, User, Calendar } from 'lucide-react';
-
-// Define the Fee interface for type safety
-interface Fee {
-    id: string | number;
-    fee_code?: string;
-    fee_type?: string;
-    category?: string;
-    amount?: number;
-    status?: string;
-    due_date?: string;
-    created_at?: string;
-    resident_name?: string;
-    resident_id?: string | number;
-    description?: string;
-}
-
-// Define the paginated response structure
-interface FeesPaginatedResponse {
-    data: Fee[];
-    current_page: number;
-    last_page: number;
-    total: number;
-    from: number;
-    to: number;
-    links: Array<{
-        url: string | null;
-        label: string;
-        active: boolean;
-    }>;
-}
-
-// Define the stats structure
-interface FeeStats {
-    total_fees?: number;
-    paid_fees?: number;
-    pending_fees?: number;
-    overdue_fees?: number;
-    total_amount?: number;
-    paid_amount?: number;
-    pending_amount?: number;
-    [key: string]: any;
-}
-
-// Define fee type structure
-interface FeeType {
-    id: string | number;
-    name: string;
-    [key: string]: any;
-}
-
-// Define resident structure
-interface Resident {
-    id: string | number;
-    first_name: string;
-    last_name: string;
-    [key: string]: any;
-}
-
-// Define filter structure
-interface Filters {
-    search?: string;
-    status?: string;
-    fee_type?: string;
-    resident?: string;
-    year?: string;
-    page?: string;
-    [key: string]: any;
-}
+import { 
+    Fee, 
+    FeesPaginatedResponse, 
+    FeeStats, 
+    FeeType, 
+    Resident, 
+    FeeFilters,
+    getFeeStatusLabel,
+    getFeeStatusColor,
+    formatFeeAmount
+} from '@/types/portal/fees/my-fees';
 
 // Update PageProps with proper types
 interface PageProps extends Record<string, any> {
@@ -106,7 +49,7 @@ interface PageProps extends Record<string, any> {
     householdResidents?: Resident[];
     currentResident?: Resident;
     hasProfile?: boolean;
-    filters?: Filters;
+    filters?: FeeFilters;
     error?: string;
 }
 
@@ -121,6 +64,7 @@ export default function MyFees() {
         total: 0, 
         from: 0, 
         to: 0, 
+        per_page: 10,
         links: [] 
     };
     const stats = props.stats || {};
@@ -142,33 +86,72 @@ export default function MyFees() {
         route: '/portal/fees'
     });
     
-    // Now TypeScript knows the fee type, fixing the 'unknown' error
-    const { selectedItems, selectMode, toggleSelect, selectAll, clearSelection, toggleSelectMode, setSelectMode } = useSelection<Fee>(
-        fees.data,
-        (fee: Fee) => fee.id
-    );
+    // Custom selection state management since useSelection expects string | number ID
+    const [selectedItems, setSelectedItems] = useState<Fee[]>([]);
+    const [selectMode, setSelectMode] = useState(false);
+    
+    const toggleSelect = (fee: Fee) => {
+        setSelectedItems(prev => {
+            const isSelected = prev.some(item => item.id === fee.id);
+            if (isSelected) {
+                return prev.filter(item => item.id !== fee.id);
+            } else {
+                return [...prev, fee];
+            }
+        });
+    };
+    
+    const selectAll = () => {
+        setSelectedItems([...fees.data]);
+    };
+    
+    const clearSelection = () => {
+        setSelectedItems([]);
+    };
+    
+    const toggleSelectMode = () => {
+        setSelectMode(prev => !prev);
+        if (selectMode) {
+            clearSelection();
+        }
+    };
     
     const [isExporting, setIsExporting] = useState(false);
+    
+    // Convert selected fees to number array for components that need just IDs
+    const selectedFeeIds = selectedItems.map(fee => fee.id);
     
     const handleTabChange = (tab: string) => {
         setStatusFilter(tab);
         updateFilters({ status: tab === 'all' ? '' : tab, page: '1' });
         if (isMobile) setShowMobileFilters(false);
+        // Clear selection when changing tabs
+        clearSelection();
+        setSelectMode(false);
     };
     
     const handleFeeTypeChange = (type: string) => {
         updateFilters({ fee_type: type === 'all' ? '' : type, page: '1' });
         if (isMobile) setShowMobileFilters(false);
+        // Clear selection when changing filters
+        clearSelection();
+        setSelectMode(false);
     };
     
     const handleResidentChange = (resident: string) => {
         updateFilters({ resident: resident === 'all' ? '' : resident, page: '1' });
         if (isMobile) setShowMobileFilters(false);
+        // Clear selection when changing filters
+        clearSelection();
+        setSelectMode(false);
     };
     
     const handleYearChange = (year: string) => {
         updateFilters({ year: year === 'all' ? '' : year, page: '1' });
         if (isMobile) setShowMobileFilters(false);
+        // Clear selection when changing filters
+        clearSelection();
+        setSelectMode(false);
     };
     
     const handlePrintFees = () => {
@@ -182,6 +165,11 @@ export default function MyFees() {
     const handleCopyFeeCode = (code: string) => {
         navigator.clipboard.writeText(code);
         toast.success(`Copied: ${code}`);
+    };
+    
+    // Handle single fee selection for grid view
+    const handleSelectFee = (fee: Fee) => {
+        toggleSelect(fee);
     };
     
     if (!hasProfile) {
@@ -228,7 +216,7 @@ export default function MyFees() {
         );
     }
     
-    const currentFees = fees.data; // Now properly typed as Fee[]
+    const currentFees = fees.data;
     const tabHasData = currentFees.length > 0;
     
     return (
@@ -317,6 +305,7 @@ export default function MyFees() {
                                         onDelete={() => {
                                             toast.success(`Deleted ${selectedItems.length} fees`);
                                             clearSelection();
+                                            setSelectMode(false);
                                         }}
                                         deleteLabel="Delete Selected"
                                     />
@@ -365,8 +354,8 @@ export default function MyFees() {
                                     <ModernFeeGridView
                                         fees={currentFees}
                                         selectMode={selectMode}
-                                        selectedFees={selectedItems}
-                                        onSelectFee={toggleSelect}
+                                        selectedFees={selectedFeeIds}
+                                        onSelectFee={handleSelectFee}
                                         getCategoryDisplay={getCategoryDisplay}
                                         formatDate={(date: string) => formatDate(date, isMobile)}
                                         onPrint={(fee: Fee) => printFeesList([fee], 'single', formatDate, getCategoryDisplay, formatCurrency)}
@@ -376,8 +365,8 @@ export default function MyFees() {
                                     <ModernFeeListView
                                         fees={currentFees}
                                         selectMode={selectMode}
-                                        selectedFees={selectedItems}
-                                        onSelectFee={toggleSelect}
+                                        selectedFees={selectedFeeIds}
+                                        onSelectFee={handleSelectFee}
                                         onSelectAll={selectAll}
                                         onCopyFeeCode={handleCopyFeeCode}
                                         onPrint={handlePrintFees}

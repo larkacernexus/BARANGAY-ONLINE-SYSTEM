@@ -1,6 +1,6 @@
 // pages/admin/fee-types/create.tsx
 
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { 
     ArrowLeft,
     Save,
@@ -40,20 +40,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-interface FeeTypesCreateProps {
-    categories?: Record<string, string>; // Now uses document_category_id (number) as key
-    amountTypes?: Record<string, string>;
-    frequencies?: Record<string, string>;
-    applicableTo?: Record<string, string>;
-    puroks?: string[];
-    errors?: Record<string, string>;
-}
+// Import types from centralized location
+import type { CreateFeeTypeProps, CategoryOption } from '@/types/admin/fee-types/fee.types';
 
 interface FeeFormData {
     code: string;
     name: string;
     short_name: string;
-    document_category_id: string; // Changed from category to document_category_id
+    document_category_id: string;
     base_amount: number;
     amount_type: string;
     unit: string;
@@ -102,9 +96,10 @@ const PHILIPPINE_STANDARD_DISCOUNTS = {
 };
 
 // Generate a fee code based on category name and fee name
-function generateFeeCode(name: string, categoryId: string, categories: Record<string, string>): string {
+function generateFeeCode(name: string, categoryId: string, categories: CategoryOption[]): string {
     // Get category name from ID
-    const categoryName = categories[categoryId] || 'FEE';
+    const category = categories.find(c => c.id.toString() === categoryId);
+    const categoryName = category?.name || 'FEE';
     
     // Use first 3 letters of category name as prefix
     const prefix = categoryName
@@ -126,14 +121,17 @@ function generateFeeCode(name: string, categoryId: string, categories: Record<st
     return `${prefix}-${nameInitials}-${timestamp}`;
 }
 
-export default function FeeTypesCreate({ 
-    categories = {}, 
-    amountTypes = {}, 
-    frequencies = {}, 
-    applicableTo = {}, 
-    puroks = [],
-    errors
-}: FeeTypesCreateProps) {
+export default function FeeTypesCreate() {
+    const { props } = usePage<CreateFeeTypeProps>();
+    const { 
+        categories = [], 
+        amountTypes = {}, 
+        frequencies = {}, 
+        applicableTo = {}, 
+        puroks = [],
+        errors
+    } = props;
+    
     const [selectedPuroks, setSelectedPuroks] = useState<string[]>([]);
     const [selectedRequirements, setSelectedRequirements] = useState<string[]>([]);
     const [newRequirement, setNewRequirement] = useState('');
@@ -142,13 +140,13 @@ export default function FeeTypesCreate({
     const [showDiscountInfo, setShowDiscountInfo] = useState<boolean>(false);
     
     // Get first category ID for default value
-    const firstCategoryId = Object.keys(categories)[0] || '';
+    const firstCategoryId = categories.length > 0 ? categories[0].id.toString() : '';
     
     const { data, setData, post, processing } = useForm<FeeFormData>({
         code: '',
         name: '',
         short_name: '',
-        document_category_id: firstCategoryId, // Changed from category to document_category_id
+        document_category_id: firstCategoryId,
         base_amount: 0,
         amount_type: 'fixed',
         unit: '',
@@ -288,10 +286,11 @@ export default function FeeTypesCreate({
         }
     };
 
-    const safeCategories = categories || {};
-    const safeAmountTypes = amountTypes || {};
-    const safeFrequencies = frequencies || {};
-    const safeApplicableTo = applicableTo || {};
+    // Helper to get category label
+    const getCategoryLabel = (categoryId: string): string => {
+        const category = categories.find(c => c.id.toString() === categoryId);
+        return category?.name || categoryId;
+    };
 
     return (
         <AppLayout
@@ -474,9 +473,9 @@ export default function FeeTypesCreate({
                                                 onChange={(e) => setData('document_category_id', e.target.value)}
                                             >
                                                 <option value="">Select a category</option>
-                                                {Object.entries(safeCategories).map(([id, label]) => (
-                                                    <option key={id} value={id}>
-                                                        {label}
+                                                {categories.map((category: CategoryOption) => (
+                                                    <option key={category.id} value={category.id}>
+                                                        {category.name}
                                                     </option>
                                                 ))}
                                             </select>
@@ -542,9 +541,9 @@ export default function FeeTypesCreate({
                                                 value={data.amount_type}
                                                 onChange={(e) => setData('amount_type', e.target.value)}
                                             >
-                                                {Object.entries(safeAmountTypes).map(([value, label]) => (
+                                                {Object.entries(amountTypes).map(([value, label]) => (
                                                     <option key={value} value={value}>
-                                                        {label}
+                                                        {label as string}
                                                     </option>
                                                 ))}
                                             </select>
@@ -587,9 +586,9 @@ export default function FeeTypesCreate({
                                                 value={data.frequency}
                                                 onChange={(e) => setData('frequency', e.target.value)}
                                             >
-                                                {Object.entries(safeFrequencies).map(([value, label]) => (
+                                                {Object.entries(frequencies).map(([value, label]) => (
                                                     <option key={value} value={value}>
-                                                        {label}
+                                                        {label as string}
                                                     </option>
                                                 ))}
                                             </select>
@@ -662,9 +661,9 @@ export default function FeeTypesCreate({
                                                 }
                                             }}
                                         >
-                                            {Object.entries(safeApplicableTo).map(([value, label]) => (
+                                            {Object.entries(applicableTo).map(([value, label]) => (
                                                 <option key={value} value={value}>
-                                                    {label}
+                                                    {label as string}
                                                 </option>
                                             ))}
                                         </select>
@@ -673,8 +672,8 @@ export default function FeeTypesCreate({
                                         <div className="space-y-2">
                                             <Label className="dark:text-gray-300">Select Puroks</Label>
                                             <div className="space-y-2 max-h-60 overflow-y-auto p-3 border rounded-md dark:border-gray-700">
-                                                {puroks.map((purok, index) => (
-                                                    <div key={index} className="flex items-center space-x-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-900 rounded">
+                                                {(puroks as string[]).map((purok: string, index: number) => (
+                                                    <div key={index} className="flex items-center space-x-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded">
                                                         <Checkbox
                                                             id={`purok-${index}`}
                                                             checked={selectedPuroks.includes(purok)}
@@ -740,8 +739,8 @@ export default function FeeTypesCreate({
                                     <div className="space-y-2">
                                         <Label className="dark:text-gray-300">Selected Requirements</Label>
                                         <div className="space-y-2 max-h-40 overflow-y-auto">
-                                            {selectedRequirements.map((req, index) => (
-                                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+                                            {selectedRequirements.map((req: string, index: number) => (
+                                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
                                                     <span className="text-sm dark:text-gray-300">{req}</span>
                                                     <Button
                                                         type="button"
@@ -777,7 +776,7 @@ export default function FeeTypesCreate({
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-3">
-                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                                             <Checkbox
                                                 id="is_active"
                                                 checked={data.is_active}
@@ -786,7 +785,7 @@ export default function FeeTypesCreate({
                                             />
                                             <Label htmlFor="is_active" className="cursor-pointer dark:text-gray-300">Active</Label>
                                         </div>
-                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                                             <Checkbox
                                                 id="is_mandatory"
                                                 checked={data.is_mandatory}
@@ -795,7 +794,7 @@ export default function FeeTypesCreate({
                                             />
                                             <Label htmlFor="is_mandatory" className="cursor-pointer dark:text-gray-300">Mandatory</Label>
                                         </div>
-                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                                             <Checkbox
                                                 id="auto_generate"
                                                 checked={data.auto_generate}
@@ -1075,7 +1074,7 @@ export default function FeeTypesCreate({
                                 <div className="space-y-4">
                                     <h3 className="font-medium text-lg dark:text-gray-200">Surcharge</h3>
                                     <div className="space-y-3">
-                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                                             <Checkbox
                                                 id="has_surcharge"
                                                 checked={data.has_surcharge}
@@ -1132,7 +1131,7 @@ export default function FeeTypesCreate({
                                 <div className="space-y-4">
                                     <h3 className="font-medium text-lg dark:text-gray-200">Additional Penalty</h3>
                                     <div className="space-y-3">
-                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                                             <Checkbox
                                                 id="has_penalty"
                                                 checked={data.has_penalty}

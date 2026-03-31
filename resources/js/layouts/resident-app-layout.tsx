@@ -1,6 +1,6 @@
 // @/layouts/app/resident-layout.tsx
 import AppLayoutTemplate from '@/layouts/app/resident-app-sidebar-layout';
-import { type BreadcrumbItem } from '@/types';
+import { type BreadcrumbItem } from '@/types/types';
 import { type ReactNode } from 'react';
 import ResidentMobileFooter from '@/layouts/resident-mobile-sticky-footer';
 

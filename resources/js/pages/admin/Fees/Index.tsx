@@ -1,3 +1,5 @@
+// pages/admin/fees/index.tsx
+
 import { useState, useEffect } from 'react';
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, Link, router } from '@inertiajs/react';
@@ -13,10 +15,10 @@ import FeesStats from '@/components/admin/fees/FeesStats';
 import FeesFilters from '@/components/admin/fees/FeesFilters';
 import FeesContent from '@/components/admin/fees/FeesContent';
 import FeesDialogs from '@/components/admin/fees/FeesDialogs';
-import FlashMessage from '@/components/adminui/FlashMessages';
+import FlashMessages from '@/components/adminui/FlashMessages';
 
 // Types
-import { PaginationData, Filters, Stats } from '@/types/fees.types';
+import { PaginationData, Filters, Stats, BulkOperation } from '@/types/admin/fees/fees';
 import { route } from 'ziggy-js';
 
 interface FeesIndexProps {
@@ -95,8 +97,21 @@ export default function FeesIndex({
         flash: hookFlash,
     } = useFeesManagement(fees, filters, statuses, categories, puroks, stats);
 
+    // Create wrapper function for bulk operations
+    const handleBulkOperationWrapper = (operation: string) => {
+        handleBulkOperation(operation as BulkOperation);
+    };
+
+    // Ensure hasActiveFilters is a boolean
+    const hasActiveFiltersBool = Boolean(hasActiveFilters);
+
     // Combine flash messages from props and hook
-    const combinedFlash = flash || hookFlash;
+    const combinedFlash = {
+        success: flash?.success || hookFlash?.success,
+        error: flash?.error || hookFlash?.error,
+        warning: flash?.warning || hookFlash?.warning,
+        info: flash?.info || hookFlash?.info
+    };
 
     // Handle mobile view mode override
     useEffect(() => {
@@ -165,20 +180,15 @@ export default function FeesIndex({
         setIsBulkMode(false);
     };
 
-    // ADD THIS MISSING HANDLER
+    // Handle reminders sent
     const handleRemindersSent = () => {
         // Refresh data after sending reminders
         router.reload({ only: ['fees', 'stats'] });
     };
-
-    // Check if there are fees to send reminders for
-    const hasFeesForReminders = () => {
-        if (isBulkMode && selectedFees.length > 0) {
-            return true;
-        }
-        return paginatedFees.some((fee: any) => fee.status !== 'paid');
-    };
     // ===== END HANDLERS =====
+
+    // Check if any flash messages exist
+    const hasFlashMessages = Object.values(combinedFlash).some(message => message !== undefined);
 
     return (
         <AppLayout
@@ -191,39 +201,11 @@ export default function FeesIndex({
             <TooltipProvider>
                 <div className="space-y-6">
                     {/* Flash Messages */}
-                    {combinedFlash?.success && (
-                        <FlashMessage
-                            type="success"
-                            message={combinedFlash.success}
-                            onDismiss={() => {}}
-                        />
+                    {hasFlashMessages && (
+                        <FlashMessages flash={combinedFlash} />
                     )}
                     
-                    {combinedFlash?.error && (
-                        <FlashMessage
-                            type="error"
-                            message={combinedFlash.error}
-                            onDismiss={() => {}}
-                        />
-                    )}
-                    
-                    {combinedFlash?.warning && (
-                        <FlashMessage
-                            type="warning"
-                            message={combinedFlash.warning}
-                            onDismiss={() => {}}
-                        />
-                    )}
-                    
-                    {combinedFlash?.info && (
-                        <FlashMessage
-                            type="info"
-                            message={combinedFlash.info}
-                            onDismiss={() => {}}
-                        />
-                    )}
-                    
-                    {/* Header with all required props */}
+                    {/* Header */}
                     <FeesHeader 
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
@@ -245,7 +227,7 @@ export default function FeesIndex({
                         showAdvancedFilters={showAdvancedFilters}
                         setShowAdvancedFilters={setShowAdvancedFilters}
                         handleClearFilters={handleClearFilters}
-                        hasActiveFilters={hasActiveFilters}
+                        hasActiveFilters={hasActiveFiltersBool}
                         statuses={statuses}
                         categories={categories}
                         puroks={puroks}
@@ -257,6 +239,7 @@ export default function FeesIndex({
                         onSelectAllOnPage={handleSelectAllOnPage}
                         onSelectAllFiltered={handleSelectAllFiltered}
                         onSelectAll={handleSelectAll}
+                        onClearSelection={handleClearSelection}
                     />
                     
                     {/* Main Content */}
@@ -269,7 +252,7 @@ export default function FeesIndex({
                         viewMode={viewMode}
                         setViewMode={setViewMode}
                         isMobile={isMobile}
-                        hasActiveFilters={hasActiveFilters}
+                        hasActiveFilters={hasActiveFiltersBool}
                         currentPage={currentPage}
                         totalPages={totalPages}
                         totalItems={totalItems}
@@ -287,7 +270,7 @@ export default function FeesIndex({
                         onCopyToClipboard={handleCopyToClipboard}
                         onCopySelectedData={handleCopySelectedData}
                         onSort={handleSort}
-                        onBulkOperation={handleBulkOperation}
+                        onBulkOperation={handleBulkOperationWrapper} // Use wrapper
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                         filtersState={filtersState}
                         isPerformingBulkAction={isPerformingBulkAction}
@@ -306,7 +289,7 @@ export default function FeesIndex({
                 setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                 isPerformingBulkAction={isPerformingBulkAction}
                 selectedFees={selectedFees}
-                handleBulkOperation={handleBulkOperation}
+                handleBulkOperation={handleBulkOperationWrapper} // Use wrapper
                 selectionStats={selectionStats}
             />
         </AppLayout>

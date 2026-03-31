@@ -33,7 +33,7 @@ import { FullScreenFormViewer } from '@/components/admin/forms/show/components/f
 import { DeleteFormDialog } from '@/components/admin/forms/show/components/delete-form-dialog';
 
 // Import types
-import { Form, PageProps } from '@/components/admin/forms/show/types';
+import { Form, PageProps } from '@/types/admin/forms/forms.types';
 import { FormDetailsCard } from '@/components/admin/forms/show/components/form-details-card';
 import { FormPreviewCard } from '@/components/admin/forms/show/components/form-preview-card';
 import { StatisticsCard } from '@/components/admin/forms/show/components/statistics-card';

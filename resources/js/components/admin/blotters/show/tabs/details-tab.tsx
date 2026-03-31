@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, MapPin, User, Phone, FileText } from 'lucide-react';
-import { Blotter } from '@/components/admin/blotters/show/types';
+import { Blotter } from '@/types/admin/blotters/blotter';
 
 interface DetailsTabProps {
     blotter: Blotter;

@@ -1,12 +1,12 @@
+// components/admin/fees/FeesContent.tsx
+
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { 
-    FileText, 
-} from 'lucide-react';
+import { FileText } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
 import { Pagination } from '@/components/adminui/pagination';
@@ -16,7 +16,7 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import FeesTableView from './FeesTableView';
 import FeesGridView from './FeesGridView';
 import FeesBulkActions from './FeesBulkActions';
-import { Fee, Filters, SelectionStats } from '@/types/fees.types';
+import { Fee, Filters, SelectionStats, BulkOperation } from '@/types/admin/fees/fees';
 
 interface FeesContentProps {
     fees: Fee[];
@@ -45,7 +45,7 @@ interface FeesContentProps {
     onCopyToClipboard?: (text: string, label: string) => void;
     onCopySelectedData?: () => void;
     onSort: (column: string) => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void; // Changed to BulkOperation
     setShowBulkDeleteDialog?: (show: boolean) => void;
     filtersState: Filters;
     isPerformingBulkAction: boolean;
@@ -58,6 +58,10 @@ interface FeesContentProps {
     bulkActionRef?: React.RefObject<HTMLDivElement>;
     showBulkActions?: boolean;
     setShowBulkActions?: (show: boolean) => void;
+    // Additional props that might be needed
+    onRemindersSent?: () => void;
+    onExport?: () => void;
+    onPrint?: () => void;
 }
 
 export default function FeesContent({
@@ -98,7 +102,10 @@ export default function FeesContent({
     puroks = [],
     bulkActionRef,
     showBulkActions = false,
-    setShowBulkActions = () => {}
+    setShowBulkActions = () => {},
+    onRemindersSent,
+    onExport,
+    onPrint
 }: FeesContentProps) {
     
     const handleBulkModeToggle = () => {
@@ -109,23 +116,61 @@ export default function FeesContent({
     };
 
     // Helper functions
-    const formatCurrency = (amount: number) => {
+    const formatCurrency = (amount: number | string | undefined) => {
+        const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount || 0;
+        if (isNaN(numAmount)) return '₱0.00';
         return new Intl.NumberFormat('en-PH', {
             style: 'currency',
             currency: 'PHP',
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
-        }).format(amount);
+        }).format(numAmount);
     };
 
     const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-            case 'inactive': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
-            case 'archived': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300';
-            default: return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-        }
+        const colors: Record<string, string> = {
+            active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+            inactive: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
+            archived: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+            pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+            overdue: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+            issued: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+            partial: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+            cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
+        };
+        return colors[status] || 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
     };
+
+    const getStatusIcon = (status: string) => {
+        // This can be implemented based on your icon library
+        return null;
+    };
+
+    const getCategoryColor = (category: string) => {
+        const colors: Record<string, string> = {
+            tax: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+            clearance: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+            permit: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+            fee: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            donation: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+        };
+        return colors[category] || colors.fee;
+    };
+
+    const getCategoryLabel = (category: string) => {
+        const labels: Record<string, string> = {
+            tax: 'Tax',
+            clearance: 'Clearance',
+            permit: 'Permit',
+            fee: 'Fee',
+            donation: 'Donation'
+        };
+        return labels[category] || category;
+    };
+
+    // Check if we have any fees to display
+    const hasFees = fees && fees.length > 0;
 
     return (
         <>
@@ -149,11 +194,14 @@ export default function FeesContent({
                     showBulkActions={showBulkActions}
                     setShowBulkActions={setShowBulkActions}
                     setIsBulkMode={setIsBulkMode}
+                    onRemindersSent={onRemindersSent}
+                    onExport={onExport}
+                    onPrint={onPrint}
                 />
             )}
 
             {/* Floating Select All for Grid View */}
-            {viewMode === 'grid' && fees.length > 0 && selectedFees.length < fees.length && isBulkMode && (
+            {viewMode === 'grid' && hasFees && selectedFees.length < fees.length && isBulkMode && (
                 <SelectAllFloat
                     isSelectAll={isSelectAll}
                     onSelectAll={onSelectAllOnPage}
@@ -188,7 +236,7 @@ export default function FeesContent({
                     </div>
                     <div className="flex items-center gap-3">
                         {/* Grid view select all checkbox */}
-                        {viewMode === 'grid' && isBulkMode && fees.length > 0 && (
+                        {viewMode === 'grid' && isBulkMode && hasFees && (
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="select-all-grid"
@@ -234,18 +282,18 @@ export default function FeesContent({
                     </div>
                 </CardHeader>
                 <CardContent className="p-0 dark:bg-gray-900">
-                    {/* Empty State with dark mode */}
-                    {fees.length === 0 ? (
+                    {/* Empty State with dark mode - FIXED */}
+                    {!hasFees ? (
                         <EmptyState
                             icon={<FileText className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
                             title="No fees found"
                             description={hasActiveFilters 
                                 ? "No fees match your current filters. Try adjusting your search or filters."
                                 : "No fees have been created yet."}
-                            action={hasActiveFilters ? {
-                                label: "Clear Filters",
-                                onClick: onClearFilters
-                            } : undefined}
+                            hasFilters={hasActiveFilters}
+                            onClearFilters={hasActiveFilters ? onClearFilters : undefined}
+                            onCreateNew={!hasActiveFilters ? () => window.location.href = '/admin/fees/create' : undefined}
+                            createLabel="Create Fee"
                             className="py-12 sm:py-16 dark:bg-gray-900"
                         />
                     ) : (
@@ -269,6 +317,11 @@ export default function FeesContent({
                                     isSelectAll={isSelectAll}
                                     statuses={statuses}
                                     categories={categories}
+                                    formatCurrency={formatCurrency}
+                                    getStatusColor={getStatusColor}
+                                    getStatusIcon={getStatusIcon}
+                                    getCategoryColor={getCategoryColor}
+                                    getCategoryLabel={getCategoryLabel}
                                 />
                             ) : (
                                 // Grid View
@@ -285,6 +338,9 @@ export default function FeesContent({
                                     onCopyToClipboard={onCopyToClipboard}
                                     formatCurrency={formatCurrency}
                                     getStatusColor={getStatusColor}
+                                    getStatusIcon={getStatusIcon}
+                                    getCategoryColor={getCategoryColor}
+                                    getCategoryLabel={getCategoryLabel}
                                     statuses={statuses}
                                     categories={categories}
                                 />

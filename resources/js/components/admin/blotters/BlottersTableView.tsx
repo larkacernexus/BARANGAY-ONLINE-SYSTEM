@@ -39,7 +39,7 @@ import {
     Archive,
     FileText
 } from 'lucide-react';
-import { Blotter, BlotterFilters } from '@/components/admin/blotters/blotter';
+import { Blotter, BlotterFilters } from '@/types/admin/blotters/blotter';
 import { blotterUtils } from '@/admin-utils/blotter-utils';
 import { JSX } from 'react';
 

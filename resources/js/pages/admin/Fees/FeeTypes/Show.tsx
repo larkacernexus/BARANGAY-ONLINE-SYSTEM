@@ -34,7 +34,7 @@ import { DangerZone } from '@/components/admin/fee-types/show/components//danger
 import { DeleteConfirmationDialog } from '@/components/admin/fee-types/show/components/delete-confirmation-dialog';
 
 // Import types and utilities
-import { PageProps } from '@/components/admin/fee-types/show/types';
+import { PageProps } from '@/types/admin/fee-types/fee.types';
 import { 
     formatDate, 
     formatDateTime, 
@@ -173,7 +173,6 @@ export default function FeeTypeShow({ feeType, recentFees = [], statistics = {} 
                     {/* Header with Actions */}
                     <FeeTypeHeader
                         feeType={feeType}
-                        copied={copied}
                         isNew={newFeeType}
                         onCopyLink={handleCopyLink}
                         onToggleStatus={toggleStatus}

@@ -26,7 +26,7 @@ import {
     Copy,
     Timer
 } from 'lucide-react';
-import { BulkOperation, SelectionMode, SelectionStats } from '@/types/document-types';
+import { BulkOperation, SelectionMode, SelectionStats } from '@/types/admin/document-types/document-types';
 
 interface DocumentTypesBulkActionsProps {
     selectedDocumentTypes: number[];

@@ -1,20 +1,24 @@
 // components/admin/committees/CommitteesFilters.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ChevronUp, ChevronDown, Search, Filter, Download, X, FilterX, ArrowUpDown } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ChevronUp, ChevronDown, Search, Filter, Download, X, FilterX, ArrowUpDown, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+
+// Import types from the correct path
+import type { BulkOperation } from '@/types/admin/committees/committees';
 
 interface CommitteesFiltersProps {
     search: string;
     status: string;
     sortBy: string;
-    sortOrder: string;
+    sortOrder: 'asc' | 'desc';
     showAdvancedFilters: boolean;
     isMobile: boolean;
     hasActiveFilters: boolean;
@@ -25,6 +29,8 @@ interface CommitteesFiltersProps {
     onReset: () => void;
     onToggleAdvancedFilters: () => void;
     isLoading?: boolean;
+    onBulkOperation?: (operation: BulkOperation) => void;
+    selectedCount?: number;
 }
 
 export function CommitteesFilters({
@@ -41,10 +47,12 @@ export function CommitteesFilters({
     onExport,
     onReset,
     onToggleAdvancedFilters,
-    isLoading = false
+    isLoading = false,
+    onBulkOperation,
+    selectedCount = 0
 }: CommitteesFiltersProps) {
     const searchInputRef = useRef<HTMLInputElement>(null);
-    const [localSearch, setLocalSearch] = useState(search);
+    const [localSearch, setLocalSearch] = useState<string>(search);
 
     // Debounced search
     useEffect(() => {
@@ -57,28 +65,78 @@ export function CommitteesFilters({
         return () => clearTimeout(timer);
     }, [localSearch, search, onSearchChange]);
 
-    const getSortIcon = (column: string) => {
-        if (sortBy !== column) return <ArrowUpDown className="h-3 w-3 ml-1" />;
-        return sortOrder === 'asc' ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />;
-    };
+    // Sync local search with prop when search changes externally
+    useEffect(() => {
+        if (search !== localSearch) {
+            setLocalSearch(search);
+        }
+    }, [search]);
 
-    const handleClearSearch = () => {
+    const getSortIcon = useCallback((column: string): React.ReactNode => {
+        if (sortBy !== column) return <ArrowUpDown className="h-3 w-3 ml-1" />;
+        return sortOrder === 'asc' 
+            ? <ChevronUp className="h-3 w-3 ml-1" /> 
+            : <ChevronDown className="h-3 w-3 ml-1" />;
+    }, [sortBy, sortOrder]);
+
+    const handleClearSearch = useCallback((): void => {
         setLocalSearch('');
         onSearchChange('');
-    };
+        searchInputRef.current?.focus();
+    }, [onSearchChange]);
 
     // Keyboard shortcut for search focus
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
+        const handleKeyDown = (e: KeyboardEvent): void => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
                 searchInputRef.current?.focus();
+            }
+            // Escape key to clear search
+            if (e.key === 'Escape' && localSearch) {
+                e.preventDefault();
+                handleClearSearch();
             }
         };
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [localSearch, handleClearSearch]);
+
+    // Get status label for display
+    const getStatusLabel = useCallback((statusValue: string): string => {
+        switch (statusValue) {
+            case 'active': return 'Active Only';
+            case 'inactive': return 'Inactive Only';
+            default: return 'All Statuses';
+        }
     }, []);
+
+    // Get sort by label for display
+    const getSortByLabel = useCallback((sortByValue: string): string => {
+        const labels: Record<string, string> = {
+            'name': 'Name',
+            'order': 'Order',
+            'positions_count': 'Positions',
+            'created_at': 'Created Date',
+            'updated_at': 'Updated Date'
+        };
+        return labels[sortByValue] || 'Order';
+    }, []);
+
+    // Handle sort with proper type
+    const handleSortClick = useCallback((column: string) => {
+        if (!isLoading) {
+            onSortChange(column);
+        }
+    }, [isLoading, onSortChange]);
+
+    // Handle status change with proper type
+    const handleStatusChange = useCallback((value: string) => {
+        if (!isLoading) {
+            onStatusChange(value);
+        }
+    }, [isLoading, onStatusChange]);
 
     return (
         <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
@@ -90,7 +148,7 @@ export function CommitteesFilters({
                             <Input
                                 ref={searchInputRef}
                                 placeholder="Search committees by name, code, or description... (Ctrl+F)"
-                                className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                                className="pl-10 pr-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
                                 value={localSearch}
                                 onChange={(e) => setLocalSearch(e.target.value)}
                                 disabled={isLoading}
@@ -110,16 +168,22 @@ export function CommitteesFilters({
                         <div className="flex gap-2">
                             <Select
                                 value={status}
-                                onValueChange={onStatusChange}
+                                onValueChange={handleStatusChange}
                                 disabled={isLoading}
                             >
-                                <SelectTrigger className="w-28 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
+                                <SelectTrigger className="w-32 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
                                     <SelectValue placeholder="All statuses" />
                                 </SelectTrigger>
                                 <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-                                    <SelectItem value="all" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">All Statuses</SelectItem>
-                                    <SelectItem value="active" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Active Only</SelectItem>
-                                    <SelectItem value="inactive" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Inactive Only</SelectItem>
+                                    <SelectItem value="all" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">
+                                        All Statuses
+                                    </SelectItem>
+                                    <SelectItem value="active" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">
+                                        Active Only
+                                    </SelectItem>
+                                    <SelectItem value="inactive" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">
+                                        Inactive Only
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                             
@@ -143,7 +207,11 @@ export function CommitteesFilters({
                                 onClick={onExport}
                                 disabled={isLoading}
                             >
-                                <Download className="h-4 w-4 mr-2" />
+                                {isLoading ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Download className="h-4 w-4 mr-2" />
+                                )}
                                 <span className="hidden sm:inline">Export</span>
                             </Button>
                         </div>
@@ -165,7 +233,7 @@ export function CommitteesFilters({
                                                 ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                             }`}
-                                            onClick={() => onSortChange('name')}
+                                            onClick={() => handleSortClick('name')}
                                             disabled={isLoading}
                                         >
                                             Name
@@ -179,7 +247,7 @@ export function CommitteesFilters({
                                                 ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                             }`}
-                                            onClick={() => onSortChange('order')}
+                                            onClick={() => handleSortClick('order')}
                                             disabled={isLoading}
                                         >
                                             Order
@@ -193,7 +261,7 @@ export function CommitteesFilters({
                                                 ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                             }`}
-                                            onClick={() => onSortChange('positions_count')}
+                                            onClick={() => handleSortClick('positions_count')}
                                             disabled={isLoading}
                                         >
                                             Positions
@@ -214,7 +282,7 @@ export function CommitteesFilters({
                                                 ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-400 dark:border-green-800' 
                                                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                             }`}
-                                            onClick={() => onStatusChange('active')}
+                                            onClick={() => handleStatusChange('active')}
                                             disabled={isLoading}
                                         >
                                             Active
@@ -227,31 +295,33 @@ export function CommitteesFilters({
                                                 ? 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-700' 
                                                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                             }`}
-                                            onClick={() => onStatusChange('inactive')}
+                                            onClick={() => handleStatusChange('inactive')}
                                             disabled={isLoading}
                                         >
                                             Inactive
                                         </Button>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                                    onClick={() => toast.info('Filter by positions functionality')}
-                                                    disabled={isLoading}
-                                                >
-                                                    With Positions
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
-                                                Coming soon: Filter committees with positions
-                                            </TooltipContent>
-                                        </Tooltip>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                        onClick={() => toast.info('Filter by positions functionality coming soon')}
+                                                        disabled={isLoading}
+                                                    >
+                                                        With Positions
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
+                                                    Coming soon: Filter committees with positions
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
                                     </div>
                                 </div>
 
-                                {/* Order Selection */}
+                                {/* Sort Order Selection */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort Order</Label>
                                     <div className="flex gap-2">
@@ -263,10 +333,11 @@ export function CommitteesFilters({
                                                 ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                             }`}
-                                            onClick={() => onSortChange(sortBy)}
+                                            onClick={() => handleSortClick(sortBy)}
                                             disabled={isLoading}
                                         >
                                             Ascending
+                                            <ChevronUp className="h-3 w-3 ml-1" />
                                         </Button>
                                         <Button
                                             variant="outline"
@@ -276,10 +347,11 @@ export function CommitteesFilters({
                                                 ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                             }`}
-                                            onClick={() => onSortChange(sortBy)}
+                                            onClick={() => handleSortClick(sortBy)}
                                             disabled={isLoading}
                                         >
                                             Descending
+                                            <ChevronDown className="h-3 w-3 ml-1" />
                                         </Button>
                                     </div>
                                 </div>
@@ -300,36 +372,47 @@ export function CommitteesFilters({
                                     )}
                                     {status !== 'all' && (
                                         <Badge variant="secondary" className="text-xs bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
-                                            Status: {status}
+                                            Status: {getStatusLabel(status)}
                                         </Badge>
                                     )}
                                     {sortBy !== 'order' && (
                                         <Badge variant="secondary" className="text-xs bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700">
-                                            Sorted by: {sortBy}
+                                            Sorted by: {getSortByLabel(sortBy)} ({sortOrder === 'asc' ? 'Ascending' : 'Descending'})
+                                        </Badge>
+                                    )}
+                                    {selectedCount > 0 && (
+                                        <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800">
+                                            {selectedCount} selected
                                         </Badge>
                                     )}
                                 </div>
                             )}
+                            {!hasActiveFilters && selectedCount === 0 && (
+                                <span>No active filters</span>
+                            )}
                         </div>
                         
-                        {hasActiveFilters && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={onReset}
-                                disabled={isLoading}
-                                className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 h-8"
-                            >
-                                <FilterX className="h-3.5 w-3.5 mr-1" />
-                                Clear All Filters
-                            </Button>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {hasActiveFilters && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onReset}
+                                    disabled={isLoading}
+                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 h-8"
+                                >
+                                    <FilterX className="h-3.5 w-3.5 mr-1" />
+                                    Clear All Filters
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Loading indicator */}
                     {isLoading && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 animate-pulse">
-                            Updating...
+                        <div className="text-xs text-gray-500 dark:text-gray-400 animate-pulse flex items-center gap-2">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Loading...
                         </div>
                     )}
                 </div>

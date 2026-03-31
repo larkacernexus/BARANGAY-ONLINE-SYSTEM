@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { 
     X, Search, User, Users, ArrowRight, Ban, Info, Loader2, AlertTriangle, Check
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -24,12 +24,12 @@ import {
 } from '@/components/ui/alert';
 import { route } from 'ziggy-js';
 
-interface Resident {
-    id: number;
-    first_name: string;
-    last_name: string;
-    middle_name?: string;
-    age?: number;
+// Import types from shared types file
+import { Resident, Household } from '@/types/admin/households/household.types';
+import { getFullName, formatDate, calculateAge } from '@/types/admin/households/household.types';
+
+// Extended Resident type for modal display
+interface ExtendedResident extends Resident {
     full_name: string;
     household_status: 'none' | 'member' | 'head';
     status_label: string;
@@ -47,7 +47,7 @@ interface Resident {
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    availableResidents: Resident[];
+    availableResidents: ExtendedResident[];
     householdId: number;
     currentMemberIds: number[];
     headId: number | null;
@@ -57,7 +57,9 @@ const relationshipTypes = [
     'Spouse', 'Son', 'Daughter', 'Father', 'Mother',
     'Brother', 'Sister', 'Grandparent', 'Grandchild',
     'Other Relative', 'Non-relative'
-];
+] as const;
+
+type RelationshipType = typeof relationshipTypes[number];
 
 export default function AddMemberModal({ 
     open, 
@@ -68,11 +70,10 @@ export default function AddMemberModal({
     headId
 }: Props) {
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<Resident[]>([]);
-    const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+    const [searchResults, setSearchResults] = useState<ExtendedResident[]>([]);
+    const [selectedResident, setSelectedResident] = useState<ExtendedResident | null>(null);
     const [relationship, setRelationship] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [showTransferWarning, setShowTransferWarning] = useState(false);
 
     // Filter search results based on query
     useEffect(() => {
@@ -89,19 +90,17 @@ export default function AddMemberModal({
             setSearchResults(filtered);
         } else {
             const searched = filtered.filter(resident => 
-                resident.full_name.toLowerCase().includes(searchQuery.toLowerCase())
+                (resident.full_name || getFullName(resident.first_name, resident.last_name, resident.middle_name))
+                    .toLowerCase()
+                    .includes(searchQuery.toLowerCase())
             );
             setSearchResults(searched);
         }
     }, [searchQuery, availableResidents, currentMemberIds, headId, open]);
 
-    // Update transfer warning when resident is selected
-    useEffect(() => {
-        if (selectedResident) {
-            setShowTransferWarning(selectedResident.household_status === 'member');
-        } else {
-            setShowTransferWarning(false);
-        }
+    // Check if selected resident will be transferred
+    const showTransferWarning = useMemo(() => {
+        return selectedResident?.household_status === 'member';
     }, [selectedResident]);
 
     // Reset when modal closes
@@ -114,7 +113,7 @@ export default function AddMemberModal({
         }
     }, [open]);
 
-    const handleResidentSelect = (resident: Resident) => {
+    const handleResidentSelect = (resident: ExtendedResident) => {
         setSelectedResident(resident);
         setSearchQuery('');
     };
@@ -128,18 +127,18 @@ export default function AddMemberModal({
 
         setIsSubmitting(true);
 
-  router.post(route('admin.households.members.add', householdId), {
-    resident_id: selectedResident.id,
-    relationship: relationship
-}, {
-    onSuccess: () => {
-        handleCloseModal();
-    },
-    onError: (errors) => {
-        console.error('Error adding member:', errors);
-        setIsSubmitting(false);
-    }
-});
+        router.post(route('admin.households.members.add', householdId), {
+            resident_id: selectedResident.id,
+            relationship: relationship
+        }, {
+            onSuccess: () => {
+                handleCloseModal();
+            },
+            onError: (errors) => {
+                console.error('Error adding member:', errors);
+                setIsSubmitting(false);
+            }
+        });
     };
 
     const clearSelection = () => {
@@ -148,7 +147,7 @@ export default function AddMemberModal({
     };
 
     // Get status badge for resident
-    const getStatusBadge = (resident: Resident) => {
+    const getStatusBadge = (resident: ExtendedResident) => {
         if (resident.household_status === 'head') {
             return {
                 label: 'Head of Another Household',
@@ -173,6 +172,16 @@ export default function AddMemberModal({
             className: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400',
             tooltip: 'Not in any household'
         };
+    };
+
+    const getResidentAge = (resident: ExtendedResident): string => {
+        if (resident.age) return `${resident.age} years old`;
+        if (resident.date_of_birth) return `${calculateAge(resident.date_of_birth)} years old`;
+        return 'Age not specified';
+    };
+
+    const getResidentDisplayName = (resident: ExtendedResident): string => {
+        return resident.full_name || getFullName(resident.first_name, resident.last_name, resident.middle_name);
     };
 
     return (
@@ -265,6 +274,8 @@ export default function AddMemberModal({
                                     <div className="divide-y dark:divide-gray-700">
                                         {searchResults.map((resident) => {
                                             const statusBadge = getStatusBadge(resident);
+                                            const displayName = getResidentDisplayName(resident);
+                                            const age = getResidentAge(resident);
                                             
                                             return (
                                                 <TooltipProvider key={resident.id}>
@@ -288,7 +299,7 @@ export default function AddMemberModal({
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="flex items-center gap-2 flex-wrap">
                                                                     <span className="text-sm font-medium dark:text-gray-200">
-                                                                        {resident.full_name}
+                                                                        {displayName}
                                                                     </span>
                                                                     
                                                                     <Badge 
@@ -301,7 +312,7 @@ export default function AddMemberModal({
                                                                 </div>
                                                                 
                                                                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                                                    {resident.age ? `${resident.age} years old` : 'Age not specified'}
+                                                                    {age}
                                                                 </div>
                                                                 
                                                                 {resident.current_household && (
@@ -334,8 +345,12 @@ export default function AddMemberModal({
                                             <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-medium dark:text-gray-200">{selectedResident.full_name}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{selectedResident.age} years old</p>
+                                            <p className="text-sm font-medium dark:text-gray-200">
+                                                {getResidentDisplayName(selectedResident)}
+                                            </p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                {getResidentAge(selectedResident)}
+                                            </p>
                                         </div>
                                     </div>
                                     <Button 

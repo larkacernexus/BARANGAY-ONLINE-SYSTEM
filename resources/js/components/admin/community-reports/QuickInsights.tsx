@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CommunityReport } from '@/admin-utils/communityReportTypes';
+import { CommunityReport } from '@/types/communityReportTypes';
 import { BarChart3 } from 'lucide-react';
 
 interface QuickInsightsProps {

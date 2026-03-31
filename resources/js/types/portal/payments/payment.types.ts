@@ -1,6 +1,31 @@
-// payment-show/types/payment.types.ts
-export type PaymentStatus = 'completed' | 'paid' | 'pending' | 'overdue' | 'cancelled' | 'refunded' | 'partially_paid';
-export type PaymentMethod = 'cash' | 'gcash' | 'maya' | 'bank' | 'check' | 'online' | 'card';
+// types/payment.ts
+
+export type PaymentStatus = 
+    | 'completed' 
+    | 'paid' 
+    | 'pending' 
+    | 'overdue' 
+    | 'cancelled' 
+    | 'refunded' 
+    | 'partially_paid';
+
+export type PaymentMethod = 
+    | 'cash' 
+    | 'gcash' 
+    | 'maya' 
+    | 'bank' 
+    | 'check' 
+    | 'online' 
+    | 'card';
+
+export type ViewMode = 'grid' | 'list';
+export type TabValue = 'all' | PaymentStatus;
+export type CollectionType = 'clearance' | 'certificate' | 'fee' | 'tax' | 'donation';
+export type CertificateType = 'barangay_clearance' | 'indigency' | 'residency' | 'business' | 'other';
+
+// ============================================================================
+// Core Payment Types
+// ============================================================================
 
 export interface PaymentItem {
     id: number;
@@ -106,6 +131,7 @@ export interface RelatedPayment {
 }
 
 export interface Payment {
+    balance_due: number;
     id: number;
     or_number: string;
     reference_number?: string;
@@ -173,22 +199,84 @@ export interface Payment {
     };
 }
 
-export interface PageProps {
-    payment: Payment;
-    canEdit?: boolean;
-    canDelete?: boolean;
-    canPrint?: boolean;
-    canDownload?: boolean;
-    canVerify?: boolean;
-    canRefund?: boolean;
-    canAddNote?: boolean;
-    canUploadAttachment?: boolean;
-    canPayOnline?: boolean;
-    paymentMethods?: Record<string, string>;
-    error?: string;
+// ============================================================================
+// Pagination & Response Types
+// ============================================================================
+
+export interface PaymentsPaginatedResponse {
+    data: Payment[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+    links: Array<{
+        url: string | null;
+        label: string;
+        active: boolean;
+    }>;
 }
 
-// Optional: Add helper types for payment calculations
+export interface PaymentStats {
+    total_payments: number;
+    pending_payments: number;
+    total_paid: number;
+    balance_due: number;
+    completed_payments: number;
+    overdue_payments: number;
+    cancelled_payments: number;
+    current_year_total: number;
+    current_year_paid: number;
+    current_year_balance: number;
+    refunded_payments?: number;
+    partially_paid_payments?: number;
+}
+
+// ============================================================================
+// Filter & Form Types
+// ============================================================================
+
+export interface PaymentFilters {
+    search?: string;
+    status?: string;
+    payment_method?: string;
+    collection_type?: string;
+    certificate_type?: string;
+    year?: string;
+    month?: string;
+    from_date?: string;
+    to_date?: string;
+    page?: string;
+    per_page?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
+}
+
+export interface PaymentMethodType {
+    type: string;
+    display_name: string;
+    icon?: React.ElementType;
+    color?: string;
+}
+
+export interface CollectionTypeOption {
+    type: CollectionType;
+    display_name: string;
+    description?: string;
+}
+
+export interface CertificateTypeOption {
+    type: CertificateType;
+    display_name: string;
+    description?: string;
+    requirements?: string[];
+}
+
+// ============================================================================
+// Summary & Helper Types
+// ============================================================================
+
 export interface PaymentSummary {
     subtotal: number;
     surcharge: number;
@@ -208,4 +296,254 @@ export interface PaymentStatusConfig {
     bgColor: string;
     gradient: string;
     icon: React.ElementType;
+}
+
+export interface PaymentSummaryCard {
+    title: string;
+    value: string | number;
+    icon: React.ElementType;
+    color: string;
+    bgColor: string;
+    textColor: string;
+    trend?: string;
+    trendUp?: boolean;
+    badge?: string | null;
+}
+
+export interface PaymentExportOptions {
+    format: 'csv' | 'pdf' | 'excel';
+    includeHeaders?: boolean;
+    includeBreakdown?: boolean;
+    dateRange?: {
+        start: string;
+        end: string;
+    };
+    statuses?: PaymentStatus[];
+    paymentMethods?: PaymentMethod[];
+}
+
+// ============================================================================
+// Props Types for Components
+// ============================================================================
+
+export interface PaymentShowPageProps {
+    payment: Payment;
+    canEdit?: boolean;
+    canDelete?: boolean;
+    canPrint?: boolean;
+    canDownload?: boolean;
+    canVerify?: boolean;
+    canRefund?: boolean;
+    canAddNote?: boolean;
+    canUploadAttachment?: boolean;
+    canPayOnline?: boolean;
+    paymentMethods?: Record<string, string>;
+    error?: string;
+}
+
+export interface PaymentListPageProps {
+    payments?: PaymentsPaginatedResponse;
+    stats?: PaymentStats;
+    availableYears?: number[];
+    availablePaymentMethods?: PaymentMethodType[];
+    availableCollectionTypes?: CollectionTypeOption[];
+    availableCertificateTypes?: CertificateTypeOption[];
+    currentResident?: PayerDetails;
+    hasProfile?: boolean;
+    filters?: PaymentFilters;
+    error?: string;
+}
+
+// ============================================================================
+// Component Props Types
+// ============================================================================
+
+export interface PaymentCardProps {
+    payment: Payment;
+    selectMode?: boolean;
+    selectedPayments?: number[];
+    onSelectPayment?: (id: number) => void;
+    formatDate: (date: string) => string;
+    formatCurrency: (amount: number) => string;
+    onViewDetails: (id: number) => void;
+    onMakePayment?: (id: number) => void;
+    onDownloadReceipt?: (payment: Payment) => void;
+    onCopyOrNumber: (orNumber: string) => void;
+    onCopyReference: (ref: string) => void;
+    onGenerateReceipt: (payment: Payment) => void;
+    isMobile?: boolean;
+}
+
+export interface PaymentGridCardProps extends Omit<PaymentCardProps, 'isMobile'> {
+    // Additional grid-specific props
+}
+
+export interface PaymentFiltersProps {
+    search: string;
+    setSearch: (value: string) => void;
+    handleSearchSubmit: (e: React.FormEvent) => void;
+    handleSearchClear: () => void;
+    paymentMethodFilter: string;
+    handlePaymentMethodChange: (value: string) => void;
+    collectionTypeFilter?: string;
+    handleCollectionTypeChange?: (value: string) => void;
+    certificateTypeFilter?: string;
+    handleCertificateTypeChange?: (value: string) => void;
+    yearFilter: string;
+    handleYearChange: (value: string) => void;
+    dateRange?: {
+        from: string;
+        to: string;
+    };
+    handleDateRangeChange?: (range: { from: string; to: string }) => void;
+    loading: boolean;
+    availablePaymentMethods: PaymentMethodType[];
+    availableCollectionTypes?: CollectionTypeOption[];
+    availableCertificateTypes?: CertificateTypeOption[];
+    availableYears: number[];
+    printPayments: () => void;
+    exportToCSV: () => void;
+    isExporting: boolean;
+    hasActiveFilters: boolean;
+    handleClearFilters: () => void;
+    onCopySummary: () => void;
+}
+
+export interface PaymentListViewProps {
+    payments: Payment[];
+    selectMode?: boolean;
+    selectedPayments?: number[];
+    onSelectPayment?: (id: number) => void;
+    onSelectAll?: () => void;
+    formatDate: (date: string) => string;
+    formatCurrency: (amount: number) => string;
+    onViewDetails: (id: number) => void;
+    onMakePayment?: (id: number) => void;
+    onDownloadReceipt?: (payment: Payment) => void;
+    onCopyOrNumber: (orNumber: string) => void;
+    onCopyReference: (ref: string) => void;
+    onGenerateReceipt: (payment: Payment) => void;
+    onPrint?: () => void;
+}
+
+export interface PaymentGridViewProps {
+    payments: Payment[];
+    selectMode?: boolean;
+    selectedPayments?: number[];
+    onSelectPayment?: (id: number) => void;
+    formatDate: (date: string) => string;
+    formatCurrency: (amount: number) => string;
+    onViewDetails: (id: number) => void;
+    onMakePayment?: (id: number) => void;
+    onDownloadReceipt?: (payment: Payment) => void;
+    onCopyOrNumber: (orNumber: string) => void;
+    onCopyReference: (ref: string) => void;
+    onGenerateReceipt: (payment: Payment) => void;
+    isMobile?: boolean;
+}
+
+// ============================================================================
+// Utility Functions Types
+// ============================================================================
+
+export interface PaymentUtils {
+    formatDate: (dateString: string, isMobile?: boolean) => string;
+    formatCurrency: (amount: number) => string;
+    getPaymentMethodDisplay: (method: string) => string;
+    getPaymentStatusColor: (status: string) => string;
+    getPaymentStatusLabel: (status: string) => string;
+    getStatusCount: (stats: PaymentStats, status: string, payments: Payment[]) => number;
+    printPaymentsList: (
+        payments: Payment[],
+        statusFilter: string,
+        formatDate: Function,
+        formatCurrency: Function,
+        toast?: any
+    ) => void;
+    exportToCSV: (
+        payments: Payment[],
+        statusFilter: string,
+        formatDate: Function,
+        setIsExporting: Function,
+        toast: any
+    ) => void;
+    calculatePaymentSummary: (payment: Payment) => PaymentSummary;
+    validatePaymentStatus: (status: string) => status is PaymentStatus;
+    isPaymentOverdue: (dueDate?: string | null) => boolean;
+    getPaymentProgress: (payment: Payment) => number;
+}
+
+// ============================================================================
+// Constants Types
+// ============================================================================
+
+export interface PaymentStatusConfigMap {
+    [key: string]: PaymentStatusConfig;
+}
+
+export interface PaymentMethodConfig {
+    [key: string]: {
+        display: string;
+        icon?: React.ElementType;
+        color?: string;
+        requiresReference?: boolean;
+    };
+}
+
+export interface TabConfig {
+    id: string;
+    label: string;
+    icon: React.ElementType;
+    status?: PaymentStatus;
+    count?: number;
+}
+
+// ============================================================================
+// API Response Types
+// ============================================================================
+
+export interface PaymentCreateResponse {
+    success: boolean;
+    payment: Payment;
+    message: string;
+    redirect_url?: string;
+}
+
+export interface PaymentUpdateResponse {
+    success: boolean;
+    payment: Payment;
+    message: string;
+}
+
+export interface PaymentDeleteResponse {
+    success: boolean;
+    message: string;
+}
+
+export interface PaymentReceiptResponse {
+    success: boolean;
+    receipt_url: string;
+    generated_at: string;
+    expires_at?: string;
+}
+
+export interface PaymentVerifyResponse {
+    success: boolean;
+    payment: Payment;
+    verified_by: {
+        id: number;
+        name: string;
+        role: string;
+        date: string;
+    };
+    message: string;
+}
+
+export interface PaymentRefundResponse {
+    success: boolean;
+    payment: Payment;
+    refund_amount: number;
+    refund_date: string;
+    reference_number?: string;
+    message: string;
 }

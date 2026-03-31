@@ -1,6 +1,10 @@
 // resources/js/Pages/Admin/DocumentTypes/components/document-type-tabs.tsx
+
 import React from 'react';
 import { FileText, ListChecks, Users, Settings } from 'lucide-react';
+
+// Import types from centralized location
+import type { DocumentType, ClearanceType, RecentApplication } from '@/types/admin/document-types/document-types';
 
 // Import tab content components
 import { OverviewTab } from './overview-tab';
@@ -8,11 +12,26 @@ import { RequirementsTab } from './requirements-tab';
 import { ApplicationsTab } from './applications-tab';
 import { SettingsTab } from './settings-tab';
 
+type TabType = 'overview' | 'requirements' | 'applications' | 'settings';
+
 interface Props {
-    activeTab: string;
-    setActiveTab: (tab: string) => void;
+    activeTab: TabType;
+    setActiveTab: (tab: TabType) => void;
     requiredCount: number;
     applicationsCount: number;
+}
+
+interface TabContentProps {
+    activeTab: TabType;
+    documentType: DocumentType;
+    requiredClearanceTypes: ClearanceType[];
+    recentApplications: RecentApplication[];
+    max_file_size_mb: number;
+    formatDate: (date: string) => string;
+    formatDateTime: (date: string) => string;
+    formatShortDate: (date: string) => string;
+    formatTimeAgo: (date: string) => string;
+    formatFileSize: (kb: number) => string;
 }
 
 export const DocumentTypeTabs = ({ 
@@ -95,18 +114,7 @@ DocumentTypeTabs.Content = function TabContent({
     formatShortDate,
     formatTimeAgo,
     formatFileSize
-}: { 
-    activeTab: string; 
-    documentType: any;
-    requiredClearanceTypes: any[];
-    recentApplications: any[];
-    max_file_size_mb: number;
-    formatDate: (date: string) => string;
-    formatDateTime: (date: string) => string;
-    formatShortDate: (date: string) => string;
-    formatTimeAgo: (date: string) => string;
-    formatFileSize: (kb: number) => string;
-}) {
+}: TabContentProps) {
     switch (activeTab) {
         case 'overview':
             return (
@@ -124,6 +132,7 @@ DocumentTypeTabs.Content = function TabContent({
             return (
                 <RequirementsTab
                     requiredClearanceTypes={requiredClearanceTypes}
+                    formatDate={formatDate}
                 />
             );
         case 'applications':

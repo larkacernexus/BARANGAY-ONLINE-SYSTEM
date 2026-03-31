@@ -1,3 +1,5 @@
+// components/admin/forms/FormsContent.tsx
+
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -27,11 +29,11 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import FormsTableView from './FormsTableView';
 import FormsGridView from './FormsGridView';
 import FormsBulkActions from './FormsBulkActions';
-import { Form, Filters } from '@/types';
+import { Form, Filters, BulkOperation } from '@/types/admin/forms/forms.types';
 
 interface FormsContentProps {
     forms: Form[];
-    stats?: any;
+    stats?: any;  // Stats is passed but not used in this component
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
@@ -56,7 +58,7 @@ interface FormsContentProps {
     onDownload: (form: Form) => void;
     onSort: (column: string) => void;
     onCopySelectedData: () => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     filtersState: Filters;
     isPerformingBulkAction: boolean;
@@ -68,7 +70,7 @@ interface FormsContentProps {
 
 export default function FormsContent({
     forms,
-    stats,
+    stats,  // Keep but don't use if not needed
     isBulkMode,
     setIsBulkMode,
     isSelectAll,
@@ -176,6 +178,15 @@ export default function FormsContent({
         }
     };
 
+    // Helper function to format file size
+    const formatFileSize = (bytes: number): string => {
+        if (!bytes || bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
     return (
         <>
             {/* Enhanced Bulk Actions Bar */}
@@ -266,6 +277,7 @@ export default function FormsContent({
                                     </TooltipTrigger>
                                     <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                         <p>Toggle bulk selection mode</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Ctrl+Shift+B • Ctrl+A to select</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </div>
@@ -311,6 +323,7 @@ export default function FormsContent({
                                     onDownload={onDownload}
                                     onSelectAllOnPage={onSelectAllOnPage}
                                     isSelectAll={isSelectAll}
+                                    formatFileSize={formatFileSize}
                                 />
                             ) : (
                                 // Grid View
@@ -325,6 +338,9 @@ export default function FormsContent({
                                     onDownload={onDownload}
                                     hasActiveFilters={hasActiveFilters}
                                     onClearFilters={onClearFilters}
+                                    formatFileSize={formatFileSize}
+                                    categories={categories}
+                                    agencies={agencies}
                                 />
                             )}
 

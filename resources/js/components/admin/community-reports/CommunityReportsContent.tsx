@@ -1,3 +1,5 @@
+// resources/js/components/admin/community-reports/CommunityReportsContent.tsx
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -6,7 +8,6 @@ import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Link } from '@inertiajs/react';
-import { CommunityReport } from '@/admin-utils/communityReportTypes';
 import { 
     FileText, 
     List, 
@@ -20,6 +21,9 @@ import CommunityReportBulkActions from './CommunityReportBulkActions';
 import { useEffect, useState, useRef } from 'react';
 import { SelectAllFloat } from '@/components/adminui/select-all-float';
 import { GridSelectionSummary } from '@/components/adminui/grid-selection-summary';
+
+// Import types from the correct path
+import type { CommunityReport, BulkOperation } from '@/types/admin/reports/community-report';
 
 interface CommunityReportsContentProps {
     reports: CommunityReport[];
@@ -36,7 +40,7 @@ interface CommunityReportsContentProps {
     onSelectAllOnPage: () => void;
     onItemSelect: (id: number) => void;
     onClearFilters: () => void;
-    onDelete: (report: CommunityReport) => void;
+    onDelete: (report: any) => void; // Use any to handle both old and new types
     onCopyToClipboard: (text: string, label: string) => void;
     onSort: (column: string) => void;
     isSelectAll: boolean;
@@ -46,12 +50,12 @@ interface CommunityReportsContentProps {
     safePriorities: Record<string, string>;
     safeUrgencies: Record<string, string>;
     windowWidth: number;
-    hasActiveFilters: boolean;
+    hasActiveFilters: boolean | string; // Allow both boolean and string
     isPerformingBulkAction?: boolean;
-    onMarkResolved?: (report: CommunityReport) => void;
+    onMarkResolved?: (report: any) => void; // Use any to handle both old and new types
     onViewDetails?: (report: CommunityReport) => void;
     onPrintReport?: (report: CommunityReport) => void;
-    onBulkOperation?: (operation: string, customData?: any) => Promise<void>;
+    onBulkOperation?: (operation: string, customData?: any) => Promise<void>; // Expect string
     onCopySelectedData?: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkStatusDialog?: (show: boolean) => void;
@@ -111,6 +115,11 @@ export default function CommunityReportsContent({
     const [showBulkActions, setShowBulkActions] = useState(false);
     const bulkActionRef = useRef<HTMLDivElement>(null);
     
+    // Convert hasActiveFilters to boolean
+    const activeFilters = typeof hasActiveFilters === 'string' 
+        ? hasActiveFilters === 'true' || hasActiveFilters === '1'
+        : Boolean(hasActiveFilters);
+    
     // Use the provided setIsBulkMode or fall back to local state
     const handleSetIsBulkMode = setIsBulkMode || setLocalBulkMode;
     const currentBulkMode = setIsBulkMode ? isBulkMode : localBulkMode;
@@ -118,10 +127,9 @@ export default function CommunityReportsContent({
     // Auto-detect mobile and switch to grid view
     useEffect(() => {
         const checkIsMobile = () => {
-            const mobile = windowWidth < 768; // Tablet and below
+            const mobile = windowWidth < 768;
             setIsMobile(mobile);
             
-            // Auto-switch to grid view on mobile
             if (mobile && viewMode === 'table') {
                 setViewMode('grid');
             }
@@ -134,7 +142,6 @@ export default function CommunityReportsContent({
         const newBulkMode = !currentBulkMode;
         handleSetIsBulkMode(newBulkMode);
         
-        // If turning off bulk mode, clear selection
         if (!newBulkMode) {
             onClearSelection();
         }
@@ -146,9 +153,15 @@ export default function CommunityReportsContent({
         }
     };
 
-    const handlePrintReport = (report: CommunityReport) => {
-        if (onPrintReport) {
-            onPrintReport(report);
+    // Wrapper for delete to handle type conversion
+    const handleDelete = (report: CommunityReport) => {
+        onDelete(report as any);
+    };
+
+    // Wrapper for mark resolved
+    const handleMarkResolved = (report: CommunityReport) => {
+        if (onMarkResolved) {
+            onMarkResolved(report as any);
         }
     };
 
@@ -190,23 +203,23 @@ export default function CommunityReportsContent({
         totalEstimatedAffected: 0
     };
 
-    // Mobile-optimized empty state with dark mode
+    // Mobile-optimized empty state
     const EmptyState = () => (
         <div className="flex flex-col items-center justify-center py-8 text-center px-4 dark:bg-gray-900">
             <FileText className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
             <h3 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-1">No reports found</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                {hasActiveFilters
+                {activeFilters
                     ? 'Try changing your filters.'
                     : 'No community reports yet.'}
             </p>
             <div className="flex flex-wrap gap-2 justify-center">
-                {hasActiveFilters && (
+                {activeFilters && (
                     <Button
                         variant="outline"
                         onClick={onClearFilters}
                         size={isMobile ? "sm" : "default"}
-                        className={`${isMobile ? "h-8 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900`}
+                        className={`${isMobile ? "h-8 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800`}
                     >
                         Clear Filters
                     </Button>
@@ -271,7 +284,7 @@ export default function CommunityReportsContent({
                 />
             )}
 
-            {/* Main Content Card with dark mode */}
+            {/* Main Content Card */}
             <Card className="overflow-hidden border shadow-sm dark:border-gray-800 dark:bg-gray-900">
                 <CardHeader className={`flex flex-row items-center justify-between ${isMobile ? 'pb-2 px-3' : 'pb-3 border-b dark:border-gray-800'}`}>
                     <div className="flex items-center gap-3">
@@ -284,7 +297,7 @@ export default function CommunityReportsContent({
                             )}
                         </CardTitle>
                         
-                        {/* View toggle - hidden on very small screens */}
+                        {/* View toggle */}
                         {!isMobile && (
                             <div className="flex items-center gap-1">
                                 <Tooltip>
@@ -292,13 +305,13 @@ export default function CommunityReportsContent({
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className={`h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-900 ${viewMode === 'table' ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' : ''}`}
+                                            className={`h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-800 ${viewMode === 'table' ? 'bg-gray-100 dark:bg-gray-800 dark:text-gray-200' : ''}`}
                                             onClick={() => setViewMode('table')}
                                         >
                                             <List className="h-4 w-4" />
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
+                                    <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                                         Table view
                                     </TooltipContent>
                                 </Tooltip>
@@ -307,20 +320,20 @@ export default function CommunityReportsContent({
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className={`h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-900 ${viewMode === 'grid' ? 'bg-gray-100 dark:bg-gray-900 dark:text-gray-200' : ''}`}
+                                            className={`h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-800 ${viewMode === 'grid' ? 'bg-gray-100 dark:bg-gray-800 dark:text-gray-200' : ''}`}
                                             onClick={() => setViewMode('grid')}
                                         >
                                             <Grid3X3 className="h-4 w-4" />
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
+                                    <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                                         Grid view
                                     </TooltipContent>
                                 </Tooltip>
                             </div>
                         )}
                         
-                        {/* Mobile indicator with dark mode */}
+                        {/* Mobile indicator */}
                         {isMobile && (
                             <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
                                 <Smartphone className="h-3 w-3 mr-1" />
@@ -329,7 +342,7 @@ export default function CommunityReportsContent({
                         )}
                     </div>
                     
-                    {/* Bulk mode toggle - simplified on mobile */}
+                    {/* Bulk mode toggle */}
                     <div className="flex items-center gap-2">
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && currentBulkMode && reports.length > 0 && (
@@ -338,7 +351,7 @@ export default function CommunityReportsContent({
                                     id="select-all-grid"
                                     checked={areAllOnPageSelected}
                                     onCheckedChange={onSelectAllOnPage}
-                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
+                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600"
                                     disabled={isPerformingBulkAction}
                                 />
                                 <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
@@ -363,7 +376,7 @@ export default function CommunityReportsContent({
                                             </Label>
                                         </div>
                                     </TooltipTrigger>
-                                    <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
+                                    <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                                         <p>Toggle bulk selection mode</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">Ctrl+Shift+B • Ctrl+A to select</p>
                                     </TooltipContent>
@@ -380,7 +393,7 @@ export default function CommunityReportsContent({
                                 className={`h-8 px-2 text-xs dark:border-gray-700 ${
                                     currentBulkMode 
                                         ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
-                                        : 'dark:text-gray-300 dark:hover:bg-gray-900'
+                                        : 'dark:text-gray-300 dark:hover:bg-gray-800'
                                 }`}
                                 disabled={isPerformingBulkAction}
                             >
@@ -388,7 +401,7 @@ export default function CommunityReportsContent({
                             </Button>
                         )}
                         
-                        {/* Page info - simplified on mobile */}
+                        {/* Page info */}
                         {!isMobile && totalPages > 1 && (
                             <div className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
                                 Page {currentPage} of {totalPages}
@@ -407,7 +420,6 @@ export default function CommunityReportsContent({
                     {reports.length === 0 ? (
                         <EmptyState />
                     ) : viewMode === 'table' && !isMobile ? (
-                        // TABLE VIEW (desktop only)
                         <CommunityReportsTableView
                             reports={reports}
                             isBulkMode={currentBulkMode}
@@ -425,25 +437,24 @@ export default function CommunityReportsContent({
                             windowWidth={windowWidth}
                             onSelectAllOnPage={onSelectAllOnPage}
                             onItemSelect={onItemSelect}
-                            onDelete={onDelete}
+                            onDelete={handleDelete}
                             onCopyToClipboard={onCopyToClipboard}
                             onSort={onSort}
                             onPageChange={onPageChange}
                             toggleReportExpansion={toggleReportExpansion}
-                            onMarkResolved={onMarkResolved}
+                            onMarkResolved={handleMarkResolved}
                         />
                     ) : (
-                        // GRID VIEW (mobile & desktop)
                         <>
                             <CommunityReportsGridView
                                 reports={reports}
                                 isBulkMode={currentBulkMode}
                                 selectedReports={selectedReports}
                                 onItemSelect={onItemSelect}
-                                onDelete={onDelete}
+                                onDelete={handleDelete}
                                 onViewDetails={handleViewDetails}
                                 onCopyToClipboard={onCopyToClipboard}
-                                onMarkResolved={onMarkResolved}
+                                onMarkResolved={handleMarkResolved}
                                 safeStatuses={safeStatuses}
                                 safePriorities={safePriorities}
                                 safeUrgencies={safeUrgencies}
@@ -459,11 +470,11 @@ export default function CommunityReportsContent({
                                     isSelectAll={areAllOnPageSelected}
                                     onSelectAll={onSelectAllOnPage}
                                     onClearSelection={onClearSelection}
-                                    className="mt-4 mx-4 dark:text-gray-300"
+                                    className="mt-4 mx-4"
                                 />
                             )}
                             
-                            {/* Simplified pagination for grid view with dark mode */}
+                            {/* Simplified pagination for grid view */}
                             {totalPages > 1 && (
                                 <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-3 items-center justify-between ${isMobile ? 'p-3' : 'mt-4 pt-4 px-4 border-t dark:border-gray-800'}`}>
                                     <div className={`text-gray-500 dark:text-gray-400 ${isMobile ? 'text-xs mb-2' : 'text-sm'}`}>
@@ -475,13 +486,12 @@ export default function CommunityReportsContent({
                                             size={isMobile ? "sm" : "default"}
                                             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                                             disabled={currentPage === 1}
-                                            className={`${isMobile ? "h-8 px-3 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50`}
+                                            className={`${isMobile ? "h-8 px-3 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800`}
                                         >
                                             {isMobile ? "←" : "Previous"}
                                         </Button>
                                         
                                         <div className="flex items-center gap-1">
-                                            {/* Show fewer page numbers on mobile */}
                                             {Array.from({ length: Math.min(isMobile ? 3 : 5, totalPages) }, (_, i) => {
                                                 let pageNum;
                                                 if (totalPages <= (isMobile ? 3 : 5)) {
@@ -502,7 +512,7 @@ export default function CommunityReportsContent({
                                                         className={`${isMobile ? "h-8 w-8 p-0 text-xs" : "h-8 w-8 p-0"} ${
                                                             currentPage === pageNum 
                                                                 ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
-                                                                : 'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900'
+                                                                : 'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
                                                         }`}
                                                     >
                                                         {pageNum}
@@ -516,7 +526,7 @@ export default function CommunityReportsContent({
                                             size={isMobile ? "sm" : "default"}
                                             onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
                                             disabled={currentPage === totalPages}
-                                            className={`${isMobile ? "h-8 px-3 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50`}
+                                            className={`${isMobile ? "h-8 px-3 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800`}
                                         >
                                             {isMobile ? "→" : "Next"}
                                         </Button>

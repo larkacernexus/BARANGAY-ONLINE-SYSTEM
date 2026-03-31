@@ -2,7 +2,7 @@
 import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Download, Maximize2, Printer, ArrowLeft } from 'lucide-react';
-import { Document } from '@/types/portal/records/document.types';
+import { Document } from '@/types/portal/records/records';
 
 interface MobileBottomBarProps {
     document: Document;

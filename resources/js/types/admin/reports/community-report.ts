@@ -29,6 +29,55 @@ export interface Resident {
     last_name?: string;
 }
 
+export interface Filters {
+    search?: string;
+    status?: string;
+    priority?: string;
+    urgency?: string;
+    report_type?: string;
+    category?: string;
+    from_date?: string;
+    to_date?: string;
+    purok?: string;
+    impact_level?: string;
+    assigned_to?: string;
+    source?: string;
+    has_evidences?: boolean;
+    safety_concern?: boolean;
+    environmental_impact?: boolean;
+    recurring_issue?: boolean;
+    is_anonymous?: boolean;
+    affected_people?: string;
+    sort_by?: string;
+    sort_order?: string;
+}
+
+export interface Stats {
+    total: number;
+    pending: number;
+    under_review: number;
+    assigned: number;
+    in_progress: number;
+    resolved: number;
+    rejected: number;
+    high_priority: number;
+    medium_priority: number;
+    low_priority: number;
+    critical_priority: number;
+    high_urgency: number;
+    today: number;
+    this_week: number;
+    this_month: number;
+    anonymous: number;
+    with_evidences: number;
+    safety_concerns: number;
+    environmental_issues: number;
+    recurring_issues: number;
+    average_resolution_time: string;
+    community_impact_count: number;
+    individual_impact_count: number;
+}
+
 export interface FileWithPreview extends File {
     id: string;
     preview?: string;
@@ -79,6 +128,10 @@ export interface CommunityReportFormData {
 }
 
 export interface CommunityReport {
+    category: any;
+    source: string;
+    tags: boolean;
+    user: any;
     id: number;
     report_number: string;
     user_id: number | null;
@@ -457,3 +510,52 @@ export interface ApiResponse<T = any> {
         };
     };
 }
+
+// ==================== HOOK TYPES ====================
+
+export interface UseCommunityReportsManagementProps {
+    reports: {
+        data: CommunityReport[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+        from: number;
+        to: number;
+    };
+    filters: Filters;
+    statuses?: StatusOption[];
+    priorities?: PriorityOption[];
+    urgencies?: UrgencyOption[];
+    report_types?: ReportType[];
+    categories?: string[];
+    puroks?: string[];
+    staff?: Array<{id: number, name: string}>;
+    stats: Stats;
+}
+
+export interface SelectionStats {
+    total: number;
+    by_status: Record<string, number>;
+    by_priority: Record<string, number>;
+    by_urgency: Record<string, number>;
+    by_impact: Record<string, number>;
+    by_assigned: Record<string, number>;
+    has_evidences: number;
+    safety_concerns: number;
+    environmental_issues: number;
+    recurring_issues: number;
+    anonymous: number;
+    with_attachments: number;
+}
+
+export type BulkOperation = 
+    | 'export' 
+    | 'print' 
+    | 'update_status' 
+    | 'update_priority' 
+    | 'assign_to' 
+    | 'delete' 
+    | 'generate_report' 
+    | 'escalate' 
+    | 'archive';

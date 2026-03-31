@@ -23,7 +23,7 @@ import { DesktopStats } from '@/components/portal/records/show/components/deskto
 import { DesktopPreview } from '@/components/portal/records/show/components/desktop/desktop-preview';
 import { DesktopDetails } from '@/components/portal/records/show/components/desktop/desktop-details';
 import { DesktopSidebar } from '@/components/portal/records/show/components/desktop/desktop-sidebar';
-import { RelatedDocument, Document } from '@/types/portal/records/document.types';
+import { RelatedDocument, Document } from '@/types/portal/records/records';
 
 interface PageProps {
     document: Document;

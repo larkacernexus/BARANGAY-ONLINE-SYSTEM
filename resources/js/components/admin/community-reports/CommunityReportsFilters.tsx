@@ -1,9 +1,10 @@
+// resources/js/components/admin/community-reports/CommunityReportsFilters.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Filters, CommunityReport } from '@/admin-utils/communityReportTypes';
 import { 
     Search, 
     X, 
@@ -15,7 +16,7 @@ import {
     Rows,
     RotateCcw 
 } from 'lucide-react';
-import { useState, useRef } from 'react';
+import { RefObject } from 'react';
 
 interface CommunityReportsFiltersProps {
     search: string;
@@ -72,7 +73,7 @@ interface CommunityReportsFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    hasActiveFilters: boolean;
+    hasActiveFilters: boolean | string; // Allow string or boolean
     showSelectionOptions: boolean;
     setShowSelectionOptions: (value: boolean) => void;
     handleClearFilters: () => void;
@@ -80,8 +81,8 @@ interface CommunityReportsFiltersProps {
     handleSelectAllFiltered: () => void;
     handleSelectAll: () => void;
     handleExport: () => void;
-    searchInputRef: React.RefObject<HTMLInputElement>;
-    selectionRef: React.RefObject<HTMLDivElement>;
+    searchInputRef: RefObject<HTMLInputElement | null>;
+    selectionRef: RefObject<HTMLDivElement | null>;
     windowWidth: number;
 }
 
@@ -153,6 +154,11 @@ export default function CommunityReportsFilters({
     windowWidth
 }: CommunityReportsFiltersProps) {
     
+    // Convert hasActiveFilters to boolean
+    const activeFilters = typeof hasActiveFilters === 'string' 
+        ? hasActiveFilters === 'true' || hasActiveFilters === '1'
+        : Boolean(hasActiveFilters);
+    
     return (
         <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             <CardContent className="pt-6">
@@ -212,7 +218,7 @@ export default function CommunityReportsFilters({
                         </div>
                         
                         <div className="flex items-center gap-3">
-                            {hasActiveFilters && (
+                            {activeFilters && (
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -268,7 +274,9 @@ export default function CommunityReportsFilters({
                                                 <Button
                                                     variant="ghost"
                                                     className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50"
-                                                    onClick={() => {}}
+                                                    onClick={() => {
+                                                        setShowSelectionOptions(false);
+                                                    }}
                                                 >
                                                     <RotateCcw className="h-3.5 w-3.5 mr-2" />
                                                     Clear Selection
@@ -340,7 +348,7 @@ export default function CommunityReportsFilters({
                             >
                                 <option value="all">All Types</option>
                                 {safeReportTypes.map((type) => (
-                                    <option key={type.id} value={type.id}>
+                                    <option key={type.id} value={type.id.toString()}>
                                         {type.name}
                                     </option>
                                 ))}
@@ -357,7 +365,7 @@ export default function CommunityReportsFilters({
                                 <option value="all">All Assignees</option>
                                 <option value="unassigned">Unassigned</option>
                                 {safeStaff.map((person) => (
-                                    <option key={person.id} value={person.id}>
+                                    <option key={person.id} value={person.id.toString()}>
                                         {person.name}
                                     </option>
                                 ))}
@@ -377,7 +385,7 @@ export default function CommunityReportsFilters({
                                     <option value="title">Title</option>
                                     <option value="incident_date">Incident Date</option>
                                     <option value="priority">Priority</option>
-                                    <option value="urgency">Urgency</option>
+                                    <option value="urgency_level">Urgency</option>
                                     <option value="status">Status</option>
                                     <option value="impact_level">Impact Level</option>
                                     <option value="estimated_affected_count">Affected Count</option>
@@ -429,9 +437,9 @@ export default function CommunityReportsFilters({
                                                 id="has-evidences"
                                                 checked={hasEvidencesFilter}
                                                 onCheckedChange={(checked) => setHasEvidencesFilter(checked as boolean)}
-                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-primary-600 dark:data-[state=checked]:bg-primary-500"
+                                                className="border-gray-300 dark:border-gray-600"
                                             />
-                                            <Label htmlFor="has-evidences" className="text-sm text-gray-700 dark:text-gray-300">
+                                            <Label htmlFor="has-evidences" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                                                 Has Evidence/Photos
                                             </Label>
                                         </div>
@@ -440,9 +448,9 @@ export default function CommunityReportsFilters({
                                                 id="safety-concern"
                                                 checked={safetyConcernFilter}
                                                 onCheckedChange={(checked) => setSafetyConcernFilter(checked as boolean)}
-                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-primary-600 dark:data-[state=checked]:bg-primary-500"
+                                                className="border-gray-300 dark:border-gray-600"
                                             />
-                                            <Label htmlFor="safety-concern" className="text-sm text-gray-700 dark:text-gray-300">
+                                            <Label htmlFor="safety-concern" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                                                 Safety Concern
                                             </Label>
                                         </div>
@@ -451,9 +459,9 @@ export default function CommunityReportsFilters({
                                                 id="environmental-impact"
                                                 checked={environmentalFilter}
                                                 onCheckedChange={(checked) => setEnvironmentalFilter(checked as boolean)}
-                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-primary-600 dark:data-[state=checked]:bg-primary-500"
+                                                className="border-gray-300 dark:border-gray-600"
                                             />
-                                            <Label htmlFor="environmental-impact" className="text-sm text-gray-700 dark:text-gray-300">
+                                            <Label htmlFor="environmental-impact" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                                                 Environmental Impact
                                             </Label>
                                         </div>
@@ -462,9 +470,9 @@ export default function CommunityReportsFilters({
                                                 id="recurring-issue"
                                                 checked={recurringFilter}
                                                 onCheckedChange={(checked) => setRecurringFilter(checked as boolean)}
-                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-primary-600 dark:data-[state=checked]:bg-primary-500"
+                                                className="border-gray-300 dark:border-gray-600"
                                             />
-                                            <Label htmlFor="recurring-issue" className="text-sm text-gray-700 dark:text-gray-300">
+                                            <Label htmlFor="recurring-issue" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                                                 Recurring Issue
                                             </Label>
                                         </div>
@@ -473,9 +481,9 @@ export default function CommunityReportsFilters({
                                                 id="anonymous"
                                                 checked={anonymousFilter}
                                                 onCheckedChange={(checked) => setAnonymousFilter(checked as boolean)}
-                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-primary-600 dark:data-[state=checked]:bg-primary-500"
+                                                className="border-gray-300 dark:border-gray-600"
                                             />
-                                            <Label htmlFor="anonymous" className="text-sm text-gray-700 dark:text-gray-300">
+                                            <Label htmlFor="anonymous" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                                                 Anonymous Only
                                             </Label>
                                         </div>

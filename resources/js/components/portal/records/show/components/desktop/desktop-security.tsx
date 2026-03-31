@@ -4,7 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { ModernCard } from '@/components/residentui/modern-card';
 import { Shield, Lock, Globe, Fingerprint, FileLock, History, Download, Printer, Scan } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Document } from '@/types/portal/records/document.types';
+import { Document } from '@/types/portal/records/records';
 
 interface DesktopSecurityProps {
     document: Document;

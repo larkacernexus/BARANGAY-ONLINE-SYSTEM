@@ -8,12 +8,12 @@ import {
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ChevronUp, ChevronDown, Eye, Edit, Trash2, MoreVertical, Calendar, Clock, AlertCircle, Megaphone, Copy, PlayCircle, PauseCircle, CheckCircle } from 'lucide-react';
+import { ChevronUp, ChevronDown, Eye, Edit, Trash2, MoreVertical, Calendar, Clock, AlertCircle, Megaphone, Copy, PlayCircle, PauseCircle, CheckCircle, Bell, BellRing, BarChart } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { ActionDropdown, ActionDropdownItem, ActionDropdownSeparator } from '@/components/adminui/action-dropdown';
-import { Announcement, AnnouncementFilters } from '@/types';
+import { Announcement, AnnouncementFilters } from '@/types/admin/announcements/announcement.types';
 import { announcementUtils } from '@/admin-utils/announcement-utils';
 
 interface AnnouncementsTableViewProps {
@@ -30,6 +30,11 @@ interface AnnouncementsTableViewProps {
     onToggleStatus: (announcement: Announcement) => void;
     onSelectAllOnPage: () => void;
     isSelectAll: boolean;
+    // Notification-related props
+    onSendNotifications?: (announcement: Announcement) => void;
+    onResendNotifications?: (announcement: Announcement) => void;
+    onViewNotificationStats?: (announcement: Announcement) => void;
+    onDuplicate?: (announcement: Announcement) => void;
 }
 
 export default function AnnouncementsTableView({
@@ -52,7 +57,11 @@ export default function AnnouncementsTableView({
     onDelete,
     onToggleStatus,
     onSelectAllOnPage,
-    isSelectAll
+    isSelectAll,
+    onSendNotifications,
+    onResendNotifications,
+    onViewNotificationStats,
+    onDuplicate
 }: AnnouncementsTableViewProps) {
     const getSortIcon = (column: string) => {
         if (!filtersState || filtersState.sort_by !== column) return null;
@@ -191,6 +200,46 @@ export default function AnnouncementsTableView({
                                 Edit Announcement
                             </ActionDropdownItem>
                         </Link>
+
+                        {/* Duplicate Action */}
+                        {onDuplicate && (
+                            <ActionDropdownItem
+                                icon={<Copy className="h-4 w-4" />}
+                                onClick={() => onDuplicate(announcement)}
+                            >
+                                Duplicate
+                            </ActionDropdownItem>
+                        )}
+
+                        <ActionDropdownSeparator />
+
+                        {/* Send Notification Actions */}
+                        {onSendNotifications && announcement.is_active && announcement.is_currently_active && (
+                            <ActionDropdownItem
+                                icon={<Bell className="h-4 w-4" />}
+                                onClick={() => onSendNotifications(announcement)}
+                            >
+                                Send Notification
+                            </ActionDropdownItem>
+                        )}
+
+                        {onResendNotifications && announcement.is_active && announcement.is_currently_active && (
+                            <ActionDropdownItem
+                                icon={<BellRing className="h-4 w-4" />}
+                                onClick={() => onResendNotifications(announcement)}
+                            >
+                                Resend Notification
+                            </ActionDropdownItem>
+                        )}
+
+                        {onViewNotificationStats && (
+                            <ActionDropdownItem
+                                icon={<BarChart className="h-4 w-4" />}
+                                onClick={() => onViewNotificationStats(announcement)}
+                            >
+                                View Notification Stats
+                            </ActionDropdownItem>
+                        )}
 
                         <ActionDropdownSeparator />
 

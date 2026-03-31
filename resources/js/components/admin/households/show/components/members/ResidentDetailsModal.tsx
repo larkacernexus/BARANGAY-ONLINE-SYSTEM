@@ -11,8 +11,6 @@ import {
     Mail, 
     MapPin, 
     Briefcase, 
-    GraduationCap, 
-    Church,
     Award,
     ExternalLink,
     CheckCircle,
@@ -20,27 +18,20 @@ import {
     AlertCircle,
     Home,
     Users,
-    Info,
     Star,
     Heart,
     Shield,
-    BookOpen,
     Briefcase as BriefcaseIcon,
     Calendar as CalendarIcon,
     Mail as MailIcon,
     Phone as PhoneIcon,
     MapPin as MapPinIcon,
     Cake,
-    Building2,
-    Baby,
-    Eye,
     BadgeCheck,
-    ScrollText,
     UserRound,
-    HeartHandshake,
     School,
-    Globe,
-    FileText
+    FileText,
+    Crown
 } from 'lucide-react';
 import {
     Dialog,
@@ -53,55 +44,51 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
-interface ResidentPrivilege {
-    id: number;
-    name: string;
-    code: string;
-    status: 'active' | 'expiring_soon' | 'expired' | 'pending';
-    id_number?: string;
-    expires_at?: string;
-    discount_percentage?: number;
-}
+// Import types from shared types file
+import { HouseholdMember, Resident, Privilege } from '@/types/admin/households/household.types';
+import { 
+    getFullName, 
+    getPhotoUrl, 
+    calculateAge, 
+    getGenderLabel, 
+    getCivilStatusLabel,
+    formatDate,
+    formatDateTime,
+    getRelativeTime,
+    getRelationshipLabel,
+    ExtendedMember
+} from '@/types/admin/households/household.types';
 
-interface Member {
-    id: number;
-    resident_id: number;
-    relationship_to_head: string;
-    is_head: boolean;
-    created_at?: string;
-    updated_at?: string;
-    resident: {
-        id: number;
-        first_name: string;
-        last_name: string;
-        full_name: string;
-        age?: number;
-        gender?: string;
-        civil_status?: string;
-        contact_number?: string;
-        email?: string;
-        address?: string;
-        occupation?: string;
-        education?: string;
-        religion?: string;
-        is_voter?: boolean;
-        place_of_birth?: string;
-        remarks?: string;
-        photo_url?: string;
-        privileges_list?: ResidentPrivilege[];
-    };
-}
+
+
+
 
 interface ResidentDetailsModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    member: Member | null;
+    member: ExtendedMember | null;
 }
 
 export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDetailsModalProps) => {
     if (!member) return null;
 
     const resident = member.resident;
+
+    // Get full name using shared utility
+    const fullName = resident.full_name || getFullName(resident.first_name, resident.last_name, resident.middle_name);
+    
+    // Get photo URL using shared utility
+    const photoUrl = getPhotoUrl(resident.photo_path, resident.photo_url);
+    
+    // Calculate age if not provided
+    const age = resident.age || (resident.date_of_birth ? calculateAge(resident.date_of_birth) : undefined);
+    
+    // Get avatar initials
+    const getInitials = () => {
+        const first = resident.first_name?.[0] || '';
+        const last = resident.last_name?.[0] || '';
+        return (first + last).toUpperCase();
+    };
 
     const getPrivilegeIcon = (status: string) => {
         switch (status) {
@@ -213,17 +200,17 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                     <div className="relative">
                                         <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 blur-md opacity-50" />
                                         <Avatar className="h-28 w-28 border-4 border-white dark:border-gray-800 shadow-xl relative">
-                                            {resident.photo_url ? (
-                                                <AvatarImage src={resident.photo_url} alt={resident.full_name} />
+                                            {photoUrl ? (
+                                                <AvatarImage src={photoUrl} alt={fullName} />
                                             ) : (
                                                 <AvatarFallback className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-2xl">
-                                                    {resident.first_name?.[0]}{resident.last_name?.[0]}
+                                                    {getInitials()}
                                                 </AvatarFallback>
                                             )}
                                         </Avatar>
                                         {member.is_head && (
                                             <div className="absolute -bottom-2 -right-2 rounded-full bg-blue-500 p-1.5 border-2 border-white dark:border-gray-800">
-                                                <Home className="h-3 w-3 text-white" />
+                                                <Crown className="h-3 w-3 text-white" />
                                             </div>
                                         )}
                                     </div>
@@ -231,12 +218,12 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                     {/* Name and Status */}
                                     <div className="flex-1 text-center lg:text-left">
                                         <h3 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                                            {resident.full_name}
+                                            {fullName}
                                         </h3>
                                         <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
                                             <Badge className="bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 border-0 shadow-sm px-3 py-1">
                                                 <Users className="h-3 w-3 mr-1" />
-                                                {member.relationship_to_head}
+                                                {member.relationship_to_head || getRelationshipLabel(member.relationship)}
                                             </Badge>
                                             {member.is_head && (
                                                 <Badge className="bg-blue-500 text-white border-0 shadow-sm px-3 py-1">
@@ -249,8 +236,18 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
 
                                     {/* Quick Stats */}
                                     <div className="grid grid-cols-2 gap-3 min-w-[200px]">
-                                        <StatCard icon={Calendar} label="Member Since" value={member.created_at ? new Date(member.created_at).toLocaleDateString() : 'N/A'} color="blue" />
-                                        <StatCard icon={Cake} label="Age" value={resident.age ? `${resident.age} yrs` : 'N/A'} color="purple" />
+                                        <StatCard 
+                                            icon={Calendar} 
+                                            label="Member Since" 
+                                            value={member.created_at ? formatDate(member.created_at) : 'N/A'} 
+                                            color="blue" 
+                                        />
+                                        <StatCard 
+                                            icon={Cake} 
+                                            label="Age" 
+                                            value={age ? `${age} yrs` : 'N/A'} 
+                                            color="purple" 
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -261,8 +258,8 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                 <div className="space-y-6">
                                     {/* Personal Details */}
                                     <DetailCard icon={UserRound} title="Personal Information">
-                                        <DetailRow icon={Heart} label="Gender" value={resident.gender} />
-                                        <DetailRow icon={Shield} label="Civil Status" value={resident.civil_status} />
+                                        <DetailRow icon={Heart} label="Gender" value={getGenderLabel(resident.gender)} />
+                                        <DetailRow icon={Shield} label="Civil Status" value={getCivilStatusLabel(resident.civil_status)} />
                                         <DetailRow icon={MapPin} label="Birth Place" value={resident.place_of_birth} />
                                         <DetailRow 
                                             icon={BadgeCheck} 
@@ -270,7 +267,11 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                             value={resident.is_voter ? 'Registered Voter' : 'Not Registered'}
                                             highlight={resident.is_voter}
                                         />
-                                        <DetailRow icon={Church} label="Religion" value={resident.religion} />
+                                        <DetailRow icon={School} label="Religion" value={resident.religion} />
+                                        {/* Date of Birth is now properly typed */}
+                                        {resident.date_of_birth && (
+                                            <DetailRow icon={CalendarIcon} label="Date of Birth" value={formatDate(resident.date_of_birth)} />
+                                        )}
                                     </DetailCard>
 
                                     {/* Contact Details */}
@@ -353,6 +354,11 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                                                         {privilege.discount_percentage}% OFF
                                                                     </span>
                                                                 )}
+                                                                {privilege.expiry_date && (
+                                                                    <span className="text-gray-500 dark:text-gray-400">
+                                                                        Expires: {formatDate(privilege.expiry_date)}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -379,12 +385,13 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
                                     <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                                         <Calendar className="h-4 w-4" />
-                                        <span>Added to household: {new Date(member.created_at).toLocaleString()}</span>
+                                        <span>Added to household: {formatDateTime(member.created_at)}</span>
+                                        <span className="text-xs text-gray-400">({getRelativeTime(member.created_at)})</span>
                                     </div>
                                     {member.updated_at && member.updated_at !== member.created_at && (
                                         <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                                             <Clock className="h-4 w-4" />
-                                            <span>Last updated: {new Date(member.updated_at).toLocaleString()}</span>
+                                            <span>Last updated: {formatDateTime(member.updated_at)}</span>
                                         </div>
                                     )}
                                 </div>

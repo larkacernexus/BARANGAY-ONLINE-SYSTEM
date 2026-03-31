@@ -20,7 +20,7 @@ import {
     BookOpen
 } from 'lucide-react';
 import { Link, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { PageProps } from '@/types/admin/committees/committees';
 import { useState, useEffect } from 'react';
 
 interface CreateCommitteeProps extends PageProps {

@@ -1,4 +1,5 @@
-// pages/admin/CommunityReports/Create.tsx (Refactored)
+// pages/admin/CommunityReports/Create.tsx (Complete corrected section for IncidentDetailsCard)
+
 import { useState, useRef, useEffect } from 'react';
 import { router, Link } from '@inertiajs/react';
 import { toast } from 'sonner';
@@ -6,7 +7,7 @@ import { route } from 'ziggy-js';
 import AdminLayout from '@/layouts/admin-app-layout';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Save, Send, ArrowRight, Eye, FileText, UserPlus } from 'lucide-react';
-import { PageProps, ReportType, FileWithPreview, CommunityReportFormData } from '@/types/admin/community-report';
+import { PageProps, ReportType, FileWithPreview, CommunityReportFormData } from '@/types/admin/reports/community-report';
 
 // Import components
 import { PreviewModal } from '@/components/admin/community-reports/create/components/PreviewModal';
@@ -16,6 +17,15 @@ import { ReportTypeCard } from '@/components/admin/community-reports/create/comp
 import { IncidentDetailsCard } from '@/components/admin/community-reports/create/components/IncidentDetailsCard';
 import { ReviewCard } from '@/components/admin/community-reports/create/components/ReviewCard';
 import { ProgressSidebar } from '@/components/admin/community-reports/create/components/ProgressSidebar';
+
+// Define ExistingFile interface for edit mode (if needed)
+interface ExistingFile {
+    id: number;
+    file_name: string;
+    file_path: string;
+    file_type: string;
+    file_size: number;
+}
 
 // Steps configuration
 const steps = [
@@ -34,6 +44,8 @@ export default function Create({
     const [selectedType, setSelectedType] = useState<ReportType | null>(null);
     const [selectedResident, setSelectedResident] = useState<PageProps['users'][0] | null>(null);
     const [files, setFiles] = useState<FileWithPreview[]>([]);
+    const [existingFiles, setExistingFiles] = useState<ExistingFile[]>([]); // For edit mode
+    const [isEditMode] = useState(false); // Set to true for edit mode
     const [previewModal, setPreviewModal] = useState<{
         isOpen: boolean;
         url: string | null;
@@ -134,7 +146,8 @@ export default function Create({
         setFiles(prev => [...prev, ...filesWithPreview]);
     };
 
-    const removeFile = (id: string) => {
+    // Remove a new file - matches onRemoveNewFile prop
+    const removeNewFile = (id: string) => {
         setFiles(prev => {
             const file = prev.find(f => f.id === id);
             if (file?.preview) {
@@ -144,7 +157,13 @@ export default function Create({
         });
     };
 
-    const clearAllFiles = () => {
+    // Remove an existing file (for edit mode)
+    const removeExistingFile = (fileId: number) => {
+        setExistingFiles(prev => prev.filter(f => f.id !== fileId));
+    };
+
+    // Clear all new files - matches onClearAllNewFiles prop
+    const clearAllNewFiles = () => {
         files.forEach(file => {
             if (file.preview) {
                 URL.revokeObjectURL(file.preview);
@@ -153,21 +172,43 @@ export default function Create({
         setFiles([]);
     };
 
-    const openPreview = (file: FileWithPreview) => {
-        if (file.preview) {
-            setPreviewModal({
-                isOpen: true,
-                url: file.preview,
-                type: file.type,
-                name: file.name,
-            });
-        } else {
-            const url = URL.createObjectURL(file);
+    // Clear all files (both new and existing)
+    const clearAllFiles = () => {
+        clearAllNewFiles();
+        setExistingFiles([]);
+    };
+
+    // Update openPreview to handle both FileWithPreview and ExistingFile
+    const openPreview = (file: FileWithPreview | ExistingFile) => {
+        let url: string | null = null;
+        let type = '';
+        let name = '';
+        
+        // Check if it's a FileWithPreview (new file)
+        if ('preview' in file && file.preview) {
+            url = file.preview;
+            type = file.type;
+            name = file.name;
+        } 
+        // Check if it's an ExistingFile (existing file from server)
+        else if ('file_path' in file) {
+            url = `/storage/${file.file_path}`;
+            type = file.file_type;
+            name = file.file_name;
+        }
+        // Check if it's a regular File object
+        else if ('type' in file && !('preview' in file)) {
+            url = URL.createObjectURL(file);
+            type = file.type;
+            name = file.name;
+        }
+        
+        if (url) {
             setPreviewModal({
                 isOpen: true,
                 url,
-                type: file.type,
-                name: file.name,
+                type,
+                name,
             });
         }
     };
@@ -425,15 +466,20 @@ export default function Create({
                                 <IncidentDetailsCard
                                     formData={formData}
                                     files={files}
+                                    newFiles={files}
+                                    existingFiles={existingFiles}
                                     selectedType={selectedType}
                                     puroks={puroks}
                                     today={today}
                                     onInputChange={handleInputChange}
                                     onCheckboxChange={handleCheckboxChange}
                                     onFileSelect={handleFileSelect}
-                                    onRemoveFile={removeFile}
+                                    onRemoveNewFile={removeNewFile}
+                                    onRemoveExistingFile={removeExistingFile}
+                                    onClearAllNewFiles={clearAllNewFiles}
                                     onClearAllFiles={clearAllFiles}
                                     onOpenPreview={openPreview}
+                                    isEditMode={isEditMode}
                                 />
                             )}
 

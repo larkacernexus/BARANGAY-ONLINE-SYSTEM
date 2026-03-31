@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Link } from '@inertiajs/react';
 import { Copy, Edit, Trash2, Settings } from 'lucide-react';
-import { Blotter } from '@/components/admin/blotters/show/types';
+import { Blotter } from '@/types/admin/blotters/blotter';
 
 interface QuickActionsCardProps {
     blotter: Blotter;

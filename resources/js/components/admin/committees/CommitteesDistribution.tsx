@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Committee } from '@/types/committees';
+import { Committee } from '@/types/admin/committees/committees';
 import { truncateText, getTruncationLength } from '@/lib/committeeutils';
 
 interface CommitteesDistributionProps {

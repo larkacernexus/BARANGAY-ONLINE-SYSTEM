@@ -15,25 +15,11 @@ import {
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
-interface Fee {
-    id: number;
-    fee_code: string;
-    or_number?: string;
-    fee_type?: {
-        id: number;
-        name: string;
-        code: string;
-    };
-    total_amount: number | string;
-    amount_paid: number | string;
-    balance: number | string;
-    status: string;
-    issue_date?: string;
-    due_date?: string;
-    description?: string;
-}
+// Import types from shared types file
+import { Fee, FeeStatus } from '@/types/admin/households/household.types';
+import { formatDate, formatDateTime } from '@/types/admin/households/household.types';
 
 interface FeesTabProps {
     householdId: number;
@@ -67,27 +53,51 @@ export const FeesTab = ({
     };
 
     // Recalculate totals from actual fees data to ensure accuracy
-    const calculatedTotalAmount = fees.reduce((sum, fee) => sum + toNumber(fee.total_amount), 0);
-    const calculatedTotalPaid = fees.reduce((sum, fee) => sum + toNumber(fee.amount_paid), 0);
-    const calculatedBalance = calculatedTotalAmount - calculatedTotalPaid;
+    const calculatedTotals = useMemo(() => {
+        const totalAmount = fees.reduce((sum, fee) => sum + toNumber(fee.total_amount), 0);
+        const totalPaid = fees.reduce((sum, fee) => sum + toNumber(fee.amount_paid), 0);
+        const outstandingBalance = totalAmount - totalPaid;
+        
+        return {
+            totalAmount,
+            totalPaid,
+            outstandingBalance
+        };
+    }, [fees]);
 
     // Use provided totals or calculated ones
-    const totalAmount = initialTotalAmount > 0 ? initialTotalAmount : calculatedTotalAmount;
-    const totalPaid = initialTotalPaid > 0 ? initialTotalPaid : calculatedTotalPaid;
-    const outstandingBalance = totalAmount - totalPaid;
+    const totalAmount = initialTotalAmount > 0 ? initialTotalAmount : calculatedTotals.totalAmount;
+    const totalPaid = initialTotalPaid > 0 ? initialTotalPaid : calculatedTotals.totalPaid;
+    const outstandingBalance = calculatedTotals.outstandingBalance;
 
-    const getStatusBadge = (status: string) => {
+    const getStatusBadge = (status: FeeStatus) => {
         switch (status) {
             case 'paid':
-                return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
-            case 'partially_paid':
-                return <Badge className="bg-yellow-100 text-yellow-800">Partially Paid</Badge>;
-            case 'overdue':
-                return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
+                return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Paid</Badge>;
+            case 'pending':
+                return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">Pending</Badge>;
             case 'issued':
-                return <Badge className="bg-blue-100 text-blue-800">Issued</Badge>;
+                return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">Issued</Badge>;
+            case 'overdue':
+                return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Overdue</Badge>;
+            case 'cancelled':
+                return <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-400">Cancelled</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
+        }
+    };
+
+    const getStatusIcon = (status: FeeStatus) => {
+        switch (status) {
+            case 'paid':
+                return <CheckCircle className="h-4 w-4 text-green-500" />;
+            case 'pending':
+            case 'issued':
+                return <Clock className="h-4 w-4 text-yellow-500" />;
+            case 'overdue':
+                return <AlertCircle className="h-4 w-4 text-red-500" />;
+            default:
+                return <Receipt className="h-4 w-4 text-gray-500" />;
         }
     };
 
@@ -95,6 +105,21 @@ export const FeesTab = ({
         const num = toNumber(amount);
         return `₱${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
+
+    const formatDateSafe = (date?: string): string => {
+        if (!date) return 'N/A';
+        return formatDate(date);
+    };
+
+    // Group fees by status for better organization
+    const feesByStatus = useMemo(() => {
+        return {
+            overdue: fees.filter(f => f.status === 'overdue'),
+            pending: fees.filter(f => f.status === 'pending' || f.status === 'issued'),
+            paid: fees.filter(f => f.status === 'paid'),
+            cancelled: fees.filter(f => f.status === 'cancelled')
+        };
+    }, [fees]);
 
     return (
         <div className="space-y-6">
@@ -184,72 +209,137 @@ export const FeesTab = ({
                             <p className="text-gray-500 dark:text-gray-400">This household has no fee assessments yet.</p>
                         </div>
                     ) : (
-                        <div className="space-y-4">
-                            {fees.map((fee) => {
-                                const totalAmount = toNumber(fee.total_amount);
-                                const amountPaid = toNumber(fee.amount_paid);
-                                const balance = toNumber(fee.balance);
-                                
-                                return (
-                                    <div key={fee.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 flex-wrap mb-2">
-                                                    <h3 className="font-semibold dark:text-gray-100">{fee.fee_type?.name || 'Fee'}</h3>
-                                                    {getStatusBadge(fee.status)}
-                                                    {fee.fee_code && (
-                                                        <Badge variant="outline" className="text-xs">
-                                                            {fee.fee_code}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                                                    {fee.description || 'No description'}
-                                                </p>
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                                    <div>
-                                                        <p className="text-gray-500 dark:text-gray-400">Amount</p>
-                                                        <p className="font-medium dark:text-gray-200">{formatAmount(totalAmount)}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-gray-500 dark:text-gray-400">Paid</p>
-                                                        <p className="font-medium text-green-600">{formatAmount(amountPaid)}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-gray-500 dark:text-gray-400">Balance</p>
-                                                        <p className={`font-medium ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                            {formatAmount(balance)}
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-gray-500 dark:text-gray-400">Due Date</p>
-                                                        <p className="font-medium dark:text-gray-200">
-                                                            {fee.due_date ? new Date(fee.due_date).toLocaleDateString() : 'N/A'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                {fee.or_number && (
-                                                    <p className="text-xs text-gray-400 mt-2">OR#: {fee.or_number}</p>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Link href={route('admin.fees.show', fee.id)}>
-                                                    <Button variant="ghost" size="sm">
-                                                        <Eye className="h-4 w-4" />
-                                                    </Button>
-                                                </Link>
-                                                <Button variant="ghost" size="sm">
-                                                    <Download className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                        <div className="space-y-6">
+                            {/* Overdue Fees Section */}
+                            {feesByStatus.overdue.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-red-600 dark:text-red-400 mb-3 flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4" />
+                                        Overdue Fees ({feesByStatus.overdue.length})
+                                    </h4>
+                                    {renderFeeList(feesByStatus.overdue)}
+                                </div>
+                            )}
+
+                            {/* Pending Fees Section */}
+                            {feesByStatus.pending.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-yellow-600 dark:text-yellow-400 mb-3 flex items-center gap-2">
+                                        <Clock className="h-4 w-4" />
+                                        Pending Fees ({feesByStatus.pending.length})
+                                    </h4>
+                                    {renderFeeList(feesByStatus.pending)}
+                                </div>
+                            )}
+
+                            {/* Paid Fees Section */}
+                            {feesByStatus.paid.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
+                                        <CheckCircle className="h-4 w-4" />
+                                        Paid Fees ({feesByStatus.paid.length})
+                                    </h4>
+                                    {renderFeeList(feesByStatus.paid)}
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>
             </Card>
         </div>
     );
+
+    function renderFeeList(feesList: Fee[]) {
+        return (
+            <div className="space-y-3">
+                {feesList.map((fee) => {
+                    const totalAmount = toNumber(fee.total_amount);
+                    const amountPaid = toNumber(fee.amount_paid);
+                    const balance = totalAmount - amountPaid;
+                    const isPaid = fee.status === 'paid';
+                    
+                    return (
+                        <div key={fee.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                                        <div className="flex items-center gap-2">
+                                            {getStatusIcon(fee.status)}
+                                            <h3 className="font-semibold dark:text-gray-100">
+                                                {fee.fee_type || 'Fee Assessment'}
+                                            </h3>
+                                        </div>
+                                        {getStatusBadge(fee.status)}
+                                        {fee.reference_number && (
+                                            <Badge variant="outline" className="text-xs dark:border-gray-600">
+                                                Ref: {fee.reference_number}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    
+                                    {fee.notes && (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                                            {fee.notes}
+                                        </p>
+                                    )}
+                                    
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                        <div>
+                                            <p className="text-gray-500 dark:text-gray-400">Amount</p>
+                                            <p className="font-medium dark:text-gray-200">{formatAmount(totalAmount)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-500 dark:text-gray-400">Paid</p>
+                                            <p className="font-medium text-green-600 dark:text-green-400">{formatAmount(amountPaid)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-500 dark:text-gray-400">Balance</p>
+                                            <p className={`font-medium ${balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                                {formatAmount(balance)}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-500 dark:text-gray-400">Due Date</p>
+                                            <p className="font-medium dark:text-gray-200">
+                                                {formatDateSafe(fee.due_date)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    {isPaid && fee.paid_date && (
+                                        <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                                            Paid on: {formatDateSafe(fee.paid_date)}
+                                            {fee.payment_method && ` via ${fee.payment_method.toUpperCase()}`}
+                                        </p>
+                                    )}
+                                    
+                                    {fee.receipt_number && (
+                                        <p className="text-xs text-gray-400 mt-1">Receipt #: {fee.receipt_number}</p>
+                                    )}
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                    <Link href={route('admin.fees.show', fee.id)}>
+                                        <Button variant="ghost" size="sm" title="View Details">
+                                            <Eye className="h-4 w-4" />
+                                        </Button>
+                                    </Link>
+                                    {!isPaid && (
+                                        <Link href={route('admin.payments.create', { fee_id: fee.id, household_id: householdId })}>
+                                            <Button variant="outline" size="sm" className="dark:border-gray-600">
+                                                Pay
+                                            </Button>
+                                        </Link>
+                                    )}
+                                    <Button variant="ghost" size="sm" title="Download Receipt">
+                                        <Download className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
 };

@@ -1,3 +1,5 @@
+// components/admin/fees/FeesGridView.tsx
+
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,7 +45,7 @@ import {
     CheckSquare,
     Printer
 } from 'lucide-react';
-import { Fee } from '@/types/fees.types';
+import { Fee } from '@/types/admin/fees/fees';
 import { format, isAfter, isValid, parseISO } from 'date-fns';
 
 interface FeesGridViewProps {
@@ -59,6 +61,9 @@ interface FeesGridViewProps {
     onClearFilters: () => void;
     formatCurrency: (amount: number) => string;
     getStatusColor: (status: string) => string;
+    getStatusIcon: (status: string) => React.ReactNode;
+    getCategoryColor: (category: string) => string;
+    getCategoryLabel: (category: string) => string;
     statuses?: Record<string, string>;
     categories?: Record<string, string>;
 }
@@ -108,7 +113,7 @@ const getDaysOverdue = (dueDate: string | null | undefined): number => {
     }
 };
 
-const getPayerIcon = (payerType: string) => {
+const getPayerIcon = (payerType?: string) => {
     switch (payerType) {
         case 'resident': return <User className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />;
         case 'household': return <Home className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />;
@@ -117,18 +122,7 @@ const getPayerIcon = (payerType: string) => {
     }
 };
 
-const getStatusIcon = (status: string) => {
-    switch (status) {
-        case 'paid': return <CheckCircle className="h-4 w-4 text-green-500" />;
-        case 'issued': return <FileText className="h-4 w-4 text-blue-500" />;
-        case 'pending': return <Clock className="h-4 w-4 text-amber-500" />;
-        case 'partially_paid': return <CreditCard className="h-4 w-4 text-indigo-500" />;
-        case 'overdue': return <AlertCircle className="h-4 w-4 text-red-500" />;
-        default: return null;
-    }
-};
-
-// Status color classes matching community reports pattern
+// Status color classes
 const getStatusColorClass = (status: string, isFeeOverdue: boolean) => {
     if (isFeeOverdue) {
         return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
@@ -139,7 +133,8 @@ const getStatusColorClass = (status: string, isFeeOverdue: boolean) => {
             return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
         case 'pending': 
             return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800';
-        case 'partial': 
+        case 'partial':
+        case 'issued':
             return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
         default: 
             return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
@@ -159,6 +154,9 @@ export default function FeesGridView({
     onClearFilters,
     formatCurrency,
     getStatusColor,
+    getStatusIcon,
+    getCategoryColor,
+    getCategoryLabel,
     statuses = {},
     categories = {}
 }: FeesGridViewProps) {
@@ -211,25 +209,30 @@ export default function FeesGridView({
 
     const handleCopyFeeCode = (fee: Fee, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
+        const feeCode = fee.fee_code || fee.code || 'N/A';
         if (onCopyToClipboard) {
-            onCopyToClipboard(fee.fee_code, 'Fee Code');
+            onCopyToClipboard(feeCode, 'Fee Code');
         } else {
-            navigator.clipboard.writeText(fee.fee_code);
+            navigator.clipboard.writeText(feeCode);
         }
     };
 
     const handlePaymentClick = (fee: Fee, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
+        const totalAmount = fee.total_amount ?? fee.amount ?? 0;
+        const amountPaid = fee.amount_paid ?? fee.paid_amount ?? 0;
+        const balance = fee.balance ?? (totalAmount - amountPaid);
+        
         router.get(route('admin.payments.create', { 
             fee_id: fee.id,
-            payer_type: fee.payer_type,
+            payer_type: fee.payer_type || fee.type || 'resident',
             payer_id: fee.payer_type === 'resident' ? fee.resident_id : fee.household_id,
-            payer_name: fee.payer_name,
-            contact_number: fee.contact_number,
+            payer_name: fee.payer_name || fee.resident?.full_name,
+            contact_number: fee.contact_number || fee.resident?.phone,
             address: fee.address,
             purok: fee.purok,
-            fee_code: fee.fee_code,
-            balance: fee.balance
+            fee_code: fee.fee_code || fee.code,
+            balance: balance
         }));
     };
 
@@ -268,8 +271,20 @@ export default function FeesGridView({
                 const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
                 const isCompactView = isMobile;
                 
+                // Safe amount calculations
+                const totalAmount = fee.total_amount ?? fee.amount ?? 0;
+                const amountPaid = fee.amount_paid ?? fee.paid_amount ?? 0;
+                const balance = fee.balance ?? (totalAmount - amountPaid);
+                const hasBalance = balance > 0;
+                const hasPaid = amountPaid > 0;
+                
                 // Truncation lengths based on view
                 const nameLength = isCompactView ? 20 : 30;
+                
+                // Check if fee can be edited
+                const canEdit = fee.status === 'pending' || fee.status === 'issued';
+                // Check if fee can be deleted
+                const canDelete = fee.status === 'pending';
                 
                 return (
                     <Card 
@@ -310,33 +325,33 @@ export default function FeesGridView({
                                         <MoreVertical className="h-4 w-4" />
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem onClick={(e) => handleViewClick(fee, e)}>
+                                <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
+                                    <DropdownMenuItem onClick={(e) => handleViewClick(fee, e)} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                         <Eye className="mr-2 h-4 w-4" />
                                         View Details
                                     </DropdownMenuItem>
                                     
-                                    {(fee.status === 'pending' || fee.status === 'issued') && (
-                                        <DropdownMenuItem onClick={(e) => handleEditClick(fee, e)}>
+                                    {canEdit && (
+                                        <DropdownMenuItem onClick={(e) => handleEditClick(fee, e)} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                             <Edit className="mr-2 h-4 w-4" />
                                             Edit Fee
                                         </DropdownMenuItem>
                                     )}
                                     
-                                    <DropdownMenuSeparator />
+                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                     
-                                    <DropdownMenuItem onClick={(e) => handleCopyFeeCode(fee, e)}>
+                                    <DropdownMenuItem onClick={(e) => handleCopyFeeCode(fee, e)} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                         <Copy className="mr-2 h-4 w-4" />
                                         Copy Fee Code
                                     </DropdownMenuItem>
                                     
-                                    <DropdownMenuItem onClick={(e) => handlePrint(fee, e)}>
+                                    <DropdownMenuItem onClick={(e) => handlePrint(fee, e)} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                         <Printer className="mr-2 h-4 w-4" />
                                         Print Invoice
                                     </DropdownMenuItem>
                                     
-                                    {fee.status !== 'paid' && fee.balance > 0 && (
-                                        <DropdownMenuItem onClick={(e) => handlePaymentClick(fee, e)}>
+                                    {fee.status !== 'paid' && hasBalance && (
+                                        <DropdownMenuItem onClick={(e) => handlePaymentClick(fee, e)} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                             <CreditCard className="mr-2 h-4 w-4" />
                                             Pay Fee
                                         </DropdownMenuItem>
@@ -344,11 +359,11 @@ export default function FeesGridView({
                                     
                                     {isBulkMode && (
                                         <>
-                                            <DropdownMenuSeparator />
+                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
                                             <DropdownMenuItem onClick={(e) => {
                                                 e.stopPropagation();
                                                 onItemSelect(fee.id);
-                                            }}>
+                                            }} className="dark:text-gray-300 dark:hover:bg-gray-800">
                                                 {isSelected ? (
                                                     <>
                                                         <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
@@ -364,15 +379,15 @@ export default function FeesGridView({
                                         </>
                                     )}
                                     
-                                    {fee.status === 'pending' && (
+                                    {canDelete && (
                                         <>
-                                            <DropdownMenuSeparator />
+                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
                                             <DropdownMenuItem 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     onDelete(fee);
                                                 }}
-                                                className="text-red-600"
+                                                className="text-red-600 dark:text-red-400 dark:hover:bg-red-950/50"
                                             >
                                                 <Trash2 className="mr-2 h-4 w-4" />
                                                 Delete Fee
@@ -392,13 +407,13 @@ export default function FeesGridView({
                                     </div>
                                     <span 
                                         className="font-medium text-xs text-blue-600 dark:text-blue-400 truncate hover:text-blue-700 dark:hover:text-blue-300 cursor-help"
-                                        title={`Fee Code: ${fee.fee_code}`}
+                                        title={`Fee Code: ${fee.fee_code || fee.code}`}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             handleCopyFeeCode(fee, e);
                                         }}
                                     >
-                                        {fee.fee_code}
+                                        {fee.fee_code || fee.code}
                                     </span>
                                 </div>
                                 
@@ -411,7 +426,8 @@ export default function FeesGridView({
                                         {isFeeOverdue ? `Overdue (${daysOverdue}d)` : 
                                          fee.status === 'paid' ? 'Paid' :
                                          fee.status === 'pending' ? 'Pending' :
-                                         fee.status === 'partial' ? 'Partial' : fee.status}
+                                         fee.status === 'partial' ? 'Partial' :
+                                         fee.status === 'issued' ? 'Issued' : fee.status}
                                     </Badge>
                                 </div>
                             </div>
@@ -432,9 +448,10 @@ export default function FeesGridView({
                             <div className="space-y-1.5 mb-2">
                                 {/* Payer Info */}
                                 <div className="flex items-center gap-1.5">
-                                    {getPayerIcon(fee.payer_type)}
+                                    {getPayerIcon(fee.payer_type || fee.type)}
                                     <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
-                                        {fee.payer_name ? fee.payer_name.substring(0, nameLength) : 'N/A'}
+                                        {fee.payer_name ? fee.payer_name.substring(0, nameLength) : 
+                                         fee.resident?.full_name ? fee.resident.full_name.substring(0, nameLength) : 'N/A'}
                                         {fee.payer_name && fee.payer_name.length > nameLength ? '...' : ''}
                                     </span>
                                 </div>
@@ -443,7 +460,7 @@ export default function FeesGridView({
                                 <div className="flex items-center gap-1.5">
                                     <Info className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                     <span className="text-xs text-gray-700 dark:text-gray-300 capitalize">
-                                        {fee.payer_type || 'Resident'}
+                                        {fee.payer_type || fee.type || 'Resident'}
                                     </span>
                                 </div>
                                 
@@ -452,7 +469,7 @@ export default function FeesGridView({
                                     <div className="flex items-center gap-1">
                                         <Calendar className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                         <span className="text-xs text-gray-700 dark:text-gray-300">
-                                            {formatDate(fee.issue_date)}
+                                            {formatDate(fee.created_at || fee.issue_date)}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1">
@@ -467,24 +484,24 @@ export default function FeesGridView({
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-gray-500 dark:text-gray-400">Total:</span>
                                     <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                        {formatCurrency(fee.total_amount || 0)}
+                                        {formatCurrency(totalAmount)}
                                     </span>
                                 </div>
                                 
-                                {fee.balance > 0 && (
+                                {hasBalance && (
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-gray-500 dark:text-gray-400">Balance:</span>
                                         <span className="text-xs font-medium text-red-600 dark:text-red-400">
-                                            {formatCurrency(fee.balance || 0)}
+                                            {formatCurrency(balance)}
                                         </span>
                                     </div>
                                 )}
                                 
-                                {fee.amount_paid > 0 && (
+                                {hasPaid && (
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-gray-500 dark:text-gray-400">Paid:</span>
                                         <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                                            {formatCurrency(fee.amount_paid || 0)}
+                                            {formatCurrency(amountPaid)}
                                         </span>
                                     </div>
                                 )}
@@ -515,36 +532,36 @@ export default function FeesGridView({
                                         <div className="flex items-center gap-1.5 text-xs">
                                             <Hash className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Category:</span>
-                                            <span className="text-gray-900 dark:text-white">
-                                                {categories[fee.fee_type.category] || fee.fee_type.category}
-                                            </span>
+                                            <Badge variant="outline" className={getCategoryColor(fee.fee_type.category)}>
+                                                {getCategoryLabel(fee.fee_type.category)}
+                                            </Badge>
                                         </div>
                                     )}
 
                                     {/* Contact Information */}
-                                    {fee.contact_number && (
+                                    {(fee.contact_number || fee.resident?.phone) && (
                                         <div className="flex items-center gap-1.5 text-xs">
                                             <Phone className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Contact:</span>
-                                            <span className="text-gray-900 dark:text-white">{fee.contact_number}</span>
+                                            <span className="text-gray-900 dark:text-white">{fee.contact_number || fee.resident?.phone}</span>
                                         </div>
                                     )}
 
                                     {/* Address */}
-                                    {fee.address && (
+                                    {(fee.address || fee.resident?.address) && (
                                         <div className="flex items-center gap-1.5 text-xs">
                                             <MapPin className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Address:</span>
-                                            <span className="text-gray-900 dark:text-white truncate">{fee.address}</span>
+                                            <span className="text-gray-900 dark:text-white truncate">{fee.address || fee.resident?.address}</span>
                                         </div>
                                     )}
 
                                     {/* Purok */}
-                                    {fee.purok && (
+                                    {(fee.purok || fee.resident?.purok) && (
                                         <div className="flex items-center gap-1.5 text-xs">
                                             <Home className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Purok:</span>
-                                            <span className="text-gray-900 dark:text-white">{fee.purok}</span>
+                                            <span className="text-gray-900 dark:text-white">{fee.purok || fee.resident?.purok}</span>
                                         </div>
                                     )}
 
@@ -552,15 +569,15 @@ export default function FeesGridView({
                                     <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                                         <div>
                                             <span className="text-gray-600 dark:text-gray-400">Total:</span>
-                                            <span className="text-gray-900 dark:text-white ml-1 font-medium">{formatCurrency(fee.total_amount || 0)}</span>
+                                            <span className="text-gray-900 dark:text-white ml-1 font-medium">{formatCurrency(totalAmount)}</span>
                                         </div>
                                         <div>
                                             <span className="text-gray-600 dark:text-gray-400">Paid:</span>
-                                            <span className="text-green-600 dark:text-green-400 ml-1 font-medium">{formatCurrency(fee.amount_paid || 0)}</span>
+                                            <span className="text-green-600 dark:text-green-400 ml-1 font-medium">{formatCurrency(amountPaid)}</span>
                                         </div>
                                         <div>
                                             <span className="text-gray-600 dark:text-gray-400">Balance:</span>
-                                            <span className="text-red-600 dark:text-red-400 ml-1 font-medium">{formatCurrency(fee.balance || 0)}</span>
+                                            <span className="text-red-600 dark:text-red-400 ml-1 font-medium">{formatCurrency(balance)}</span>
                                         </div>
                                         <div>
                                             <span className="text-gray-600 dark:text-gray-400">Status:</span>
@@ -581,7 +598,7 @@ export default function FeesGridView({
                                     </div>
 
                                     {/* Payment button for unpaid fees */}
-                                    {fee.status !== 'paid' && fee.balance > 0 && (
+                                    {fee.status !== 'paid' && hasBalance && (
                                         <div className="pt-1">
                                             <Button
                                                 size="sm"
@@ -621,7 +638,7 @@ export default function FeesGridView({
                             )}
                         </CardContent>
 
-                        {/* Footer Actions - Keep as quick action buttons */}
+                        {/* Footer Actions */}
                         <CardFooter className={`px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 ${isCompactView ? 'py-1.5' : ''}`}>
                             <div className="flex items-center justify-between w-full">
                                 <div className="flex items-center gap-0.5">
@@ -643,7 +660,7 @@ export default function FeesGridView({
                                     </Tooltip>
 
                                     {/* Edit */}
-                                    {(fee.status === 'pending' || fee.status === 'issued') && (
+                                    {canEdit && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Button
@@ -662,7 +679,7 @@ export default function FeesGridView({
                                     )}
 
                                     {/* Pay - for unpaid fees */}
-                                    {fee.status !== 'paid' && fee.balance > 0 && (
+                                    {fee.status !== 'paid' && hasBalance && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Button
@@ -716,7 +733,7 @@ export default function FeesGridView({
                                 </div>
 
                                 {/* Delete button - only show if pending */}
-                                {fee.status === 'pending' && (
+                                {canDelete && (
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button

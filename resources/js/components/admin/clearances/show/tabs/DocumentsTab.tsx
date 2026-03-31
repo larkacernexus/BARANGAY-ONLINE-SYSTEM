@@ -1,4 +1,3 @@
-// components/admin/clearances/show/tabs/DocumentsTab.tsx
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,15 +28,28 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Document, DocumentStats } from '@/types/clearance';
+import { ClearanceDocument } from '@/types/admin/clearances/clearance-types'; // Fix import
 import { JSX } from 'react';
 
+interface DocumentStats {
+    total: number;
+    verified: number;
+    pending: number;
+    rejected: number;
+    pendingCount?: number;
+    verifiedCount?: number;
+    rejectedCount?: number;
+    pendingPercentage?: number;
+    verifiedPercentage?: number;
+    rejectedPercentage?: number;
+}
+
 interface DocumentsTabProps {
-    documents: Document[];
+    documents: ClearanceDocument[];
     documentStats: DocumentStats;
     canProcess: boolean;
-    onViewDocument: (doc: Document, index: number) => void;
-    onDownloadDocument: (doc: Document) => void;
+    onViewDocument: (doc: ClearanceDocument, index: number) => void;
+    onDownloadDocument: (doc: ClearanceDocument) => void;
     onVerifyDocument: (documentId: number) => void;
     onRejectDocument?: (documentId: number, notes: string) => void;
     onVerifyAll: () => void;
@@ -46,9 +58,9 @@ interface DocumentsTabProps {
     onUploadDocuments: () => void;
     formatDateTime: (date?: string) => string;
     formatFileSize: (bytes?: number) => string;
-    getFileIcon: (document: Document) => JSX.Element;
-    getDocumentStatusColor: (document: Document) => string;
-    getDocumentStatusText: (document: Document) => string;
+    getFileIcon: (document: ClearanceDocument) => JSX.Element;
+    getDocumentStatusColor: (document: ClearanceDocument) => string;
+    getDocumentStatusText: (document: ClearanceDocument) => string;
 }
 
 export function DocumentsTab({
@@ -70,11 +82,16 @@ export function DocumentsTab({
     getDocumentStatusText
 }: DocumentsTabProps) {
     
-    const getStatusIcon = (doc: Document) => {
-        if (doc.is_verified) return <CheckCircle className="h-3 w-3" />;
-        if (doc.status === 'rejected') return <XCircle className="h-3 w-3" />;
-        if (doc.status === 'pending') return <Clock className="h-3 w-3" />;
+    const getStatusIcon = (doc: ClearanceDocument) => {
+        const status = doc.verification_status;
+        if (status === 'verified') return <CheckCircle className="h-3 w-3" />;
+        if (status === 'rejected') return <XCircle className="h-3 w-3" />;
+        if (status === 'pending') return <Clock className="h-3 w-3" />;
         return <AlertCircle className="h-3 w-3" />;
+    };
+
+    const getDocumentName = (doc: ClearanceDocument): string => {
+        return doc.original_name || doc.file_name || 'Document';
     };
 
     return (
@@ -149,8 +166,9 @@ export function DocumentsTab({
 
                             {/* Documents List */}
                             <div className="space-y-3">
-                                {documents.map((doc: Document, index: number) => {
-                                    const isImage = doc.mime_type?.startsWith('image/') || 
+                                {documents.map((doc: ClearanceDocument, index: number) => {
+                                    const isImage = doc.is_image || 
+                                                   doc.mime_type?.startsWith('image/') || 
                                                    doc.file_name?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
                                     const isPDF = doc.mime_type === 'application/pdf' || 
                                                   doc.file_name?.match(/\.pdf$/i);
@@ -160,10 +178,10 @@ export function DocumentsTab({
                                             <div className="flex items-start justify-between p-4">
                                                 <div className="flex items-start gap-4 flex-1 min-w-0">
                                                     <div className="flex-shrink-0">
-                                                        {isImage && doc.thumbnail_url ? (
+                                                        {isImage && doc.file_path ? (
                                                             <img
-                                                                src={doc.thumbnail_url}
-                                                                alt={doc.name}
+                                                                src={doc.file_path}
+                                                                alt={getDocumentName(doc)}
                                                                 className="h-20 w-20 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity border border-gray-200 dark:border-gray-700"
                                                                 onClick={() => onViewDocument(doc, index)}
                                                             />
@@ -189,7 +207,7 @@ export function DocumentsTab({
                                                         <div className="flex items-start justify-between">
                                                             <div className="min-w-0">
                                                                 <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                                                                    {doc.name || doc.original_name || doc.file_name}
+                                                                    {getDocumentName(doc)}
                                                                 </h4>
                                                                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                                                                     <Badge 
@@ -199,9 +217,19 @@ export function DocumentsTab({
                                                                         {getStatusIcon(doc)}
                                                                         {getDocumentStatusText(doc)}
                                                                     </Badge>
-                                                                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                                                                        {doc.description || 'Document'}
-                                                                    </span>
+                                                                    {doc.document_type && (
+                                                                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                                                                            {doc.document_type.name}
+                                                                        </span>
+                                                                    )}
+                                                                    {doc.description && (
+                                                                        <>
+                                                                            <span className="text-sm text-gray-400 dark:text-gray-600">•</span>
+                                                                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                                                                                {doc.description}
+                                                                            </span>
+                                                                        </>
+                                                                    )}
                                                                     <span className="text-sm text-gray-400 dark:text-gray-600">•</span>
                                                                     <span className="text-sm text-gray-500 dark:text-gray-400">
                                                                         {formatFileSize(doc.file_size)}
@@ -209,17 +237,16 @@ export function DocumentsTab({
                                                                 </div>
                                                                 <div className="mt-2 space-y-1">
                                                                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                                        Uploaded {formatDateTime(doc.uploaded_at)}
+                                                                        Uploaded {formatDateTime(doc.created_at)}
                                                                     </p>
-                                                                    {doc.verified_at && doc.is_verified && (
+                                                                    {doc.verified_at && doc.verification_status === 'verified' && (
                                                                         <p className="text-xs text-green-600 dark:text-green-400">
                                                                             Verified on {formatDateTime(doc.verified_at)}
                                                                         </p>
                                                                     )}
-                                                                    {doc.rejected_at && doc.status === 'rejected' && (
+                                                                    {doc.rejection_reason && doc.verification_status === 'rejected' && (
                                                                         <p className="text-xs text-red-600 dark:text-red-400">
-                                                                            Rejected on {formatDateTime(doc.rejected_at)}
-                                                                            {doc.rejection_reason && `: ${doc.rejection_reason}`}
+                                                                            Rejected: {doc.rejection_reason}
                                                                         </p>
                                                                     )}
                                                                 </div>
@@ -246,7 +273,7 @@ export function DocumentsTab({
                                                         <Download className="h-4 w-4" />
                                                     </Button>
                                                     
-                                                    {canProcess && !doc.is_verified && doc.status !== 'rejected' && (
+                                                    {canProcess && doc.verification_status !== 'verified' && doc.verification_status !== 'rejected' && (
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
                                                                 <Button variant="ghost" size="sm" className="dark:text-gray-400 dark:hover:text-white">

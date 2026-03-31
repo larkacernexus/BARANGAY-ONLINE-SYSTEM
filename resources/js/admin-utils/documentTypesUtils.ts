@@ -1,5 +1,5 @@
 // admin-utils/documentTypesUtils.ts
-import { DocumentType, FilterState, SelectionStats } from '@/types/document-types';
+import { DocumentType, FilterState, SelectionStats } from '@/types/admin/document-types/document-types';
 
 // Format date
 export const formatDate = (dateString: string): string => {

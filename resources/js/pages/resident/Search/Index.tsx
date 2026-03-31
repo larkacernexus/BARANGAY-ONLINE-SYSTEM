@@ -1,3 +1,5 @@
+// pages/resident/Search/Index.tsx (Fixed)
+
 import React, { useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import ResidentAppLayout from '@/layouts/resident-app-layout';
@@ -55,6 +57,8 @@ interface PageProps {
   searchResults?: SearchResult[];
   recentSearches?: string[];
   currentQuery?: string;
+  // Add index signature to satisfy Inertia's PageProps requirement
+  [key: string]: any;
 }
 
 // Icon mapping - Resident focused
@@ -202,16 +206,6 @@ export default function ResidentSearchIndex() {
     setFilters(prev => 
       prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
     );
-  };
-
-  // Helper function to get resident profile URL with tab
-  const getResidentProfileUrl = (residentId: number) => {
-    return route('resident.profile.show', { tab: 'profile' });
-  };
-
-  // Helper function to get household URL with members tab
-  const getHouseholdUrl = (householdId: number) => {
-    return route('resident.profile.show', { tab: 'members' });
   };
 
   return (

@@ -1,17 +1,27 @@
 // resources/js/Pages/Admin/DocumentTypes/components/status-banner.tsx
+
 import React from 'react';
 import { Link } from '@inertiajs/react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, Edit } from 'lucide-react';
 import { route } from 'ziggy-js';
-import { DocumentType } from '../types';
+
+// Import from the centralized types file
+import type { DocumentType } from '@/types/admin/document-types/document-types';
 
 interface Props {
     documentType: DocumentType;
 }
 
 export const StatusBanner = ({ documentType }: Props) => {
+    // Check if document type has no category
+    const hasNoCategory = !documentType.category && !documentType.category_name;
+    
+    if (!hasNoCategory) {
+        return null;
+    }
+    
     return (
         <Card className="border-l-4 border-l-amber-500 dark:bg-gray-900">
             <CardContent className="p-4">

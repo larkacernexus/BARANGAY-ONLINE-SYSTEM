@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/Announcements/components/announcement-header.tsx
+
 import React, { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
@@ -41,22 +42,18 @@ import {
 } from 'lucide-react';
 import { route } from 'ziggy-js';
 
-interface Announcement {
-    id: number;
-    title: string;
-    type: string;
-    type_label: string;
-    priority: number;
-    priority_label: string;
-    is_active: boolean;
-    status: string;
-    is_currently_active: boolean;
-    has_attachments: boolean;
-    attachments_count: number;
-}
+// Import types from admin types
+import type { 
+    Announcement, 
+    AnnouncementType,
+    PriorityLevel,
+    AnnouncementStatus
+} from '@/types/admin/announcements/announcement.types';
 
+// Props interface using the Announcement type
 interface Props {
     announcement: Announcement;
+    copied?: boolean; // Optional since we manage internal state
     onCopyLink: () => void;
     onPreview: (e: React.MouseEvent) => void;
     onToggleStatus: () => void;
@@ -64,7 +61,8 @@ interface Props {
     onDelete: () => void;
 }
 
-const getTypeIcon = (type: string) => {
+// Helper functions with proper typing
+const getTypeIcon = (type: AnnouncementType | string) => {
     switch (type) {
         case 'important': return <AlertCircle className="h-3 w-3" />;
         case 'event': return <CalendarDays className="h-3 w-3" />;
@@ -74,7 +72,7 @@ const getTypeIcon = (type: string) => {
     }
 };
 
-const getTypeColor = (type: string): string => {
+const getTypeColor = (type: AnnouncementType | string): string => {
     switch (type) {
         case 'important': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
         case 'event': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
@@ -84,8 +82,9 @@ const getTypeColor = (type: string): string => {
     }
 };
 
-const getPriorityIcon = (priority: number) => {
-    switch (priority) {
+const getPriorityIcon = (priority: PriorityLevel | number) => {
+    const priorityNum = typeof priority === 'number' ? priority : parseInt(priority);
+    switch (priorityNum) {
         case 4: return <AlertCircle className="h-3 w-3" />;
         case 3: return <Bell className="h-3 w-3" />;
         case 2: return <Bell className="h-3 w-3" />;
@@ -94,8 +93,9 @@ const getPriorityIcon = (priority: number) => {
     }
 };
 
-const getPriorityColor = (priority: number): string => {
-    switch (priority) {
+const getPriorityColor = (priority: PriorityLevel | number): string => {
+    const priorityNum = typeof priority === 'number' ? priority : parseInt(priority);
+    switch (priorityNum) {
         case 4: return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
         case 3: return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800';
         case 2: return 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800';
@@ -104,7 +104,7 @@ const getPriorityColor = (priority: number): string => {
     }
 };
 
-const getStatusColor = (status: string, isActive: boolean): string => {
+const getStatusColor = (status: AnnouncementStatus | string, isActive: boolean): string => {
     if (!isActive) return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-700';
     
     switch (status) {
@@ -121,7 +121,7 @@ const getStatusColor = (status: string, isActive: boolean): string => {
     }
 };
 
-const getStatusIcon = (status: string, isActive: boolean) => {
+const getStatusIcon = (status: AnnouncementStatus | string, isActive: boolean) => {
     if (!isActive) return <XCircle className="h-3 w-3" />;
     switch (status) {
         case 'active':
@@ -139,28 +139,41 @@ const getStatusIcon = (status: string, isActive: boolean) => {
 
 export const AnnouncementHeader = ({
     announcement,
+    copied: externalCopied,
     onCopyLink,
     onPreview,
     onToggleStatus,
     onDuplicate,
     onDelete
 }: Props) => {
-    const [copied, setCopied] = useState(false);
+    const [internalCopied, setInternalCopied] = useState(false);
+    
+    // Use external copied state if provided, otherwise use internal
+    const copied = externalCopied !== undefined ? externalCopied : internalCopied;
 
     const handleCopyLink = () => {
         onCopyLink();
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        if (externalCopied === undefined) {
+            setInternalCopied(true);
+            setTimeout(() => setInternalCopied(false), 2000);
+        }
     };
 
-    const getGradientByType = (type: string): string => {
+    const getGradientByType = (type: AnnouncementType | string): string => {
         switch (type) {
             case 'important': return 'from-red-600 to-rose-600 dark:from-red-700 dark:to-rose-700';
             case 'event': return 'from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700';
             case 'maintenance': return 'from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700';
+            case 'other': return 'from-gray-600 to-slate-600 dark:from-gray-700 dark:to-slate-700';
             default: return 'from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700';
         }
     };
+
+    // Determine if announcement is active (using is_active flag)
+    const isActive = announcement.is_active === true;
+    
+    // Determine if announcement is currently displayed
+    const isCurrentlyDisplayed = announcement.is_currently_active === true;
 
     return (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -181,15 +194,15 @@ export const AnnouncementHeader = ({
                         </h1>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                             {/* Status Badge */}
-                            <Badge variant="outline" className={getStatusColor(announcement.status, announcement.is_active)}>
-                                {getStatusIcon(announcement.status, announcement.is_active)}
+                            <Badge variant="outline" className={getStatusColor(announcement.status, isActive)}>
+                                {getStatusIcon(announcement.status, isActive)}
                                 <span className="ml-1">
-                                    {announcement.is_active ? 'Active' : 'Inactive'}
+                                    {isActive ? 'Active' : 'Inactive'}
                                 </span>
                             </Badge>
 
                             {/* Currently Displayed Badge */}
-                            {announcement.is_currently_active && (
+                            {isCurrentlyDisplayed && (
                                 <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
                                     <CheckCircle className="h-3 w-3 mr-1" />
                                     Currently Displayed
@@ -216,7 +229,7 @@ export const AnnouncementHeader = ({
                                             <div className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 rounded-full cursor-default">
                                                 <Paperclip className="h-3 w-3" />
                                                 <span className="text-sm font-medium">
-                                                    {announcement.attachments_count}
+                                                    {announcement.attachments_count || 0}
                                                 </span>
                                             </div>
                                         </TooltipTrigger>
@@ -289,12 +302,12 @@ export const AnnouncementHeader = ({
                             onClick={onToggleStatus} 
                             className="dark:text-gray-300 dark:hover:bg-gray-700"
                         >
-                            {announcement.is_active ? (
+                            {isActive ? (
                                 <XCircle className="h-4 w-4 mr-2" />
                             ) : (
                                 <CheckCircle className="h-4 w-4 mr-2" />
                             )}
-                            {announcement.is_active ? 'Deactivate' : 'Activate'}
+                            {isActive ? 'Deactivate' : 'Activate'}
                         </DropdownMenuItem>
                         
                         <DropdownMenuItem 

@@ -24,7 +24,7 @@ import { useClearanceUtils } from '@/hooks/useClearanceUtils';
 import { usePrintClearance } from '@/hooks/usePrintClearance';
 
 // Import types
-import { ClearanceRequest, ActivityLog } from '@/types/clearance';
+import { ClearanceRequest, ActivityLog } from '@/types/admin/clearances/clearance-types';
 
 interface ShowClearanceProps {
     clearance: ClearanceRequest;
@@ -99,6 +99,11 @@ export default function ShowClearance({
 
     const { handlePrintClearance } = usePrintClearance(printRef);
 
+    // Create wrapper function for print button
+    const handlePrintButton = () => {
+        handlePrintClearance(clearance);
+    };
+
     // Derived data
     const validityStatus = getValidityStatus(clearance);
     const documentStats = getDocumentStats(clearance.documents);
@@ -121,15 +126,11 @@ export default function ShowClearance({
 
     // Document action handlers
     const onVerifyDocument = (documentId: number) => {
-        handleVerifyDocument(documentId, (updatedDoc) => {
-            setViewedDocument(updatedDoc);
-        });
+        handleVerifyDocument(documentId);
     };
 
     const onRejectDocument = (documentId: number, notes: string) => {
-        handleRejectDocument(documentId, notes, (updatedDoc) => {
-            setViewedDocument(updatedDoc);
-        });
+        handleRejectDocument(documentId, notes);
     };
 
     const onDownloadDocument = (doc: any) => {
@@ -177,7 +178,6 @@ export default function ShowClearance({
 
     // Note handler
     const handleAddNote = () => {
-        // Implement add note functionality
         toast.info('Add note feature coming soon');
     };
 
@@ -200,7 +200,7 @@ export default function ShowClearance({
                     isPrinting={isPrinting}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
-                    onPrint={handlePrintClearance}
+                    onPrint={handlePrintButton}
                     onPreview={() => setShowPrintPreview(true)}
                     onCopyReference={copyReferenceNumber}
                     getStatusVariant={getStatusVariant}
@@ -213,7 +213,7 @@ export default function ShowClearance({
                     validityStatus={validityStatus}
                     formatDate={formatDate}
                     onPreview={() => setShowPrintPreview(true)}
-                    onPrint={handlePrintClearance}
+                    onPrint={handlePrintButton}
                     onDownload={handleDownload}
                 />
 

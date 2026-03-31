@@ -2,7 +2,7 @@
 import { useState, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 import { toast } from 'sonner';
-import { Committee, BulkOperation } from '@/types/committees';
+import { Committee, BulkOperation } from '@/types/admin/committees/committees';
 
 interface UseCommitteesBulkActionsProps {
     selectedIds: number[];

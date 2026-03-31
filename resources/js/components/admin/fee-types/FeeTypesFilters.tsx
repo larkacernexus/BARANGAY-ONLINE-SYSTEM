@@ -1,5 +1,6 @@
 // components/admin/fee-types/FeeTypesFilters.tsx
-import { useState, useRef } from 'react';
+
+import { useState, useRef, RefObject } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,11 +8,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Download, FilterX, Layers, Search, X, Rows, Filter, Hash, RotateCcw, AlertCircle } from 'lucide-react';
 import { route } from 'ziggy-js';
 
-interface FilterState {
-    search: string;
-    category: string;
-    status: string;
-}
+// Import types from centralized location
+import type { FilterState } from '@/types/admin/fee-types/fee.types';
 
 interface FeeTypesFiltersProps {
     search: string;
@@ -24,7 +22,7 @@ interface FeeTypesFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef: React.RefObject<HTMLInputElement>;
+    searchInputRef: RefObject<HTMLInputElement | null>;
     categories: Record<string, string>;
     categoryCounts: Record<string, number>;
     isLoading?: boolean;
@@ -48,6 +46,22 @@ export default function FeeTypesFilters({
 }: FeeTypesFiltersProps) {
     const [showSelectionOptions, setShowSelectionOptions] = useState(false);
     const selectionRef = useRef<HTMLDivElement>(null);
+
+    // Handler for category change
+    const handleCategoryChange = (value: string) => {
+        updateFilter('category', value);
+    };
+
+    // Handler for status change
+    const handleStatusChange = (value: string) => {
+        updateFilter('status', value);
+    };
+
+    // Get category display name
+    const getCategoryDisplayName = (categoryId: string): string => {
+        if (categoryId === 'all') return '';
+        return categories[categoryId] || categoryId;
+    };
 
     return (
         <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
@@ -97,7 +111,7 @@ export default function FeeTypesFilters({
                                         <span className="hidden sm:inline">Export</span>
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
+                                <TooltipContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-200">
                                     <p>Export filtered results</p>
                                 </TooltipContent>
                             </Tooltip>
@@ -109,7 +123,7 @@ export default function FeeTypesFilters({
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                             Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} fee types
                             {search && ` matching "${search}"`}
-                            {filtersState.category !== 'all' && ` • Category: ${categories[filtersState.category] || filtersState.category}`}
+                            {filtersState.category !== 'all' && ` • Category: ${getCategoryDisplayName(filtersState.category)}`}
                             {filtersState.status !== 'all' && ` • Status: ${filtersState.status}`}
                         </div>
                         
@@ -136,7 +150,7 @@ export default function FeeTypesFilters({
                             <span className="flex-1">
                                 Active filters applied.
                                 {search && ` Search: "${search}"`}
-                                {filtersState.category !== 'all' && ` Category: ${categories[filtersState.category] || filtersState.category}`}
+                                {filtersState.category !== 'all' && ` Category: ${getCategoryDisplayName(filtersState.category)}`}
                                 {filtersState.status !== 'all' && ` Status: ${filtersState.status}`}
                             </span>
                             <Button
@@ -158,7 +172,7 @@ export default function FeeTypesFilters({
                             <select
                                 className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={filtersState.category}
-                                onChange={(e) => updateFilter('category', e.target.value)}
+                                onChange={(e) => handleCategoryChange(e.target.value)}
                                 disabled={isLoading}
                             >
                                 <option value="all" className="bg-white dark:bg-gray-900">All Categories</option>
@@ -175,7 +189,7 @@ export default function FeeTypesFilters({
                             <select
                                 className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={filtersState.status}
-                                onChange={(e) => updateFilter('status', e.target.value)}
+                                onChange={(e) => handleStatusChange(e.target.value)}
                                 disabled={isLoading}
                             >
                                 <option value="all" className="bg-white dark:bg-gray-900">All Status</option>

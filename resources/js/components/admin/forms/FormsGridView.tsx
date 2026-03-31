@@ -1,3 +1,5 @@
+// components/admin/forms/FormsGridView.tsx
+
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,7 +22,7 @@ import {
 } from 'lucide-react';
 import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
-import { Form } from '@/types';
+import { Form } from '@/types/admin/forms/forms.types';
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
 import { formUtils } from '@/admin-utils/form-utils';
@@ -36,6 +38,10 @@ interface FormsGridViewProps {
     onDownload: (form: Form) => void;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
+    // Add missing props
+    formatFileSize?: (bytes: number) => string;
+    categories?: string[];
+    agencies?: string[];
 }
 
 // Helper function to get file icon based on mime type
@@ -64,11 +70,15 @@ const getStatusColor = (isActive: boolean) => {
 
 const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
+    try {
+        return new Date(dateString).toLocaleDateString('en-PH', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    } catch {
+        return 'Invalid date';
+    }
 };
 
 export default function FormsGridView({
@@ -81,7 +91,10 @@ export default function FormsGridView({
     onToggleStatus,
     onDownload,
     hasActiveFilters,
-    onClearFilters
+    onClearFilters,
+    formatFileSize = formUtils.formatFileSize, // Default to formUtils if not provided
+    categories = [],
+    agencies = []
 }: FormsGridViewProps) {
     const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
     
@@ -173,7 +186,7 @@ export default function FormsGridView({
                                 <div className="flex items-center gap-2 flex-1 min-w-0">
                                     {/* Icon */}
                                     <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex-shrink-0">
-                                        {getFileIcon(form.mime_type)}
+                                        {getFileIcon(form.file_type)}
                                     </div>
                                     
                                     <div className="min-w-0 flex-1">
@@ -204,13 +217,13 @@ export default function FormsGridView({
                                                 <MoreVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                                             </button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-48">
+                                        <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
                                             <DropdownMenuItem 
                                                 onClick={(e) => {
                                                     e.preventDefault();
                                                     handleViewDetails(form.id, e);
                                                 }}
-                                                className="flex items-center gap-2 cursor-pointer"
+                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                             >
                                                 <Eye className="h-4 w-4" />
                                                 <span>View Details</span>
@@ -221,7 +234,7 @@ export default function FormsGridView({
                                                     e.preventDefault();
                                                     handleEdit(form.id, e);
                                                 }}
-                                                className="flex items-center gap-2 cursor-pointer"
+                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                             >
                                                 <Edit className="h-4 w-4" />
                                                 <span>Edit Form</span>
@@ -232,20 +245,20 @@ export default function FormsGridView({
                                                     e.preventDefault();
                                                     onDownload(form);
                                                 }}
-                                                className="flex items-center gap-2 cursor-pointer"
+                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                             >
                                                 <DownloadIcon className="h-4 w-4" />
                                                 <span>Download File</span>
                                             </DropdownMenuItem>
                                             
-                                            <DropdownMenuSeparator />
+                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
                                             
                                             <DropdownMenuItem 
                                                 onClick={(e) => {
                                                     e.preventDefault();
                                                     onToggleStatus(form);
                                                 }}
-                                                className="flex items-center gap-2 cursor-pointer"
+                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                             >
                                                 {isActive ? (
                                                     <>
@@ -265,7 +278,7 @@ export default function FormsGridView({
                                                     e.preventDefault();
                                                     navigator.clipboard.writeText(form.id.toString());
                                                 }}
-                                                className="flex items-center gap-2 cursor-pointer"
+                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                             >
                                                 <Copy className="h-4 w-4" />
                                                 <span>Copy Form ID</span>
@@ -277,7 +290,7 @@ export default function FormsGridView({
                                                         e.preventDefault();
                                                         navigator.clipboard.writeText(form.file_name);
                                                     }}
-                                                    className="flex items-center gap-2 cursor-pointer"
+                                                    className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                 >
                                                     <FileText className="h-4 w-4" />
                                                     <span>Copy Filename</span>
@@ -286,13 +299,13 @@ export default function FormsGridView({
 
                                             {isBulkMode && (
                                                 <>
-                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                     <DropdownMenuItem 
                                                         onClick={(e) => {
                                                             e.preventDefault();
                                                             onItemSelect(form.id);
                                                         }}
-                                                        className="flex items-center gap-2 cursor-pointer"
+                                                        className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
                                                     >
                                                         {isSelected ? (
                                                             <>
@@ -309,7 +322,7 @@ export default function FormsGridView({
                                                 </>
                                             )}
                                             
-                                            <DropdownMenuSeparator />
+                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
                                             
                                             <DropdownMenuItem 
                                                 onClick={(e) => {
@@ -335,15 +348,14 @@ export default function FormsGridView({
                                     {isActive ? 'Active' : 'Inactive'}
                                 </Badge>
                                 
-                                <Badge variant="outline" className="text-xs px-2 py-0.5">
-                                    {formUtils.getCategoryColor(form.category || 'Other')}
-                                    <span className="ml-1">{form.category || 'Uncategorized'}</span>
+                                <Badge variant="outline" className={`text-xs px-2 py-0.5 ${formUtils.getCategoryColor(form.category || 'Other')}`}>
+                                    {form.category || 'Uncategorized'}
                                 </Badge>
                                 
                                 {form.download_count > 0 && (
                                     <Badge variant="outline" className="text-xs px-2 py-0.5">
                                         <DownloadIcon className="h-3 w-3 mr-1" />
-                                        {form.download_count} downloads
+                                        {form.download_count.toLocaleString()} downloads
                                     </Badge>
                                 )}
                             </div>
@@ -368,7 +380,7 @@ export default function FormsGridView({
                                     <FileText className="h-3.5 w-3.5 flex-shrink-0" />
                                     <span className="truncate">
                                         {formUtils.truncateText(form.file_name || 'No file', 25)}
-                                        {form.file_size && ` (${formUtils.formatFileSize(form.file_size)})`}
+                                        {form.file_size && ` (${formatFileSize(form.file_size)})`}
                                     </span>
                                 </div>
 
@@ -377,14 +389,6 @@ export default function FormsGridView({
                                     <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
                                     <span>{formatDate(form.created_at)}</span>
                                 </div>
-
-                                {/* Created by */}
-                                {form.created_by?.name && (
-                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                        <User className="h-3.5 w-3.5 flex-shrink-0" />
-                                        <span className="truncate">Uploaded by: {form.created_by.name}</span>
-                                    </div>
-                                )}
                             </div>
 
                             {/* Expand/Collapse indicator */}
@@ -433,8 +437,8 @@ export default function FormsGridView({
                                             <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">File Details:</p>
                                             <div className="space-y-1 text-gray-600 dark:text-gray-400">
                                                 <div>Name: {form.file_name}</div>
-                                                {form.file_size && <div>Size: {formUtils.formatFileSize(form.file_size)}</div>}
-                                                {form.mime_type && <div>Type: {form.mime_type}</div>}
+                                                {form.file_size && <div>Size: {formatFileSize(form.file_size)}</div>}
+                                                {form.file_type && <div>Type: {form.file_type}</div>}
                                             </div>
                                         </div>
                                     )}

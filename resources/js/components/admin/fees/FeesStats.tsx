@@ -9,7 +9,7 @@ import {
     Percent
 } from 'lucide-react';
 import { StatCard } from '@/components/adminui/stats-grid';
-import { Stats } from '@/types/fees.types';
+import { Stats } from '@/types/admin/fee-types/fee.types';
 
 interface FeesStatsProps {
     stats: Stats;

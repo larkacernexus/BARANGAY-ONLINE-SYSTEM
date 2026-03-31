@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-import { PageProps } from '@/types';
+import { PageProps } from '@/types/admin/forms/forms.types';
 
 // Define categories and agencies as constants (matching the Model)
 const CATEGORIES = [

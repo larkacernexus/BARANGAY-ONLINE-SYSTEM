@@ -25,7 +25,22 @@ import { BlotterTabs } from '@/components/admin/blotters/show/components/blotter
 import { BlotterBanner } from '@/components/admin/blotters/show/components/blotter-banner';
 
 // Import types
-import { Blotter, Attachment } from '@/components/admin/blotters/show/types';
+import { Blotter } from '@/types/admin/blotters/blotter';
+
+// Define DisplayAttachment interface matching the shared type
+interface DisplayAttachment {
+    id?: number;
+    name: string;
+    file_name?: string;
+    path?: string;
+    file_path?: string;
+    size: number;
+    file_size?: number;
+    type: string;
+    file_type?: string;
+    url?: string;
+    preview?: string;
+}
 
 interface Props {
     blotter: Blotter;
@@ -37,7 +52,7 @@ export default function BlotterShow({ blotter }: Props) {
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
-    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [attachments, setAttachments] = useState<DisplayAttachment[]>([]);
     const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
 
     // Safely get arrays
@@ -46,7 +61,9 @@ export default function BlotterShow({ blotter }: Props) {
     // Fetch attachments with URLs
     useEffect(() => {
         const fetchAttachments = async () => {
-            if (!blotter.attachments || blotter.attachments.length === 0) {
+            const hasAttachments = blotter.attachments && blotter.attachments.length > 0;
+            
+            if (!hasAttachments) {
                 setAttachments([]);
                 return;
             }
@@ -54,23 +71,56 @@ export default function BlotterShow({ blotter }: Props) {
             setIsLoadingAttachments(true);
             try {
                 const attachmentsWithUrls = await Promise.all(
-                    blotter.attachments.map(async (attachment, index) => {
+                    (blotter.attachments || []).map(async (attachment, index) => {
                         try {
                             const response = await axios.get(`/admin/blotters/${blotter.id}/attachment-url/${index}`);
+                            const isImage = attachment.type?.startsWith('image/') || 
+                                          attachment.file_type?.startsWith('image/');
+                            
                             return {
-                                ...attachment,
+                                id: attachment.id || index,
+                                name: attachment.name || attachment.file_name || 'Unknown file',
+                                file_name: attachment.file_name,
+                                path: attachment.path || attachment.file_path,
+                                file_path: attachment.file_path,
+                                size: attachment.size || attachment.file_size || 0,
+                                file_size: attachment.file_size,
+                                type: attachment.type || attachment.file_type || 'application/octet-stream',
+                                file_type: attachment.file_type,
                                 url: response.data.url,
-                                preview: attachment.type.startsWith('image/') ? response.data.url : undefined
-                            };
+                                preview: isImage ? response.data.url : undefined
+                            } as DisplayAttachment;
                         } catch (error) {
-                            return attachment;
+                            console.error('Error fetching attachment URL:', error);
+                            return {
+                                id: attachment.id || index,
+                                name: attachment.name || attachment.file_name || 'Unknown file',
+                                file_name: attachment.file_name,
+                                path: attachment.path || attachment.file_path,
+                                file_path: attachment.file_path,
+                                size: attachment.size || attachment.file_size || 0,
+                                file_size: attachment.file_size,
+                                type: attachment.type || attachment.file_type || 'application/octet-stream',
+                                file_type: attachment.file_type,
+                            } as DisplayAttachment;
                         }
                     })
                 );
                 setAttachments(attachmentsWithUrls);
             } catch (error) {
                 console.error('Error fetching attachment URLs:', error);
-                setAttachments(blotter.attachments);
+                const fallbackAttachments = (blotter.attachments || []).map((attachment, index) => ({
+                    id: attachment.id || index,
+                    name: attachment.name || attachment.file_name || 'Unknown file',
+                    file_name: attachment.file_name,
+                    path: attachment.path || attachment.file_path,
+                    file_path: attachment.file_path,
+                    size: attachment.size || attachment.file_size || 0,
+                    file_size: attachment.file_size,
+                    type: attachment.type || attachment.file_type || 'application/octet-stream',
+                    file_type: attachment.file_type,
+                }));
+                setAttachments(fallbackAttachments);
             } finally {
                 setIsLoadingAttachments(false);
             }
@@ -117,7 +167,11 @@ export default function BlotterShow({ blotter }: Props) {
         const data = {
             blotter: {
                 ...blotter,
-                attachments: attachments.map(a => ({ name: a.name, size: a.size, type: a.type })),
+                attachments: attachments.map(a => ({ 
+                    name: a.name, 
+                    size: a.size, 
+                    type: a.type 
+                })),
                 involved_residents: involvedResidents
             }
         };
@@ -126,10 +180,13 @@ export default function BlotterShow({ blotter }: Props) {
         const a = document.createElement('a');
         a.href = url;
         a.download = `blotter-${blotter.blotter_number}.json`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
-    const handleDownload = async (attachment: Attachment, index: number) => {
+    const handleDownload = async (attachment: DisplayAttachment, index: number): Promise<void> => {
         try {
             const response = await axios.get(`/admin/blotters/${blotter.id}/download-attachment/${index}`, {
                 responseType: 'blob'
@@ -141,7 +198,7 @@ export default function BlotterShow({ blotter }: Props) {
             link.setAttribute('download', attachment.name);
             document.body.appendChild(link);
             link.click();
-            link.remove();
+            document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Error downloading attachment:', error);

@@ -6,6 +6,16 @@ import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
 import { route } from 'ziggy-js';
 
+// Import types
+import type { 
+    Announcement, 
+    AnnouncementAttachment, 
+    AudienceDetails,
+    AnnouncementType,
+    PriorityLevel,
+    AudienceType
+} from '@/types/admin/announcements/announcement.types';
+
 // Import all the extracted components
 import { AnnouncementHeader } from '@/components/admin/announcements/show/components/announcement-header';
 import { ExpiryBanner } from '@/components/admin/announcements/show/components/expiry-banner';
@@ -13,66 +23,15 @@ import { AnnouncementTabs } from '@/components/admin/announcements/show/componen
 import { ImagePreviewDialog } from '@/components/admin/announcements/show/components/image-preview-dialog';
 import { PreviewModal } from '@/components/admin/announcements/show/components/preview-modal';
 
+// Import icons needed for helper functions
+import { 
+    AlertCircle, CalendarDays, Wrench, Tag, Megaphone, 
+    Bell, Users, MapPin, Home, Briefcase, UserCircle, Globe,
+    FileImage, FileText, FileSpreadsheet, FileArchive, File,
+    XCircle, CheckCircle, Clock, Archive, Eye, EyeOff
+} from 'lucide-react';
 
-// ==================== INTERFACES ====================
-interface AnnouncementAttachment {
-    id: number;
-    file_path: string;
-    file_name: string;
-    original_name: string;
-    file_size: number;
-    formatted_size: string;
-    mime_type: string;
-    is_image: boolean;
-    created_at: string;
-    created_by?: string;
-}
-
-interface Announcement {
-    id: number;
-    title: string;
-    content: string;
-    type: string;
-    type_label: string;
-    priority: number;
-    priority_label: string;
-    is_active: boolean;
-    audience_type: string;
-    audience_type_label: string;
-    audience_summary: string;
-    estimated_reach: number;
-    target_roles: number[] | null;
-    target_puroks: number[] | null;
-    target_households: number[] | null;
-    target_businesses: number[] | null;
-    target_users: number[] | null;
-    start_date: string | null;
-    end_date: string | null;
-    formatted_date_range: string;
-    created_at: string;
-    updated_at: string;
-    status: string;
-    status_label: string;
-    status_color: string;
-    is_currently_active: boolean;
-    has_attachments: boolean;
-    attachments_count: number;
-    attachments?: AnnouncementAttachment[];
-    creator: {
-        id: number;
-        name: string;
-        email: string;
-    } | null;
-}
-
-interface AudienceDetails {
-    roles?: Array<{ id: number; name: string }>;
-    puroks?: Array<{ id: number; name: string }>;
-    households?: Array<{ id: number; household_number: string; purok?: { name: string } }>;
-    businesses?: Array<{ id: number; business_name: string; owner_name?: string }>;
-    users?: Array<{ id: number; first_name: string; last_name: string; email: string; role?: { name: string } }>;
-}
-
+// ==================== PROPS INTERFACE ====================
 interface Props {
     announcement: Announcement;
     audience_details: AudienceDetails;
@@ -82,7 +41,7 @@ interface Props {
 }
 
 // ==================== HELPER FUNCTIONS ====================
-export const formatDate = (dateString: string | null) => {
+export const formatDate = (dateString: string | null): string => {
     if (!dateString) return 'Not set';
     return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -91,7 +50,7 @@ export const formatDate = (dateString: string | null) => {
     });
 };
 
-export const formatDateTime = (dateString: string | null) => {
+export const formatDateTime = (dateString: string | null): string => {
     if (!dateString) return 'Not set';
     return new Date(dateString).toLocaleString('en-US', {
         year: 'numeric',
@@ -102,7 +61,7 @@ export const formatDateTime = (dateString: string | null) => {
     });
 };
 
-export const getTypeIcon = (type: string) => {
+export const getTypeIcon = (type: AnnouncementType | string) => {
     switch (type) {
         case 'important': return <AlertCircle className="h-5 w-5" />;
         case 'event': return <CalendarDays className="h-5 w-5" />;
@@ -112,7 +71,7 @@ export const getTypeIcon = (type: string) => {
     }
 };
 
-export const getTypeColor = (type: string): string => {
+export const getTypeColor = (type: AnnouncementType | string): string => {
     switch (type) {
         case 'important': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800';
         case 'event': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
@@ -122,8 +81,9 @@ export const getTypeColor = (type: string): string => {
     }
 };
 
-export const getPriorityIcon = (priority: number) => {
-    switch (priority) {
+export const getPriorityIcon = (priority: PriorityLevel | number) => {
+    const priorityNum = typeof priority === 'number' ? priority : parseInt(priority);
+    switch (priorityNum) {
         case 4: return <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-400" />;
         case 3: return <Bell className="h-4 w-4 text-orange-500 dark:text-orange-400" />;
         case 2: return <Bell className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />;
@@ -132,8 +92,9 @@ export const getPriorityIcon = (priority: number) => {
     }
 };
 
-export const getPriorityColor = (priority: number): string => {
-    switch (priority) {
+export const getPriorityColor = (priority: PriorityLevel | number): string => {
+    const priorityNum = typeof priority === 'number' ? priority : parseInt(priority);
+    switch (priorityNum) {
         case 4: return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800';
         case 3: return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800';
         case 2: return 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800';
@@ -142,7 +103,7 @@ export const getPriorityColor = (priority: number): string => {
     }
 };
 
-export const getAudienceIcon = (type: string) => {
+export const getAudienceIcon = (type: AudienceType | string) => {
     switch (type) {
         case 'roles': return Users;
         case 'puroks': return MapPin;
@@ -167,7 +128,7 @@ export const getFileIcon = (attachment: AnnouncementAttachment) => {
 };
 
 export const getStatusIcon = (status: string, isActive: boolean) => {
-    if (!isActive) return <XCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />;
+    if (!isActive) return <EyeOff className="h-4 w-4 text-gray-500 dark:text-gray-400" />;
     switch (status) {
         case 'active':
         case 'published':
@@ -182,16 +143,8 @@ export const getStatusIcon = (status: string, isActive: boolean) => {
     }
 };
 
-// Import icons needed for helper functions
-import { 
-    AlertCircle, CalendarDays, Wrench, Tag, Megaphone, 
-    Bell, Users, MapPin, Home, Briefcase, UserCircle, Globe,
-    FileImage, FileText, FileSpreadsheet, FileArchive, File,
-    XCircle, CheckCircle, Clock, Archive
-} from 'lucide-react';
-
 export default function AnnouncementsShow({ announcement, audience_details, types, priorities, audience_types }: Props) {
-    const [activeTab, setActiveTab] = useState('details');
+    const [activeTab, setActiveTab] = useState<'details' | 'attachments' | 'audience' | 'preview'>('details');
     const [viewingAttachment, setViewingAttachment] = useState<AnnouncementAttachment | null>(null);
     const [isDownloading, setIsDownloading] = useState<number | null>(null);
     const [copied, setCopied] = useState(false);
@@ -200,7 +153,6 @@ export default function AnnouncementsShow({ announcement, audience_details, type
     const handleDownload = (attachment: AnnouncementAttachment) => {
         setIsDownloading(attachment.id);
         try {
-            // Use the correct route for downloading
             window.location.href = route('admin.announcements.download-attachment', attachment.id);
             toast.success('Download started');
         } catch (error) {
@@ -215,7 +167,6 @@ export default function AnnouncementsShow({ announcement, audience_details, type
         if (attachment.is_image) {
             setViewingAttachment(attachment);
         } else {
-            // For non-image files, open in new tab
             window.open(route('admin.announcements.view-attachment', attachment.id), '_blank');
         }
     };
@@ -283,7 +234,7 @@ export default function AnnouncementsShow({ announcement, audience_details, type
     };
 
     // Get days until end date
-    const getDaysUntilEnd = () => {
+    const getDaysUntilEnd = (): number | null => {
         if (!announcement.end_date) return null;
         const end = new Date(announcement.end_date);
         const today = new Date();
@@ -375,9 +326,9 @@ export default function AnnouncementsShow({ announcement, audience_details, type
                 getTypeIcon={getTypeIcon}
                 getTypeColor={getTypeColor}
                 getPriorityColor={getPriorityColor}
-                getFileIcon={getFileIcon} getAudienceIcon={function (type: string): React.ElementType {
-                    throw new Error('Function not implemented.');
-                } }            />
+                getFileIcon={getFileIcon}
+                getAudienceIcon={getAudienceIcon}
+            />
         </AppLayout>
     );
 }

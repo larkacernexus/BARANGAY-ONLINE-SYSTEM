@@ -25,6 +25,11 @@ export interface Blotter {
     investigator: string | null;
     resolved_datetime: string | null;
     attachments: Array<{
+        file_path: string;
+        file_type: any;
+        id: number;
+        file_name: string;
+        file_size: number;
         name: string;
         path: string;
         size: number;
@@ -65,4 +70,44 @@ export interface BlotterFilters {
     sort_by: string;
     sort_order: 'asc' | 'desc';
     search?: string;
+}
+
+export interface Attachment {
+    file_type: string;
+    id: number;
+    file_name: string;
+    file_size: number;
+    name: string;
+    path: string;
+    size: number;
+    type: string;
+    url?: string;
+    preview?: string;
+}
+
+export interface InvolvedResident {
+    id: number;
+    name: string;
+    address: string | null;
+    contact: string | null;
+}
+
+export interface IncidentType {
+    code: string;
+    name: string;
+    category: string;
+    description: string;
+    priority_level: number;
+    resolution_days: number;
+    requires_evidence: boolean;
+    legal_basis?: string;
+}
+
+export interface Resident {
+    id: number;
+    name: string;
+    first_name: string;
+    last_name: string;
+    address?: string;
+    contact_number?: string;
 }

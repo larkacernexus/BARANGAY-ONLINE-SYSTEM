@@ -1,12 +1,13 @@
 // pages/admin/Blotters/Edit.tsx
+
 import { useState, useEffect } from 'react';
 import { router, Link } from '@inertiajs/react';
 import { toast } from 'sonner';
 import AdminLayout from '@/layouts/admin-app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Save, Send, ArrowRight, Eye, FileText, AlertCircle, Users, UserPlus, AlertTriangle, CheckCircle, Info } from 'lucide-react';
-import { BLOTTER_INCIDENT_TYPES, getPriorityLevelColor, getPriorityLevelLabel } from '@/data/blotterIncidentTypes';
+import { ArrowLeft, Save, Send, ArrowRight, Eye, FileText, AlertCircle, Users, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { BLOTTER_INCIDENT_TYPES } from '@/data/blotterIncidentTypes';
 
 // Import components
 import { StepProgress } from '@/components/admin/blotters/create/components/StepProgress';
@@ -19,30 +20,8 @@ import { InvolvedResidentsCard } from '@/components/admin/blotters/create/compon
 import { ReviewCard } from '@/components/admin/blotters/create/components/ReviewCard';
 import { ProgressSidebar } from '@/components/admin/blotters/create/components/ProgressSidebar';
 
-// Types
-interface Resident {
-    id: number;
-    name: string;
-    first_name: string;
-    last_name: string;
-    address?: string;
-    contact_number?: string;
-}
-
-interface Attachment {
-    id: number;
-    file_name: string;
-    file_path: string;
-    file_type: string;
-    file_size: number;
-    created_at: string;
-}
-
-interface InvolvedResident {
-    id: number;
-    name: string;
-    address?: string;
-}
+// Import types - FIXED: Use correct path
+import type { Resident, Attachment, InvolvedResident, IncidentType } from '@/types/admin/blotters/blotter';
 
 interface Props {
     blotter: {
@@ -81,8 +60,8 @@ const steps = [
 ];
 
 export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Props) {
-    const [activeStep, setActiveStep] = useState(1);
-    const [selectedType, setSelectedType] = useState<any>(null);
+    const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
+    const [selectedType, setSelectedType] = useState<IncidentType | null>(null);
     const [selectedResidents, setSelectedResidents] = useState<Resident[]>([]);
     const [newAttachments, setNewAttachments] = useState<File[]>([]);
     const [existingAttachments, setExistingAttachments] = useState<Attachment[]>([]);
@@ -92,6 +71,7 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
     const [selectedReporterResident, setSelectedReporterResident] = useState<Resident | null>(null);
     const [selectedRespondentResident, setSelectedRespondentResident] = useState<Resident | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     const [data, setData] = useState({
         incident_type: blotter.incident_type,
@@ -108,14 +88,12 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
         respondent_address: blotter.respondent_address,
         respondent_is_resident: !!blotter.respondent_resident_id,
         respondent_resident_id: blotter.respondent_resident_id,
-        witnesses: blotter.witnesses,
-        evidence: blotter.evidence,
+        witnesses: blotter.witnesses || '',
+        evidence: blotter.evidence || '',
         priority: blotter.priority,
         involved_residents: blotter.involved_residents?.map(r => r.id) || [],
         attachments: [] as File[],
     });
-
-    const [errors, setErrors] = useState<Record<string, string>>({});
 
     // Initialize data from blotter
     useEffect(() => {
@@ -181,42 +159,42 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
     }).length;
     const totalProgress = Math.round((completedRequired / requiredFields.length) * 100);
 
-    const isStepValid = () => {
+    const isStepValid = (): boolean => {
         if (activeStep === 1) {
-            return data.incident_type && data.incident_datetime && data.location && data.incident_description;
+            return !!(data.incident_type && data.incident_datetime && data.location && data.incident_description);
         }
         if (activeStep === 2) {
-            return (data.reporter_name || data.reporter_resident_id) ? true : false;
+            return !!(data.reporter_name || data.reporter_resident_id);
         }
         return true;
     };
 
     // Navigation
-    const goToStep = (step: number) => {
+    const goToStep = (step: number): void => {
         if (step >= 1 && step <= 3) {
-            setActiveStep(step);
+            setActiveStep(step as 1 | 2 | 3);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
-    const nextStep = () => {
+    const nextStep = (): void => {
         if (activeStep === 1 && !isStepValid()) return;
         if (activeStep === 2 && !isStepValid()) return;
         if (activeStep < 3) {
-            setActiveStep(prev => prev + 1);
+            setActiveStep(prev => (prev + 1) as 1 | 2 | 3);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
-    const prevStep = () => {
+    const prevStep = (): void => {
         if (activeStep > 1) {
-            setActiveStep(prev => prev - 1);
+            setActiveStep(prev => (prev - 1) as 1 | 2 | 3);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
     // Event handlers
-    const handleIncidentTypeSelect = (type: any) => {
+    const handleIncidentTypeSelect = (type: IncidentType): void => {
         setSelectedType(type);
         setData(prev => ({ ...prev, incident_type: type.code }));
         
@@ -228,13 +206,13 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
         setIncidentSearchTerm(type.name);
     };
 
-    const handleIncidentTypeClear = () => {
+    const handleIncidentTypeClear = (): void => {
         setSelectedType(null);
         setData(prev => ({ ...prev, incident_type: '' }));
         setIncidentSearchTerm('');
     };
 
-    const handleReporterResidentSelect = (resident: Resident) => {
+    const handleReporterResidentSelect = (resident: Resident): void => {
         setSelectedReporterResident(resident);
         setData(prev => ({
             ...prev,
@@ -245,7 +223,7 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
         }));
     };
 
-    const handleReporterResidentClear = () => {
+    const handleReporterResidentClear = (): void => {
         setSelectedReporterResident(null);
         setData(prev => ({
             ...prev,
@@ -256,7 +234,7 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
         }));
     };
 
-    const handleRespondentResidentSelect = (resident: Resident) => {
+    const handleRespondentResidentSelect = (resident: Resident): void => {
         setSelectedRespondentResident(resident);
         setData(prev => ({
             ...prev,
@@ -266,7 +244,7 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
         }));
     };
 
-    const handleRespondentResidentClear = () => {
+    const handleRespondentResidentClear = (): void => {
         setSelectedRespondentResident(null);
         setData(prev => ({
             ...prev,
@@ -276,7 +254,7 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
         }));
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
         if (e.target.files) {
             const files = Array.from(e.target.files);
             setNewAttachments([...newAttachments, ...files]);
@@ -295,17 +273,17 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
         }
     };
 
-    const removeNewFile = (index: number) => {
+    const removeNewFile = (index: number): void => {
         setNewAttachments(newAttachments.filter((_, i) => i !== index));
         setAttachmentPreviews(prev => prev.filter((_, i) => i !== index));
     };
 
-    const removeExistingFile = (fileId: number) => {
+    const removeExistingFile = (fileId: number): void => {
         setExistingAttachments(prev => prev.filter(f => f.id !== fileId));
         setAttachmentsToDelete(prev => [...prev, fileId]);
     };
 
-    const toggleResident = (resident: Resident) => {
+    const toggleResident = (resident: Resident): void => {
         const isSelected = selectedResidents.some(r => r.id === resident.id);
         if (isSelected) {
             setSelectedResidents(selectedResidents.filter(r => r.id !== resident.id));
@@ -322,7 +300,7 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent): void => {
         e.preventDefault();
         
         if (!isStepValid()) {
@@ -348,7 +326,9 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
 
         // Append attachments to delete
         if (attachmentsToDelete.length > 0) {
-            submitData.append('delete_attachments', JSON.stringify(attachmentsToDelete));
+            attachmentsToDelete.forEach((id, index) => {
+                submitData.append(`delete_attachments[${index}]`, String(id));
+            });
         }
 
         // Append new attachments
@@ -417,7 +397,7 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
                 { title: 'Edit Blotter', href: `/admin/blotters/${blotter.id}/edit` }
             ]}
         >
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} encType="multipart/form-data">
                 <div className="space-y-6 p-4 md:p-6">
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -515,6 +495,7 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
                                         onFileChange={handleFileChange}
                                         onRemoveNewFile={removeNewFile}
                                         onRemoveExistingFile={removeExistingFile}
+                                        isEditMode={true}
                                     />
                                 </>
                             )}
@@ -553,6 +534,7 @@ export default function Edit({ blotter, residents, barangayName = 'Kibawe' }: Pr
                                         evidence={data.evidence}
                                         onWitnessesChange={(val) => setData(prev => ({ ...prev, witnesses: val }))}
                                         onEvidenceChange={(val) => setData(prev => ({ ...prev, evidence: val }))}
+                                        showTips={true}
                                     />
                                     <InvolvedResidentsCard
                                         residents={residents}

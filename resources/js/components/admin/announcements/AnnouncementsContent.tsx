@@ -35,12 +35,18 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import AnnouncementsTableView from '@/components/admin/announcements/AnnouncementsTableView';
 import AnnouncementsGridView from '@/components/admin/announcements/AnnouncementsGridView';
 import AnnouncementsBulkActions from './AnnouncementsBulkActions';
-import { Announcement, AnnouncementFilters } from '@/types';
-import { announcementUtils } from '@/admin-utils/announcement-utils';
+import { 
+    Announcement, 
+    AnnouncementFilters, 
+    AnnouncementStats, 
+    SelectionMode, 
+    SelectionStats,
+    BulkOperation
+} from '@/types/admin/announcements/announcement.types';
 
 interface AnnouncementsContentProps {
     announcements: Announcement[];
-    stats: any;
+    stats?: AnnouncementStats;
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
@@ -62,19 +68,19 @@ interface AnnouncementsContentProps {
     onClearSelection: () => void;
     onDelete: (announcement: Announcement) => void;
     onToggleStatus: (announcement: Announcement) => void;
-    onSendNotifications: (announcement: Announcement) => void;
-    onResendNotifications: (announcement: Announcement) => void;
-    onViewNotificationStats: (announcement: Announcement) => void;
-    onDuplicate: (announcement: Announcement) => void;
+    onSendNotifications?: (announcement: Announcement) => void;
+    onResendNotifications?: (announcement: Announcement) => void;
+    onViewNotificationStats?: (announcement: Announcement) => void;
+    onDuplicate?: (announcement: Announcement) => void;
     onSort: (column: string) => void;
-    onBulkOperation: (operation: string, additionalData?: any) => void;
+    onBulkOperation: (operation: BulkOperation, additionalData?: any) => void;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkNotifyDialog?: (show: boolean) => void;
     filtersState: AnnouncementFilters;
     isPerformingBulkAction: boolean;
-    selectionMode: 'page' | 'filtered' | 'all';
-    selectionStats?: any;
+    selectionMode: SelectionMode;
+    selectionStats?: SelectionStats;
     types?: Record<string, string>;
     priorities?: Record<string, string>;
     audienceTypes?: Record<string, string>;
@@ -135,13 +141,13 @@ export default function AnnouncementsContent({
             {
                 label: 'Export',
                 icon: <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('export'),
+                onClick: () => onBulkOperation('export' as BulkOperation),
                 tooltip: 'Export selected announcements'
             },
             {
                 label: 'Publish',
                 icon: <Send className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('publish'),
+                onClick: () => onBulkOperation('publish' as BulkOperation),
                 tooltip: 'Publish selected announcements'
             }
         ],
@@ -149,19 +155,19 @@ export default function AnnouncementsContent({
             {
                 label: 'Activate',
                 icon: <Bell className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('activate'),
+                onClick: () => onBulkOperation('activate' as BulkOperation),
                 tooltip: 'Activate selected announcements'
             },
             {
                 label: 'Deactivate',
                 icon: <Bell className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('deactivate'),
+                onClick: () => onBulkOperation('deactivate' as BulkOperation),
                 tooltip: 'Deactivate selected announcements'
             },
             {
                 label: 'Archive',
                 icon: <Archive className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('archive'),
+                onClick: () => onBulkOperation('archive' as BulkOperation),
                 tooltip: 'Archive selected announcements'
             },
             {
@@ -301,6 +307,7 @@ export default function AnnouncementsContent({
                 <CardContent className="p-0 dark:bg-gray-900">
                     {/* Empty State with dark mode */}
                     {announcements.length === 0 ? (
+                       <div className="py-12 sm:py-16 dark:bg-gray-900">
                         <EmptyState
                             icon={<Megaphone className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
                             title="No announcements found"
@@ -311,8 +318,8 @@ export default function AnnouncementsContent({
                                 label: "Clear Filters",
                                 onClick: onClearFilters
                             } : undefined}
-                            className="py-12 sm:py-16 dark:bg-gray-900"
                         />
+                    </div>
                     ) : (
                         <>
                             {/* Table View */}

@@ -10,7 +10,7 @@ import { Info, ChevronUp, ChevronDown, Calendar, Clock, Copy, Tag } from 'lucide
 import { cn } from '@/lib/utils';
 import { formatDate, formatDateTime } from '@/components/residentui/lib/resident-ui-utils';
 import { getDocumentStatus } from '@/utils/portal/records/document.utils';
-import type { AppDocument } from '@/types/portal/records/document.types';
+import type { Document } from '@/types/portal/records/records';
 
 // Define the Tag type
 interface Tag {
@@ -20,7 +20,7 @@ interface Tag {
 }
 
 // Use intersection type instead of extending
-type ExtendedDocument = AppDocument & {
+type ExtendedDocument = Document & {
     tags?: (string | Tag)[];
     uploaded_by_user?: {
         id: number;

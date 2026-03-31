@@ -1,18 +1,20 @@
 // resources/js/components/admin/forms/FormsFilters.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ChevronUp, ChevronDown, FilterX, Filter, Download, AlertCircle } from 'lucide-react';
 import { FilterBar } from '@/components/adminui/filter-bar';
-// Remove StatsCards import
+import { Filters } from '@/types/admin/forms/forms.types';
+import { RefObject } from 'react';
 
 interface FormsFiltersProps {
     search: string;
     setSearch: (value: string) => void;
-    onSearchChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    filtersState: any;
-    updateFilter: (key: string, value: string) => void;
+    onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    filtersState: Filters;
+    updateFilter: (key: keyof Filters, value: string) => void;
     showAdvancedFilters: boolean;
     setShowAdvancedFilters: (value: boolean) => void;
     handleClearFilters: () => void;
@@ -23,12 +25,11 @@ interface FormsFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef?: React.RefObject<HTMLInputElement>;
+    searchInputRef?: RefObject<HTMLInputElement | null>;  // Allow null
     isLoading?: boolean;
 }
 
 export default function FormsFilters({
-    // Remove stats from props
     search,
     setSearch,
     onSearchChange,
@@ -38,8 +39,8 @@ export default function FormsFilters({
     setShowAdvancedFilters,
     handleClearFilters,
     hasActiveFilters,
-    categories = [], // Add default for categories
-    agencies = [], // Add default for agencies
+    categories = [],
+    agencies = [],
     isMobile,
     totalItems,
     startIndex,
@@ -48,17 +49,22 @@ export default function FormsFilters({
     isLoading = false
 }: FormsFiltersProps) {
     
-    // Remove the formStats array and StatsCards component
+    // Create a wrapper function that converts the event to a string
+    const handleSearchChange = (value: string) => {
+        // Simulate an event object for the parent's onSearchChange
+        const fakeEvent = {
+            target: { value }
+        } as React.ChangeEvent<HTMLInputElement>;
+        onSearchChange(fakeEvent);
+    };
     
     return (
         <>
-            {/* Stats have been moved to a separate FormsStats component */}
-            
             <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
                 <CardContent className="p-4 sm:pt-6">
                     <FilterBar
                         search={search}
-                        onSearchChange={onSearchChange || setSearch}
+                        onSearchChange={handleSearchChange}
                         onClearFilters={handleClearFilters}
                         hasActiveFilters={hasActiveFilters}
                         showAdvancedFilters={showAdvancedFilters}

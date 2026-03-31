@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ChevronRight, AlertCircle, MapPin, User, Phone, Users } from 'lucide-react';
-import { Blotter, InvolvedResident } from '@/components/admin/blotters/show/types';
+import { Blotter, InvolvedResident } from '@/types/admin/blotters/blotter';
 import { QuickStatsCard } from '../cards/quick-stats-card';
 import { QuickActionsCard } from '../cards/quick-actions-card';
 import { TimelineCard } from '../cards/timeline-card';

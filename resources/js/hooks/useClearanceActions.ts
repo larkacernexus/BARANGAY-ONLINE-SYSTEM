@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
 import { toast } from 'sonner';
-import { ClearanceRequest } from '@/types/clearance';
+import { ClearanceRequest } from '@/types/admin/clearances/clearance-types';
 
 export function useClearanceActions(clearance: ClearanceRequest) {
     const [isProcessing, setIsProcessing] = useState(false);

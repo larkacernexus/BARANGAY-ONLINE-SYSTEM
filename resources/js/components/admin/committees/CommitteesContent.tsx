@@ -1,4 +1,5 @@
 // resources/js/components/admin/committees/CommitteesContent.tsx
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -13,7 +14,7 @@ import { Pagination } from '@/components/adminui/pagination';
 import { SelectAllFloat } from '@/components/adminui/select-all-float';
 import { GridSelectionSummary } from '@/components/adminui/grid-selection-summary';
 import { Grid3X3, List, Users } from 'lucide-react';
-import { Committee } from '@/types/committees';
+import { Committee } from '@/types/admin/committees/committees';
 
 interface CommitteesContentProps {
     committees: Committee[];
@@ -36,6 +37,7 @@ interface CommitteesContentProps {
     onToggleStatus: (committee: Committee) => void;
     onToggleBulkMode: () => void;
     onClearSelection?: () => void;
+    onCreateCommittee?: () => void; // Add this prop for create action
 }
 
 export function CommitteesContent({
@@ -58,7 +60,8 @@ export function CommitteesContent({
     onDelete,
     onToggleStatus,
     onToggleBulkMode,
-    onClearSelection = () => {}
+    onClearSelection = () => {},
+    onCreateCommittee = () => {} // Default empty function
 }: CommitteesContentProps) {
     return (
         <>
@@ -194,11 +197,10 @@ export function CommitteesContent({
                             description={hasActiveFilters 
                                 ? "No committees match your current filters. Try adjusting your search or filters."
                                 : "No committees have been created yet."}
-                            action={hasActiveFilters ? {
-                                label: "Clear Filters",
-                                onClick: onClearFilters
-                            } : undefined}
-                            className="py-12 sm:py-16"
+                            hasFilters={hasActiveFilters}
+                            onClearFilters={onClearFilters}
+                            onCreateNew={!hasActiveFilters ? onCreateCommittee : undefined}
+                            createLabel="Create Committee"
                         />
                     ) : viewMode === 'table' ? (
                         <CommitteesTable
@@ -214,14 +216,17 @@ export function CommitteesContent({
                     ) : (
                         <>
                             <CommitteesGridView
-                                committees={committees}
-                                selectedIds={selectedIds}
-                                isBulkMode={isBulkMode}
-                                onItemSelect={onItemSelect}
-                                onDelete={onDelete}
-                                onToggleStatus={onToggleStatus}
-                                isMobile={isMobile}
-                            />
+                                        committees={committees}
+                                        selectedIds={selectedIds}
+                                        isBulkMode={isBulkMode}
+                                        onItemSelect={onItemSelect}
+                                        onDelete={onDelete}
+                                        onToggleStatus={onToggleStatus}
+                                        isMobile={isMobile} hasActiveFilters={false} onClearFilters={function (): void {
+                                            throw new Error('Function not implemented.');
+                                        } } onCopyToClipboard={function (text: string, label: string): void {
+                                            throw new Error('Function not implemented.');
+                                        } }                            />
                             
                             {/* Grid Selection Summary */}
                             {viewMode === 'grid' && isBulkMode && selectedIds.length > 0 && (

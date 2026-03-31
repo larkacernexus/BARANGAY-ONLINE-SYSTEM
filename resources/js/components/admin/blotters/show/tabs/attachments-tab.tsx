@@ -1,160 +1,200 @@
-// resources/js/components/admin/blotters/show/components/tabs/attachments-tab.tsx
+// resources/js/components/admin/blotters/show/tabs/attachments-tab.tsx
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Link } from '@inertiajs/react';
-import { Download, Grid, List, Edit, Loader2, FileText, Eye } from 'lucide-react';
+import { Download, FileText, FileImage, FileArchive, FileSpreadsheet, Loader2, Eye } from 'lucide-react';
 import { useState } from 'react';
-import { Attachment } from '@/components/admin/blotters/show/types';
-import { AttachmentCard } from '@/components/admin/blotters/show/cards/attachment-card';
-import { formatFileSize } from '@/components/admin/blotters/show/utils/helpers';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { DisplayAttachment } from '@/types/admin/blotters/display-attachment';
 
 interface AttachmentsTabProps {
-    attachments: Attachment[];
+    attachments: DisplayAttachment[];
     isLoading: boolean;
-    onDownload: (attachment: Attachment, index: number) => void;
+    onDownload: (attachment: DisplayAttachment, index: number) => void;
     blotterId: number;
 }
 
-export function AttachmentsTab({ attachments, isLoading, onDownload, blotterId }: AttachmentsTabProps) {
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-    const hasAttachments = attachments.length > 0;
+// Helper function to format file size
+const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
 
-    const handleDownloadAll = () => {
-        attachments.forEach((attachment, index) => {
-            onDownload(attachment, index);
-        });
-    };
+// Helper function to get file icon component
+const getFileIcon = (type: string) => {
+    if (type.startsWith('image/')) {
+        return FileImage;
+    }
+    if (type.includes('pdf')) {
+        return FileText;
+    }
+    if (type.includes('word') || type.includes('document')) {
+        return FileText;
+    }
+    if (type.includes('excel') || type.includes('spreadsheet')) {
+        return FileSpreadsheet;
+    }
+    if (type.includes('zip') || type.includes('rar')) {
+        return FileArchive;
+    }
+    return FileText;
+};
 
-    const totalSize = attachments.reduce((sum, a) => sum + a.size, 0);
+// Helper function to get file extension
+const getFileExtension = (filename: string): string => {
+    return filename.split('.').pop()?.toLowerCase() || '';
+};
+
+export function AttachmentsTab({
+    attachments,
+    isLoading,
+    onDownload,
+    blotterId
+}: AttachmentsTabProps) {
+    const [previewOpen, setPreviewOpen] = useState<number | null>(null);
+
+    if (isLoading) {
+        return (
+            <Card className="dark:bg-gray-900">
+                <CardContent className="py-12">
+                    <div className="flex items-center justify-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-gray-500 dark:text-gray-400" />
+                        <span className="ml-2 text-gray-500 dark:text-gray-400">Loading attachments...</span>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!attachments || attachments.length === 0) {
+        return (
+            <Card className="dark:bg-gray-900">
+                <CardContent className="py-12 text-center">
+                    <Download className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold dark:text-gray-100 mb-2">No Attachments</h3>
+                    <p className="text-gray-500 dark:text-gray-400">
+                        No files have been attached to this blotter record.
+                    </p>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card className="dark:bg-gray-900">
             <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                        <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                            <Download className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                            Attachments ({attachments.length})
-                        </CardTitle>
-                        <CardDescription className="dark:text-gray-400">
-                            Files and documents related to this blotter
-                        </CardDescription>
-                    </div>
-                    {hasAttachments && (
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center border rounded-lg dark:border-gray-700">
-                                <Button
-                                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setViewMode('grid')}
-                                    className="rounded-r-none"
-                                >
-                                    <Grid className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant={viewMode === 'list' ? 'default' : 'ghost'}
-                                    size="sm"
-                                    onClick={() => setViewMode('list')}
-                                    className="rounded-l-none"
-                                >
-                                    <List className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                    <Download className="h-5 w-5" />
+                    Attachments
+                </CardTitle>
+                <CardDescription className="dark:text-gray-400">
+                    Files attached to this blotter record ({attachments.length} file{attachments.length !== 1 ? 's' : ''})
+                </CardDescription>
             </CardHeader>
             <CardContent>
-                {isLoading ? (
-                    <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                    </div>
-                ) : hasAttachments ? (
-                    viewMode === 'grid' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {attachments.map((attachment, index) => (
-                                <AttachmentCard
-                                    key={index}
-                                    attachment={attachment}
-                                    onDownload={() => onDownload(attachment, index)}
-                                    onView={() => attachment.preview && window.open(attachment.preview, '_blank')}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {attachments.map((attachment, index) => (
-                                <div
-                                    key={index}
-                                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                                        <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700">
-                                            <FileText className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-medium truncate dark:text-gray-300">{attachment.name}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                {formatFileSize(attachment.size)}
-                                            </p>
-                                        </div>
+                <div className="space-y-3">
+                    {attachments.map((attachment, index) => {
+                        const fileName = attachment.name || attachment.file_name || 'Unknown file';
+                        const fileSize = attachment.size || attachment.file_size || 0;
+                        const fileType = attachment.type || attachment.file_type || 'application/octet-stream';
+                        const IconComponent = getFileIcon(fileType);
+                        const isImage = fileType.startsWith('image/');
+                        
+                        return (
+                            <div
+                                key={attachment.id || index}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group"
+                            >
+                                <div className="flex items-start gap-3 mb-3 sm:mb-0">
+                                    <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                                        <IconComponent className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        {attachment.type.startsWith('image/') && attachment.preview && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => window.open(attachment.preview, '_blank')}
-                                            >
-                                                <Eye className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => onDownload(attachment, index)}
-                                        >
-                                            <Download className="h-4 w-4" />
-                                        </Button>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium truncate dark:text-gray-200">
+                                            {fileName}
+                                        </p>
+                                        <div className="flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            <span>{formatFileSize(fileSize)}</span>
+                                            <span>•</span>
+                                            <span className="uppercase">{getFileExtension(fileName)}</span>
+                                        </div>
                                     </div>
                                 </div>
-                            ))}
+                                <div className="flex items-center gap-2">
+                                    {isImage && attachment.preview && (
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => setPreviewOpen(index)}
+                                                        className="dark:border-gray-600 dark:text-gray-300"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                        <span className="sr-only">Preview</span>
+                                                    </Button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Preview image</TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    )}
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => onDownload(attachment, index)}
+                                                    className="dark:border-gray-600 dark:text-gray-300"
+                                                >
+                                                    <Download className="h-4 w-4" />
+                                                    <span className="sr-only">Download</span>
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Download file</TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Image Preview Modal */}
+                {previewOpen !== null && attachments[previewOpen]?.preview && (
+                    <div 
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" 
+                        onClick={() => setPreviewOpen(null)}
+                    >
+                        <div 
+                            className="relative max-w-4xl max-h-[90vh]" 
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <img
+                                src={attachments[previewOpen].preview}
+                                alt={attachments[previewOpen].name || 'Preview'}
+                                className="max-w-full max-h-[90vh] object-contain rounded-lg"
+                            />
+                            <button
+                                onClick={() => setPreviewOpen(null)}
+                                className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/70 transition-colors"
+                                aria-label="Close preview"
+                            >
+                                ✕
+                            </button>
                         </div>
-                    )
-                ) : (
-                    <div className="text-center py-12 space-y-4">
-                        <FileText className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600" />
-                        <div>
-                            <h4 className="font-medium text-gray-700 dark:text-gray-300">No attachments</h4>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                                No files have been attached to this blotter
-                            </p>
-                        </div>
-                        <Link href={`/admin/blotters/${blotterId}/edit`}>
-                            <Button variant="outline" className="dark:border-gray-600 dark:text-gray-300">
-                                <Edit className="h-4 w-4 mr-2" />
-                                Add Attachments
-                            </Button>
-                        </Link>
                     </div>
                 )}
             </CardContent>
-            {hasAttachments && (
-                <CardFooter className="border-t dark:border-gray-700 pt-4">
-                    <div className="flex justify-between items-center w-full text-sm text-gray-500 dark:text-gray-400">
-                        <span>Total size: {formatFileSize(totalSize)}</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleDownloadAll}
-                        >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download All
-                        </Button>
-                    </div>
-                </CardFooter>
-            )}
         </Card>
     );
 }

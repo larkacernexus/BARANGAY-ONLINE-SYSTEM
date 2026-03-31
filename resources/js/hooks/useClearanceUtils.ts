@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, StatusVariant, UrgencyVariant } from '@/types/clearance';
+import { ClearanceRequest, ClearanceDocument, StatusVariant, UrgencyVariant } from '@/types/admin/clearances/clearance-types';
 import {
     Clock,
     CheckCircle,
@@ -15,39 +15,38 @@ import {
 
 export function useClearanceUtils() {
     // Format date
-    const formatDate = (dateString?: string): string => {
-        if (!dateString) return 'Not set';
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return 'Invalid date';
-            return date.toLocaleDateString('en-PH', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                weekday: 'long'
-            });
-        } catch (error) {
-            return 'Invalid date';
-        }
-    };
+    const formatDate = (dateString?: string | null): string => {
+    if (!dateString) return 'Not set';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Invalid date';
+        return date.toLocaleDateString('en-PH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+        });
+    } catch (error) {
+        return 'Invalid date';
+    }
+};
 
-    const formatDateTime = (dateString?: string): string => {
-        if (!dateString) return 'Not set';
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return 'Invalid date';
-            return date.toLocaleDateString('en-PH', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        } catch (error) {
-            return 'Invalid date';
-        }
-    };
-
+   const formatDateTime = (dateString?: string | null): string => {
+    if (!dateString) return 'Not set';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Invalid date';
+        return date.toLocaleDateString('en-PH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (error) {
+        return 'Invalid date';
+    }
+};
     // Format file size
     const formatFileSize = (bytes?: number): string => {
         if (!bytes) return 'Unknown size';
@@ -68,7 +67,7 @@ export function useClearanceUtils() {
     };
 
     // Get file icon for list view
-    const getFileIcon = (document: Document): React.ReactElement => {
+    const getFileIcon = (document: ClearanceDocument): React.ReactElement => {
         const isImage = !!(document.mime_type?.startsWith('image/') || 
                        document.file_name?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i));
         const isPDF = !!(document.mime_type === 'application/pdf' || 
@@ -127,9 +126,9 @@ export function useClearanceUtils() {
         return variants[urgency] || 'outline';
     };
 
-    // Get document status color
-    const getDocumentStatusColor = (document: Document): string => {
-        const status = document.is_verified ? 'verified' : (document.status || 'pending');
+    // Get document status color - Updated to use ClearanceDocument
+    const getDocumentStatusColor = (document: ClearanceDocument): string => {
+        const status = document.verification_status || 'pending';
         switch (status) {
             case 'verified': return 'bg-green-100 text-green-800 border-green-200';
             case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
@@ -138,14 +137,21 @@ export function useClearanceUtils() {
         }
     };
 
-    // Get document status text
-    const getDocumentStatusText = (document: Document): string => {
-        if (document.is_verified) return 'Verified';
-        return document.status ? document.status.charAt(0).toUpperCase() + document.status.slice(1) : 'Pending';
-    };
+    // Get document status text - Updated to use ClearanceDocument
+            const getDocumentStatusText = (document: ClearanceDocument): string => {
+                const status = document.verification_status || 'pending';
+                
+                const statusMap: Record<string, string> = {
+                    'verified': 'Verified',
+                    'rejected': 'Rejected',
+                    'pending': 'Pending'
+                };
+                
+                return statusMap[status] || 'Pending';
+            };
 
-    // Calculate remaining validity
-    const getValidityStatus = (clearance: any): { text: string; color: string } | null => {
+    // Calculate remaining validity - Updated to use ClearanceRequest
+    const getValidityStatus = (clearance: ClearanceRequest): { text: string; color: string } | null => {
         if (clearance.status !== 'issued' || !clearance.valid_until) {
             return null;
         }
@@ -164,13 +170,26 @@ export function useClearanceUtils() {
         }
     };
 
-    // Calculate document statistics
-    const getDocumentStats = (documents: Document[] = []) => ({
-        total: documents.length,
-        verified: documents.filter(d => d.is_verified).length,
-        pending: documents.filter(d => !d.is_verified && (!d.status || d.status === 'pending')).length,
-        rejected: documents.filter(d => d.status === 'rejected').length
-    });
+    // Calculate document statistics - Updated to use ClearanceDocument
+    const getDocumentStats = (documents: ClearanceDocument[] = []) => {
+        const total = documents.length;
+        const verified = documents.filter(d => d.verification_status === 'verified').length;
+        const pending = documents.filter(d => d.verification_status === 'pending').length;
+        const rejected = documents.filter(d => d.verification_status === 'rejected').length;
+
+        return {
+            total,
+            verified,
+            pending,
+            rejected,
+            pendingCount: pending,
+            verifiedCount: verified,
+            rejectedCount: rejected,
+            pendingPercentage: total > 0 ? (pending / total) * 100 : 0,
+            verifiedPercentage: total > 0 ? (verified / total) * 100 : 0,
+            rejectedPercentage: total > 0 ? (rejected / total) * 100 : 0
+        };
+    };
 
     return {
         formatDate,

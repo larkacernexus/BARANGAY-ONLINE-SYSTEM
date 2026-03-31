@@ -10,6 +10,13 @@ export interface Committee {
     positions_count?: number;
 }
 
+export interface PageProps {
+    auth?: any;
+    flash?: any;
+    errors?: Record<string, string>;
+    [key: string]: any;
+}
+
 export interface PaginationMeta {
     current_page: number;
     from: number;

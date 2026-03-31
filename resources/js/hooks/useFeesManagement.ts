@@ -1,8 +1,10 @@
+// hooks/useFeesManagement.ts
+
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { format, isAfter } from 'date-fns';
 import { route } from 'ziggy-js';
-import { Fee, Filters, Stats, PaginationData, BulkOperation, SelectionMode, SelectionStats } from '@/types/fees.types';
+import { Fee, Filters, Stats, PaginationData, BulkOperation, SelectionMode, SelectionStats } from '@/types/admin/fees/fees';
 
 export const useFeesManagement = (
     initialFees: PaginationData = {
@@ -40,15 +42,7 @@ export const useFeesManagement = (
         this_month_count: 0,
         this_month_amount: 0,
         this_month_collected: 0,
-        status_counts: {
-            pending: 0,
-            issued: 0,
-            partially_paid: 0,
-            paid: 0,
-            overdue: 0,
-            cancelled: 0,
-            waived: 0
-        },
+        status_counts: {},
         category_totals: {}
     }
 ) => {
@@ -159,7 +153,6 @@ export const useFeesManagement = (
 
     // Filter fees client-side
     const filteredFees = useMemo(() => {
-        // Safe access to initialFees.data
         const feesData = initialFees?.data || [];
         let result = [...feesData];
 
@@ -191,12 +184,12 @@ export const useFeesManagement = (
 
         if (filters.from_date) {
             const fromDate = new Date(filters.from_date);
-            result = result.filter(fee => new Date(fee.issue_date) >= fromDate);
+            result = result.filter(fee => new Date(fee.issue_date || fee.created_at) >= fromDate);
         }
 
         if (filters.to_date) {
             const toDate = new Date(filters.to_date);
-            result = result.filter(fee => new Date(fee.issue_date) <= toDate);
+            result = result.filter(fee => new Date(fee.issue_date || fee.created_at) <= toDate);
         }
 
         // Sorting
@@ -280,8 +273,8 @@ export const useFeesManagement = (
     const handleSelectAll = () => {
         const total = initialFees?.total || 0;
         if (confirm(`This will select ALL ${total} fees. This action may take a moment.`)) {
-            const pageIds = paginatedFees.map(fee => fee.id);
-            setSelectedFees(pageIds);
+            const allIds = filteredFees.map(fee => fee.id);
+            setSelectedFees(allIds);
             setSelectionMode('all');
         }
     };
@@ -319,26 +312,47 @@ export const useFeesManagement = (
             isOverdue(fee.due_date) && fee.status !== 'paid'
         ).length;
         
+        const paidCount = selectedData.filter(fee => fee.status === 'paid').length;
+        const pendingCount = selectedData.filter(fee => fee.status === 'pending').length;
+        const issuedCount = selectedData.filter(fee => fee.status === 'issued').length;
+        const partiallyPaidCount = selectedData.filter(fee => fee.status === 'partial' || fee.status === 'partially_paid').length;
+        const overdueStatusCount = selectedData.filter(fee => fee.status === 'overdue').length;
+        
         return {
             total: selectedData.length,
-            totalAmount,
-            totalPaid,
-            totalBalance,
-            overdueCount,
-            paidCount: selectedData.filter(fee => fee.status === 'paid').length,
-            pendingCount: selectedData.filter(fee => fee.status === 'pending').length,
-            issuedCount: selectedData.filter(fee => fee.status === 'issued').length,
-            partiallyPaidCount: selectedData.filter(fee => fee.status === 'partially_paid').length,
+            totalAmount: totalAmount,
+            totalPaid: totalPaid,
+            totalBalance: totalBalance,
+            overdueCount: overdueCount,
+            paidCount: paidCount,
+            pendingCount: pendingCount,
+            issuedCount: issuedCount,
+            partiallyPaidCount: partiallyPaidCount,
             withCertificates: selectedData.filter(fee => fee.certificate_number).length,
             withReceipts: selectedData.filter(fee => fee.or_number).length,
             residents: selectedData.filter(fee => fee.payer_type === 'resident').length,
             households: selectedData.filter(fee => fee.payer_type === 'household').length,
             businesses: selectedData.filter(fee => fee.payer_type === 'business').length,
+            paid: paidCount,
+            pending: pendingCount,
+            overdue: overdueStatusCount,
+            paidAmount: totalPaid,
+            pendingAmount: selectedData.filter(fee => fee.status === 'pending').reduce((sum, fee) => sum + (fee.total_amount || 0), 0),
+            overdueAmount: selectedData.filter(fee => fee.status === 'overdue').reduce((sum, fee) => sum + (fee.total_amount || 0), 0),
+            byStatus: {
+                paid: paidCount,
+                pending: pendingCount,
+                issued: issuedCount,
+                partial: partiallyPaidCount,
+                overdue: overdueStatusCount,
+                cancelled: selectedData.filter(fee => fee.status === 'cancelled').length,
+                refunded: selectedData.filter(fee => fee.status === 'refunded').length,
+            }
         };
     }, [selectedFeesData]);
 
     // Bulk operations
-    const handleBulkOperation = async (operation: BulkOperation) => {
+    const handleBulkOperation = useCallback(async (operation: BulkOperation) => {
         if (selectedFees.length === 0) {
             alert('Please select at least one fee');
             return;
@@ -366,6 +380,14 @@ export const useFeesManagement = (
                         });
                     }
                     break;
+                case 'mark_paid':
+                case 'mark_pending':
+                case 'send_reminders':
+                case 'apply_penalties':
+                case 'waive_penalties':
+                    // Handle other operations
+                    console.log(`Operation: ${operation} - To be implemented`);
+                    break;
                 default:
                     alert('Operation not supported yet');
             }
@@ -374,7 +396,7 @@ export const useFeesManagement = (
         } finally {
             setIsPerformingBulkAction(false);
         }
-    };
+    }, [selectedFees]);
 
     // Individual fee operations
     const handleDelete = (fee: Fee) => {
@@ -414,13 +436,19 @@ export const useFeesManagement = (
         setFilters(prev => ({ ...prev, [key]: value }));
     };
 
-    const hasActiveFilters = 
-        search || 
-        filters.status !== 'all' || 
-        filters.category !== 'all' || 
-        filters.purok !== 'all' ||
-        filters.from_date ||
-        filters.to_date;
+    // FIX: Convert hasActiveFilters to boolean using useMemo
+    const hasActiveFilters = useMemo(() => {
+        return Boolean(
+            search || 
+            filters.status !== 'all' || 
+            filters.category !== 'all' || 
+            filters.purok !== 'all' ||
+            filters.from_date ||
+            filters.to_date ||
+            filters.amount_min ||
+            filters.amount_max
+        );
+    }, [search, filters]);
 
     // Reset selection when bulk mode is turned off
     useEffect(() => {
@@ -433,7 +461,7 @@ export const useFeesManagement = (
     return {
         // State
         search,
-        filters,
+        filters: filters,
         showAdvancedFilters,
         currentPage,
         windowWidth,
@@ -484,7 +512,7 @@ export const useFeesManagement = (
         handleClearFilters,
         updateFilter,
         
-        // Computed
+        // Computed - Now guaranteed to be boolean
         hasActiveFilters,
         
         // Props

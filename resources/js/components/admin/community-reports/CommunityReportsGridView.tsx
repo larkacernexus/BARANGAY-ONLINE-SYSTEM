@@ -1,4 +1,5 @@
-// CommunityReportsGridView.tsx
+// resources/js/components/admin/community-reports/CommunityReportsGridView.tsx
+
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -28,7 +29,6 @@ import {
     ExternalLink,
     MessageSquare
 } from 'lucide-react';
-import { CommunityReport } from '@/admin-utils/communityReportTypes';
 import { 
     formatDate, 
     getTimeAgo, 
@@ -37,6 +37,9 @@ import {
     getPriorityIcon,
 } from '@/admin-utils/communityReportHelpers';
 import { useState } from 'react';
+
+// Import types from the correct path
+import type { CommunityReport } from '@/types/admin/reports/community-report';
 
 interface CommunityReportsGridViewProps {
     reports: CommunityReport[];
@@ -49,12 +52,13 @@ interface CommunityReportsGridViewProps {
     onMarkResolved?: (report: CommunityReport) => void;
     safeStatuses: Record<string, string>;
     safePriorities: Record<string, string>;
+    safeUrgencies: Record<string, string>;
     windowWidth: number;
     isMobile?: boolean;
 }
 
 // Helper function for phone number formatting
-const formatPhoneNumber = (phone: string) => {
+const formatPhoneNumber = (phone: string): string => {
     if (!phone) return '';
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length === 11 && cleaned.startsWith('0')) {
@@ -87,6 +91,7 @@ export default function CommunityReportsGridView({
     onMarkResolved,
     safeStatuses,
     safePriorities,
+    safeUrgencies,
     windowWidth,
     isMobile = false
 }: CommunityReportsGridViewProps) {
@@ -113,19 +118,16 @@ export default function CommunityReportsGridView({
 
     // Handle card click
     const handleCardClick = (reportId: number, e: React.MouseEvent) => {
-        // Don't do anything if we're in bulk mode - let the checkbox handle it
         if (isBulkMode) {
             e.stopPropagation();
             return;
         }
-        
-        // Toggle expansion when clicking the card (both mobile and desktop)
         e.stopPropagation();
         toggleCardExpansion(reportId);
     };
 
-    // Get grid columns based on screen size - UPDATED TO 4 COLUMNS
-    const getGridColumns = () => {
+    // Get grid columns based on screen size
+    const getGridColumns = (): string => {
         if (windowWidth < 640) return "grid-cols-1";
         if (windowWidth < 768) return "grid-cols-2";
         if (windowWidth < 1024) return "grid-cols-3";
@@ -133,8 +135,8 @@ export default function CommunityReportsGridView({
         return "grid-cols-4";
     };
 
-    // Status color - light and dark mode optimized
-    const getStatusColor = (status: string) => {
+    // Status color
+    const getStatusColor = (status: string): string => {
         switch (status?.toLowerCase()) {
             case 'resolved': 
                 return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
@@ -153,8 +155,8 @@ export default function CommunityReportsGridView({
         }
     };
     
-    // Priority color - light and dark mode optimized
-    const getPriorityColor = (priority: string) => {
+    // Priority color
+    const getPriorityColor = (priority: string): string => {
         switch (priority?.toLowerCase()) {
             case 'critical': 
                 return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
@@ -169,8 +171,8 @@ export default function CommunityReportsGridView({
         }
     };
 
-    // Urgency color - light and dark mode optimized
-    const getUrgencyColor = (urgency: string) => {
+    // Urgency color
+    const getUrgencyColor = (urgency: string): string => {
         switch (urgency?.toLowerCase()) {
             case 'high': 
                 return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
@@ -205,6 +207,16 @@ export default function CommunityReportsGridView({
                 const titleLength = isCompactView ? 25 : 40;
                 const locationLength = isCompactView ? 15 : 25;
                 const userNameLength = isCompactView ? 12 : 20;
+                
+                // Safe access to user properties
+                const userName = report.user?.name || report.reporter_name || 'Unknown';
+                const userPhone = report.user?.phone || report.reporter_contact;
+                const userPurok = report.user?.purok;
+                const userEmail = report.user?.email;
+                const assignedToName = report.assigned_user?.name || report.assigned_to_name;
+                const hasEvidence = report.evidences && report.evidences.length > 0;
+                const reportCategory = (report.report_type as any)?.category || report.category;
+                const reportTypeName = (report.report_type as any)?.name;
                 
                 return (
                     <Card 
@@ -324,16 +336,16 @@ export default function CommunityReportsGridView({
                                     <User className="h-3 w-3 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                                     <span 
                                         className="text-xs text-gray-700 dark:text-gray-300 truncate"
-                                        title={report.is_anonymous ? 'Anonymous report' : `Reporter: ${report.user?.name || 'Unknown'}`}
+                                        title={report.is_anonymous ? 'Anonymous report' : `Reporter: ${userName}`}
                                     >
                                         {report.is_anonymous 
                                             ? 'Anonymous' 
-                                            : truncateText(report.user?.name || 'Unknown', userNameLength)}
+                                            : truncateText(userName, userNameLength)}
                                     </span>
                                 </div>
                             </div>
                             
-                            {/* Expand/Collapse indicator area - placed after the primary info */}
+                            {/* Expand/Collapse indicator area */}
                             {!isBulkMode && !isExpanded && (
                                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -350,37 +362,37 @@ export default function CommunityReportsGridView({
                                 </div>
                             )}
                             
-                            {/* EXPANDED DETAILS SECTION - Only shows when explicitly expanded */}
+                            {/* EXPANDED DETAILS SECTION */}
                             {isExpanded && (
                                 <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-2 animate-in fade-in-50">
                                     {/* Category and Type */}
-                                    {(report.category || report.report_type) && (
+                                    {(reportCategory || reportTypeName) && (
                                         <div className="flex flex-wrap gap-1">
-                                            {report.category && (
+                                            {reportCategory && (
                                                 <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                                    {getDisplayName(report.category)}
+                                                    {getDisplayName(reportCategory)}
                                                 </Badge>
                                             )}
-                                            {report.report_type && (
+                                            {reportTypeName && (
                                                 <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300">
-                                                    {getDisplayName(report.report_type)}
+                                                    {getDisplayName(reportTypeName)}
                                                 </Badge>
                                             )}
                                         </div>
                                     )}
                                     
                                     {/* Assigned to */}
-                                    {report.assigned_to && (
+                                    {assignedToName && (
                                         <div className="flex items-center gap-1.5 text-xs">
                                             <User className="h-3 w-3 text-green-500 dark:text-green-400 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Assigned to:</span>
-                                            <span className="font-medium text-gray-900 dark:text-white truncate" title={report.assigned_to.name}>
-                                                {report.assigned_to.name}
+                                            <span className="font-medium text-gray-900 dark:text-white truncate" title={assignedToName}>
+                                                {assignedToName}
                                             </span>
                                         </div>
                                     )}
                                     
-                                    {/* Special flags - now with more details */}
+                                    {/* Special flags */}
                                     <div className="flex flex-wrap gap-1">
                                         {report.safety_concern && (
                                             <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800">
@@ -413,40 +425,38 @@ export default function CommunityReportsGridView({
                                     {/* Contact info for non-anonymous */}
                                     {!report.is_anonymous && (
                                         <div className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300">
-                                            {report.user?.phone && (
+                                            {userPhone && (
                                                 <div 
                                                     className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        onCopyToClipboard(report.user!.phone!, 'Phone Number');
+                                                        onCopyToClipboard(userPhone!, 'Phone Number');
                                                     }}
                                                     title="Click to copy phone number"
                                                 >
                                                     <Phone className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                                    <span className="truncate">{formatPhoneNumber(report.user.phone)}</span>
+                                                    <span className="truncate">{formatPhoneNumber(userPhone)}</span>
                                                 </div>
                                             )}
                                             
-                                            {/* Purok info */}
-                                            {report.user?.purok && (
+                                            {userPurok && (
                                                 <div className="flex items-center gap-1.5">
                                                     <Home className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                                    <span>Purok {report.user.purok}</span>
+                                                    <span>Purok {userPurok}</span>
                                                 </div>
                                             )}
                                             
-                                            {/* Email if available */}
-                                            {report.user?.email && (
+                                            {userEmail && (
                                                 <div 
                                                     className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        onCopyToClipboard(report.user!.email!, 'Email');
+                                                        onCopyToClipboard(userEmail!, 'Email');
                                                     }}
                                                     title="Click to copy email"
                                                 >
                                                     <MessageSquare className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                                    <span className="truncate">{report.user.email}</span>
+                                                    <span className="truncate">{userEmail}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -463,10 +473,10 @@ export default function CommunityReportsGridView({
                                     )}
                                     
                                     {/* Evidence count */}
-                                    {report.evidences && report.evidences.length > 0 && (
+                                    {hasEvidence && (
                                         <div className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
                                             <span className="font-medium">📎</span>
-                                            <span>{report.evidences.length} evidence file(s)</span>
+                                            <span>{report.evidences!.length} evidence file(s)</span>
                                         </div>
                                     )}
                                     
@@ -497,7 +507,7 @@ export default function CommunityReportsGridView({
                             )}
                         </CardContent>
                         
-                        {/* Footer with actions - always visible but compact */}
+                        {/* Footer with actions */}
                         <CardFooter className={`px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 ${isCompactView ? 'py-1.5' : ''}`}>
                             <div className="flex items-center justify-between w-full">
                                 <div className="flex items-center gap-0.5">
@@ -516,7 +526,7 @@ export default function CommunityReportsGridView({
                                                 <Eye className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
                                             </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
+                                        <TooltipContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
                                             <p className="text-xs">View Details</p>
                                         </TooltipContent>
                                     </Tooltip>
@@ -536,12 +546,12 @@ export default function CommunityReportsGridView({
                                                 <Copy className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
                                             </Button>
                                         </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
+                                        <TooltipContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
                                             <p className="text-xs">Copy ID</p>
                                         </TooltipContent>
                                     </Tooltip>
                                     
-                                    {/* Mark as Resolved (if applicable) */}
+                                    {/* Mark as Resolved */}
                                     {report.status !== 'resolved' && report.status !== 'rejected' && onMarkResolved && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
@@ -557,7 +567,7 @@ export default function CommunityReportsGridView({
                                                     <CheckCircle className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
                                                 </Button>
                                             </TooltipTrigger>
-                                            <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
+                                            <TooltipContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
                                                 <p className="text-xs">Mark Resolved</p>
                                             </TooltipContent>
                                         </Tooltip>
@@ -579,7 +589,7 @@ export default function CommunityReportsGridView({
                                             <AlertTriangle className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
                                         </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
+                                    <TooltipContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
                                         <p className="text-xs">Delete Report</p>
                                     </TooltipContent>
                                 </Tooltip>

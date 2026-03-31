@@ -47,42 +47,28 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-} from '@/components/ui/alert';
 
-interface Category {
-    id: number;
-    name: string;
-    slug: string;
-    description: string | null;
-}
+// Import types from centralized location
+import type { CategoryOption } from '@/types/admin/document-types/document-types';
 
-interface CommonFormat {
-    [key: string]: string;
-}
-
-interface CommonType {
-    code: string;
-    name: string;
-    description: string;
-    accepted_formats: string[];
-    max_file_size: number;
-    sort_order: number;
-    is_required: boolean;
-    category_id: number;
-}
-
-interface PageProps {
-    categories: Category[];
-    commonFormats: CommonFormat;
-    commonTypes: CommonType[];
+// Extend PageProps with index signature to satisfy Inertia's constraint
+interface CreatePageProps extends Record<string, any> {
+    categories: CategoryOption[];
+    commonFormats: Record<string, string>;
+    commonTypes: Array<{
+        code: string;
+        name: string;
+        description: string;
+        accepted_formats: string[];
+        max_file_size: number;
+        sort_order: number;
+        is_required: boolean;
+        category_id: number;
+    }>;
 }
 
 export default function DocumentTypeCreate() {
-    const { props } = usePage<PageProps>();
+    const { props } = usePage<CreatePageProps>();
     const { categories = [], commonFormats = {}, commonTypes = [] } = props;
 
     // Form state
@@ -261,9 +247,9 @@ export default function DocumentTypeCreate() {
         return Object.keys(newErrors).length === 0;
     };
 
-    // Handle form submit - ONLY triggered by clicking Create Document Type button
+    // Handle form submit
     const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault(); // Prevent any default form submission
+        e.preventDefault();
         
         if (!validateForm()) {
             setActiveTab('basic');
@@ -422,8 +408,8 @@ export default function DocumentTypeCreate() {
                     {/* Main Form */}
                     <div className="space-y-4">
                         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                            <TabsList className="grid w-full grid-cols-3 lg:w-auto ">
-                                <TabsTrigger value="basic" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white ">
+                            <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+                                <TabsTrigger value="basic" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white">
                                     <FileText className="h-4 w-4" />
                                     <span className="hidden sm:inline">Basic Information</span>
                                 </TabsTrigger>
@@ -431,7 +417,7 @@ export default function DocumentTypeCreate() {
                                     <HardDrive className="h-4 w-4" />
                                     <span className="hidden sm:inline">File Specifications</span>
                                 </TabsTrigger>
-                                <TabsTrigger value="settings" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white ">
+                                <TabsTrigger value="settings" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white">
                                     <ListOrdered className="h-4 w-4" />
                                     <span className="hidden sm:inline">Settings</span>
                                 </TabsTrigger>

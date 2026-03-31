@@ -40,6 +40,7 @@ import {
   ChevronUp,
   QrCode,
   Lock,
+  FileText, // Added for receipts
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
@@ -50,13 +51,14 @@ const residentNav = [
   { title: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard, shortTitle: 'Dashboard' },
   { title: 'Profile', href: '/residentsettings/profile', icon: User, shortTitle: 'Profile' },
   { title: 'Fees & Charges', href: '/portal/fees', icon: Receipt, shortTitle: 'Fees' },
+  { title: 'Receipts', href: '/portal/receipts', icon: FileText, shortTitle: 'Receipts' }, // Added Receipts
   { title: 'Payment History', href: '/portal/payments', icon: Wallet, shortTitle: 'Payments' },
   { title: 'Clearances', href: '/portal/my-clearances', icon: ShieldCheck, shortTitle: 'Clearances' },
   { title: 'Community Reports', href: '/portal/community-reports', icon: BarChart3, shortTitle: 'Reports' },
   { title: 'My Records', href: '/portal/my-records', icon: FolderOpen, shortTitle: 'Records' },
 ];
 
-// Quick actions - only include routes that exist in your web.php
+// Quick actions - include receipts as a quick action
 const allQuickActions = [
   { 
     title: 'Request Clearance', 
@@ -65,6 +67,7 @@ const allQuickActions = [
     icon: ScrollText, 
     description: 'Get documents'
   },
+
   { 
     title: 'Submit Report', 
     shortTitle: 'Report',

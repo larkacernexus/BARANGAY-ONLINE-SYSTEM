@@ -25,7 +25,7 @@ import {
     SelectionMode, 
     FilterState, 
     SelectionStats 
-} from '@/types/document-types';
+} from '@/types/admin/document-types/document-types';
 
 interface DocumentTypesContentProps {
     documentTypes: DocumentType[];

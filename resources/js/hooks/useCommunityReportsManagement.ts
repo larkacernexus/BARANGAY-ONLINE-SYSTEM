@@ -7,7 +7,7 @@ import {
     Filters, 
     Stats, 
     BulkOperation 
-} from '@/admin-utils/communityReportTypes';
+} from '@/types/communityReportTypes';
 import { 
     formatDate, 
     formatDateTime, 
@@ -223,7 +223,7 @@ export function useCommunityReportsManagement({
                 report.location?.toLowerCase().includes(searchLower) ||
                 report.report_type?.name?.toLowerCase().includes(searchLower) ||
                 report.report_type?.category?.toLowerCase().includes(searchLower) ||
-                report.tags?.some(tag => tag.toLowerCase().includes(searchLower)) ||
+                report.tags?.some((tag: string) => tag.toLowerCase().includes(searchLower)) ||
                 report.resolution_notes?.toLowerCase().includes(searchLower) ||
                 (!report.is_anonymous && report.user?.name?.toLowerCase().includes(searchLower)) ||
                 (!report.is_anonymous && report.user?.email?.toLowerCase().includes(searchLower)) ||

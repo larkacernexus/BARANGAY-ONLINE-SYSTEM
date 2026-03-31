@@ -1,4 +1,3 @@
-// components/admin/clearances/show/StatusSummaryCard.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -20,7 +19,7 @@ import {
     FileCheck,
     MessageSquare
 } from 'lucide-react';
-import { ClearanceRequest } from '@/types/clearance';
+import { ClearanceRequest } from '@/types/admin/clearances/clearance-types'; // Fix import
 import { JSX } from 'react';
 
 interface StatusSummaryCardProps {
@@ -73,10 +72,14 @@ export function StatusSummaryCard({
 
     const getPaymentStatusColor = (status: string): string => {
         const colors: Record<string, string> = {
+            'completed': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
             'paid': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
             'pending': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+            'pending_payment': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
             'unpaid': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700',
             'partially_paid': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+            'failed': 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+            'refunded': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700',
         };
         return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
     };
@@ -102,22 +105,61 @@ export function StatusSummaryCard({
 
     const getPaymentStatusIcon = (status: string) => {
         switch (status) {
+            case 'completed':
             case 'paid':
                 return <CheckCircle className="h-4 w-4" />;
             case 'pending':
+            case 'pending_payment':
                 return <Clock className="h-4 w-4" />;
             case 'unpaid':
                 return <DollarSign className="h-4 w-4" />;
             case 'partially_paid':
                 return <AlertCircle className="h-4 w-4" />;
+            case 'failed':
+                return <XCircle className="h-4 w-4" />;
+            case 'refunded':
+                return <RefreshCw className="h-4 w-4" />;
             default:
                 return <DollarSign className="h-4 w-4" />;
         }
     };
 
+    const getPaymentStatusDisplay = (status: string): string => {
+        const statusMap: Record<string, string> = {
+            'completed': 'Paid',
+            'paid': 'Paid',
+            'pending': 'Pending',
+            'pending_payment': 'Pending Payment',
+            'unpaid': 'Unpaid',
+            'partially_paid': 'Partially Paid',
+            'failed': 'Failed',
+            'refunded': 'Refunded'
+        };
+        return statusMap[status] || status;
+    };
+
+    const getStatusDisplay = (status: string): string => {
+        const statusMap: Record<string, string> = {
+            'pending': 'Pending',
+            'pending_payment': 'Pending Payment',
+            'processing': 'Processing',
+            'approved': 'Approved',
+            'issued': 'Issued',
+            'rejected': 'Rejected',
+            'cancelled': 'Cancelled'
+        };
+        return statusMap[status] || status;
+    };
+
     const documentStats = {
         total: clearance.documents?.length || 0,
-        verified: clearance.documents?.filter(d => d.is_verified).length || 0,
+        verified: clearance.documents?.filter(d => d.verification_status === 'verified').length || 0,
+    };
+
+    const getPaymentStatus = () => {
+        if (clearance.payment?.status) return clearance.payment.status;
+        if (clearance.payment_status) return clearance.payment_status;
+        return 'unpaid';
     };
 
     return (
@@ -137,14 +179,14 @@ export function StatusSummaryCard({
                         <span className="text-sm text-gray-600 dark:text-gray-400">Request Status</span>
                         <Badge variant="outline" className={getStatusColor(clearance.status)}>
                             {getStatusIconComponent(clearance.status)}
-                            <span className="ml-1">{clearance.status_display || clearance.status}</span>
+                            <span className="ml-1">{getStatusDisplay(clearance.status)}</span>
                         </Badge>
                     </div>
                     <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600 dark:text-gray-400">Payment Status</span>
-                        <Badge variant="outline" className={getPaymentStatusColor(clearance.payment_status || 'unpaid')}>
-                            {getPaymentStatusIcon(clearance.payment_status || 'unpaid')}
-                            <span className="ml-1">{clearance.payment_status || 'unpaid'}</span>
+                        <Badge variant="outline" className={getPaymentStatusColor(getPaymentStatus())}>
+                            {getPaymentStatusIcon(getPaymentStatus())}
+                            <span className="ml-1">{getPaymentStatusDisplay(getPaymentStatus())}</span>
                         </Badge>
                     </div>
                     <div className="flex items-center justify-between">
@@ -236,7 +278,7 @@ export function StatusSummaryCard({
                                 </Button>
                             )}
 
-                            {['pending', 'processing'].includes(clearance.status) && canProcess && (
+                            {['pending', 'pending_payment', 'processing'].includes(clearance.status) && canProcess && (
                                 <Button
                                     variant="outline"
                                     onClick={onReject}

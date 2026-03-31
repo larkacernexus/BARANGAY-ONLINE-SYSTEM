@@ -4,10 +4,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Building, Droplets, Zap, Wifi, Car } from 'lucide-react';
-import { Household } from '../types';
+
+// Import types from shared types file
+import { Household } from '@/types/admin/households/household.types';
+
+// Extended interface to include properties that might be specific to the show page
+interface ExtendedHousehold extends Household {
+    housing_type?: string;
+    ownership_status?: string;
+    water_source?: string;
+    income_range?: string;
+    electricity?: boolean;
+    internet?: boolean;
+    vehicle?: boolean;
+    purok?: string;
+}
 
 interface HousingInfoProps {
-    household: Household;
+    household: ExtendedHousehold;
 }
 
 export const HousingInfo = ({ household }: HousingInfoProps) => {
@@ -50,31 +64,49 @@ export const HousingInfo = ({ household }: HousingInfoProps) => {
                 <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Household Amenities</p>
                     <div className="grid gap-3 md:grid-cols-3">
-                        <div className={`flex items-center gap-2 p-3 rounded-lg ${household.electricity ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-900/50'} dark:text-gray-300`}>
+                        <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                            household.electricity ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-900/50'
+                        } dark:text-gray-300`}>
                             <Zap className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                             <span>Electricity</span>
                             {household.electricity ? (
-                                <Badge className="ml-auto bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Yes</Badge>
+                                <Badge className="ml-auto bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                    Yes
+                                </Badge>
                             ) : (
-                                <Badge variant="outline" className="ml-auto dark:border-gray-600 dark:text-gray-300">No</Badge>
+                                <Badge variant="outline" className="ml-auto dark:border-gray-600 dark:text-gray-300">
+                                    No
+                                </Badge>
                             )}
                         </div>
-                        <div className={`flex items-center gap-2 p-3 rounded-lg ${household.internet ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-900/50'} dark:text-gray-300`}>
+                        <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                            household.internet ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-900/50'
+                        } dark:text-gray-300`}>
                             <Wifi className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                             <span>Internet</span>
                             {household.internet ? (
-                                <Badge className="ml-auto bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Yes</Badge>
+                                <Badge className="ml-auto bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                    Yes
+                                </Badge>
                             ) : (
-                                <Badge variant="outline" className="ml-auto dark:border-gray-600 dark:text-gray-300">No</Badge>
+                                <Badge variant="outline" className="ml-auto dark:border-gray-600 dark:text-gray-300">
+                                    No
+                                </Badge>
                             )}
                         </div>
-                        <div className={`flex items-center gap-2 p-3 rounded-lg ${household.vehicle ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-900/50'} dark:text-gray-300`}>
+                        <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                            household.vehicle ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-900/50'
+                        } dark:text-gray-300`}>
                             <Car className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                             <span>Vehicle</span>
                             {household.vehicle ? (
-                                <Badge className="ml-auto bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">Yes</Badge>
+                                <Badge className="ml-auto bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                                    Yes
+                                </Badge>
                             ) : (
-                                <Badge variant="outline" className="ml-auto dark:border-gray-600 dark:text-gray-300">No</Badge>
+                                <Badge variant="outline" className="ml-auto dark:border-gray-600 dark:text-gray-300">
+                                    No
+                                </Badge>
                             )}
                         </div>
                     </div>

@@ -23,45 +23,80 @@ import {
     X,
     Trash2,
     Camera,
-    Image,
-    Globe
+    Globe,
+    Loader2,
+    AlertCircle
 } from 'lucide-react';
-import { Link, useForm, usePage } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
-import { PageProps } from '@/types';
+import { Link, useForm } from '@inertiajs/react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { 
+    PageProps, 
+    Resident, 
+    Purok, 
+    HouseholdMember,
+    getFullName,
+    getPhotoUrl,
+    hasPhoto
+} from '@/types/admin/households/household.types';
 
-interface Resident {
-    id: number;
-    name: string;
-    age?: number;
-    address?: string;
-    first_name: string;
-    last_name: string;
-    middle_name?: string;
-    purok_id?: number;
-    purok_name?: string;
-    photo_path?: string;
-    photo_url?: string;
-}
+// ============================================================================
+// Constants
+// ============================================================================
 
-interface HouseholdMember {
-    id: number;
-    name: string;
-    relationship: string;
-    age: number;
-    resident_id?: number;
-    household_member_id?: number;
-    purok_id?: number;
-    purok_name?: string;
-    photo_path?: string;
-    photo_url?: string;
-    is_head?: boolean;
-}
+const INCOME_RANGES = [
+    'Below ₱10,000',
+    '₱10,000 - ₱20,000',
+    '₱20,000 - ₱30,000',
+    '₱30,000 - ₱50,000',
+    '₱50,000 - ₱100,000',
+    'Above ₱100,000'
+] as const;
 
-interface Purok {
-    id: number;
-    name: string;
-}
+const HOUSING_TYPES = [
+    'Concrete',
+    'Semi-concrete',
+    'Wood',
+    'Nipa/Bamboo',
+    'Mixed Materials',
+    'Others'
+] as const;
+
+const OWNERSHIP_STATUSES = [
+    'Owned',
+    'Rented',
+    'Free Use',
+    'With Consent',
+    'Government Housing'
+] as const;
+
+const WATER_SOURCES = [
+    'Level I (Point Source)',
+    'Level II (Communal Faucet)',
+    'Level III (Waterworks System)',
+    'Deep Well',
+    'Shallow Well',
+    'Spring',
+    'Others'
+] as const;
+
+const RELATIONSHIP_TYPES = [
+    'Head',
+    'Spouse',
+    'Son',
+    'Daughter',
+    'Father',
+    'Mother',
+    'Brother',
+    'Sister',
+    'Grandparent',
+    'Grandchild',
+    'Other Relative',
+    'Non-relative'
+] as const;
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
 
 interface HouseholdFormData {
     household_number: string;
@@ -112,29 +147,187 @@ interface EditHouseholdProps extends PageProps {
     current_members: HouseholdMember[];
 }
 
-// Helper function to get photo URL
-const getPhotoUrl = (photoPath?: string, photoUrl?: string): string | null => {
-    // Use photo_url if provided (direct URL from backend)
-    if (photoUrl) {
-        // If photoUrl is already a full URL, return it
-        if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://') || photoUrl.startsWith('/')) {
-            return photoUrl;
-        }
-        // If it's relative, prepend with base URL
-        return `/${photoUrl.replace(/^\/+/, '')}`;
-    }
+// ============================================================================
+// Helper Components
+// ============================================================================
+
+interface MemberCardProps {
+    member: HouseholdMember;
+    isHead: boolean;
+    onRemove?: (id: number) => void;
+    onUpdateRelationship?: (id: number, relationship: string) => void;
+    householdId: number;
+    purokId: number | null;
+    relationshipTypes: readonly string[];
+}
+
+const MemberCard = ({ 
+    member, 
+    isHead, 
+    onRemove, 
+    onUpdateRelationship, 
+    householdId, 
+    purokId,
+    relationshipTypes 
+}: MemberCardProps) => {
+    const photoUrl = getPhotoUrl(member.photo_path, member.photo_url);
     
-    // If only photo_path exists
-    if (photoPath) {
-        // Remove 'public/' prefix if present
-        const cleanPath = photoPath.replace('public/', '');
-        
-        // Return with /storage prefix
-        return `/storage/${cleanPath}`;
-    }
-    
-    return null;
+    return (
+        <div className="border rounded-lg p-4 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600 transition-colors dark:bg-gray-900/50">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center overflow-hidden ${
+                        isHead
+                            ? 'border-2 border-blue-500 dark:border-blue-400' 
+                            : 'border border-gray-300 dark:border-gray-600'
+                    }`}>
+                        {photoUrl ? (
+                            <img 
+                                src={photoUrl}
+                                alt={member.full_name || member.name}
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            <div className={`h-full w-full flex items-center justify-center ${
+                                isHead
+                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                            }`}>
+                                {isHead ? <Home className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <div className="font-medium flex items-center gap-2 dark:text-white">
+                            {member.full_name || member.name}
+                            {isHead && (
+                                <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
+                                    Head of Family
+                                </span>
+                            )}
+                            {hasPhoto(member) && (
+                                <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded flex items-center gap-1">
+                                    <Camera className="h-3 w-3" />
+                                    Photo
+                                </span>
+                            )}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {member.relationship}
+                            {member.age && member.age > 0 && ` • ${member.age} years old`}
+                            {member.resident_id && !isHead && (
+                                <span className="ml-2 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-0.5 rounded">
+                                    Existing Resident
+                                </span>
+                            )}
+                            {member.purok_name && (
+                                <span className="ml-2 text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-2 py-0.5 rounded">
+                                    Purok: {member.purok_name}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                {!isHead && onRemove && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onRemove(member.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                )}
+            </div>
+            
+            {!isHead && onUpdateRelationship && (
+                <div className="mt-4">
+                    <Label htmlFor={`relationship-${member.id}`} className="dark:text-gray-300">Relationship to Head</Label>
+                    <Select 
+                        value={member.relationship}
+                        onValueChange={(value) => onUpdateRelationship(member.id, value)}
+                    >
+                        <SelectTrigger className="mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white">
+                            <SelectValue placeholder="Select relationship" />
+                        </SelectTrigger>
+                        <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                            {relationshipTypes
+                                .filter(rel => rel !== 'Head')
+                                .map((relationship) => (
+                                    <SelectItem key={relationship} value={relationship} className="dark:text-white">
+                                        {relationship}
+                                    </SelectItem>
+                                ))
+                            }
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+            
+            {!member.resident_id && member.name && !isHead && (
+                <div className="mt-3 pt-3 border-t border-dashed dark:border-gray-700">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        This member is not in the residents database yet.
+                    </div>
+                    <Link 
+                        href={`/admin/residents/create?return_to=/households/${householdId}/edit&name=${encodeURIComponent(member.name)}&age=${member.age}&relationship=${encodeURIComponent(member.relationship)}&household_id=${householdId}&purok_id=${purokId || ''}`}
+                        target="_blank"
+                        className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                        <Plus className="h-3 w-3" />
+                        Add to Residents Database
+                    </Link>
+                </div>
+            )}
+        </div>
+    );
 };
+
+interface ChecklistItemProps {
+    completed: boolean;
+    label: string;
+    subLabel?: string;
+    warning?: boolean;
+}
+
+const ChecklistItem = ({ completed, label, subLabel, warning = false }: ChecklistItemProps) => {
+    const getStatusClass = () => {
+        if (completed) return 'text-green-600 dark:text-green-400';
+        if (warning) return 'text-amber-600 dark:text-amber-400';
+        return 'text-gray-400 dark:text-gray-600';
+    };
+    
+    const getDotClass = () => {
+        if (completed) return 'bg-green-600 dark:bg-green-400';
+        if (warning) return 'bg-amber-600 dark:bg-amber-400';
+        return 'bg-gray-400 dark:bg-gray-500';
+    };
+    
+    const getBgClass = () => {
+        if (completed) return 'bg-green-100 dark:bg-green-900/30';
+        if (warning) return 'bg-amber-100 dark:bg-amber-900/30';
+        return 'bg-gray-100 dark:bg-gray-700';
+    };
+    
+    return (
+        <div className={`flex items-center space-x-2 ${getStatusClass()}`}>
+            <div className={`h-5 w-5 rounded-full ${getBgClass()} flex items-center justify-center`}>
+                <div className={`h-2 w-2 rounded-full ${getDotClass()}`}></div>
+            </div>
+            <div>
+                <span className="text-sm">{label}</span>
+                {subLabel && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">{subLabel}</span>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ============================================================================
+// Main Component
+// ============================================================================
 
 export default function EditHousehold({ 
     household, 
@@ -143,22 +336,20 @@ export default function EditHousehold({
     available_residents = [],
     current_members 
 }: EditHouseholdProps) {
-    // FIX: Initialize members with proper head relationship
-    const initialMembers = (current_members || []).map(member => {
-        const isHead = member.is_head === true || member.relationship === 'Head';
-        return {
+    // State
+    const [members, setMembers] = useState<HouseholdMember[]>(() => {
+        return (current_members || []).map(member => ({
             ...member,
-            relationship: isHead ? 'Head' : (member.relationship || 'Other Relative'),
-            is_head: isHead,
-        };
+            relationship: (member.is_head || member.relationship === 'Head') ? 'Head' : (member.relationship || 'Other Relative'),
+            is_head: member.is_head || member.relationship === 'Head',
+        }));
     });
     
-    const [members, setMembers] = useState<HouseholdMember[]>(initialMembers);
     const [showMemberSearch, setShowMemberSearch] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<Resident[]>(available_residents);
-
-    const { data, setData, put, processing, errors } = useForm<HouseholdFormData>({
+    
+    // Form
+    const { data, setData, put, processing, errors, reset } = useForm<HouseholdFormData>({
         household_number: household.household_number,
         contact_number: household.contact_number,
         email: household.email || '',
@@ -173,108 +364,40 @@ export default function EditHousehold({
         internet: household.internet,
         vehicle: household.vehicle,
         remarks: household.remarks || '',
-        members: initialMembers,
+        members: members,
         google_maps_url: household.google_maps_url || '',
         latitude: household.latitude || null,
         longitude: household.longitude || null,
     });
 
-    const incomeRanges = [
-        'Below ₱10,000',
-        '₱10,000 - ₱20,000',
-        '₱20,000 - ₱30,000',
-        '₱30,000 - ₱50,000',
-        '₱50,000 - ₱100,000',
-        'Above ₱100,000'
-    ];
-
-    const housingTypes = [
-        'Concrete',
-        'Semi-concrete',
-        'Wood',
-        'Nipa/Bamboo',
-        'Mixed Materials',
-        'Others'
-    ];
-
-    const ownershipStatuses = [
-        'Owned',
-        'Rented',
-        'Free Use',
-        'With Consent',
-        'Government Housing'
-    ];
-
-    const waterSources = [
-        'Level I (Point Source)',
-        'Level II (Communal Faucet)',
-        'Level III (Waterworks System)',
-        'Deep Well',
-        'Shallow Well',
-        'Spring',
-        'Others'
-    ];
-
-    const relationshipTypes = [
-        'Head',
-        'Spouse',
-        'Son',
-        'Daughter',
-        'Father',
-        'Mother',
-        'Brother',
-        'Sister',
-        'Grandparent',
-        'Grandchild',
-        'Other Relative',
-        'Non-relative'
-    ];
-
-    // Get the current head member
-    const headMember = members.find(m => m.relationship === 'Head' || m.is_head);
+    // Computed values
+    const headMember = useMemo(() => members.find(m => m.relationship === 'Head' || m.is_head), [members]);
+    const currentHeadResident = useMemo(() => 
+        headMember?.resident_id 
+            ? heads.find(h => h.id === headMember.resident_id)
+            : null,
+        [headMember, heads]
+    );
     
-    // Get the current head resident from heads list
-    const currentHeadResident = headMember?.resident_id 
-        ? heads.find(h => h.id === headMember.resident_id)
-        : null;
-
-    // FIX: Update form data when members change - FORCE HEAD RELATIONSHIP
-    useEffect(() => {
-        setData('total_members', members.length);
-        setData('members', members.map(member => {
-            const isHead = member.relationship === 'Head' || member.is_head;
-            return {
-                id: member.id,
-                name: member.name,
-                relationship: isHead ? 'Head' : member.relationship,
-                age: member.age,
-                resident_id: member.resident_id,
-                household_member_id: member.household_member_id,
-                purok_id: member.purok_id,
-                photo_path: member.photo_path,
-                photo_url: member.photo_url,
-                is_head: isHead,
-            };
-        }));
-    }, [members]);
-
-    // Filter search results based on query
-    useEffect(() => {
-        if (!searchQuery.trim()) {
-            setSearchResults(available_residents);
-        } else {
-            const filtered = available_residents.filter(resident => {
-                const fullName = `${resident.first_name} ${resident.last_name}`.toLowerCase();
-                const searchLower = searchQuery.toLowerCase();
-                return fullName.includes(searchLower) ||
-                    resident.first_name.toLowerCase().includes(searchLower) ||
-                    resident.last_name.toLowerCase().includes(searchLower);
-            });
-            setSearchResults(filtered);
-        }
+    const searchResults = useMemo(() => {
+        if (!searchQuery.trim()) return available_residents;
+        const searchLower = searchQuery.toLowerCase();
+        return available_residents.filter(resident => {
+            const fullName = getFullName(resident.first_name, resident.last_name, resident.middle_name).toLowerCase();
+            return fullName.includes(searchLower) ||
+                resident.first_name.toLowerCase().includes(searchLower) ||
+                resident.last_name.toLowerCase().includes(searchLower);
+        });
     }, [searchQuery, available_residents]);
 
-    const removeMember = (id: number) => {
+    // Update form data when members change
+    useEffect(() => {
+        setData('total_members', members.length);
+        setData('members', members);
+    }, [members, setData]);
+
+    // Handlers
+    const handleRemoveMember = useCallback((id: number) => {
         const memberToRemove = members.find(m => m.id === id);
         if (memberToRemove?.relationship === 'Head' || memberToRemove?.is_head) {
             alert('Cannot remove the head of family. Change the head first.');
@@ -282,35 +405,34 @@ export default function EditHousehold({
         }
         
         if (members.length > 1) {
-            setMembers(members.filter(member => member.id !== id));
+            setMembers(prev => prev.filter(member => member.id !== id));
         }
-    };
+    }, [members]);
 
-    const updateMember = (id: number, field: string, value: string | number | undefined) => {
-        setMembers(members.map(member => 
-            member.id === id ? { ...member, [field]: value } : member
+    const handleUpdateMemberRelationship = useCallback((id: number, relationship: string) => {
+        setMembers(prev => prev.map(member => 
+            member.id === id ? { ...member, relationship } : member
         ));
-    };
+    }, []);
 
-    const addExistingResident = (resident: Resident) => {
-        const newId = members.length > 0 ? Math.max(...members.map(m => m.id)) + 1 : 1;
-        
-        // Check if this resident is already added
+    const handleAddExistingResident = useCallback((resident: Resident) => {
         const isAlreadyAdded = members.some(m => m.resident_id === resident.id);
         if (isAlreadyAdded) {
             alert('This resident is already added to the household.');
             return;
         }
 
-        const fullName = `${resident.first_name} ${resident.last_name}`.trim();
+        const newId = members.length > 0 ? Math.max(...members.map(m => m.id)) + 1 : 1;
+        const fullName = getFullName(resident.first_name, resident.last_name, resident.middle_name);
         
-        // Default relationship for new members (not head)
-        const relationship = 'Other Relative';
-        
-        setMembers([...members, { 
-            id: newId, 
-            name: fullName, 
-            relationship: relationship, 
+        setMembers(prev => [...prev, { 
+            id: newId,
+            household_id: household.id,
+            name: fullName,
+            first_name: resident.first_name,
+            last_name: resident.last_name,
+            middle_name: resident.middle_name,
+            relationship: 'Other Relative',
             age: resident.age || 0,
             resident_id: resident.id,
             purok_id: resident.purok_id,
@@ -318,56 +440,60 @@ export default function EditHousehold({
             photo_path: resident.photo_path,
             photo_url: resident.photo_url,
             is_head: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
         }]);
         
         setShowMemberSearch(false);
         setSearchQuery('');
-    };
+    }, [members, household.id]);
 
-    // FIX: handleHeadChange - ALWAYS set relationship to "Head"
-    const handleHeadChange = (value: string) => {
+    const handleHeadChange = useCallback((value: string) => {
         if (!value) {
-            // Clear head selection by removing any head member
-            const newMembers = members.filter(m => m.relationship !== 'Head' && !m.is_head);
-            setMembers(newMembers);
+            setMembers(prev => prev.filter(m => m.relationship !== 'Head' && !m.is_head));
             return;
         }
 
         const selectedHead = heads.find(head => head.id.toString() === value);
         if (selectedHead) {
-            const fullName = `${selectedHead.first_name} ${selectedHead.last_name}`.trim();
+            const fullName = getFullName(selectedHead.first_name, selectedHead.last_name, selectedHead.middle_name);
             
-            // Update purok_id based on selected head
             if (selectedHead.purok_id) {
                 setData('purok_id', selectedHead.purok_id);
             }
             
-            // Check if head already exists in members
             const existingHeadIndex = members.findIndex(m => m.relationship === 'Head' || m.is_head);
             
             if (existingHeadIndex !== -1) {
-                // Update existing head
-                const updatedMembers = [...members];
-                updatedMembers[existingHeadIndex] = {
-                    ...updatedMembers[existingHeadIndex],
-                    id: selectedHead.id,
-                    name: fullName,
-                    resident_id: selectedHead.id,
-                    age: selectedHead.age || 0,
-                    relationship: 'Head',
-                    purok_id: selectedHead.purok_id,
-                    purok_name: selectedHead.purok_name,
-                    photo_path: selectedHead.photo_path,
-                    photo_url: selectedHead.photo_url,
-                    is_head: true,
-                };
-                setMembers(updatedMembers);
+                setMembers(prev => {
+                    const updated = [...prev];
+                    updated[existingHeadIndex] = {
+                        ...updated[existingHeadIndex],
+                        id: selectedHead.id,
+                        name: fullName,
+                        first_name: selectedHead.first_name,
+                        last_name: selectedHead.last_name,
+                        middle_name: selectedHead.middle_name,
+                        resident_id: selectedHead.id,
+                        age: selectedHead.age || 0,
+                        relationship: 'Head',
+                        purok_id: selectedHead.purok_id,
+                        purok_name: selectedHead.purok_name,
+                        photo_path: selectedHead.photo_path,
+                        photo_url: selectedHead.photo_url,
+                        is_head: true,
+                    };
+                    return updated;
+                });
             } else {
-                // Add new head as first member in the list
-                const newHeadMember = { 
-                    id: selectedHead.id, 
-                    name: fullName, 
-                    relationship: 'Head', 
+                const newHeadMember: HouseholdMember = { 
+                    id: selectedHead.id,
+                    household_id: household.id,
+                    name: fullName,
+                    first_name: selectedHead.first_name,
+                    last_name: selectedHead.last_name,
+                    middle_name: selectedHead.middle_name,
+                    relationship: 'Head',
                     age: selectedHead.age || 0,
                     resident_id: selectedHead.id,
                     purok_id: selectedHead.purok_id,
@@ -375,28 +501,31 @@ export default function EditHousehold({
                     photo_path: selectedHead.photo_path,
                     photo_url: selectedHead.photo_url,
                     is_head: true,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
                 };
                 
-                // Add head as first member in the list
-                setMembers([newHeadMember, ...members.filter(m => !(m.relationship === 'Head' || m.is_head))]);
+                setMembers(prev => [newHeadMember, ...prev.filter(m => !(m.relationship === 'Head' || m.is_head))]);
             }
         }
-    };
+    }, [heads, members, setData, household.id]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleReset = useCallback(() => {
+        if (confirm('Are you sure you want to reset all changes?')) {
+            const resetMembers = (current_members || []).map(member => ({
+                ...member,
+                relationship: (member.is_head || member.relationship === 'Head') ? 'Head' : (member.relationship || 'Other Relative'),
+                is_head: member.is_head || member.relationship === 'Head',
+            }));
+            setMembers(resetMembers);
+            reset();
+        }
+    }, [current_members, reset]);
+
+    const handleSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         
-        // DEBUG: Log all members and their relationships
-        console.log('=== DEBUG MEMBERS ===');
-        members.forEach(m => {
-            console.log(`Name: ${m.name}, Relationship: "${m.relationship}", is_head: ${m.is_head}`);
-        });
-        console.log('====================');
-        
-        // Validate that we have exactly one head member
         const headMembers = members.filter(m => m.relationship === 'Head' || m.is_head);
-        console.log('Head members found:', headMembers.length);
-        
         if (headMembers.length !== 1) {
             alert(`Household must have exactly one head member. Found ${headMembers.length} head(s).`);
             return;
@@ -405,23 +534,13 @@ export default function EditHousehold({
         put(`/admin/households/${household.id}`, {
             preserveScroll: true,
         });
-    };
+    }, [members, put, household.id]);
 
-    const deleteHousehold = () => {
+    const handleDelete = useCallback(() => {
         if (confirm('Are you sure you want to delete this household? This action cannot be undone.')) {
             window.location.href = `/admin/households/${household.id}/delete`;
         }
-    };
-
-    // Get photo URL for a resident
-    const getResidentPhotoUrl = (resident: Resident | HouseholdMember) => {
-        return getPhotoUrl(resident.photo_path, resident.photo_url);
-    };
-
-    // Check if resident has photo
-    const hasPhoto = (resident: Resident | HouseholdMember): boolean => {
-        return !!(resident.photo_path || resident.photo_url);
-    };
+    }, [household.id]);
 
     return (
         <AppLayout
@@ -433,109 +552,155 @@ export default function EditHousehold({
                 { title: 'Edit Household', href: `/admin/households/${household.id}/edit` }
             ]}
         >
-            <form onSubmit={handleSubmit}>
-                <div className="space-y-6">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <Link href={`/admin/households/${household.id}`}>
-                                <Button variant="ghost" size="sm" type="button">
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Back
-                                </Button>
-                            </Link>
-                            <div>
-                                <h1 className="text-3xl font-bold tracking-tight dark:text-white">Edit Household</h1>
-                                <p className="text-gray-500 dark:text-gray-400">
-                                    Household #{household.household_number} • Last updated {new Date().toLocaleDateString()}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button 
-                                variant="destructive" 
-                                size="sm" 
-                                type="button"
-                                onClick={deleteHousehold}
-                            >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
+            <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <Link href={`/admin/households/${household.id}`}>
+                            <Button variant="ghost" size="sm" type="button">
+                                <ArrowLeft className="h-4 w-4 mr-2" />
+                                Back
                             </Button>
-                            <Button type="submit" disabled={processing}>
-                                <Save className="h-4 w-4 mr-2" />
-                                {processing ? 'Saving...' : 'Update Household'}
-                            </Button>
+                        </Link>
+                        <div>
+                            <h1 className="text-3xl font-bold tracking-tight dark:text-white">Edit Household</h1>
+                            <p className="text-gray-500 dark:text-gray-400">
+                                Household #{household.household_number} • Last updated {new Date().toLocaleDateString()}
+                            </p>
                         </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            type="button"
+                            onClick={handleDelete}
+                        >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                        </Button>
+                        <Button type="submit" disabled={processing}>
+                            {processing ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="h-4 w-4 mr-2" />
+                                    Update Household
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </div>
 
-                    {/* Error Messages */}
-                    {Object.keys(errors).length > 0 && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
-                            <p className="font-bold">Please fix the following errors:</p>
-                            <ul className="list-disc list-inside mt-2">
-                                {Object.entries(errors).map(([field, error]) => (
-                                    <li key={field}><strong>{field}:</strong> {error}</li>
-                                ))}
-                            </ul>
+                {/* Error Messages */}
+                {Object.keys(errors).length > 0 && (
+                    <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
+                        <div className="p-4">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <p className="font-medium text-red-800 dark:text-red-300">Please fix the following errors:</p>
+                                    <ul className="list-disc list-inside mt-2 space-y-1">
+                                        {Object.entries(errors).map(([field, error]) => (
+                                            <li key={field} className="text-sm text-red-600 dark:text-red-400">
+                                                <span className="font-medium capitalize">{field.replace(/_/g, ' ')}:</span> {error}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
-                    )}
+                    </Card>
+                )}
 
-                    <div className="grid gap-6 lg:grid-cols-3">
-                        {/* Left Column - Household Information */}
-                        <div className="lg:col-span-2 space-y-6">
-                            {/* Basic Household Information */}
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-white">
-                                        <Home className="h-5 w-5" />
-                                        Basic Household Information
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Edit the household's basic details
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="householdNumber" className="dark:text-gray-300">Household Number</Label>
-                                            <Input 
-                                                id="householdNumber" 
-                                                value={data.household_number}
-                                                onChange={(e) => setData('household_number', e.target.value)}
-                                                required
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                                            />
-                                            {errors.household_number && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.household_number}</p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="registrationDate" className="dark:text-gray-300">Registration Date</Label>
-                                            <Input 
-                                                id="registrationDate" 
-                                                type="date" 
-                                                defaultValue={new Date().toISOString().split('T')[0]}
-                                                readOnly
-                                                className="bg-gray-50 dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:read-only:bg-gray-900"
-                                            />
-                                        </div>
-                                    </div>
-
+                <div className="grid gap-6 lg:grid-cols-3">
+                    {/* Left Column - Main Form */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {/* Basic Household Information */}
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 dark:text-white">
+                                    <Home className="h-5 w-5" />
+                                    Basic Household Information
+                                </CardTitle>
+                                <CardDescription className="dark:text-gray-400">
+                                    Edit the household's basic details
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="head_resident_id" className="dark:text-gray-300">Head of Family *</Label>
-                                        <Select 
-                                            value={currentHeadResident?.id?.toString() || ''}
-                                            onValueChange={handleHeadChange}
-                                        >
-                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
-                                                <SelectValue placeholder="Select or search for head of family">
-                                                    {currentHeadResident ? (
+                                        <Label htmlFor="householdNumber" className="dark:text-gray-300">Household Number</Label>
+                                        <Input 
+                                            id="householdNumber" 
+                                            value={data.household_number}
+                                            onChange={(e) => setData('household_number', e.target.value)}
+                                            required
+                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                        />
+                                        {errors.household_number && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.household_number}</p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="registrationDate" className="dark:text-gray-300">Registration Date</Label>
+                                        <Input 
+                                            id="registrationDate" 
+                                            type="date" 
+                                            defaultValue={new Date().toISOString().split('T')[0]}
+                                            readOnly
+                                            className="bg-gray-50 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="head_resident_id" className="dark:text-gray-300">Head of Family *</Label>
+                                    <Select 
+                                        value={currentHeadResident?.id?.toString() || ''}
+                                        onValueChange={handleHeadChange}
+                                    >
+                                        <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
+                                            <SelectValue placeholder="Select or search for head of family">
+                                                {currentHeadResident ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-6 w-6 rounded-full overflow-hidden">
+                                                            {hasPhoto(currentHeadResident) ? (
+                                                                <img 
+                                                                    src={getPhotoUrl(currentHeadResident.photo_path, currentHeadResident.photo_url)!}
+                                                                    alt={getFullName(currentHeadResident.first_name, currentHeadResident.last_name, currentHeadResident.middle_name)}
+                                                                    className="h-full w-full object-cover"
+                                                                />
+                                                            ) : (
+                                                                <div className="h-full w-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                                                                    <User className="h-3 w-3 text-gray-500 dark:text-gray-400" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <span>{currentHeadResident.first_name} {currentHeadResident.last_name}</span>
+                                                        {currentHeadResident.age && (
+                                                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                ({currentHeadResident.age} years)
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : 'Select head of family'}
+                                            </SelectValue>
+                                        </SelectTrigger>
+                                        <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                            {heads.map((head) => {
+                                                const fullName = getFullName(head.first_name, head.last_name, head.middle_name);
+                                                return (
+                                                    <SelectItem key={head.id} value={head.id.toString()} className="dark:text-white">
                                                         <div className="flex items-center gap-2">
                                                             <div className="h-6 w-6 rounded-full overflow-hidden">
-                                                                {hasPhoto(currentHeadResident) ? (
+                                                                {hasPhoto(head) ? (
                                                                     <img 
-                                                                        src={getResidentPhotoUrl(currentHeadResident)!}
-                                                                        alt={currentHeadResident.first_name + ' ' + currentHeadResident.last_name}
+                                                                        src={getPhotoUrl(head.photo_path, head.photo_url)!}
+                                                                        alt={fullName}
                                                                         className="h-full w-full object-cover"
                                                                     />
                                                                 ) : (
@@ -544,243 +709,192 @@ export default function EditHousehold({
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                            <span>{currentHeadResident.first_name} {currentHeadResident.last_name}</span>
-                                                            {currentHeadResident.age && (
+                                                            <span>{fullName}</span>
+                                                            {head.age && (
                                                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                                    ({currentHeadResident.age} years)
+                                                                    ({head.age} years)
                                                                 </span>
                                                             )}
                                                         </div>
-                                                    ) : 'Select head of family'}
-                                                </SelectValue>
-                                            </SelectTrigger>
-                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                {heads.map((head) => {
-                                                    const fullName = `${head.first_name} ${head.last_name}`.trim();
-                                                    return (
-                                                        <SelectItem key={head.id} value={head.id.toString()} className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="h-6 w-6 rounded-full overflow-hidden">
-                                                                    {hasPhoto(head) ? (
-                                                                        <img 
-                                                                            src={getResidentPhotoUrl(head)!}
-                                                                            alt={fullName}
-                                                                            className="h-full w-full object-cover"
-                                                                        />
-                                                                    ) : (
-                                                                        <div className="h-full w-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                                                                            <User className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <span>{fullName}</span>
-                                                                {head.age && (
-                                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                                        ({head.age} years)
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </SelectItem>
-                                                    );
-                                                })}
-                                            </SelectContent>
-                                        </Select>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            Select the head of family from available residents. The head will be added as the first household member.
-                                        </p>
-                                    </div>
+                                                    </SelectItem>
+                                                );
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Select the head of family from available residents. The head will be added as the first household member.
+                                    </p>
+                                </div>
 
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="contactNumber" className="dark:text-gray-300">Contact Number *</Label>
-                                            <div className="relative">
-                                                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input 
-                                                    id="contactNumber" 
-                                                    placeholder="09123456789" 
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-white" 
-                                                    required 
-                                                    value={data.contact_number}
-                                                    onChange={(e) => setData('contact_number', e.target.value)}
-                                                />
-                                            </div>
-                                            {errors.contact_number && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.contact_number}</p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="email" className="dark:text-gray-300">Email Address</Label>
-                                            <div className="relative">
-                                                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input 
-                                                    id="email" 
-                                                    type="email" 
-                                                    placeholder="family@example.com" 
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-white" 
-                                                    value={data.email}
-                                                    onChange={(e) => setData('email', e.target.value)}
-                                                />
-                                            </div>
-                                            {errors.email && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.email}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Address Information with Google Maps */}
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-white">
-                                        <MapPin className="h-5 w-5" />
-                                        Address Information
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Edit the household's address
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
+                                <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="completeAddress" className="dark:text-gray-300">Complete Address *</Label>
-                                        <Textarea 
-                                            id="completeAddress" 
-                                            placeholder="House No., Street, Barangay Kibawe" 
-                                            required 
-                                            rows={3}
-                                            value={data.address}
-                                            onChange={(e) => setData('address', e.target.value)}
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                                        />
-                                        {errors.address && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.address}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="purok_id" className="dark:text-gray-300">Purok *</Label>
-                                            <Select 
-                                                value={data.purok_id?.toString() || ''}
-                                                onValueChange={(value) => setData('purok_id', value ? parseInt(value) : null)}
-                                            >
-                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
-                                                    <SelectValue placeholder="Select purok">
-                                                        {data.purok_id ? (
-                                                            puroks.find(p => p.id === data.purok_id)?.name || 'Select purok'
-                                                        ) : 'Select purok'}
-                                                    </SelectValue>
-                                                </SelectTrigger>
-                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                    {puroks.map((purok) => (
-                                                        <SelectItem key={purok.id} value={purok.id.toString()} className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">
-                                                            {purok.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            {errors.purok_id && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.purok_id}</p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="nearestLandmark" className="dark:text-gray-300">Nearest Landmark</Label>
+                                        <Label htmlFor="contactNumber" className="dark:text-gray-300">Contact Number *</Label>
+                                        <div className="relative">
+                                            <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                                             <Input 
-                                                id="nearestLandmark" 
-                                                placeholder="e.g., Near barangay hall, beside school" 
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                                id="contactNumber" 
+                                                placeholder="09123456789" 
+                                                className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-white" 
+                                                required 
+                                                value={data.contact_number}
+                                                onChange={(e) => setData('contact_number', e.target.value)}
                                             />
                                         </div>
+                                        {errors.contact_number && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.contact_number}</p>
+                                        )}
                                     </div>
-
-                                    {/* GOOGLE MAPS URL FIELD */}
-                                    <div className="space-y-2 pt-2">
-                                        <Label htmlFor="google_maps_url" className="flex items-center gap-2 dark:text-gray-300">
-                                            <Globe className="h-4 w-4" />
-                                            Google Maps Link
-                                        </Label>
-                                        <Input 
-                                            id="google_maps_url" 
-                                            placeholder="https://maps.app.goo.gl/..." 
-                                            value={data.google_maps_url || ''}
-                                            onChange={(e) => setData('google_maps_url', e.target.value)}
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-white font-mono text-sm"
-                                        />
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Paste any Google Maps share link. Coordinates will be extracted automatically when you save.
-                                        </p>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email" className="dark:text-gray-300">Email Address</Label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                            <Input 
+                                                id="email" 
+                                                type="email" 
+                                                placeholder="family@example.com" 
+                                                className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-white" 
+                                                value={data.email}
+                                                onChange={(e) => setData('email', e.target.value)}
+                                            />
+                                        </div>
+                                        {errors.email && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+                                        )}
                                     </div>
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                                    {/* Coordinates Display */}
-                                    {(data.latitude || data.longitude) && (
-                                        <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                                            <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">📍 Current Coordinates</p>
-                                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                                <div>
-                                                    <span className="text-green-600 dark:text-green-400">Latitude:</span>
-                                                    <code className="ml-2 text-green-800 dark:text-green-300 font-mono">
-                                                        {data.latitude?.toFixed(6)}
-                                                    </code>
-                                                </div>
-                                                <div>
-                                                    <span className="text-green-600 dark:text-green-400">Longitude:</span>
-                                                    <code className="ml-2 text-green-800 dark:text-green-300 font-mono">
-                                                        {data.longitude?.toFixed(6)}
-                                                    </code>
-                                                </div>
-                                            </div>
-                                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                                                These coordinates will update automatically if you change the Google Maps link.
-                                            </p>
-                                        </div>
+                        {/* Address Information */}
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 dark:text-white">
+                                    <MapPin className="h-5 w-5" />
+                                    Address Information
+                                </CardTitle>
+                                <CardDescription className="dark:text-gray-400">
+                                    Edit the household's address
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="completeAddress" className="dark:text-gray-300">Complete Address *</Label>
+                                    <Textarea 
+                                        id="completeAddress" 
+                                        placeholder="House No., Street, Barangay Kibawe" 
+                                        required 
+                                        rows={3}
+                                        value={data.address}
+                                        onChange={(e) => setData('address', e.target.value)}
+                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                    />
+                                    {errors.address && (
+                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.address}</p>
                                     )}
+                                </div>
 
-                                    {/* Location Preview */}
-                                    {data.purok_id && data.address && (
-                                        <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                                            <div className="flex items-start gap-2">
-                                                <Home className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
-                                                <div>
-                                                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Location Preview</p>
-                                                    <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
-                                                        {data.address}, {puroks.find(p => p.id === data.purok_id)?.name || 'Selected Purok'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Household Members */}
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 dark:text-white">
-                                            <Users className="h-5 w-5" />
-                                            Household Members
-                                            <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                                                ({members.length} member{members.length !== 1 ? 's' : ''})
-                                            </span>
-                                        </div>
-                                        <Button 
-                                            type="button" 
-                                            variant="outline" 
-                                            size="sm"
-                                            onClick={() => setShowMemberSearch(true)}
-                                            className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="purok_id" className="dark:text-gray-300">Purok *</Label>
+                                        <Select 
+                                            value={data.purok_id?.toString() || ''}
+                                            onValueChange={(value) => setData('purok_id', value ? parseInt(value) : null)}
                                         >
-                                            <Search className="h-4 w-4 mr-2" />
-                                            Add Other Members
-                                        </Button>
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        The head of family will appear here automatically when selected above. Add other family members below.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                   {/* Member Search Modal */}
-                                   {showMemberSearch && (
+                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
+                                                <SelectValue placeholder="Select purok" />
+                                            </SelectTrigger>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                {puroks.map((purok) => (
+                                                    <SelectItem key={purok.id} value={purok.id.toString()} className="dark:text-white">
+                                                        {purok.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {errors.purok_id && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.purok_id}</p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="nearestLandmark" className="dark:text-gray-300">Nearest Landmark</Label>
+                                        <Input 
+                                            id="nearestLandmark" 
+                                            placeholder="e.g., Near barangay hall, beside school" 
+                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Google Maps URL Field */}
+                                <div className="space-y-2 pt-2">
+                                    <Label htmlFor="google_maps_url" className="flex items-center gap-2 dark:text-gray-300">
+                                        <Globe className="h-4 w-4" />
+                                        Google Maps Link
+                                    </Label>
+                                    <Input 
+                                        id="google_maps_url" 
+                                        placeholder="https://maps.app.goo.gl/..." 
+                                        value={data.google_maps_url || ''}
+                                        onChange={(e) => setData('google_maps_url', e.target.value)}
+                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-white font-mono text-sm"
+                                    />
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Paste any Google Maps share link. Coordinates will be extracted automatically when you save.
+                                    </p>
+                                </div>
+
+                                {/* Coordinates Display */}
+                                {(data.latitude || data.longitude) && (
+                                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                        <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">📍 Current Coordinates</p>
+                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                            <div>
+                                                <span className="text-green-600 dark:text-green-400">Latitude:</span>
+                                                <code className="ml-2 text-green-800 dark:text-green-300 font-mono">
+                                                    {data.latitude?.toFixed(6)}
+                                                </code>
+                                            </div>
+                                            <div>
+                                                <span className="text-green-600 dark:text-green-400">Longitude:</span>
+                                                <code className="ml-2 text-green-800 dark:text-green-300 font-mono">
+                                                    {data.longitude?.toFixed(6)}
+                                                </code>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Household Members */}
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
+                            <CardHeader>
+                                <CardTitle className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 dark:text-white">
+                                        <Users className="h-5 w-5" />
+                                        Household Members
+                                        <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                                            ({members.length} member{members.length !== 1 ? 's' : ''})
+                                        </span>
+                                    </div>
+                                    <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => setShowMemberSearch(true)}
+                                        className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+                                    >
+                                        <Search className="h-4 w-4 mr-2" />
+                                        Add Other Members
+                                    </Button>
+                                </CardTitle>
+                                <CardDescription className="dark:text-gray-400">
+                                    The head of family will appear here automatically when selected above. Add other family members below.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {/* Member Search Modal */}
+                                {showMemberSearch && (
                                     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                                         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col dark:border dark:border-gray-700">
                                             <div className="p-6 border-b dark:border-gray-700">
@@ -852,9 +966,6 @@ export default function EditHousehold({
                                                                 <p className="text-gray-500 dark:text-gray-400 mb-4">
                                                                     No residents found for "<span className="font-medium">{searchQuery}</span>"
                                                                 </p>
-                                                                <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
-                                                                    Try a different search term or create a new resident.
-                                                                </p>
                                                                 <Link 
                                                                     href={`/admin/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(searchQuery)}&household_id=${household.id}&purok_id=${data.purok_id || ''}`}
                                                                     className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -878,11 +989,11 @@ export default function EditHousehold({
                                                                 </div>
                                                                 
                                                                 {searchResults.map((resident) => {
-                                                                    const fullName = `${resident.first_name} ${resident.last_name}`.trim();
+                                                                    const fullName = getFullName(resident.first_name, resident.last_name, resident.middle_name);
                                                                     const isAlreadyAdded = members.some(m => m.resident_id === resident.id);
                                                                     const isHead = currentHeadResident?.id === resident.id;
                                                                     const currentPurok = resident.purok_name || 'No purok';
-                                                                    const photoUrl = getResidentPhotoUrl(resident);
+                                                                    const photoUrl = getPhotoUrl(resident.photo_path, resident.photo_url);
                                                                     
                                                                     return (
                                                                         <div 
@@ -905,23 +1016,6 @@ export default function EditHousehold({
                                                                                                 src={photoUrl}
                                                                                                 alt={fullName}
                                                                                                 className="h-full w-full object-cover"
-                                                                                                onError={(e) => {
-                                                                                                    e.currentTarget.style.display = 'none';
-                                                                                                    const parent = e.currentTarget.parentElement;
-                                                                                                    if (parent) {
-                                                                                                        parent.innerHTML = `
-                                                                                                            <div class="h-full w-full flex items-center justify-center ${
-                                                                                                                isHead 
-                                                                                                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
-                                                                                                                    : isAlreadyAdded
-                                                                                                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                                                                                                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                                                                                                            }">
-                                                                                                                <User class="h-6 w-6" />
-                                                                                                            </div>
-                                                                                                        `;
-                                                                                                    }
-                                                                                                }}
                                                                                             />
                                                                                         ) : (
                                                                                             <div className={`h-full w-full flex items-center justify-center ${
@@ -948,7 +1042,7 @@ export default function EditHousehold({
                                                                                                     Already in Household
                                                                                                 </span>
                                                                                             )}
-                                                                                            {photoUrl && (
+                                                                                            {hasPhoto(resident) && (
                                                                                                 <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded flex items-center gap-1">
                                                                                                     <Camera className="h-3 w-3" />
                                                                                                     Photo
@@ -979,7 +1073,7 @@ export default function EditHousehold({
                                                                                     ) : (
                                                                                         <Button 
                                                                                             size="sm" 
-                                                                                            onClick={() => addExistingResident(resident)}
+                                                                                            onClick={() => handleAddExistingResident(resident)}
                                                                                             type="button"
                                                                                             className="whitespace-nowrap dark:bg-blue-600 dark:hover:bg-blue-700"
                                                                                         >
@@ -990,7 +1084,6 @@ export default function EditHousehold({
                                                                                 </div>
                                                                             </div>
                                                                             
-                                                                            {/* Show if resident is from different purok */}
                                                                             {!isHead && !isAlreadyAdded && resident.purok_id && resident.purok_id !== data.purok_id && (
                                                                                 <div className="mt-3 pt-3 border-t border-dashed border-amber-200 dark:border-amber-800">
                                                                                     <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm">
@@ -1004,14 +1097,6 @@ export default function EditHousehold({
                                                                         </div>
                                                                     );
                                                                 })}
-                                                                
-                                                                {/* Show message if no residents match search */}
-                                                                {!searchQuery && searchResults.length === 0 && (
-                                                                    <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-                                                                        <User className="h-8 w-8 mx-auto mb-3" />
-                                                                        No available residents to add.
-                                                                    </div>
-                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -1020,542 +1105,372 @@ export default function EditHousehold({
                                             
                                             <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                                 <div className="flex items-center justify-between">
-                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                setShowMemberSearch(false);
-                                                                setSearchQuery('');
-                                                            }}
-                                                            type="button"
-                                                            className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            setShowMemberSearch(false);
+                                                            setSearchQuery('');
+                                                        }}
+                                                        type="button"
+                                                        className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+                                                    >
+                                                        Close
+                                                    </Button>
+                                                    {available_residents.length > 0 && (
+                                                        <Link 
+                                                            href={`/admin/residents/create?return_to=/households/${household.id}/edit&purok_id=${data.purok_id || ''}`}
+                                                            className="inline-flex items-center justify-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                                                            onClick={() => setShowMemberSearch(false)}
                                                         >
-                                                            Close
-                                                        </Button>
-                                                        {available_residents.length > 0 && (
-                                                            <Link 
-                                                                href={`/admin/residents/create?return_to=/households/${household.id}/edit&purok_id=${data.purok_id || ''}`}
-                                                                className="inline-flex items-center justify-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                                                                onClick={() => setShowMemberSearch(false)}
-                                                            >
-                                                                <Plus className="h-4 w-4 mr-2" />
-                                                                Create New Resident
-                                                            </Link>
-                                                        )}
-                                                    </div>
+                                                            <Plus className="h-4 w-4 mr-2" />
+                                                            Create New Resident
+                                                        </Link>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
-                                    <div className="space-y-4">
-                                        {members.length === 0 ? (
-                                            <div className="text-center py-8 border-2 border-dashed rounded-lg dark:border-gray-700">
-                                                <User className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                                                <h3 className="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">No head of family selected</h3>
-                                                <p className="text-gray-500 dark:text-gray-500 mb-4">
-                                                    Select a head of family from the dropdown above to start
-                                                </p>
-                                                <div className="text-sm text-gray-400 dark:text-gray-600">
-                                                    Once selected, they will appear here automatically
-                                                </div>
+                                <div className="space-y-4">
+                                    {members.length === 0 ? (
+                                        <div className="text-center py-8 border-2 border-dashed rounded-lg dark:border-gray-700">
+                                            <User className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                                            <h3 className="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">No head of family selected</h3>
+                                            <p className="text-gray-500 dark:text-gray-500 mb-4">
+                                                Select a head of family from the dropdown above to start
+                                            </p>
+                                            <div className="text-sm text-gray-400 dark:text-gray-600">
+                                                Once selected, they will appear here automatically
                                             </div>
-                                        ) : (
-                                            members.map((member) => {
-                                                const photoUrl = getResidentPhotoUrl(member);
-                                                const isHead = member.relationship === 'Head' || member.is_head;
-                                                return (
-                                                    <div key={member.id} className="border rounded-lg p-4 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600 transition-colors dark:bg-gray-900/50">
-                                                        <div className="flex items-center justify-between mb-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`h-10 w-10 rounded-full flex items-center justify-center overflow-hidden ${
-                                                                    isHead
-                                                                        ? 'border-2 border-blue-500 dark:border-blue-400' 
-                                                                        : 'border border-gray-300 dark:border-gray-600'
-                                                                }`}>
-                                                                    {photoUrl ? (
-                                                                        <img 
-                                                                            src={photoUrl}
-                                                                            alt={member.name}
-                                                                            className="h-full w-full object-cover"
-                                                                            onError={(e) => {
-                                                                                e.currentTarget.style.display = 'none';
-                                                                                const parent = e.currentTarget.parentElement;
-                                                                                if (parent) {
-                                                                                    parent.innerHTML = `
-                                                                                        <div class="h-full w-full flex items-center justify-center ${
-                                                                                            isHead
-                                                                                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
-                                                                                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                                                                                        }">
-                                                                                            ${isHead ? '<Home class="h-5 w-5" />' : '<User class="h-5 w-5" />'}
-                                                                                        </div>
-                                                                                    `;
-                                                                                }
-                                                                            }}
-                                                                        />
-                                                                    ) : (
-                                                                        <div className={`h-full w-full flex items-center justify-center ${
-                                                                            isHead
-                                                                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
-                                                                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                                                                        }`}>
-                                                                            {isHead ? (
-                                                                                <Home className="h-5 w-5" />
-                                                                            ) : (
-                                                                                <User className="h-5 w-5" />
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div>
-                                                                    <div className="font-medium flex items-center gap-2 dark:text-white">
-                                                                        {member.name || `Member #${member.id}`}
-                                                                        {isHead ? (
-                                                                            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
-                                                                                Head of Family
-                                                                            </span>
-                                                                        ) : null}
-                                                                        {photoUrl && (
-                                                                            <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded flex items-center gap-1">
-                                                                                <Camera className="h-3 w-3" />
-                                                                                Photo
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                                        {member.relationship}
-                                                                        {member.age > 0 && ` • ${member.age} years old`}
-                                                                        {member.resident_id && !isHead && (
-                                                                            <span className="ml-2 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-0.5 rounded">
-                                                                                Existing Resident
-                                                                            </span>
-                                                                        )}
-                                                                        {member.purok_name && (
-                                                                            <span className="ml-2 text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-2 py-0.5 rounded">
-                                                                                Purok: {member.purok_name}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            {!isHead && (
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => removeMember(member.id)}
-                                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-900/20"
-                                                                >
-                                                                    <X className="h-4 w-4" />
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                        
-                                                        {/* Relationship Selection for non-head members */}
-                                                        {!isHead && (
-                                                            <div className="mt-4">
-                                                                <Label htmlFor={`relationship-${member.id}`} className="dark:text-gray-300">Relationship to Head</Label>
-                                                                <Select 
-                                                                    value={member.relationship}
-                                                                    onValueChange={(value) => updateMember(member.id, 'relationship', value)}
-                                                                >
-                                                                    <SelectTrigger className="mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white">
-                                                                        <SelectValue placeholder="Select relationship" />
-                                                                    </SelectTrigger>
-                                                                    <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                                        {relationshipTypes
-                                                                            .filter(rel => rel !== 'Head') // Remove Head option for non-head members
-                                                                            .map((relationship) => (
-                                                                                <SelectItem key={relationship} value={relationship} className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">
-                                                                                    {relationship}
-                                                                                </SelectItem>
-                                                                            ))
-                                                                        }
-                                                                    </SelectContent>
-                                                                </Select>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {!member.resident_id && member.name && !isHead && (
-                                                            <div className="mt-3 pt-3 border-t border-dashed dark:border-gray-700">
-                                                                <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                                                    This member is not in the residents database yet.
-                                                                </div>
-                                                                <Link 
-                                                                    href={`/admin/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(member.name)}&age=${member.age}&relationship=${encodeURIComponent(member.relationship)}&household_id=${household.id}&purok_id=${data.purok_id || ''}`}
-                                                                    target="_blank"
-                                                                    className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
-                                                                >
-                                                                    <Plus className="h-3 w-3" />
-                                                                    Add to Residents Database
-                                                                </Link>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Housing & Economic Information */}
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-white">
-                                        <Building className="h-5 w-5" />
-                                        Housing & Economic Information
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="housingType" className="dark:text-gray-300">Housing Type</Label>
-                                            <Select 
-                                                value={data.housing_type}
-                                                onValueChange={(value) => setData('housing_type', value)}
-                                            >
-                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
-                                                    <SelectValue placeholder="Select housing type" />
-                                                </SelectTrigger>
-                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                    {housingTypes.map((type) => (
-                                                        <SelectItem key={type} value={type} className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">
-                                                            {type}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="ownershipStatus" className="dark:text-gray-300">Ownership Status</Label>
-                                            <Select 
-                                                value={data.ownership_status}
-                                                onValueChange={(value) => setData('ownership_status', value)}
-                                            >
-                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
-                                                    <SelectValue placeholder="Select ownership status" />
-                                                </SelectTrigger>
-                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                    {ownershipStatuses.map((status) => (
-                                                        <SelectItem key={status} value={status} className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">
-                                                            {status}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="waterSource" className="dark:text-gray-300">Water Source</Label>
-                                            <Select 
-                                                value={data.water_source}
-                                                onValueChange={(value) => setData('water_source', value)}
-                                            >
-                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
-                                                    <SelectValue placeholder="Select water source" />
-                                                </SelectTrigger>
-                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                    {waterSources.map((source) => (
-                                                        <SelectItem key={source} value={source} className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">
-                                                            {source}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="incomeRange" className="dark:text-gray-300">Monthly Income Range</Label>
-                                            <Select 
-                                                value={data.income_range}
-                                                onValueChange={(value) => setData('income_range', value)}
-                                            >
-                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
-                                                    <SelectValue placeholder="Select income range" />
-                                                </SelectTrigger>
-                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                    {incomeRanges.map((range) => (
-                                                        <SelectItem key={range} value={range} className="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700">
-                                                            {range}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox 
-                                                id="electricity" 
-                                                checked={data.electricity}
-                                                onCheckedChange={(checked) => setData('electricity', checked as boolean)}
-                                                className="dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
-                                            />
-                                            <Label htmlFor="electricity" className="text-sm dark:text-gray-300">
-                                                <div className="flex items-center gap-2">
-                                                    <Zap className="h-4 w-4" />
-                                                    Has electricity connection
-                                                </div>
-                                            </Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox 
-                                                id="internet" 
-                                                checked={data.internet}
-                                                onCheckedChange={(checked) => setData('internet', checked as boolean)}
-                                                className="dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
-                                            />
-                                            <Label htmlFor="internet" className="text-sm dark:text-gray-300">
-                                                Has internet connection
-                                            </Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox 
-                                                id="vehicle" 
-                                                checked={data.vehicle}
-                                                onCheckedChange={(checked) => setData('vehicle', checked as boolean)}
-                                                className="dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
-                                            />
-                                            <Label htmlFor="vehicle" className="text-sm dark:text-gray-300">
-                                                Owns a vehicle
-                                            </Label>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Additional Information */}
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="dark:text-white">Additional Information</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="remarks" className="dark:text-gray-300">Remarks/Notes</Label>
-                                        <Textarea 
-                                            id="remarks" 
-                                            placeholder="Any additional information about this household..."
-                                            rows={3}
-                                            value={data.remarks}
-                                            onChange={(e) => setData('remarks', e.target.value)}
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                    ) : (
+                                        members.map((member) => (
+                                          <MemberCard
+                                            key={member.id}
+                                            member={member}
+                                            isHead={member.relationship === 'Head' || member.is_head === true}
+                                            onRemove={handleRemoveMember}
+                                            onUpdateRelationship={handleUpdateMemberRelationship}
+                                            householdId={household.id}
+                                            purokId={data.purok_id}
+                                            relationshipTypes={RELATIONSHIP_TYPES}
                                         />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                                        ))
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                        {/* Right Column - Summary & Actions */}
-                        <div className="space-y-6">
-                            {/* Household Summary */}
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="dark:text-white">Household Summary</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-gray-500 dark:text-gray-400">Household #:</span>
-                                            <span className="font-mono font-bold dark:text-white">{household.household_number}</span>
+                        {/* Housing & Economic Information */}
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 dark:text-white">
+                                    <Building className="h-5 w-5" />
+                                    Housing & Economic Information
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="housingType" className="dark:text-gray-300">Housing Type</Label>
+                                        <Select 
+                                            value={data.housing_type}
+                                            onValueChange={(value) => setData('housing_type', value)}
+                                        >
+                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
+                                                <SelectValue placeholder="Select housing type" />
+                                            </SelectTrigger>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                {HOUSING_TYPES.map((type) => (
+                                                    <SelectItem key={type} value={type} className="dark:text-white">
+                                                        {type}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="ownershipStatus" className="dark:text-gray-300">Ownership Status</Label>
+                                        <Select 
+                                            value={data.ownership_status}
+                                            onValueChange={(value) => setData('ownership_status', value)}
+                                        >
+                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
+                                                <SelectValue placeholder="Select ownership status" />
+                                            </SelectTrigger>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                {OWNERSHIP_STATUSES.map((status) => (
+                                                    <SelectItem key={status} value={status} className="dark:text-white">
+                                                        {status}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="waterSource" className="dark:text-gray-300">Water Source</Label>
+                                        <Select 
+                                            value={data.water_source}
+                                            onValueChange={(value) => setData('water_source', value)}
+                                        >
+                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
+                                                <SelectValue placeholder="Select water source" />
+                                            </SelectTrigger>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                {WATER_SOURCES.map((source) => (
+                                                    <SelectItem key={source} value={source} className="dark:text-white">
+                                                        {source}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="incomeRange" className="dark:text-gray-300">Monthly Income Range</Label>
+                                        <Select 
+                                            value={data.income_range}
+                                            onValueChange={(value) => setData('income_range', value)}
+                                        >
+                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
+                                                <SelectValue placeholder="Select income range" />
+                                            </SelectTrigger>
+                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                                {INCOME_RANGES.map((range) => (
+                                                    <SelectItem key={range} value={range} className="dark:text-white">
+                                                        {range}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox 
+                                            id="electricity" 
+                                            checked={data.electricity}
+                                            onCheckedChange={(checked) => setData('electricity', checked as boolean)}
+                                            className="dark:border-gray-600"
+                                        />
+                                        <Label htmlFor="electricity" className="text-sm dark:text-gray-300">
+                                            <div className="flex items-center gap-2">
+                                                <Zap className="h-4 w-4" />
+                                                Has electricity connection
+                                            </div>
+                                        </Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox 
+                                            id="internet" 
+                                            checked={data.internet}
+                                            onCheckedChange={(checked) => setData('internet', checked as boolean)}
+                                            className="dark:border-gray-600"
+                                        />
+                                        <Label htmlFor="internet" className="text-sm dark:text-gray-300">
+                                            Has internet connection
+                                        </Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox 
+                                            id="vehicle" 
+                                            checked={data.vehicle}
+                                            onCheckedChange={(checked) => setData('vehicle', checked as boolean)}
+                                            className="dark:border-gray-600"
+                                        />
+                                        <Label htmlFor="vehicle" className="text-sm dark:text-gray-300">
+                                            Owns a vehicle
+                                        </Label>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Additional Information */}
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
+                            <CardHeader>
+                                <CardTitle className="dark:text-white">Additional Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="remarks" className="dark:text-gray-300">Remarks/Notes</Label>
+                                    <Textarea 
+                                        id="remarks" 
+                                        placeholder="Any additional information about this household..."
+                                        rows={3}
+                                        value={data.remarks}
+                                        onChange={(e) => setData('remarks', e.target.value)}
+                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Right Column - Summary & Actions */}
+                    <div className="space-y-6">
+                        {/* Household Summary */}
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
+                            <CardHeader>
+                                <CardTitle className="dark:text-white">Household Summary</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 dark:text-gray-400">Household #:</span>
+                                        <span className="font-mono font-bold dark:text-white">{household.household_number}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 dark:text-gray-400">Total Members:</span>
+                                        <span className="font-bold text-lg dark:text-white">{members.length}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 dark:text-gray-400">Purok:</span>
+                                        <span className="font-medium dark:text-white">
+                                            {data.purok_id ? (
+                                                puroks.find(p => p.id === data.purok_id)?.name || 'Not set'
+                                            ) : 'Not set'}
+                                        </span>
+                                    </div>
+                                    {(data.latitude || data.longitude) && (
+                                        <div className="border-t dark:border-gray-700 pt-3">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">📍 Coordinates</p>
+                                            <p className="text-xs font-mono dark:text-gray-300">{data.latitude?.toFixed(6)}, {data.longitude?.toFixed(6)}</p>
                                         </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-gray-500 dark:text-gray-400">Total Members:</span>
-                                            <span className="font-bold text-lg dark:text-white">{members.length}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-gray-500 dark:text-gray-400">Purok:</span>
-                                            <span className="font-medium dark:text-white">
-                                                {data.purok_id ? (
-                                                    puroks.find(p => p.id === data.purok_id)?.name || 'Not set'
-                                                ) : 'Not set'}
+                                    )}
+                                    <div className="border-t dark:border-gray-700 pt-4">
+                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Members with Photos:</div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                {members.filter(m => hasPhoto(m)).length} of {members.length} members
+                                            </span>
+                                            <span className="text-sm font-medium dark:text-white">
+                                                {Math.round((members.filter(m => hasPhoto(m)).length / Math.max(members.length, 1)) * 100)}%
                                             </span>
                                         </div>
-                                        {(data.latitude || data.longitude) && (
-                                            <div className="border-t dark:border-gray-700 pt-3">
-                                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">📍 Coordinates</p>
-                                                <p className="text-xs font-mono dark:text-gray-300">{data.latitude?.toFixed(6)}, {data.longitude?.toFixed(6)}</p>
-                                            </div>
-                                        )}
-                                        <div className="border-t dark:border-gray-700 pt-4">
-                                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Members with Photos:</div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm text-gray-600 dark:text-gray-400">
-                                                    {members.filter(m => hasPhoto(m)).length} of {members.length} members
-                                                </span>
-                                                <span className="text-sm font-medium dark:text-white">
-                                                    {Math.round((members.filter(m => hasPhoto(m)).length / Math.max(members.length, 1)) * 100)}%
-                                                </span>
-                                            </div>
-                                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                                                <div 
-                                                    className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full" 
-                                                    style={{ width: `${(members.filter(m => hasPhoto(m)).length / Math.max(members.length, 1)) * 100}%` }}
-                                                ></div>
-                                            </div>
+                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                            <div 
+                                                className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full transition-all duration-300" 
+                                                style={{ width: `${(members.filter(m => hasPhoto(m)).length / Math.max(members.length, 1)) * 100}%` }}
+                                            />
                                         </div>
                                     </div>
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                            {/* Registration Checklist */}
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="dark:text-white">Edit Checklist</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3">
-                                        <div className={`flex items-center space-x-2 ${headMember ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-600'}`}>
-                                            <div className={`h-5 w-5 rounded-full ${headMember ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-700'} flex items-center justify-center`}>
-                                                <div className={`h-2 w-2 rounded-full ${headMember ? 'bg-green-600 dark:bg-green-400' : 'bg-gray-400 dark:bg-gray-500'}`}></div>
-                                            </div>
-                                            <span className="text-sm">Head of family information</span>
-                                        </div>
-                                        <div className={`flex items-center space-x-2 ${data.address ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-600'}`}>
-                                            <div className={`h-5 w-5 rounded-full ${data.address ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-700'} flex items-center justify-center`}>
-                                                <div className={`h-2 w-2 rounded-full ${data.address ? 'bg-green-600 dark:bg-green-400' : 'bg-gray-400 dark:bg-gray-500'}`}></div>
-                                            </div>
-                                            <span className="text-sm">Complete address</span>
-                                        </div>
-                                        <div className={`flex items-center space-x-2 ${data.contact_number ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-600'}`}>
-                                            <div className={`h-5 w-5 rounded-full ${data.contact_number ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-700'} flex items-center justify-center`}>
-                                                <div className={`h-2 w-2 rounded-full ${data.contact_number ? 'bg-green-600 dark:bg-green-400' : 'bg-gray-400 dark:bg-gray-500'}`}></div>
-                                            </div>
-                                            <span className="text-sm">Contact information</span>
-                                        </div>
-                                        <div className={`flex items-center space-x-2 ${data.purok_id ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                                            <div className={`h-5 w-5 rounded-full ${data.purok_id ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'} flex items-center justify-center`}>
-                                                <div className={`h-2 w-2 rounded-full ${data.purok_id ? 'bg-green-600 dark:bg-green-400' : 'bg-amber-600 dark:bg-amber-400'}`}></div>
-                                            </div>
-                                            <span className="text-sm">Purok selection</span>
-                                        </div>
-                                        <div className={`flex items-center space-x-2 ${members.length > 1 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                                            <div className={`h-5 w-5 rounded-full ${members.length > 1 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'} flex items-center justify-center`}>
-                                                <div className={`h-2 w-2 rounded-full ${members.length > 1 ? 'bg-green-600 dark:bg-green-400' : 'bg-amber-600 dark:bg-amber-400'}`}></div>
-                                            </div>
-                                            <span className="text-sm">Household members ({members.length})</span>
-                                        </div>
-                                        {/* GOOGLE MAPS CHECKLIST ITEM */}
-                                        <div className={`flex items-center space-x-2 ${data.google_maps_url ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-600'}`}>
-                                            <div className={`h-5 w-5 rounded-full ${data.google_maps_url ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-700'} flex items-center justify-center`}>
-                                                <div className={`h-2 w-2 rounded-full ${data.google_maps_url ? 'bg-green-600 dark:bg-green-400' : 'bg-gray-400 dark:bg-gray-500'}`}></div>
-                                            </div>
-                                            <span className="text-sm">Google Maps location {data.google_maps_url ? '(coordinates will extract)' : ''}</span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                        {/* Edit Checklist */}
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
+                            <CardHeader>
+                                <CardTitle className="dark:text-white">Edit Checklist</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-3">
+                                    <ChecklistItem 
+                                        completed={!!headMember}
+                                        label="Head of family information"
+                                    />
+                                    <ChecklistItem 
+                                        completed={!!data.address}
+                                        label="Complete address"
+                                    />
+                                    <ChecklistItem 
+                                        completed={!!data.contact_number}
+                                        label="Contact information"
+                                    />
+                                    <ChecklistItem 
+                                        completed={!!data.purok_id}
+                                        label="Purok selection"
+                                        warning={!data.purok_id}
+                                    />
+                                    <ChecklistItem 
+                                        completed={members.length > 1}
+                                        label={`Household members (${members.length})`}
+                                        warning={members.length <= 1}
+                                    />
+                                    <ChecklistItem 
+                                        completed={!!data.google_maps_url}
+                                        label="Google Maps location"
+                                        subLabel={data.google_maps_url ? '(coordinates will extract)' : ''}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                            {/* Quick Actions */}
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="dark:text-white">Quick Actions</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                    <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
-                                        Print Household Profile
-                                    </Button>
-                                    <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
-                                        View History
-                                    </Button>
-                                    <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
-                                        Generate Report
-                                    </Button>
-                                    <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
-                                        Check Duplicates
-                                    </Button>
-                                </CardContent>
-                            </Card>
-
-                            {/* Water Source Info */}
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-white">
-                                        <Droplets className="h-5 w-5" />
-                                        Water Source Guide
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2 text-xs">
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                                            <span className="dark:text-gray-300">Level I: Point Source (Well, Spring)</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                                            <span className="dark:text-gray-300">Level II: Communal Faucet</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-2 w-2 rounded-full bg-purple-500"></div>
-                                            <span className="dark:text-gray-300">Level III: Waterworks System</span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
-
-                    {/* Form Actions */}
-                    <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
-                        <div className="flex items-center gap-2">
-                            <Link href={`/admin/households/${household.id}`}>
-                                <Button variant="ghost" type="button" className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700">
-                                    Cancel
+                        {/* Quick Actions */}
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
+                            <CardHeader>
+                                <CardTitle className="dark:text-white">Quick Actions</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
+                                    Print Household Profile
                                 </Button>
-                            </Link>
-                            <Button 
-                                variant="outline" 
-                                type="button"
-                                onClick={() => {
-                                    // Reset form to original values
-                                    const resetMembers = (current_members || []).map(member => {
-                                        const isHead = member.is_head === true || member.relationship === 'Head';
-                                        return {
-                                            ...member,
-                                            relationship: isHead ? 'Head' : (member.relationship || 'Other Relative'),
-                                            is_head: isHead,
-                                        };
-                                    });
-                                    setMembers(resetMembers);
-                                    setData({
-                                        household_number: household.household_number,
-                                        contact_number: household.contact_number,
-                                        email: household.email || '',
-                                        address: household.address,
-                                        purok_id: household.purok_id,
-                                        total_members: household.member_count,
-                                        income_range: household.income_range || '',
-                                        housing_type: household.housing_type || '',
-                                        ownership_status: household.ownership_status || '',
-                                        water_source: household.water_source || '',
-                                        electricity: household.electricity,
-                                        internet: household.internet,
-                                        vehicle: household.vehicle,
-                                        remarks: household.remarks || '',
-                                        members: resetMembers,
-                                        google_maps_url: household.google_maps_url || '',
-                                        latitude: household.latitude || null,
-                                        longitude: household.longitude || null,
-                                    });
-                                }}
-                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
-                            >
-                                Reset Changes
-                            </Button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button type="submit" disabled={processing} className="dark:bg-blue-600 dark:hover:bg-blue-700">
-                                <Save className="h-4 w-4 mr-2" />
-                                {processing ? 'Updating...' : 'Update Household'}
-                            </Button>
-                        </div>
+                                <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
+                                    View History
+                                </Button>
+                                <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
+                                    Generate Report
+                                </Button>
+                                <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
+                                    Check Duplicates
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        {/* Water Source Guide */}
+                        <Card className="dark:bg-gray-900 dark:border-gray-700">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 dark:text-white">
+                                    <Droplets className="h-5 w-5" />
+                                    Water Source Guide
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-2 text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                                        <span className="dark:text-gray-300">Level I: Point Source (Well, Spring)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                        <span className="dark:text-gray-300">Level II: Communal Faucet</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-purple-500"></div>
+                                        <span className="dark:text-gray-300">Level III: Waterworks System</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
+                </div>
+
+                {/* Form Actions */}
+                <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-4 pt-6 border-t dark:border-gray-700">
+                    <div className="flex flex-col-reverse sm:flex-row items-center gap-2 w-full sm:w-auto">
+                        <Link href={`/admin/households/${household.id}`} className="w-full sm:w-auto">
+                            <Button variant="ghost" type="button" className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700 w-full">
+                                Cancel
+                            </Button>
+                        </Link>
+                        <Button 
+                            variant="outline" 
+                            type="button"
+                            onClick={handleReset}
+                            className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600 w-full sm:w-auto"
+                        >
+                            Reset Changes
+                        </Button>
+                    </div>
+                    <Button type="submit" disabled={processing} className="dark:bg-blue-600 dark:hover:bg-blue-700 w-full sm:w-auto">
+                        <Save className="h-4 w-4 mr-2" />
+                        {processing ? 'Updating...' : 'Update Household'}
+                    </Button>
                 </div>
             </form>
         </AppLayout>

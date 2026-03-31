@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Link } from '@inertiajs/react';
 import { User, MapPin, Phone, ChevronRight } from 'lucide-react';
-import { InvolvedResident } from '@/components/admin/blotters/show/types';
+import { InvolvedResident } from '@/types/admin/blotters/blotter';
 
 interface InvolvedResidentCardProps {
     resident: InvolvedResident;

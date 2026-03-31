@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/DocumentTypes/components/requirements-tab.tsx
+
 import React from 'react';
 import { Link } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,8 +22,12 @@ import {
 } from 'lucide-react';
 import { route } from 'ziggy-js';
 
+// Import types from centralized location
+import type { ClearanceType } from '@/types/admin/document-types/document-types';
+
 interface Props {
-    requiredClearanceTypes: any[];
+    requiredClearanceTypes: ClearanceType[];
+    formatDate?: (date: string) => string; // Optional, not used but kept for consistency
 }
 
 export const RequirementsTab = ({ requiredClearanceTypes }: Props) => {
@@ -88,9 +93,11 @@ export const RequirementsTab = ({ requiredClearanceTypes }: Props) => {
                                                     </Badge>
                                                 )}
                                             </TableCell>
-                                            <TableCell className="dark:text-gray-300">{type.pivot?.sort_order || 0}</TableCell>
+                                            <TableCell className="dark:text-gray-300">
+                                                {(type as any).pivot?.sort_order || 0}
+                                            </TableCell>
                                             <TableCell>
-                                                {type.pivot?.is_required ? (
+                                                {(type as any).pivot?.is_required ? (
                                                     <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                                                 ) : (
                                                     <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />

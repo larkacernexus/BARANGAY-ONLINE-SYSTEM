@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Shield, CheckCircle, Eye, Printer, Download } from 'lucide-react';
-import { ClearanceRequest } from '@/types/clearance';
+import { ClearanceRequest } from '@/types/admin/clearances/clearance-types'; // Fix import path
 
 interface StatusBannerProps {
     clearance: ClearanceRequest;
@@ -22,6 +22,10 @@ export function StatusBanner({
 }: StatusBannerProps) {
     if (clearance.status !== 'issued' || !validityStatus) return null;
 
+    // Check payment status from payment object or payment_status property
+    const isPaid = clearance.payment?.status === 'completed' || clearance.payment_status === 'completed';
+    const paymentStatus = clearance.payment?.status || clearance.payment_status;
+
     return (
         <Card className={`border-l-4 ${validityStatus.color.includes('green') ? 'border-l-green-500' : validityStatus.color.includes('amber') ? 'border-l-amber-500' : 'border-l-red-500'}`}>
             <CardContent className="p-4">
@@ -32,7 +36,7 @@ export function StatusBanner({
                             <p className="font-medium">Clearance Status</p>
                             <p className={`text-sm ${validityStatus.color}`}>
                                 {validityStatus.text} • Issued on {formatDate(clearance.issue_date)} • Valid until {formatDate(clearance.valid_until)}
-                                {clearance.payment_status === 'paid' && (
+                                {isPaid && (
                                     <span className="ml-2 inline-flex items-center gap-1 text-green-600">
                                         <CheckCircle className="h-3 w-3" />
                                         Paid
@@ -41,7 +45,7 @@ export function StatusBanner({
                             </p>
                         </div>
                     </div>
-                    {clearance.payment_status === 'paid' ? (
+                    {isPaid ? (
                         <div className="flex gap-2">
                             <Button variant="outline" size="sm" onClick={onPreview}>
                                 <Eye className="h-4 w-4 mr-2" />

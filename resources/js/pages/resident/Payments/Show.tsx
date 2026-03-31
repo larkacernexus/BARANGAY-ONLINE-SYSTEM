@@ -29,7 +29,7 @@ import { DeletePaymentDialog } from '@/components/portal/payments/show/component
 import { usePaymentActions } from '@/components/residentui/hooks/usePaymentActions';
 import { usePaymentDialogs } from '@/components/residentui/hooks/usePaymentDialogs';
 
-import { PageProps, PaymentAttachment } from '@/types/portal/payments/payment.types';
+import { PaymentShowPageProps, PaymentAttachment } from '@/types/portal/payments/payment.types';
 import { getPaymentStatusConfig, calculateProgress } from '@/utils/portal/payments/payment-utils';
 import { 
     AlertCircle, 
@@ -59,7 +59,7 @@ export default function PaymentShow({
     canPayOnline = false,
     paymentMethods = {},
     error 
-}: PageProps) {
+}: PaymentShowPageProps) {
     const [activeTab, setActiveTab] = useState('details');
     const [viewingAttachment, setViewingAttachment] = useState<PaymentAttachment | null>(null);
     

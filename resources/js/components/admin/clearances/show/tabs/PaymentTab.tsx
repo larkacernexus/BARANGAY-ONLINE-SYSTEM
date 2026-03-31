@@ -1,4 +1,3 @@
-// components/admin/clearances/show/tabs/PaymentTab.tsx
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,8 +27,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { PaymentStatusBadge } from '../PaymentStatusBadge';
-import { ClearanceRequest, ClearanceType, Payment } from '@/types/clearance';
+import { ClearanceRequest, ClearanceType, Payment } from '@/types/admin/clearances/clearance-types'; // Fix import
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -69,6 +67,47 @@ export function PaymentTab({
         setTimeout(() => setCopied(false), 2000);
     };
 
+    // Helper function to get payment status
+    const getPaymentStatus = () => {
+        if (payment?.status) return payment.status;
+        if (clearance.payment_status) return clearance.payment_status;
+        return 'unpaid';
+    };
+
+    const getPaymentStatusDisplay = () => {
+        const status = getPaymentStatus();
+        const statusMap: Record<string, string> = {
+            'completed': 'Paid',
+            'paid': 'Paid',
+            'pending': 'Pending',
+            'pending_payment': 'Pending',
+            'failed': 'Failed',
+            'refunded': 'Refunded',
+            'unpaid': 'Unpaid',
+            'partially_paid': 'Partially Paid'
+        };
+        return statusMap[status] || status;
+    };
+
+    const isPaid = () => {
+        const status = getPaymentStatus();
+        return status === 'completed' || status === 'paid';
+    };
+
+    const getAmountPaid = () => {
+        return payment?.total_amount || 0;
+    };
+
+    const getBalance = () => {
+        if (clearance.balance !== undefined && clearance.balance !== null) {
+            return clearance.balance;
+        }
+        if (clearance.fee_amount && getAmountPaid()) {
+            return clearance.fee_amount - getAmountPaid();
+        }
+        return 0;
+    };
+
     return (
         <div>
             <Card className="dark:bg-gray-900">
@@ -95,30 +134,36 @@ export function PaymentTab({
                         </div>
                         
                         <div className={`p-4 rounded-lg border ${
-                            clearance.payment_status === 'paid' 
+                            isPaid() 
                                 ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800' 
-                                : clearance.payment_status === 'partially_paid'
+                                : getPaymentStatus() === 'partially_paid'
                                 ? 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-200 dark:border-amber-800'
                                 : 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 border-gray-200 dark:border-gray-700'
                         }`}>
                             <p className={`text-sm font-medium ${
-                                clearance.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' :
-                                clearance.payment_status === 'partially_paid' ? 'text-amber-600 dark:text-amber-400' :
+                                isPaid() ? 'text-green-600 dark:text-green-400' :
+                                getPaymentStatus() === 'partially_paid' ? 'text-amber-600 dark:text-amber-400' :
                                 'text-gray-600 dark:text-gray-400'
                             }`}>
                                 Payment Status
                             </p>
                             <div className="flex items-center gap-2 mt-1">
-                                <PaymentStatusBadge status={clearance.payment_status || 'unpaid'} />
+                                <Badge variant="outline" className={
+                                    isPaid() ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' :
+                                    getPaymentStatus() === 'pending' || getPaymentStatus() === 'pending_payment' ? 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800' :
+                                    'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700'
+                                }>
+                                    {getPaymentStatusDisplay()}
+                                </Badge>
                             </div>
                         </div>
                         
                         <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
                             <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Amount Paid</p>
-                            <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(clearance.amount_paid || 0)}</p>
-                            {clearance.balance !== undefined && clearance.balance > 0 && (
+                            <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(getAmountPaid())}</p>
+                            {getBalance() > 0 && (
                                 <p className="text-xs text-purple-500 dark:text-purple-400 mt-1">
-                                    Balance: {formatCurrency(clearance.balance)}
+                                    Balance: {formatCurrency(getBalance())}
                                 </p>
                             )}
                         </div>
@@ -157,12 +202,12 @@ export function PaymentTab({
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">Amount</p>
-                                                <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(payment.amount)}</p>
+                                                <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(payment.total_amount)}</p>
                                             </div>
                                             <div>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
                                                 <Badge variant="outline" className={
-                                                    payment.status === 'completed' || payment.status === 'paid'
+                                                    payment.status === 'completed'
                                                         ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
                                                         : payment.status === 'pending'
                                                         ? 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800'
@@ -205,8 +250,8 @@ export function PaymentTab({
                                     </div>
                                 </div>
                                 
-                                {/* Payer Information if available */}
-                                {payment.payer && (
+                                {/* Payer Information */}
+                                {payment.payer_name && (
                                     <>
                                         <Separator className="dark:bg-gray-700" />
                                         <div className="space-y-3">
@@ -214,18 +259,18 @@ export function PaymentTab({
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div className="flex items-center gap-2">
                                                     <User className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                    <span className="text-sm dark:text-gray-300">{payment.payer.name}</span>
+                                                    <span className="text-sm dark:text-gray-300">{payment.payer_name}</span>
                                                 </div>
-                                                {payment.payer.contact && (
+                                                {payment.payer_email && (
                                                     <div className="flex items-center gap-2">
-                                                        <Phone className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                        <span className="text-sm dark:text-gray-300">{payment.payer.contact}</span>
+                                                        <Mail className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                                        <span className="text-sm dark:text-gray-300">{payment.payer_email}</span>
                                                     </div>
                                                 )}
-                                                {payment.payer.address && (
-                                                    <div className="flex items-center gap-2 md:col-span-2">
-                                                        <MapPin className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                        <span className="text-sm dark:text-gray-300">{payment.payer.address}</span>
+                                                {payment.payer_contact && (
+                                                    <div className="flex items-center gap-2">
+                                                        <Phone className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                                                        <span className="text-sm dark:text-gray-300">{payment.payer_contact}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -241,7 +286,7 @@ export function PaymentTab({
                                         <p className="text-sm text-gray-500 dark:text-gray-400">Manage payment for this clearance</p>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {canProcess && clearance.payment_status !== 'paid' && (
+                                        {canProcess && !isPaid() && (
                                             <Button
                                                 onClick={onVerifyPayment}
                                                 className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white dark:from-green-700 dark:to-emerald-700"
@@ -323,12 +368,12 @@ export function PaymentTab({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
                                     <p className="text-xs text-gray-500 dark:text-gray-400">Amount</p>
-                                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(payment.amount)}</p>
+                                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(payment.total_amount)}</p>
                                 </div>
                                 <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
                                     <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
                                     <Badge variant="outline" className={
-                                        payment.status === 'completed' || payment.status === 'paid'
+                                        payment.status === 'completed'
                                             ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
                                             : 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700'
                                     }>

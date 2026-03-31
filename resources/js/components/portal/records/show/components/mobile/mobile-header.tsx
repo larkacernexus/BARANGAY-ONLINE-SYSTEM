@@ -7,7 +7,7 @@ import { ChevronLeft, MoreVertical, Maximize2, Download, Printer, Folder, Lock }
 import { cn } from '@/lib/utils';
 import { StatusBadge } from '../status-badge';
 import { getFileIcon, getFileColor, getDocumentStatus } from '@/utils/portal/records/document.utils';
-import { Document } from '@/types/portal/records/document.types';
+import { Document } from '@/types/portal/records/records';
 
 
 interface MobileHeaderProps {

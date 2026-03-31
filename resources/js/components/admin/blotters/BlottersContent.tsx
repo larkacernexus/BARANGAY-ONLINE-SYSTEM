@@ -40,7 +40,7 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import BlottersTableView from '@/components/admin/blotters/BlottersTableView';
 import BlottersGridView from '@/components/admin/blotters/BlottersGridView';
 import BlottersBulkActions from '@/components/admin/blotters/BlottersBulkActions';
-import { Blotter, BlotterFilters } from '@/components/admin/blotters/blotter';
+import { Blotter, BlotterFilters } from '@/types/admin/blotters/blotter';
 import { blotterUtils } from '@/admin-utils/blotter-utils';
 
 interface BlottersContentProps {

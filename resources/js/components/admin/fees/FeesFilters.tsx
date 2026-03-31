@@ -1,3 +1,5 @@
+// components/admin/fees/FeesFilters.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,7 +15,7 @@ import {
     List as ListIcon
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Filters } from '@/types/fees.types';
+import { Filters } from '@/types/admin/fees/fees';
 import { RefObject } from 'react';
 
 interface FeesFiltersProps {
@@ -38,6 +40,7 @@ interface FeesFiltersProps {
     onSelectAll: () => void;
     searchInputRef?: RefObject<HTMLInputElement>;
     isLoading?: boolean;
+    onClearSelection?: () => void;  // Added missing prop
 }
 
 export default function FeesFilters({
@@ -61,7 +64,8 @@ export default function FeesFilters({
     onSelectAllFiltered,
     onSelectAll,
     searchInputRef,
-    isLoading = false
+    isLoading = false,
+    onClearSelection
 }: FeesFiltersProps) {
     return (
         <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
@@ -111,8 +115,11 @@ export default function FeesFilters({
                                 onClick={() => {
                                     const exportUrl = new URL('/admin/fees/export', window.location.origin);
                                     if (search) exportUrl.searchParams.append('search', search);
-                                    if (filtersState.status !== 'all') exportUrl.searchParams.append('status', filtersState.status);
-                                    if (filtersState.category !== 'all') exportUrl.searchParams.append('category', filtersState.category);
+                                    if (filtersState.status && filtersState.status !== 'all') exportUrl.searchParams.append('status', filtersState.status);
+                                    if (filtersState.category && filtersState.category !== 'all') exportUrl.searchParams.append('category', filtersState.category);
+                                    if (filtersState.purok && filtersState.purok !== 'all') exportUrl.searchParams.append('purok', filtersState.purok);
+                                    if (filtersState.from_date) exportUrl.searchParams.append('from_date', filtersState.from_date);
+                                    if (filtersState.to_date) exportUrl.searchParams.append('to_date', filtersState.to_date);
                                     window.open(exportUrl.toString(), '_blank');
                                 }}
                                 disabled={isLoading}
@@ -145,26 +152,46 @@ export default function FeesFilters({
                             )}
                             {isBulkMode && selectedFees.length > 0 && (
                                 <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={onSelectAllOnPage}
-                                        disabled={isLoading}
-                                        className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                    >
-                                        <ListIcon className="h-3.5 w-3.5 mr-1" />
-                                        {selectedFees.length === totalItems ? 'Deselect Page' : 'Select Page'}
-                                    </Button>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={onSelectAllOnPage}
+                                                disabled={isLoading}
+                                                className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                                <ListIcon className="h-3.5 w-3.5 mr-1" />
+                                                Select Page
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
+                                            Select all on current page
+                                        </TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={onSelectAllFiltered}
+                                                disabled={isLoading}
+                                                className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                                <Layers className="h-3.5 w-3.5 mr-1" />
+                                                Select All
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
+                                            Select all filtered fees ({totalItems})
+                                        </TooltipContent>
+                                    </Tooltip>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => {
-                                                    if (selectedFees.length > 0) {
-                                                        // Clear selection
-                                                    }
-                                                }}
+                                                onClick={() => onClearSelection?.()}
                                                 disabled={isLoading}
                                                 className="h-8 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50"
                                             >
@@ -172,7 +199,7 @@ export default function FeesFilters({
                                             </Button>
                                         </TooltipTrigger>
                                         <TooltipContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100">
-                                            Clear Selection
+                                            Clear Selection ({selectedFees.length} selected)
                                         </TooltipContent>
                                     </Tooltip>
                                 </div>
@@ -292,7 +319,7 @@ export default function FeesFilters({
                                     </div>
                                 </div>
 
-                                {/* Amount Range */}
+                                {/* Amount Range - Fixed field names */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Amount Range</label>
                                     <div className="flex gap-2">
@@ -300,8 +327,8 @@ export default function FeesFilters({
                                             placeholder="Min amount"
                                             type="number"
                                             className="w-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                                            value={filtersState.min_amount || ''}
-                                            onChange={(e) => updateFilter('min_amount', e.target.value)}
+                                            value={filtersState.amount_min || ''}
+                                            onChange={(e) => updateFilter('amount_min', e.target.value)}
                                             disabled={isLoading}
                                         />
                                         <span className="self-center text-sm text-gray-500 dark:text-gray-400">to</span>
@@ -309,8 +336,8 @@ export default function FeesFilters({
                                             placeholder="Max amount"
                                             type="number"
                                             className="w-full bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                                            value={filtersState.max_amount || ''}
-                                            onChange={(e) => updateFilter('max_amount', e.target.value)}
+                                            value={filtersState.amount_max || ''}
+                                            onChange={(e) => updateFilter('amount_max', e.target.value)}
                                             disabled={isLoading}
                                         />
                                     </div>
@@ -359,6 +386,21 @@ export default function FeesFilters({
                                             disabled={isLoading}
                                         >
                                             This Month
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            onClick={() => {
+                                                const today = new Date();
+                                                const thirtyDaysAgo = new Date(today);
+                                                thirtyDaysAgo.setDate(today.getDate() - 30);
+                                                updateFilter('from_date', thirtyDaysAgo.toISOString().split('T')[0]);
+                                                updateFilter('to_date', today.toISOString().split('T')[0]);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Last 30 Days
                                         </Button>
                                     </div>
                                 </div>

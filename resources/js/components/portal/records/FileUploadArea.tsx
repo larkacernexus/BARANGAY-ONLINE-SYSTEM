@@ -14,7 +14,7 @@ interface FileUploadAreaProps {
   maxFileSize: number;
   allowedTypes: string[];
   dragActive: boolean;
-  fileInputRef: RefObject<HTMLInputElement>;
+  fileInputRef: RefObject<HTMLInputElement | null>; // Fixed: Allow null
   onDragEnter: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
@@ -52,6 +52,19 @@ export function FileUploadArea({
     }
     // Fallback to allowedTypes if accepted_formats is not available or not an array
     return allowedTypes.map(t => t.toUpperCase()).join(', ');
+  };
+
+  // Helper to safely get max file size
+  const getMaxFileSize = () => {
+    if (selectedDocumentType.max_file_size) {
+      return formatKBtoMB(selectedDocumentType.max_file_size * 1024);
+    }
+    return formatKBtoMB(maxFileSize * 1024);
+  };
+
+  const handleBrowseClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onBrowseClick(e);
   };
 
   return (
@@ -95,7 +108,7 @@ export function FileUploadArea({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
               <div className="flex items-center gap-2">
                 <span className="font-medium">Max File Size:</span>
-                <span>{formatKBtoMB(selectedDocumentType.max_file_size || maxFileSize * 1024)}</span>
+                <span>{getMaxFileSize()}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">Accepted Formats:</span>
@@ -126,7 +139,7 @@ export function FileUploadArea({
           <Button 
             type="button"
             variant="outline"
-            onClick={onBrowseClick}
+            onClick={handleBrowseClick}
             className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Browse Files

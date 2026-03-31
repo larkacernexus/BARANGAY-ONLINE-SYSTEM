@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/Announcements/components/details-tab.tsx
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,40 +32,13 @@ import {
     Globe
 } from 'lucide-react';
 
-interface Announcement {
-    id: number;
-    title: string;
-    content: string;
-    type: string;
-    type_label: string;
-    priority: number;
-    priority_label: string;
-    is_active: boolean;
-    audience_type: string;
-    audience_type_label: string;
-    audience_summary: string;
-    estimated_reach: number;
-    start_date: string | null;
-    end_date: string | null;
-    formatted_date_range: string;
-    created_at: string;
-    updated_at: string;
-    status: string;
-    is_currently_active: boolean;
-    creator: {
-        id: number;
-        name: string;
-        email: string;
-    } | null;
-}
-
-interface AudienceDetails {
-    roles?: Array<{ id: number; name: string }>;
-    puroks?: Array<{ id: number; name: string }>;
-    households?: Array<{ id: number; household_number: string; purok?: { name: string } }>;
-    businesses?: Array<{ id: number; business_name: string; owner_name?: string }>;
-    users?: Array<{ id: number; first_name: string; last_name: string; email: string; role?: { name: string } }>;
-}
+// Import types from admin types
+import type { 
+    Announcement, 
+    AudienceDetails,
+    AnnouncementType,
+    PriorityLevel
+} from '@/types/admin/announcements/announcement.types';
 
 interface Props {
     announcement: Announcement;
@@ -72,8 +46,8 @@ interface Props {
     AudienceIcon: React.ElementType;
     formatDate: (date: string | null) => string;
     formatDateTime: (date: string | null) => string;
-    getTypeColor: (type: string) => string;
-    getPriorityColor: (priority: number) => string;
+    getTypeColor: (type: AnnouncementType | string) => string;
+    getPriorityColor: (priority: PriorityLevel | number) => string;
     getStatusIcon: (status: string, isActive: boolean) => React.ReactNode;
 }
 
@@ -87,6 +61,11 @@ export const DetailsTab = ({
     getPriorityColor,
     getStatusIcon
 }: Props) => {
+    // Helper to get creator initials
+    const getCreatorInitials = (name: string): string => {
+        return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    };
+
     return (
         <div className="grid gap-6 md:grid-cols-3">
             {/* Left Column - Main Content */}
@@ -101,8 +80,8 @@ export const DetailsTab = ({
                     </CardHeader>
                     <CardContent>
                         <div className="prose max-w-none dark:prose-invert">
-                            <div className="whitespace-pre-wrap bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg dark:text-gray-300">
-                                {announcement.content}
+                            <div className="whitespace-pre-wrap bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg dark:text-gray-300 leading-relaxed">
+                                {announcement.content || 'No content provided.'}
                             </div>
                         </div>
                     </CardContent>
@@ -124,15 +103,19 @@ export const DetailsTab = ({
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Estimated Reach</p>
-                                    <p className="text-2xl font-bold dark:text-gray-100">{announcement.estimated_reach.toLocaleString()}</p>
+                                    <p className="text-2xl font-bold dark:text-gray-100">
+                                        {announcement.estimated_reach?.toLocaleString() || 'N/A'}
+                                    </p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                         {announcement.audience_type_label}
                                     </p>
                                 </div>
                             </div>
-                            <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
-                                {announcement.audience_summary}
-                            </Badge>
+                            {announcement.audience_summary && (
+                                <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
+                                    {announcement.audience_summary}
+                                </Badge>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -164,13 +147,15 @@ export const DetailsTab = ({
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className="text-sm text-gray-600 dark:text-gray-400">Status</span>
-                                <Badge variant={announcement.is_active ? "default" : "secondary"} className={announcement.is_active ? '' : 'dark:bg-gray-700 dark:text-gray-300'}>
+                                <Badge variant={announcement.is_active ? "default" : "secondary"} 
+                                       className={announcement.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'dark:bg-gray-700 dark:text-gray-300'}>
                                     {announcement.is_active ? 'Active' : 'Inactive'}
                                 </Badge>
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className="text-sm text-gray-600 dark:text-gray-400">Currently Displayed</span>
-                                <Badge variant={announcement.is_currently_active ? "default" : "secondary"} className={announcement.is_currently_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'dark:bg-gray-700 dark:text-gray-300'}>
+                                <Badge variant={announcement.is_currently_active ? "default" : "secondary"} 
+                                       className={announcement.is_currently_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'dark:bg-gray-700 dark:text-gray-300'}>
                                     {announcement.is_currently_active ? 'Yes' : 'No'}
                                 </Badge>
                             </div>
@@ -202,10 +187,14 @@ export const DetailsTab = ({
                                     {formatDate(announcement.end_date)}
                                 </div>
                             </div>
-                            <Separator className="dark:bg-gray-700" />
-                            <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                                {announcement.formatted_date_range}
-                            </div>
+                            {announcement.formatted_date_range && (
+                                <>
+                                    <Separator className="dark:bg-gray-700" />
+                                    <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                                        {announcement.formatted_date_range}
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -230,7 +219,7 @@ export const DetailsTab = ({
                                 <div className="flex items-center gap-2">
                                     <Avatar className="h-6 w-6 dark:bg-gray-700">
                                         <AvatarFallback className="text-xs dark:bg-gray-600 dark:text-gray-200">
-                                            {announcement.creator.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                            {getCreatorInitials(announcement.creator.name)}
                                         </AvatarFallback>
                                     </Avatar>
                                     <span className="dark:text-gray-300">{announcement.creator.name}</span>

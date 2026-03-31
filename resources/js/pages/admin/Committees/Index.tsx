@@ -1,4 +1,5 @@
-// app/committees/index.tsx or resources/js/pages/admin/Committees/Index.tsx
+// resources/js/pages/admin/Committees/Index.tsx
+
 import AppLayout from '@/layouts/admin-app-layout';
 import { CommitteesHeader } from '@/components/admin/committees/CommitteesHeader';
 import { CommitteesFilters } from '@/components/admin/committees/CommitteesFilters';
@@ -12,7 +13,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useCommitteesSelection } from '@/hooks/useCommitteesSelection';
 import { useCommitteesFilters } from '@/hooks/useCommitteesFilters';
 import { useCommitteesBulkActions } from '@/hooks/useCommitteesBulkActions';
-import { Committee, CommitteesIndexProps } from '@/types/committees';
+import { Committee, CommitteesIndexProps } from '@/types/admin/committees/committees';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { router, usePage } from '@inertiajs/react';
@@ -100,10 +101,16 @@ export default function CommitteesIndex({ committees, filters = {}, stats }: Com
 
     // Handle page change
     const handlePageChange = (page: number) => {
-        router.get('/admin/committees', {
-            ...filters,
-            page: page
-        }, {
+        const queryParams: Record<string, any> = {};
+        
+        // Add filter params if they exist
+        if (search) queryParams.search = search;
+        if (status !== 'all') queryParams.status = status;
+        if (sortBy !== 'order') queryParams.sort_by = sortBy;
+        if (sortOrder !== 'asc') queryParams.sort_order = sortOrder;
+        if (page > 1) queryParams.page = page;
+        
+        router.get('/admin/committees', queryParams, {
             preserveState: true,
             preserveScroll: true,
         });
@@ -146,6 +153,38 @@ export default function CommitteesIndex({ committees, filters = {}, stats }: Com
         handleBulkOperation('generate_report');
     };
 
+    // Handle export with current filters
+    const handleExport = () => {
+        const exportFilters = {
+            search,
+            status: status !== 'all' ? status : undefined,
+            sort_by: sortBy !== 'order' ? sortBy : undefined,
+            sort_order: sortOrder !== 'asc' ? sortOrder : undefined,
+        };
+        handleExportAll(exportFilters);
+    };
+
+    // Filter change handlers with proper types
+    const onSearchChange = (value: string) => {
+        handleFilterChange('search', value);
+    };
+
+    const onStatusChange = (value: string) => {
+        handleFilterChange('status', value);
+    };
+
+    const onSortChange = (column: string) => {
+        handleSort(column);
+    };
+
+    const onResetFilters = () => {
+        handleResetFilters();
+    };
+
+    const onToggleAdvancedFilters = () => {
+        setShowAdvancedFilters(!showAdvancedFilters);
+    };
+
     return (
         <AppLayout
             title="Committees"
@@ -168,26 +207,28 @@ export default function CommitteesIndex({ committees, filters = {}, stats }: Com
                         search={search}
                         status={status}
                         sortBy={sortBy}
-                        sortOrder={sortOrder}
+                        sortOrder={sortOrder as 'asc' | 'desc'} 
                         showAdvancedFilters={showAdvancedFilters}
                         isMobile={isMobile}
-                        hasActiveFilters={hasActiveFilters}
-                        onSearchChange={(value: string) => handleFilterChange('search', value)}
-                        onStatusChange={(value: string) => handleFilterChange('status', value)}
-                        onSortChange={handleSort}
-                        onExport={() => handleExportAll(filters)}
-                        onReset={handleResetFilters}
-                        onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                        hasActiveFilters={hasActiveFilters as boolean}
+                        onSearchChange={onSearchChange}
+                        onStatusChange={onStatusChange}
+                        onSortChange={onSortChange}
+                        onExport={handleExport}
+                        onReset={onResetFilters}
+                        onToggleAdvancedFilters={onToggleAdvancedFilters}
+                        isLoading={false}
+                        selectedCount={selectedIds.length}
                     />
 
-                    <CommitteesContent
+                   <CommitteesContent
                         committees={filteredCommittees}
                         selectedIds={selectedIds}
                         isBulkMode={isBulkMode}
                         isSelectAll={isSelectAll}
                         viewMode={viewMode}
                         isMobile={isMobile}
-                        hasActiveFilters={hasActiveFilters}
+                        hasActiveFilters={Boolean(hasActiveFilters)} // Convert to boolean explicitly
                         currentPage={safeCommittees.meta?.current_page || 1}
                         totalPages={safeCommittees.meta?.last_page || 1}
                         totalItems={safeCommittees.meta?.total || filteredCommittees.length}
@@ -201,7 +242,7 @@ export default function CommitteesIndex({ committees, filters = {}, stats }: Com
                         onToggleStatus={handleToggleStatus}
                         onToggleBulkMode={toggleBulkMode}
                     />
-
+                    
                     <KeyboardShortcutsHelp
                         isBulkMode={isBulkMode}
                         isPerformingBulkAction={isPerformingBulkAction}
@@ -212,7 +253,7 @@ export default function CommitteesIndex({ committees, filters = {}, stats }: Com
                         <CommitteesQuickActions
                             selectedIds={selectedIds}
                             onGenerateReport={handleGenerateReport}
-                            onExport={() => handleExportAll(filters)}
+                            onExport={handleExport}
                         />
 
                         <CommitteesDistribution

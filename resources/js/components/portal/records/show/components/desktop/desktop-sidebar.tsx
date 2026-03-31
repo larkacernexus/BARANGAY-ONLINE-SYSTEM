@@ -7,7 +7,7 @@ import { Maximize2, Download, Printer, ArrowLeft, Zap, Link2, ChevronRight, Lock
 import { cn } from '@/lib/utils';
 import { DesktopSecurity } from './desktop-security';
 import { getFileIcon, getFileColor } from '@/utils/portal/records/document.utils';
-import { Document, RelatedDocument } from '@/types/portal/records/document.types';
+import { Document, RelatedDocument } from '@/types/portal/records/records';
 
 interface DesktopSidebarProps {
     document: Document;

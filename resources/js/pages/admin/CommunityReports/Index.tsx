@@ -1,3 +1,5 @@
+// resources/js/Pages/Admin/CommunityReports/Index.tsx
+
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -18,16 +20,33 @@ import QuickInsights from '@/components/admin/community-reports/QuickInsights';
 import RecentReports from '@/components/admin/community-reports/RecentReports';
 import KeyboardShortcutsHelp from '@/components/admin/community-reports/KeyboardShortcutsHelp';
 
-// Types
-import { Filters, Stats } from '@/admin-utils/communityReportTypes';
+// Import types
+import type { 
+    CommunityReport, 
+    Filters, 
+    Stats,
+    StatusOption,
+    PriorityOption,
+    UrgencyOption,
+    ReportType,
+    BulkOperation
+} from  '@/types/admin/reports/community-report';
 
 interface CommunityReportsIndexProps {
-    reports: any;
+    reports: {
+        data: CommunityReport[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+        from: number;
+        to: number;
+    };
     filters: Filters;
     statuses?: Record<string, string>;
     priorities?: Record<string, string>;
     urgencies?: Record<string, string>;
-    report_types?: Array<{id: number, name: string, category: string}>;
+    report_types?: ReportType[];
     categories?: string[];
     puroks?: string[];
     staff?: Array<{id: number, name: string}>;
@@ -100,9 +119,9 @@ export default function CommunityReportsIndex({
         filteredReports,
         paginatedReports,
         safeStats,
-        safeStatuses,
-        safePriorities,
-        safeUrgencies,
+        safeStatuses,      
+        safePriorities,   
+        safeUrgencies,     
         safeReportTypes,
         safeCategories,
         safePuroks,
@@ -126,8 +145,7 @@ export default function CommunityReportsIndex({
         handleSort,
         handleDelete,
         toggleReportExpansion,
-        handleExport,
-        handleClearSelection // THIS IS ALREADY DEFINED HERE
+        handleExport
     } = useCommunityReportsManagement({
         reports: rawReports,
         filters,
@@ -142,9 +160,15 @@ export default function CommunityReportsIndex({
     });
 
     // Add mark as resolved handler
-    const handleMarkResolved = (report: any) => {
+    const handleMarkResolved = (report: CommunityReport) => {
         // Implement mark as resolved logic here
         console.log('Mark as resolved:', report.id);
+    };
+
+    // Wrapper for onBulkOperation to convert BulkOperation to string for the component
+    const handleBulkOperationWrapper = async (operation: string, customData?: any) => {
+        // Cast string to BulkOperation
+        await handleBulkOperation(operation as BulkOperation, customData);
     };
 
     return (
@@ -263,7 +287,6 @@ export default function CommunityReportsIndex({
                         }}
                     />
                     
-                    
                     {/* Main Content */}
                     <CommunityReportsContent
                         reports={paginatedReports}
@@ -299,8 +322,7 @@ export default function CommunityReportsIndex({
                         onPrintReport={(report) => {
                             window.open(`/admin/community-reports/${report.id}/print`, '_blank');
                         }}
-                        // Add bulk operation props
-                        onBulkOperation={handleBulkOperation}
+                        onBulkOperation={handleBulkOperationWrapper}
                         onCopySelectedData={handleCopySelectedData}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                         setShowBulkStatusDialog={setShowBulkStatusDialog}
@@ -312,7 +334,10 @@ export default function CommunityReportsIndex({
                     
                     {/* Additional Information */}
                     <div className="grid gap-6 sm:grid-cols-2">
-                        <RecentReports reports={paginatedReports} windowWidth={windowWidth} />
+                        <RecentReports 
+                            reports={paginatedReports.slice(0, 5)} 
+                            windowWidth={windowWidth} 
+                        />
                         <QuickInsights filteredReports={filteredReports} />
                     </div>
                     
@@ -339,7 +364,7 @@ export default function CommunityReportsIndex({
                 setShowBulkAssignDialog={setShowBulkAssignDialog}
                 isPerformingBulkAction={isPerformingBulkAction}
                 selectedReports={selectedReports}
-                handleBulkOperation={handleBulkOperation}
+                handleBulkOperation={handleBulkOperationWrapper}
                 selectionStats={selectionStats}
                 bulkEditValue={bulkEditValue}
                 setBulkEditValue={setBulkEditValue}

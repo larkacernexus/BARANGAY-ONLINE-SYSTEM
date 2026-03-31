@@ -1,10 +1,14 @@
-// CommunityReportsTableView.tsx
+// resources/js/components/admin/community-reports/CommunityReportsTableView.tsx
+
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import CommunityReportRow from './CommunityReportRow';
 import CommunityReportExpandedRow from './CommunityReportExpandedRow';
-import { CommunityReport } from '@/admin-utils/communityReportTypes';
+import { ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
+
+// Import types
+import type { CommunityReport } from '@/types/admin/reports/community-report';
 
 interface CommunityReportsTableViewProps {
     reports: CommunityReport[];
@@ -29,6 +33,8 @@ interface CommunityReportsTableViewProps {
     onPageChange: (page: number) => void;
     toggleReportExpansion: (id: number) => void;
     onMarkResolved?: (report: CommunityReport) => void;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
 }
 
 export default function CommunityReportsTableView({
@@ -53,11 +59,18 @@ export default function CommunityReportsTableView({
     onSort,
     onPageChange,
     toggleReportExpansion,
-    onMarkResolved
+    onMarkResolved,
+    sortBy = 'created_at',
+    sortOrder = 'desc'
 }: CommunityReportsTableViewProps) {
     
     const getSortIcon = (column: string) => {
-        return null; // Implement as needed
+        if (sortBy !== column) {
+            return <ArrowUpDown className="h-3 w-3 ml-1" />;
+        }
+        return sortOrder === 'asc' 
+            ? <ChevronUp className="h-3 w-3 ml-1" /> 
+            : <ChevronDown className="h-3 w-3 ml-1" />;
     };
 
     return (
@@ -81,7 +94,7 @@ export default function CommunityReportsTableView({
                                         </TableHead>
                                     )}
                                     <TableHead 
-                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[140px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700"
+                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[140px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                         onClick={() => onSort('report_number')}
                                     >
                                         <div className="flex items-center gap-1">
@@ -90,7 +103,7 @@ export default function CommunityReportsTableView({
                                         </div>
                                     </TableHead>
                                     <TableHead 
-                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[200px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700"
+                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[200px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                         onClick={() => onSort('title')}
                                     >
                                         <div className="flex items-center gap-1">
@@ -99,7 +112,7 @@ export default function CommunityReportsTableView({
                                         </div>
                                     </TableHead>
                                     <TableHead 
-                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700"
+                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                         onClick={() => onSort('priority')}
                                     >
                                         <div className="flex items-center gap-1">
@@ -107,11 +120,23 @@ export default function CommunityReportsTableView({
                                             {getSortIcon('priority')}
                                         </div>
                                     </TableHead>
-                                    <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[180px] border-gray-200 dark:border-gray-700">
-                                        Timeline & Impact
+                                    <TableHead 
+                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        onClick={() => onSort('incident_date')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Timeline & Impact
+                                            {getSortIcon('incident_date')}
+                                        </div>
                                     </TableHead>
-                                    <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[200px] border-gray-200 dark:border-gray-700">
-                                        Reporter & Assignment
+                                    <TableHead 
+                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[200px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        onClick={() => onSort('assigned_to')}
+                                    >
+                                        <div className="flex items-center gap-1">
+                                            Reporter & Assignment
+                                            {getSortIcon('assigned_to')}
+                                        </div>
                                     </TableHead>
                                     <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[100px] border-gray-200 dark:border-gray-700">
                                         Actions
@@ -169,7 +194,7 @@ export default function CommunityReportsTableView({
                             size="sm"
                             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
                             disabled={currentPage === 1}
-                            className="h-8 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
+                            className="h-8 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
                         >
                             ← Prev
                         </Button>
@@ -194,7 +219,7 @@ export default function CommunityReportsTableView({
                                         className={`h-8 w-8 p-0 ${
                                             currentPage === pageNum 
                                                 ? 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700' 
-                                                : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-900 dark:hover:text-white'
+                                                : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                                         }`}
                                     >
                                         {pageNum}
@@ -207,7 +232,7 @@ export default function CommunityReportsTableView({
                             size="sm"
                             onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
                             disabled={currentPage === totalPages}
-                            className="h-8 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
+                            className="h-8 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
                         >
                             Next →
                         </Button>

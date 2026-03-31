@@ -1,7 +1,7 @@
 // utils/document.utils.ts
 import { File, FileText, FileImage, FileSpreadsheet, FileCode } from 'lucide-react';
 import { FILE_TYPE_CONFIG } from '@/components/residentui/constants/document-ui';
-import { Document } from '@/types/portal/records/document.types';
+import { Document } from '@/types/portal/records/records';
 
 export const getDocumentStatus = (doc: Document): string => {
     if (doc.status) return doc.status;

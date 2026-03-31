@@ -1,4 +1,5 @@
-// components/community-report/IncidentDetailsCard.tsx
+// components/admin/community-reports/create/components/IncidentDetailsCard.tsx
+
 import { useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -7,7 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, Camera, Upload, Search, X, ImageIcon, Video, File, Trash2 } from 'lucide-react';
-import { FileWithPreview } from '@/components/admin/community-reports/create/types/community-report';
+
+// Import types
+import type { FileWithPreview, ReportType } from '@/components/admin/community-reports/create//types/community-report';
 
 interface ExistingFile {
     id: number;
@@ -15,6 +18,20 @@ interface ExistingFile {
     file_path: string;
     file_type: string;
     file_size: number;
+}
+
+interface FormData {
+    title: string;
+    description: string;
+    detailed_description: string;
+    incident_date: string;
+    incident_time: string;
+    location: string;
+    recurring_issue: boolean;
+    safety_concern: boolean;
+    environmental_impact: boolean;
+    perpetrator_details: string;
+    preferred_resolution: string;
 }
 
 const getFileIcon = (type: string) => {
@@ -33,30 +50,20 @@ const formatFileSize = (bytes: number): string => {
 };
 
 interface IncidentDetailsCardProps {
-    formData: {
-        title: string;
-        description: string;
-        detailed_description: string;
-        incident_date: string;
-        incident_time: string;
-        location: string;
-        recurring_issue: boolean;
-        safety_concern: boolean;
-        environmental_impact: boolean;
-        perpetrator_details: string;
-        preferred_resolution: string;
-    };
+    formData: FormData;
+    files?: FileWithPreview[];
     newFiles?: FileWithPreview[];
     existingFiles?: ExistingFile[];
-    selectedType: any;
+    selectedType: ReportType | null;
     puroks: string[];
     today: string;
-    onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+    onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
     onCheckboxChange: (name: string, checked: boolean) => void;
     onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onRemoveNewFile?: (id: string) => void;
     onRemoveExistingFile?: (fileId: number) => void;
     onClearAllNewFiles?: () => void;
+    onClearAllFiles?: () => void;
     onOpenPreview: (file: FileWithPreview | ExistingFile) => void;
     isEditMode?: boolean;
 }
@@ -74,11 +81,33 @@ export const IncidentDetailsCard = ({
     onRemoveNewFile,
     onRemoveExistingFile,
     onClearAllNewFiles,
+    onClearAllFiles,
     onOpenPreview,
     isEditMode = false
 }: IncidentDetailsCardProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const totalFilesCount = newFiles.length + existingFiles.length;
+
+    const handleRemoveNewFile = (id: string) => {
+        if (onRemoveNewFile) {
+            onRemoveNewFile(id);
+        }
+    };
+
+    const handleRemoveExistingFile = (fileId: number) => {
+        if (onRemoveExistingFile) {
+            onRemoveExistingFile(fileId);
+        }
+    };
+
+    const handleClearAllFiles = () => {
+        if (onClearAllNewFiles) {
+            onClearAllNewFiles();
+        }
+        if (onClearAllFiles) {
+            onClearAllFiles();
+        }
+    };
 
     return (
         <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
@@ -216,11 +245,11 @@ export const IncidentDetailsCard = ({
                             <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
                                 Click to upload evidence files
                             </p>
-                            <Button variant="outline" type="button" className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900">
+                            <Button variant="outline" type="button" className="border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
                                 <Upload className="h-4 w-4 mr-2" />
                                 Select Files
                             </Button>
-                            <p className="text-xs text-gray-400 dark:text-gray-600 mt-2">
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                                 JPG, PNG, GIF, PDF, MP4, MOV, AVI • Max 10MB per file
                             </p>
                         </div>
@@ -248,7 +277,7 @@ export const IncidentDetailsCard = ({
                                                             {file.file_name}
                                                         </p>
                                                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                            {(file.file_size / 1024).toFixed(2)} KB
+                                                            {formatFileSize(file.file_size)}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -266,7 +295,7 @@ export const IncidentDetailsCard = ({
                                                         type="button"
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() => onRemoveExistingFile?.(file.id)}
+                                                        onClick={() => handleRemoveExistingFile(file.id)}
                                                         className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-500"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
@@ -287,12 +316,12 @@ export const IncidentDetailsCard = ({
                                 <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100">
                                     New Files ({newFiles.length})
                                 </h4>
-                                {onClearAllNewFiles && (
+                                {(onClearAllNewFiles || onClearAllFiles) && (
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        onClick={onClearAllNewFiles}
+                                        onClick={handleClearAllFiles}
                                         className="text-xs h-7 px-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                                     >
                                         Clear All
@@ -309,7 +338,7 @@ export const IncidentDetailsCard = ({
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex items-center gap-3 flex-1 min-w-0">
                                                         <div className={`w-10 h-10 rounded flex items-center justify-center flex-shrink-0 ${
-                                                            isImage ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-900'
+                                                            isImage ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-100 dark:bg-gray-800'
                                                         }`}>
                                                             <FileIcon className={`h-5 w-5 ${
                                                                 isImage ? 'text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
@@ -336,7 +365,7 @@ export const IncidentDetailsCard = ({
                                                             type="button"
                                                             variant="ghost"
                                                             size="icon"
-                                                            onClick={() => onRemoveNewFile?.(file.id)}
+                                                            onClick={() => handleRemoveNewFile(file.id)}
                                                             className="h-8 w-8 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-500"
                                                         >
                                                             <X className="h-4 w-4" />
@@ -346,7 +375,7 @@ export const IncidentDetailsCard = ({
                                                 {isImage && file.preview && (
                                                     <div className="mt-3">
                                                         <div 
-                                                            className="relative aspect-video rounded-md overflow-hidden bg-gray-100 dark:bg-gray-900 cursor-pointer"
+                                                            className="relative aspect-video rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800 cursor-pointer"
                                                             onClick={() => onOpenPreview(file)}
                                                         >
                                                             <img 
@@ -386,7 +415,7 @@ export const IncidentDetailsCard = ({
                             }
                             className="border-gray-300 dark:border-gray-600"
                         />
-                        <Label htmlFor="recurring_issue" className="text-gray-700 dark:text-gray-300">This is a recurring issue</Label>
+                        <Label htmlFor="recurring_issue" className="text-gray-700 dark:text-gray-300 cursor-pointer">This is a recurring issue</Label>
                     </div>
 
                     <div className="flex items-center space-x-2">
@@ -398,7 +427,7 @@ export const IncidentDetailsCard = ({
                             }
                             className="border-gray-300 dark:border-gray-600"
                         />
-                        <Label htmlFor="safety_concern" className="text-gray-700 dark:text-gray-300">This is a safety concern</Label>
+                        <Label htmlFor="safety_concern" className="text-gray-700 dark:text-gray-300 cursor-pointer">This is a safety concern</Label>
                     </div>
 
                     <div className="flex items-center space-x-2">
@@ -410,7 +439,7 @@ export const IncidentDetailsCard = ({
                             }
                             className="border-gray-300 dark:border-gray-600"
                         />
-                        <Label htmlFor="environmental_impact" className="text-gray-700 dark:text-gray-300">This has environmental impact</Label>
+                        <Label htmlFor="environmental_impact" className="text-gray-700 dark:text-gray-300 cursor-pointer">This has environmental impact</Label>
                     </div>
 
                     <div className="space-y-2">
