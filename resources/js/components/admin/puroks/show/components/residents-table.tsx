@@ -24,7 +24,7 @@ import {
     ChevronLeft,
     ChevronRight,
 } from 'lucide-react';
-import { PaginatedData, Resident } from '../types';
+import { PaginatedData, Resident } from '@/types/admin/puroks/purok';
 
 interface Props {
     residents: PaginatedData<Resident>;

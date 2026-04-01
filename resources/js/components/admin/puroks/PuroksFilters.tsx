@@ -1,4 +1,5 @@
 // resources/js/components/admin/puroks/PuroksFilters.tsx
+
 import { useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,10 +15,9 @@ import {
     ChevronDown,
     AlertCircle
 } from 'lucide-react';
-import { PurokFilters } from '@/types/purok';
+import { PurokFilters } from '@/types/admin/puroks/purok';
 
 interface PuroksFiltersProps {
-    // Remove stats from props
     search: string;
     setSearch: (value: string) => void;
     onSearchChange?: (value: string) => void;
@@ -31,12 +31,11 @@ interface PuroksFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef?: React.RefObject<HTMLInputElement>;
+    searchInputRef?: React.RefObject<HTMLInputElement | null>; // ← FIX: Allow null
     isLoading?: boolean;
 }
 
 export default function PuroksFilters({
-    // Remove stats from destructuring
     search,
     setSearch,
     onSearchChange,
@@ -53,9 +52,6 @@ export default function PuroksFilters({
     searchInputRef,
     isLoading = false
 }: PuroksFiltersProps) {
-    const [showSelectionOptions, setShowSelectionOptions] = useState(false);
-    const selectionRef = useRef<HTMLDivElement>(null);
-
     const handleSearch = (value: string) => {
         setSearch(value);
         if (onSearchChange) {
@@ -78,13 +74,27 @@ export default function PuroksFilters({
 
     const getSortIcon = (column: string) => {
         if (filtersState.sort_by !== column) return null;
-        return filtersState.sort_order === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+        return filtersState.sort_order === 'asc' 
+            ? <ChevronUp className="h-4 w-4 ml-1" /> 
+            : <ChevronDown className="h-4 w-4 ml-1" />;
     };
+
+    const exportData = () => {
+        const queryParams = new URLSearchParams();
+        if (search) queryParams.append('search', search);
+        if (filtersState.status && filtersState.status !== 'all') queryParams.append('status', filtersState.status);
+        if (filtersState.sort_by) queryParams.append('sort_by', filtersState.sort_by);
+        if (filtersState.sort_order) queryParams.append('sort_order', filtersState.sort_order);
+        window.location.href = `/admin/puroks/export?${queryParams.toString()}`;
+    };
+
+    // Safe access to filter values with fallbacks
+    const currentStatus = filtersState.status ?? 'all';
+    const currentSortBy = filtersState.sort_by ?? 'name';
+    const currentSortOrder = filtersState.sort_order ?? 'asc';
 
     return (
         <>
-            {/* Stats have been moved to PuroksStats component */}
-            
             <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
                 <CardContent className="pt-6">
                     <div className="flex flex-col space-y-4">
@@ -114,7 +124,7 @@ export default function PuroksFilters({
                             <div className="flex gap-2">
                                 <select 
                                     className="border rounded px-3 py-2 text-sm w-28 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
-                                    value={filtersState.status}
+                                    value={currentStatus}
                                     onChange={(e) => handleStatusFilter(e.target.value)}
                                     disabled={isLoading}
                                 >
@@ -140,12 +150,7 @@ export default function PuroksFilters({
                                 <Button 
                                     variant="outline"
                                     className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                    onClick={() => {
-                                        const exportUrl = new URL('/admin/puroks/export', window.location.origin);
-                                        if (search) exportUrl.searchParams.append('search', search);
-                                        if (filtersState.status !== 'all') exportUrl.searchParams.append('status', filtersState.status);
-                                        window.open(exportUrl.toString(), '_blank');
-                                    }}
+                                    onClick={exportData}
                                     disabled={isLoading}
                                 >
                                     <Download className="h-4 w-4 mr-2" />
@@ -166,7 +171,7 @@ export default function PuroksFilters({
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.sort_by === 'name' 
+                                                    currentSortBy === 'name' 
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -174,13 +179,13 @@ export default function PuroksFilters({
                                                 disabled={isLoading}
                                             >
                                                 Name
-                                                <span className="ml-1">{getSortIcon('name')}</span>
+                                                {getSortIcon('name')}
                                             </Button>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.sort_by === 'total_households' 
+                                                    currentSortBy === 'total_households' 
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -188,13 +193,13 @@ export default function PuroksFilters({
                                                 disabled={isLoading}
                                             >
                                                 Households
-                                                <span className="ml-1">{getSortIcon('total_households')}</span>
+                                                {getSortIcon('total_households')}
                                             </Button>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.sort_by === 'total_residents' 
+                                                    currentSortBy === 'total_residents' 
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -202,13 +207,13 @@ export default function PuroksFilters({
                                                 disabled={isLoading}
                                             >
                                                 Residents
-                                                <span className="ml-1">{getSortIcon('total_residents')}</span>
+                                                {getSortIcon('total_residents')}
                                             </Button>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.sort_by === 'leader_name' 
+                                                    currentSortBy === 'leader_name' 
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -216,7 +221,7 @@ export default function PuroksFilters({
                                                 disabled={isLoading}
                                             >
                                                 Leader
-                                                <span className="ml-1">{getSortIcon('leader_name')}</span>
+                                                {getSortIcon('leader_name')}
                                             </Button>
                                         </div>
                                     </div>
@@ -260,7 +265,7 @@ export default function PuroksFilters({
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.status === 'active' 
+                                                    currentStatus === 'active' 
                                                     ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-400 dark:border-green-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -273,7 +278,7 @@ export default function PuroksFilters({
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.status === 'inactive' 
+                                                    currentStatus === 'inactive' 
                                                     ? 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-700' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -286,14 +291,14 @@ export default function PuroksFilters({
                                     </div>
                                 </div>
 
-                                {/* Active Filters Summary (inside advanced) */}
+                                {/* Active Filters Summary */}
                                 {hasActiveFilters && (
                                     <div className="border-t border-gray-200 dark:border-gray-800 pt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                                         <AlertCircle className="h-3 w-3" />
                                         <span>Active filters:</span>
-                                        {filtersState.status && filtersState.status !== 'all' && (
+                                        {currentStatus !== 'all' && (
                                             <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-full">
-                                                Status: {filtersState.status}
+                                                Status: {currentStatus}
                                             </span>
                                         )}
                                         {search && (
@@ -301,9 +306,9 @@ export default function PuroksFilters({
                                                 Search: "{search.length > 15 ? search.substring(0, 15) + '...' : search}"
                                             </span>
                                         )}
-                                        {filtersState.sort_by && filtersState.sort_by !== 'name' && (
+                                        {currentSortBy !== 'name' && (
                                             <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-full">
-                                                Sort: {filtersState.sort_by.replace('_', ' ')} ({filtersState.sort_order})
+                                                Sort: {currentSortBy.replace('_', ' ')} ({currentSortOrder})
                                             </span>
                                         )}
                                     </div>
@@ -311,12 +316,12 @@ export default function PuroksFilters({
                             </div>
                         )}
 
-                        {/* Active filters indicator and clear button */}
+                        {/* Results info and clear button */}
                         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                             <div className="text-sm text-gray-500 dark:text-gray-400">
                                 Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} puroks
                                 {search && ` matching "${search}"`}
-                                {filtersState.status !== 'all' && ` • Status: ${filtersState.status}`}
+                                {currentStatus !== 'all' && ` • Status: ${currentStatus}`}
                             </div>
                             
                             <div className="flex items-center gap-3">

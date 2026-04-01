@@ -1,4 +1,4 @@
-import { Position, PositionFilters } from '@/types/position';
+import { Position, PositionFilters } from '@/types/admin/positions/position.types';
 
 export const positionUtils = {
     filterPositions: ({

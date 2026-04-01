@@ -1,6 +1,8 @@
 // resources/js/Pages/Admin/Privileges/components/all-assignments-table.tsx
+
 import React from 'react';
 import { Link } from '@inertiajs/react';
+import { format, parseISO } from 'date-fns';
 import {
     Card,
     CardContent,
@@ -17,33 +19,18 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Eye, UserPlus } from 'lucide-react';
-
-interface Resident {
-    id: number;
-    first_name: string;
-    last_name: string;
-    middle_name?: string;
-}
-
-interface ResidentPrivilege {
-    id: number;
-    resident_id: number;
-    id_number?: string;
-    verified_at: string | null;
-    expires_at: string | null;
-    created_at: string;
-    resident: Resident;
-}
+import { Badge } from '@/components/ui/badge';
+import { Eye, UserPlus, Clock, XCircle, CheckCircle } from 'lucide-react';
+import { ResidentPrivilege as PrivilegeAssignment, Resident } from '@/types/admin/privileges/privilege.types';
 
 interface Props {
-    assignments: ResidentPrivilege[];
+    assignments: PrivilegeAssignment[];
     canAssign: boolean;
     onAssignClick: () => void;
 }
 
 // Helper functions
-const formatDate = (dateString: string | null, includeTime: boolean = false) => {
+const formatDate = (dateString: string | null, includeTime: boolean = false): string => {
     if (!dateString) return 'N/A';
     try {
         const date = parseISO(dateString);
@@ -53,7 +40,7 @@ const formatDate = (dateString: string | null, includeTime: boolean = false) => 
     }
 };
 
-const getAssignmentStatusBadge = (assignment: ResidentPrivilege) => {
+const getAssignmentStatusBadge = (assignment: PrivilegeAssignment) => {
     if (!assignment.verified_at) {
         return (
             <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800 flex items-center gap-1">
@@ -80,7 +67,8 @@ const getAssignmentStatusBadge = (assignment: ResidentPrivilege) => {
     );
 };
 
-const getFullName = (resident: Resident) => {
+const getFullName = (resident?: Resident): string => {
+    if (!resident) return 'Unknown Resident';
     let name = `${resident.first_name}`;
     if (resident.middle_name) {
         name += ` ${resident.middle_name.charAt(0)}.`;
@@ -88,10 +76,6 @@ const getFullName = (resident: Resident) => {
     name += ` ${resident.last_name}`;
     return name;
 };
-
-import { format, parseISO } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
-import { Clock, XCircle, CheckCircle } from 'lucide-react';
 
 export const AllAssignmentsTable = ({
     assignments,
@@ -143,9 +127,13 @@ export const AllAssignmentsTable = ({
                                 assignments.map((assignment) => (
                                     <TableRow key={assignment.id} className="dark:border-gray-700">
                                         <TableCell className="font-medium dark:text-gray-200">
-                                            <Link href={`/admin/residents/${assignment.resident_id}`} className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
-                                                {getFullName(assignment.resident)}
-                                            </Link>
+                                            {assignment.resident ? (
+                                                <Link href={`/admin/residents/${assignment.resident_id}`} className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
+                                                    {getFullName(assignment.resident)}
+                                                </Link>
+                                            ) : (
+                                                <span className="text-gray-500 italic">Resident not found</span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="dark:text-gray-300">
                                             {assignment.id_number || <span className="text-gray-400 italic">N/A</span>}
@@ -163,11 +151,17 @@ export const AllAssignmentsTable = ({
                                             {formatDate(assignment.created_at)}
                                         </TableCell>
                                         <TableCell>
-                                            <Link href={`/admin/residents/${assignment.resident_id}`}>
-                                                <Button size="sm" variant="ghost" className="dark:text-gray-400 dark:hover:text-white">
+                                            {assignment.resident ? (
+                                                <Link href={`/admin/residents/${assignment.resident_id}`}>
+                                                    <Button size="sm" variant="ghost" className="dark:text-gray-400 dark:hover:text-white">
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                </Link>
+                                            ) : (
+                                                <Button size="sm" variant="ghost" disabled className="dark:text-gray-600">
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
-                                            </Link>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))

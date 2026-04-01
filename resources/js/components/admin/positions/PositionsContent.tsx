@@ -1,3 +1,5 @@
+// resources/js/components/admin/positions/PositionsContent.tsx
+
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -47,12 +49,12 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import PositionsTableView from '@/components/admin/positions/PositionsTableView';
 import PositionsGridView from '@/components/admin/positions/PositionsGridView';
 import PositionsBulkActions from '@/components/admin/positions/PositionsBulkActions';
-import { Position, PositionFilters, PositionStats } from '@/types/position';
+import { Position, PositionFilters, PositionStats, BulkOperation } from '@/types/admin/positions/position.types'; // ← ADD BulkOperation
 import { positionUtils } from '@/admin-utils/position-utils';
 
 interface PositionsContentProps {
     positions: Position[];
-    stats: PositionStats;
+    stats?: PositionStats;
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
@@ -74,7 +76,7 @@ interface PositionsContentProps {
     onClearSelection: () => void;
     onDelete: (position: Position) => void;
     onSort: (column: string) => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void; // ← CHANGE FROM string TO BulkOperation
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkStatusDialog?: (show: boolean) => void;
@@ -82,6 +84,7 @@ interface PositionsContentProps {
     isPerformingBulkAction: boolean;
     selectionMode: 'page' | 'filtered' | 'all';
     selectionStats?: any;
+    onCopyToClipboard?: (text: string, label: string) => void; // ← ADD THIS
 }
 
 export default function PositionsContent({
@@ -115,7 +118,8 @@ export default function PositionsContent({
     filtersState,
     isPerformingBulkAction,
     selectionMode,
-    selectionStats = {}
+    selectionStats = {},
+    onCopyToClipboard
 }: PositionsContentProps) {
     
     // Bulk action items configuration
@@ -124,19 +128,19 @@ export default function PositionsContent({
             {
                 label: 'Export',
                 icon: <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('export'),
+                onClick: () => onBulkOperation('export' as BulkOperation),
                 tooltip: 'Export selected positions'
             },
             {
                 label: 'Print',
                 icon: <Printer className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('print'),
+                onClick: () => onBulkOperation('print' as BulkOperation),
                 tooltip: 'Print selected positions'
             },
             {
                 label: 'Report',
                 icon: <BarChart3 className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('generate_report'),
+                onClick: () => onBulkOperation('generate_report' as BulkOperation),
                 tooltip: 'Generate report for selected positions'
             }
         ],
@@ -144,19 +148,19 @@ export default function PositionsContent({
             {
                 label: 'Activate',
                 icon: <CheckCircle className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('activate'),
+                onClick: () => onBulkOperation('activate' as BulkOperation),
                 tooltip: 'Activate selected positions'
             },
             {
                 label: 'Deactivate',
                 icon: <XCircle className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('deactivate'),
+                onClick: () => onBulkOperation('deactivate' as BulkOperation),
                 tooltip: 'Deactivate selected positions'
             },
             {
                 label: 'Require Account',
                 icon: <Key className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('toggle_account'),
+                onClick: () => onBulkOperation('toggle_account' as BulkOperation),
                 tooltip: 'Set account requirement for selected positions'
             },
             {
@@ -337,6 +341,7 @@ export default function PositionsContent({
                                     hasActiveFilters={hasActiveFilters}
                                     onClearFilters={onClearFilters}
                                     selectionStats={selectionStats}
+                                    onCopyToClipboard={onCopyToClipboard}
                                 />
                             )}
 

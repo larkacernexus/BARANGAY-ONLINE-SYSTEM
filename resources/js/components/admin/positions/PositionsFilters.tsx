@@ -1,5 +1,4 @@
 // resources/js/components/admin/positions/PositionsFilters.tsx
-import { useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,13 +14,12 @@ import {
     ChevronDown,
     AlertCircle
 } from 'lucide-react';
-import { PositionFilters } from '@/types/position';
+import { PositionFilters } from '@/types/admin/positions/position.types';
 
 interface PositionsFiltersProps {
-    // Remove stats from props
     search: string;
     setSearch: (value: string) => void;
-    onSearchChange?: (value: string) => void;
+    onSearchChange: (value: string) => void;
     filtersState: PositionFilters;
     updateFilter: (key: keyof PositionFilters, value: string) => void;
     showAdvancedFilters: boolean;
@@ -32,12 +30,14 @@ interface PositionsFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef?: React.RefObject<HTMLInputElement>;
+    searchInputRef?: React.RefObject<HTMLInputElement | null>; // ← FIX: Allow null
     isLoading?: boolean;
 }
 
+// Define the valid sort fields
+type SortableField = NonNullable<PositionFilters['sort_by']>;
+
 export default function PositionsFilters({
-    // Remove stats from destructuring
     search,
     setSearch,
     onSearchChange,
@@ -57,9 +57,7 @@ export default function PositionsFilters({
     
     const handleSearch = (value: string) => {
         setSearch(value);
-        if (onSearchChange) {
-            onSearchChange(value);
-        }
+        onSearchChange(value);
     };
 
     const handleStatusFilter = (status: string) => {
@@ -70,35 +68,48 @@ export default function PositionsFilters({
         updateFilter('requires_account', value);
     };
 
-    const handleSort = (column: string) => {
+    const handleSort = (column: SortableField) => {
         if (filtersState.sort_by === column) {
-            updateFilter('sort_order', filtersState.sort_order === 'asc' ? 'desc' : 'asc');
+            const newOrder = filtersState.sort_order === 'asc' ? 'desc' : 'asc';
+            updateFilter('sort_order', newOrder);
         } else {
             updateFilter('sort_by', column);
             updateFilter('sort_order', 'asc');
         }
     };
 
-    const getSortIcon = (column: string) => {
+    const getSortIcon = (column: SortableField) => {
         if (filtersState.sort_by !== column) return null;
-        return filtersState.sort_order === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+        return filtersState.sort_order === 'asc' ? 
+            <ChevronUp className="h-4 w-4 ml-1" /> : 
+            <ChevronDown className="h-4 w-4 ml-1" />;
     };
 
     const exportData = () => {
         const queryParams = new URLSearchParams();
         if (search) queryParams.append('search', search);
-        if (filtersState.status !== 'all') queryParams.append('status', filtersState.status);
-        if (filtersState.requires_account !== 'all') queryParams.append('requires_account', filtersState.requires_account);
+        if (filtersState.status && filtersState.status !== 'all') {
+            queryParams.append('status', filtersState.status);
+        }
+        if (filtersState.requires_account && filtersState.requires_account !== 'all') {
+            queryParams.append('requires_account', filtersState.requires_account);
+        }
         if (filtersState.sort_by) queryParams.append('sort_by', filtersState.sort_by);
         if (filtersState.sort_order) queryParams.append('sort_order', filtersState.sort_order);
         window.location.href = `/admin/positions/export?${queryParams.toString()}`;
     };
 
+    // Safe access to filter values with fallbacks
+    const currentStatus = filtersState.status ?? 'all';
+    const currentRequiresAccount = filtersState.requires_account ?? 'all';
+    const currentSortBy = filtersState.sort_by ?? 'order';
+    const currentSortOrder = filtersState.sort_order ?? 'asc';
+
+    // Helper to check if a sort field is active
+    const isSortActive = (field: SortableField) => currentSortBy === field;
+
     return (
         <>
-            {/* Stats have been moved to PositionsStats component */}
-            
-            {/* Search and Filters */}
             <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
                 <CardContent className="pt-6">
                     <div className="flex flex-col space-y-4">
@@ -127,7 +138,7 @@ export default function PositionsFilters({
                             </div>
                             <div className="flex gap-2">
                                 <Select
-                                    value={filtersState.status}
+                                    value={currentStatus}
                                     onValueChange={handleStatusFilter}
                                     disabled={isLoading}
                                 >
@@ -135,9 +146,9 @@ export default function PositionsFilters({
                                         <SelectValue placeholder="All statuses" />
                                     </SelectTrigger>
                                     <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-                                        <SelectItem value="all" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">All Statuses</SelectItem>
-                                        <SelectItem value="active" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Active Only</SelectItem>
-                                        <SelectItem value="inactive" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Inactive Only</SelectItem>
+                                        <SelectItem value="all">All Statuses</SelectItem>
+                                        <SelectItem value="active">Active Only</SelectItem>
+                                        <SelectItem value="inactive">Inactive Only</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 
@@ -179,7 +190,7 @@ export default function PositionsFilters({
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.sort_by === 'name' 
+                                                    isSortActive('name')
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -187,13 +198,13 @@ export default function PositionsFilters({
                                                 disabled={isLoading}
                                             >
                                                 Name
-                                                <span className="ml-1">{getSortIcon('name')}</span>
+                                                {getSortIcon('name')}
                                             </Button>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.sort_by === 'order' 
+                                                    isSortActive('order')
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -201,13 +212,13 @@ export default function PositionsFilters({
                                                 disabled={isLoading}
                                             >
                                                 Order
-                                                <span className="ml-1">{getSortIcon('order')}</span>
+                                                {getSortIcon('order')}
                                             </Button>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.sort_by === 'officials_count' 
+                                                    isSortActive('officials_count')
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -215,13 +226,13 @@ export default function PositionsFilters({
                                                 disabled={isLoading}
                                             >
                                                 Officials
-                                                <span className="ml-1">{getSortIcon('officials_count')}</span>
+                                                {getSortIcon('officials_count')}
                                             </Button>
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.sort_by === 'code' 
+                                                    isSortActive('code')
                                                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -229,7 +240,7 @@ export default function PositionsFilters({
                                                 disabled={isLoading}
                                             >
                                                 Code
-                                                <span className="ml-1">{getSortIcon('code')}</span>
+                                                {getSortIcon('code')}
                                             </Button>
                                         </div>
                                     </div>
@@ -238,7 +249,7 @@ export default function PositionsFilters({
                                     <div className="space-y-2">
                                         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Account Required</Label>
                                         <Select
-                                            value={filtersState.requires_account}
+                                            value={currentRequiresAccount}
                                             onValueChange={handleAccountFilter}
                                             disabled={isLoading}
                                         >
@@ -246,9 +257,9 @@ export default function PositionsFilters({
                                                 <SelectValue placeholder="All types" />
                                             </SelectTrigger>
                                             <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-                                                <SelectItem value="all" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">All Types</SelectItem>
-                                                <SelectItem value="yes" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">Requires Account</SelectItem>
-                                                <SelectItem value="no" className="text-gray-900 dark:text-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700">No Account Needed</SelectItem>
+                                                <SelectItem value="all">All Types</SelectItem>
+                                                <SelectItem value="yes">Requires Account</SelectItem>
+                                                <SelectItem value="no">No Account Needed</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -261,7 +272,7 @@ export default function PositionsFilters({
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.status === 'active' 
+                                                    currentStatus === 'active' 
                                                     ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-400 dark:border-green-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -274,7 +285,7 @@ export default function PositionsFilters({
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.status === 'inactive' 
+                                                    currentStatus === 'inactive' 
                                                     ? 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900 dark:text-gray-400 dark:border-gray-700' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -287,7 +298,7 @@ export default function PositionsFilters({
                                                 variant="outline"
                                                 size="sm"
                                                 className={`h-8 ${
-                                                    filtersState.requires_account === 'yes' 
+                                                    currentRequiresAccount === 'yes' 
                                                     ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-400 dark:border-purple-800' 
                                                     : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                                                 }`}
@@ -300,19 +311,19 @@ export default function PositionsFilters({
                                     </div>
                                 </div>
 
-                                {/* Active Filters Summary (inside advanced) */}
+                                {/* Active Filters Summary */}
                                 {hasActiveFilters && (
                                     <div className="border-t border-gray-200 dark:border-gray-800 pt-3 flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                                         <AlertCircle className="h-3 w-3" />
                                         <span>Active filters:</span>
-                                        {filtersState.status && filtersState.status !== 'all' && (
+                                        {currentStatus !== 'all' && (
                                             <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-full">
-                                                Status: {filtersState.status}
+                                                Status: {currentStatus}
                                             </span>
                                         )}
-                                        {filtersState.requires_account && filtersState.requires_account !== 'all' && (
+                                        {currentRequiresAccount !== 'all' && (
                                             <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-full">
-                                                Account: {filtersState.requires_account === 'yes' ? 'Required' : 'Not Required'}
+                                                Account: {currentRequiresAccount === 'yes' ? 'Required' : 'Not Required'}
                                             </span>
                                         )}
                                         {search && (
@@ -320,9 +331,9 @@ export default function PositionsFilters({
                                                 Search: "{search.length > 15 ? search.substring(0, 15) + '...' : search}"
                                             </span>
                                         )}
-                                        {filtersState.sort_by && filtersState.sort_by !== 'order' && (
+                                        {currentSortBy !== 'order' && (
                                             <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-full">
-                                                Sort: {filtersState.sort_by.replace('_', ' ')} ({filtersState.sort_order})
+                                                Sort: {currentSortBy.replace('_', ' ')} ({currentSortOrder})
                                             </span>
                                         )}
                                     </div>
@@ -330,13 +341,13 @@ export default function PositionsFilters({
                             </div>
                         )}
 
-                        {/* Active filters indicator and clear button */}
+                        {/* Results info and clear filters */}
                         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                             <div className="text-sm text-gray-500 dark:text-gray-400">
                                 Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} positions
                                 {search && ` matching "${search}"`}
-                                {filtersState.status !== 'all' && ` • Status: ${filtersState.status}`}
-                                {filtersState.requires_account !== 'all' && ` • Account: ${filtersState.requires_account === 'yes' ? 'Required' : 'Not Required'}`}
+                                {currentStatus !== 'all' && ` • Status: ${currentStatus}`}
+                                {currentRequiresAccount !== 'all' && ` • Account: ${currentRequiresAccount === 'yes' ? 'Required' : 'Not Required'}`}
                             </div>
                             
                             <div className="flex items-center gap-3">

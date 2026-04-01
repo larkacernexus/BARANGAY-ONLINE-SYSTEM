@@ -1,3 +1,5 @@
+// resources/js/components/admin/positions/PositionsGridView.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,8 +20,7 @@ import {
     Calendar,
     Crown
 } from 'lucide-react';
-import { Position } from '@/types/position';
-import { positionUtils } from '@/admin-utils/position-utils';
+import { Position } from '@/types/admin/positions/position.types'; // ← FIX IMPORT PATH
 
 interface PositionsGridViewProps {
     positions: Position[];
@@ -30,8 +31,8 @@ interface PositionsGridViewProps {
     onDelete: (position: Position) => void;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
-    selectionStats: any;
-    onCopyToClipboard: (text: string, label: string) => void;
+    selectionStats?: any; // ← MAKE OPTIONAL
+    onCopyToClipboard?: (text: string, label: string) => void; // ← MAKE OPTIONAL
 }
 
 export default function PositionsGridView({
@@ -43,11 +44,27 @@ export default function PositionsGridView({
     onDelete,
     hasActiveFilters,
     onClearFilters,
-    selectionStats,
-    onCopyToClipboard
+    selectionStats = {}, // ← ADD DEFAULT VALUE
+    onCopyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text).then(() => {
+            console.log(`Copied ${label}: ${text}`);
+        }).catch(() => {
+            console.error(`Failed to copy ${label}`);
+        });
+    } // ← ADD DEFAULT FUNCTION
 }: PositionsGridViewProps) {
-    const truncateText = positionUtils.truncateText;
-    const formatDate = positionUtils.formatDate;
+    
+    // Helper functions (in case positionUtils doesn't have them)
+    const truncateText = (text: string, length: number): string => {
+        if (!text) return '';
+        if (text.length <= length) return text;
+        return text.substring(0, length) + '...';
+    };
+
+    const formatDate = (dateString: string): string => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleDateString();
+    };
 
     const getStatusBadgeVariant = (isActive: boolean): "default" | "secondary" | "destructive" | "outline" => {
         return isActive ? 'default' : 'secondary';
@@ -60,7 +77,7 @@ export default function PositionsGridView({
     };
 
     const isKagawad = (name: string, code: string) => {
-        return name.toLowerCase().includes('kagawad') || code.toLowerCase().includes('kagawad');
+        return name?.toLowerCase().includes('kagawad') || code?.toLowerCase().includes('kagawad');
     };
 
     const emptyState = (
@@ -111,11 +128,15 @@ export default function PositionsGridView({
                             <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-2">
                                     <div className={`h-10 w-10 rounded-full ${isKagawadPos ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-blue-100 dark:bg-blue-900/30'} flex items-center justify-center flex-shrink-0`}>
-                                        <Shield className={`h-5 w-5 ${isKagawadPos ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}`} />
+                                        {isKagawadPos ? (
+                                            <Crown className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                        ) : (
+                                            <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                        )}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-medium text-gray-900 dark:text-gray-100 truncate flex items-center gap-1">
-                                            {position.name}
+                                        <div className="font-medium text-gray-900 dark:text-gray-100 truncate flex items-center gap-1 flex-wrap">
+                                            <span>{truncateText(position.name, 25)}</span>
                                             {isKagawadPos && (
                                                 <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
                                                     Kagawad
@@ -188,7 +209,7 @@ export default function PositionsGridView({
                                     <div className="space-y-1">
                                         <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</div>
                                         <div className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                                            {position.description}
+                                            {truncateText(position.description, 80)}
                                         </div>
                                     </div>
                                 )}
@@ -199,7 +220,7 @@ export default function PositionsGridView({
                                         <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Committee</div>
                                         <div className="flex items-center gap-1 text-gray-900 dark:text-gray-100">
                                             <TargetIcon className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
-                                            {position.committee.name}
+                                            <span className="truncate">{position.committee.name}</span>
                                         </div>
                                     </div>
                                 )}
@@ -212,7 +233,7 @@ export default function PositionsGridView({
                                             <span className="font-medium">Officials</span>
                                         </div>
                                         <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 text-center">
-                                            {position.officials_count || 0}
+                                            {position.officials_count ?? 0}
                                         </div>
                                     </div>
                                     <div className="space-y-1">
@@ -243,7 +264,7 @@ export default function PositionsGridView({
                                         }`}
                                     >
                                         {position.requires_account && <Key className="h-3 w-3" />}
-                                        {position.requires_account ? 'Account Req' : 'No Account'}
+                                        {position.requires_account ? 'Account Required' : 'No Account'}
                                     </Badge>
                                 </div>
 
@@ -254,7 +275,7 @@ export default function PositionsGridView({
                                             <Calendar className="h-3 w-3" />
                                             {formatDate(position.created_at)}
                                         </div>
-                                        <Link href={`/officials?position_id=${position.id}`}>
+                                        <Link href={`/admin/officials?position_id=${position.id}`}>
                                             <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
                                                 View Officials
                                             </Button>

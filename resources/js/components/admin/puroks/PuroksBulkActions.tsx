@@ -1,3 +1,5 @@
+// resources/js/components/admin/puroks/PuroksBulkActions.tsx
+
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +25,7 @@ import {
     Users2,
     Trash2
 } from 'lucide-react';
+import { BulkOperation } from '@/types/admin/puroks/purok'; // ← Import BulkOperation type
 
 interface BulkActionItem {
     label: string;
@@ -44,7 +47,7 @@ interface PuroksBulkActionsProps {
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void; // ← CHANGE: Use BulkOperation type
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     bulkActions: {
@@ -129,7 +132,7 @@ export default function PuroksBulkActions({
                                         disabled={isPerformingBulkAction}
                                     >
                                         {action.icon}
-                                        {action.label}
+                                        {!isMobile && action.label}
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -166,18 +169,25 @@ export default function PuroksBulkActions({
                                             key={index}
                                             variant="ghost"
                                             className="w-full justify-start h-8 text-sm"
-                                            onClick={action.onClick}
+                                            onClick={() => {
+                                                action.onClick();
+                                                setShowBulkActions(false);
+                                            }}
                                         >
                                             {action.icon}
                                             {action.label}
                                         </Button>
                                     ))}
+                                    <div className="border-t my-1"></div>
                                     {bulkActions.destructive.map((action, index) => (
                                         <Button
                                             key={index}
                                             variant="ghost"
-                                            className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-                                            onClick={action.onClick}
+                                            className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50"
+                                            onClick={() => {
+                                                action.onClick();
+                                                setShowBulkActions(false);
+                                            }}
                                         >
                                             {action.icon}
                                             {action.label}
@@ -238,11 +248,11 @@ export default function PuroksBulkActions({
                             </span>
                         </div>
                     </div>
-                    {selectionStats.hasLeaders !== undefined && (
+                    {(selectionStats.hasLeaders !== undefined || selectionStats.hasMaps !== undefined) && (
                         <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">
                             <div className="flex items-center gap-1">
                                 <UserPlus className="h-3 w-3 text-cyan-500" />
-                                <span>{selectionStats.hasLeaders} with leaders</span>
+                                <span>{selectionStats.hasLeaders || 0} with leaders</span>
                             </div>
                             <div className="flex items-center gap-1">
                                 <Globe className="h-3 w-3 text-red-500" />

@@ -1,3 +1,5 @@
+// resources/js/components/admin/puroks/PuroksTableView.tsx
+
 import {
     Table,
     TableBody,
@@ -31,9 +33,11 @@ import {
     Square,
     ExternalLink,
     Phone,
-    Map
+    Map,
+    ChevronUp,
+    ChevronDown
 } from 'lucide-react';
-import { Purok, PurokFilters } from '@/types/purok';
+import { Purok, PurokFilters } from '@/types/admin/puroks/purok';
 import { purokUtils } from '@/admin-utils/purok-utils';
 import { JSX } from 'react';
 
@@ -49,7 +53,7 @@ interface PuroksTableViewProps {
     onClearFilters: () => void;
     onDelete: (purok: Purok) => void;
     selectionStats: any;
-    getSortIcon: (column: string) => string | null;
+    getSortIcon: (column: string) => React.ReactNode; // ← FIX: Change to React.ReactNode
     onViewOnMap?: (purok: Purok) => void;
 }
 
@@ -151,9 +155,9 @@ export default function PuroksTableView({
 
     const handleCopyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text).then(() => {
-            // Toast would be handled by parent
+            console.log(`Copied ${label}: ${text}`);
         }).catch(() => {
-            // Toast would be handled by parent
+            console.error(`Failed to copy ${label}`);
         });
     };
 
@@ -194,12 +198,12 @@ export default function PuroksTableView({
                                     </TableHead>
                                 )}
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('name')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Purok Name
-                                        {getSortIcon('name')}
+                                        <span className="ml-1">{getSortIcon('name')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
@@ -209,39 +213,39 @@ export default function PuroksTableView({
                                     Map
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('total_households')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Households
-                                        {getSortIcon('total_households')}
+                                        <span className="ml-1">{getSortIcon('total_households')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('total_residents')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Residents
-                                        {getSortIcon('total_residents')}
+                                        <span className="ml-1">{getSortIcon('total_residents')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('status')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Status
-                                        {getSortIcon('status')}
+                                        <span className="ml-1">{getSortIcon('status')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('created_at')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Created
-                                        {getSortIcon('created_at')}
+                                        <span className="ml-1">{getSortIcon('created_at')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[80px]">
@@ -472,7 +476,7 @@ export default function PuroksTableView({
                                                     <DropdownMenuSeparator />
                                                     
                                                     <DropdownMenuItem 
-                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/50"
                                                         onClick={() => onDelete(purok)}
                                                     >
                                                         <Trash2 className="mr-2 h-4 w-4" />

@@ -94,12 +94,14 @@ export const getModuleColor = (moduleName: string) => {
     }
 };
 
-export const getStatusVariant = (status: string) => {
-    return status === 'active' ? 'default' : 'secondary';
+// Updated to accept boolean
+export const getStatusVariant = (isActive: boolean): "default" | "secondary" | "destructive" | "outline" => {
+    return isActive ? "default" : "secondary";
 };
 
-export const getStatusIcon = (status: string) => {
-    return status === 'active' 
+// Updated to accept boolean
+export const getStatusIcon = (isActive: boolean) => {
+    return isActive 
         ? <Check className="h-3 w-3 text-green-500 dark:text-green-400" />
         : <X className="h-3 w-3 text-gray-500 dark:text-gray-400" />;
 };

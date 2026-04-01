@@ -1,21 +1,27 @@
-// resources/js/Pages/Admin/Puroks/components/demographics-card.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import {
     BarChart3,
 } from 'lucide-react';
-import { Demographics } from '../types';
+import { Demographics } from '@/types/admin/puroks/purok'; // Import the correct type
 
 interface Props {
     demographics: Demographics;
 }
 
 export const DemographicsCard = ({ demographics }: Props) => {
-    const total = demographics.gender.male + demographics.gender.female + demographics.gender.other;
+    // Fix the calculation to use the correct structure
+    const total = demographics.gender.male + demographics.gender.female + (demographics.gender.other || 0);
     const malePercentage = total > 0 ? Math.round((demographics.gender.male / total) * 100) : 0;
     const femalePercentage = total > 0 ? Math.round((demographics.gender.female / total) * 100) : 0;
-    const otherPercentage = total > 0 ? Math.round((demographics.gender.other / total) * 100) : 0;
+    const otherPercentage = total > 0 && demographics.gender.other ? Math.round((demographics.gender.other / total) * 100) : 0;
+
+    // Calculate total for age groups
+    const totalAgeGroups = demographics.ageGroups['0-17'] + 
+                          demographics.ageGroups['18-30'] + 
+                          demographics.ageGroups['31-59'] + 
+                          demographics.ageGroups['60+'];
 
     return (
         <Card className="dark:bg-gray-900">
@@ -60,7 +66,7 @@ export const DemographicsCard = ({ demographics }: Props) => {
                             </div>
                         </div>
                         
-                        {demographics.gender.other > 0 && (
+                        {demographics.gender.other && demographics.gender.other > 0 && (
                             <div>
                                 <div className="flex justify-between text-sm mb-1">
                                     <span className="dark:text-gray-300">Other</span>
@@ -83,28 +89,62 @@ export const DemographicsCard = ({ demographics }: Props) => {
                 <div>
                     <div className="flex justify-between text-sm mb-3">
                         <span className="text-gray-600 dark:text-gray-400">Age Groups</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Total: {totalAgeGroups}</span>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <span className="text-sm dark:text-gray-300 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                Children (&lt;18)
+                                0-17 (Children)
                             </span>
-                            <span className="font-medium dark:text-gray-200">{demographics.age_groups.children}</span>
+                            <span className="font-medium dark:text-gray-200">{demographics.ageGroups['0-17']}</span>
                         </div>
                         <div className="flex items-center justify-between">
                             <span className="text-sm dark:text-gray-300 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                Adults (18-59)
+                                18-30 (Young Adults)
                             </span>
-                            <span className="font-medium dark:text-gray-200">{demographics.age_groups.adults}</span>
+                            <span className="font-medium dark:text-gray-200">{demographics.ageGroups['18-30']}</span>
                         </div>
                         <div className="flex items-center justify-between">
                             <span className="text-sm dark:text-gray-300 flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                                Seniors (60+)
+                                31-59 (Adults)
                             </span>
-                            <span className="font-medium dark:text-gray-200">{demographics.age_groups.seniors}</span>
+                            <span className="font-medium dark:text-gray-200">{demographics.ageGroups['31-59']}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm dark:text-gray-300 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                                60+ (Seniors)
+                            </span>
+                            <span className="font-medium dark:text-gray-200">{demographics.ageGroups['60+']}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Add Civil Status Section */}
+                <Separator className="dark:bg-gray-700" />
+                <div>
+                    <div className="flex justify-between text-sm mb-3">
+                        <span className="text-gray-600 dark:text-gray-400">Civil Status</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm dark:text-gray-300">Single</span>
+                            <span className="font-medium dark:text-gray-200">{demographics.civilStatus.single}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm dark:text-gray-300">Married</span>
+                            <span className="font-medium dark:text-gray-200">{demographics.civilStatus.married}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm dark:text-gray-300">Widowed</span>
+                            <span className="font-medium dark:text-gray-200">{demographics.civilStatus.widowed}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm dark:text-gray-300">Divorced</span>
+                            <span className="font-medium dark:text-gray-200">{demographics.civilStatus.divorced}</span>
                         </div>
                     </div>
                 </div>

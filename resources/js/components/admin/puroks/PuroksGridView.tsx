@@ -1,3 +1,5 @@
+// resources/js/components/admin/puroks/PuroksGridView.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,7 +32,7 @@ import {
     CheckSquare,
     Square
 } from 'lucide-react';
-import { Purok } from '@/types';
+import { Purok } from '@/types/admin/puroks/purok'; // ← FIX: Correct import path
 import { JSX } from 'react';
 
 interface PuroksGridViewProps {
@@ -42,8 +44,8 @@ interface PuroksGridViewProps {
     onDelete: (purok: Purok) => void;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
-    selectionStats: any;
-    onCopyToClipboard: (text: string, label: string) => void;
+    selectionStats?: any; // ← MAKE OPTIONAL
+    onCopyToClipboard?: (text: string, label: string) => void; // ← MAKE OPTIONAL
     onViewOnMap?: (purok: Purok) => void;
 }
 
@@ -56,8 +58,14 @@ export default function PuroksGridView({
     onDelete,
     hasActiveFilters,
     onClearFilters,
-    selectionStats,
-    onCopyToClipboard,
+    selectionStats = {},
+    onCopyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text).then(() => {
+            console.log(`Copied ${label}: ${text}`);
+        }).catch(() => {
+            console.error(`Failed to copy ${label}`);
+        });
+    },
     onViewOnMap
 }: PuroksGridViewProps) {
     const truncateText = (text: string, maxLength: number = 30): string => {
@@ -86,7 +94,7 @@ export default function PuroksGridView({
         return classes[status.toLowerCase()] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
     };
 
-    const formatDate = (dateString: string) => {
+    const formatDate = (dateString: string): string => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-PH', {
             year: 'numeric',
@@ -154,7 +162,7 @@ export default function PuroksGridView({
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                                            {purok.name}
+                                            {truncateText(purok.name, 25)}
                                         </div>
                                         <Badge 
                                             variant={getStatusBadgeVariant(purok.status)} 
@@ -286,7 +294,7 @@ export default function PuroksGridView({
                                             <DropdownMenuSeparator />
                                             
                                             <DropdownMenuItem 
-                                                className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                                className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/50"
                                                 onClick={() => onDelete(purok)}
                                             >
                                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -304,7 +312,7 @@ export default function PuroksGridView({
                                     <div className="space-y-1">
                                         <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</div>
                                         <div className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                                            {purok.description}
+                                            {truncateText(purok.description, 80)}
                                         </div>
                                     </div>
                                 )}
@@ -314,12 +322,12 @@ export default function PuroksGridView({
                                     <div className="space-y-1">
                                         <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Leader</div>
                                         <div className="text-gray-900 dark:text-gray-100 font-medium">
-                                            {purok.leader_name}
+                                            {truncateText(purok.leader_name, 20)}
                                         </div>
                                         {purok.leader_contact && (
                                             <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
                                                 <Phone className="h-3.5 w-3.5" />
-                                                {purok.leader_contact}
+                                                {truncateText(purok.leader_contact, 15)}
                                             </div>
                                         )}
                                     </div>
@@ -333,7 +341,7 @@ export default function PuroksGridView({
                                             <span className="font-medium">Households</span>
                                         </div>
                                         <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 text-center">
-                                            {purok.total_households?.toLocaleString() || 0}
+                                            {(purok.total_households ?? 0).toLocaleString()}
                                         </div>
                                     </div>
                                     <div className="space-y-1">
@@ -342,7 +350,7 @@ export default function PuroksGridView({
                                             <span className="font-medium">Residents</span>
                                         </div>
                                         <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 text-center">
-                                            {purok.total_residents?.toLocaleString() || 0}
+                                            {(purok.total_residents ?? 0).toLocaleString()}
                                         </div>
                                     </div>
                                 </div>

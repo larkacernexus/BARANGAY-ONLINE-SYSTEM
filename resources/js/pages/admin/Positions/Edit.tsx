@@ -1,3 +1,5 @@
+// resources/js/Pages/Admin/Positions/Edit.tsx
+
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,36 +21,19 @@ import {
     X,
 } from 'lucide-react';
 import { Link, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types';
 import { useState, useEffect } from 'react';
+import { PageProps, Position, PositionFormData, Committee } from '@/types/admin/positions/position.types';
 
 interface CommitteeOption {
     value: number;
     label: string;
-    code: string;
+    name: string;
+    is_active: boolean;
 }
 
 interface RoleOption {
     id: number;
     name: string;
-}
-
-interface Position {
-    id: number;
-    code: string;
-    name: string;
-    description: string;
-    order: number;
-    role_id: number | null;
-    requires_account: boolean;
-    is_active: boolean;
-    committee_id: number | null;
-    additional_committees: number[];
-    created_at: string;
-    updated_at: string;
-    committee?: CommitteeOption;
-    role?: RoleOption;
-    officials_count?: number;
 }
 
 interface EditPositionProps extends PageProps {
@@ -58,21 +43,28 @@ interface EditPositionProps extends PageProps {
 }
 
 export default function EditPosition({ position, committees = [], roles = [] }: EditPositionProps) {
-    const { data, setData, post, processing, errors, delete: destroy } = useForm({
+    const { data, setData, post, processing, errors, delete: destroy } = useForm<PositionFormData>({
         code: position.code || '',
         name: position.name || '',
         description: position.description || '',
         order: position.order || 0,
-        role_id: position.role_id || null as number | null,
         requires_account: position.requires_account ?? false,
         is_active: position.is_active ?? true,
-        committee_id: position.committee_id || null as number | null,
-        additional_committees: position.additional_committees || [] as number[],
+        committee_id: position.committee_id || null,
     });
 
-    const [selectedCommittee, setSelectedCommittee] = useState<CommitteeOption | null>(
-        position.committee || null
-    );
+    // Convert the actual Committee type to CommitteeOption for display
+    const [selectedCommittee, setSelectedCommittee] = useState<CommitteeOption | null>(() => {
+        if (position.committee) {
+            return {
+                value: position.committee.id,
+                label: position.committee.name,
+                name: position.committee.name,
+                is_active: position.committee.is_active
+            };
+        }
+        return null;
+    });
 
     // Initialize form with current data
     useEffect(() => {
@@ -81,13 +73,22 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
             name: position.name || '',
             description: position.description || '',
             order: position.order || 0,
-            role_id: position.role_id || null,
             requires_account: position.requires_account ?? false,
             is_active: position.is_active ?? true,
             committee_id: position.committee_id || null,
-            additional_committees: position.additional_committees || [],
         });
-        setSelectedCommittee(position.committee || null);
+        
+        // Update selected committee state when position changes
+        if (position.committee) {
+            setSelectedCommittee({
+                value: position.committee.id,
+                label: position.committee.name,
+                name: position.committee.name,
+                is_active: position.committee.is_active
+            });
+        } else {
+            setSelectedCommittee(null);
+        }
     }, [position]);
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -104,7 +105,9 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
     };
 
     const handleDelete = () => {
-        if (position.officials_count && position.officials_count > 0) {
+        const hasOfficials = (position.officials_count ?? 0) > 0;
+        
+        if (hasOfficials) {
             alert('Cannot delete position that has assigned officials. Please reassign officials first.');
             return;
         }
@@ -113,7 +116,6 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
             destroy(`/admin/positions/${position.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
-                    // Redirect to positions list
                     window.location.href = '/admin/positions';
                 }
             });
@@ -132,41 +134,13 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
         }
     };
 
-    const handleRoleSelect = (roleId: string) => {
-        if (roleId === "null" || roleId === "") {
-            setData('role_id', null);
-        } else {
-            const id = parseInt(roleId);
-            setData('role_id', id);
-        }
-    };
+    const isKagawadPosition = data.name?.toLowerCase().includes('kagawad') || 
+                              data.code?.toLowerCase().includes('kagawad');
 
-    const toggleAdditionalCommittee = (committeeId: number) => {
-        const current = data.additional_committees;
-        if (current.includes(committeeId)) {
-            setData('additional_committees', current.filter(id => id !== committeeId));
-        } else {
-            setData('additional_committees', [...current, committeeId]);
-        }
-    };
-
-    const getSelectedAdditionalCommittees = () => {
-        return committees.filter(c => data.additional_committees.includes(c.value));
-    };
-
-    const isKagawadPosition = data.name.toLowerCase().includes('kagawad') || 
-                              data.code.toLowerCase().includes('kagawad');
-
-    const isFieldChanged = (field: keyof typeof data, original: any) => {
+    const isFieldChanged = (field: keyof PositionFormData, original: any) => {
         const currentValue = data[field];
         const originalValue = original;
         
-        // Handle array comparison
-        if (Array.isArray(currentValue) && Array.isArray(originalValue)) {
-            return JSON.stringify([...currentValue].sort()) !== JSON.stringify([...originalValue].sort());
-        }
-        
-        // Handle null/undefined comparisons
         if (currentValue === null || currentValue === undefined) {
             return originalValue !== null && originalValue !== undefined;
         }
@@ -184,56 +158,33 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
             name: position.name || '',
             description: position.description || '',
             order: position.order || 0,
-            role_id: position.role_id || null,
             requires_account: position.requires_account ?? false,
             is_active: position.is_active ?? true,
             committee_id: position.committee_id || null,
-            additional_committees: position.additional_committees || [],
         });
-        setSelectedCommittee(position.committee || null);
+        
+        if (position.committee) {
+            setSelectedCommittee({
+                value: position.committee.id,
+                label: position.committee.name,
+                name: position.committee.name,
+                is_active: position.committee.is_active
+            });
+        } else {
+            setSelectedCommittee(null);
+        }
     };
 
     const getChangedFieldsCount = () => {
-        const fields: (keyof typeof data)[] = [
-            'code', 'name', 'description', 'order', 'role_id', 
-            'requires_account', 'is_active', 'committee_id', 'additional_committees'
+        const fields: (keyof PositionFormData)[] = [
+            'code', 'name', 'description', 'order', 
+            'requires_account', 'is_active', 'committee_id'
         ];
         
-        return fields.filter(field => isFieldChanged(field, position[field])).length;
+        return fields.filter(field => isFieldChanged(field, position[field as keyof Position])).length;
     };
 
-    // Safe committee access helper - filter out any invalid committees
-    const safeCommittees = Array.isArray(committees) 
-        ? committees.filter(committee => 
-            committee && 
-            typeof committee === 'object' && 
-            committee.value && 
-            typeof committee.value === 'number' &&
-            committee.label && 
-            typeof committee.label === 'string'
-        ) 
-        : [];
-
-    // Safe roles helper
-    const safeRoles = Array.isArray(roles) 
-        ? roles.filter(role => 
-            role && 
-            typeof role === 'object' && 
-            role.id && 
-            typeof role.id === 'number' &&
-            role.name && 
-            typeof role.name === 'string'
-        ) 
-        : [];
-
-    // Get current additional committees safely
-    const getCurrentAdditionalCommittees = () => {
-        return safeCommittees.filter(c => 
-            position.additional_committees && 
-            Array.isArray(position.additional_committees) && 
-            position.additional_committees.includes(c.value)
-        );
-    };
+    const hasOfficials = (position.officials_count ?? 0) > 0;
 
     return (
         <AppLayout
@@ -268,7 +219,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                 type="button"
                                 variant="destructive"
                                 onClick={handleDelete}
-                                disabled={processing || (position.officials_count && position.officials_count > 0)}
+                                disabled={processing || hasOfficials}
                                 className="flex items-center gap-2 dark:bg-red-900 dark:hover:bg-red-800"
                             >
                                 <Trash2 className="h-4 w-4" />
@@ -299,7 +250,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                     )}
 
                     {/* Warning for positions with officials */}
-                    {position.officials_count && position.officials_count > 0 && (
+                    {hasOfficials && (
                         <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400">
                             <div className="flex items-center gap-2">
                                 <Users className="h-5 w-5" />
@@ -395,47 +346,22 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                                 Was: {position.order}
                                             </p>
                                         )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="role_id" className="dark:text-gray-300">System Role</Label>
-                                        <Select 
-                                            value={data.role_id?.toString() || "null"}
-                                            onValueChange={handleRoleSelect}
-                                        >
-                                            <SelectTrigger className={`${isFieldChanged('role_id', position.role_id) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
-                                                <SelectValue placeholder="Select system role" />
-                                            </SelectTrigger>
-                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                <SelectItem value="null" className="dark:text-white dark:focus:bg-gray-700">No role</SelectItem>
-                                                {safeRoles.map((role) => (
-                                                    <SelectItem key={role.id} value={role.id.toString()} className="dark:text-white dark:focus:bg-gray-700">
-                                                        {role.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {isFieldChanged('role_id', position.role_id) && (
-                                            <p className="text-xs text-blue-600 dark:text-blue-400">
-                                                Was: {position.role?.name || 'No role'}
-                                            </p>
+                                        {errors.order && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.order}</p>
                                         )}
                                     </div>
-                                </div>
-
-                                {/* Committee Selection */}
-                                <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label className="dark:text-gray-300">Primary Committee</Label>
+                                        <Label htmlFor="committee_id" className="dark:text-gray-300">Committee</Label>
                                         <Select 
                                             value={data.committee_id?.toString() || "null"}
                                             onValueChange={handleCommitteeSelect}
                                         >
                                             <SelectTrigger className={`${isFieldChanged('committee_id', position.committee_id) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
-                                                <SelectValue placeholder="Select primary committee" />
+                                                <SelectValue placeholder="Select committee" />
                                             </SelectTrigger>
                                             <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                 <SelectItem value="null" className="dark:text-white dark:focus:bg-gray-700">No committee</SelectItem>
-                                                {safeCommittees.map((committee) => (
+                                                {committees.map((committee) => (
                                                     <SelectItem key={committee.value} value={committee.value.toString()} className="dark:text-white dark:focus:bg-gray-700">
                                                         <div className="flex items-center gap-2">
                                                             <Target className="h-3 w-3" />
@@ -447,49 +373,18 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                         </Select>
                                         {isFieldChanged('committee_id', position.committee_id) && (
                                             <p className="text-xs text-blue-600 dark:text-blue-400">
-                                                Was: {position.committee?.label || 'No committee'}
+                                                Was: {position.committee?.name || 'No committee'}
                                             </p>
                                         )}
                                         {isKagawadPosition && !data.committee_id && (
                                             <p className="text-sm text-amber-600 dark:text-amber-400">
-                                                Kagawad positions usually have a primary committee
+                                                Kagawad positions usually have a committee assigned
                                             </p>
                                         )}
+                                        {errors.committee_id && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.committee_id}</p>
+                                        )}
                                     </div>
-
-                                    {safeCommittees.length > 0 && (
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <Label className="dark:text-gray-300">Additional Committees</Label>
-                                                {isFieldChanged('additional_committees', position.additional_committees) && (
-                                                    <span className="text-xs text-blue-600 dark:text-blue-400">
-                                                        {(position.additional_committees?.length || 0)} → {data.additional_committees.length}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                                {safeCommittees.map((committee) => (
-                                                    <div key={committee.value} className="flex items-center space-x-2">
-                                                        <Checkbox 
-                                                            id={`committee_${committee.value}`}
-                                                            checked={data.additional_committees.includes(committee.value)}
-                                                            onCheckedChange={() => toggleAdditionalCommittee(committee.value)}
-                                                            disabled={committee.value === data.committee_id}
-                                                            className={`${((position.additional_committees?.includes(committee.value) || false) !== 
-                                                                data.additional_committees.includes(committee.value)) ? 
-                                                                'border-blue-300 dark:border-blue-600' : ''} dark:border-gray-600`}
-                                                        />
-                                                        <Label 
-                                                            htmlFor={`committee_${committee.value}`} 
-                                                            className="cursor-pointer text-sm dark:text-gray-300"
-                                                        >
-                                                            {committee.label}
-                                                        </Label>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
 
                                 <div className="space-y-2">
@@ -506,6 +401,9 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                         <p className="text-xs text-blue-600 dark:text-blue-400">
                                             Description has been modified
                                         </p>
+                                    )}
+                                    {errors.description && (
+                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.description}</p>
                                     )}
                                 </div>
 
@@ -526,6 +424,9 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                             Was: {position.requires_account ? 'Required' : 'Not required'}
                                         </p>
                                     )}
+                                    {errors.requires_account && (
+                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.requires_account}</p>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center space-x-2">
@@ -542,6 +443,9 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                         <p className="text-xs text-blue-600 dark:text-blue-400">
                                             Was: {position.is_active ? 'Active' : 'Inactive'}
                                         </p>
+                                    )}
+                                    {errors.is_active && (
+                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.is_active}</p>
                                     )}
                                 </div>
                             </CardContent>
@@ -593,38 +497,21 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                             <span className="text-gray-500 dark:text-gray-400">Officials:</span>
                                             <span className="font-medium flex items-center gap-1 dark:text-white">
                                                 <Users className="h-3 w-3" />
-                                                {position.officials_count || 0}
+                                                {position.officials_count ?? 0}
                                             </span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 dark:text-gray-400">System Role:</span>
-                                            <span className="font-medium dark:text-white">{position.role?.name || 'None'}</span>
                                         </div>
                                     </div>
 
-                                    {/* Current Committees */}
-                                    {(position.committee || (position.additional_committees && position.additional_committees.length > 0)) && (
+                                    {/* Current Committee */}
+                                    {position.committee && (
                                         <div className="pt-4 border-t dark:border-gray-700">
-                                            <h5 className="font-medium mb-2 dark:text-gray-300">Current Committees:</h5>
-                                            <div className="space-y-2">
-                                                {position.committee && (
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
-                                                            <Target className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                                                            <span className="text-sm dark:text-gray-300">{position.committee.label}</span>
-                                                        </div>
-                                                        <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
-                                                            Primary
-                                                        </Badge>
-                                                    </div>
-                                                )}
-                                                
-                                                {getCurrentAdditionalCommittees().map((committee) => (
-                                                    <div key={committee.value} className="flex items-center gap-2">
-                                                        <Target className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-                                                        <span className="text-sm dark:text-gray-300">{committee.label}</span>
-                                                    </div>
-                                                ))}
+                                            <h5 className="font-medium mb-2 dark:text-gray-300">Committee:</h5>
+                                            <div className="flex items-center gap-2">
+                                                <Target className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                                <span className="text-sm dark:text-gray-300">{position.committee.name}</span>
+                                                <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
+                                                    Assigned
+                                                </Badge>
                                             </div>
                                         </div>
                                     )}
@@ -651,8 +538,8 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                         </Button>
                                     </Link>
                                     
-                                    {position.officials_count && position.officials_count > 0 && (
-                                        <Link href={`/admin/officials?position=${position.id}`}>
+                                    {hasOfficials && (
+                                        <Link href={`/admin/officials?position_id=${position.id}`}>
                                             <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
                                                 <Users className="h-4 w-4 mr-2" />
                                                 View Assigned Officials
@@ -666,6 +553,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                             <Button
                                                 variant={data.is_active ? "default" : "outline"}
                                                 className="w-full justify-start"
+                                                type="button"
                                                 onClick={() => setData('is_active', true)}
                                             >
                                                 <CheckCircle className="h-4 w-4 mr-2" />
@@ -674,6 +562,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                             <Button
                                                 variant={!data.is_active ? "default" : "outline"}
                                                 className="w-full justify-start"
+                                                type="button"
                                                 onClick={() => setData('is_active', false)}
                                             >
                                                 <X className="h-4 w-4 mr-2" />
@@ -688,6 +577,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                             <Button
                                                 variant={data.requires_account ? "default" : "outline"}
                                                 className="w-full justify-start"
+                                                type="button"
                                                 onClick={() => setData('requires_account', true)}
                                             >
                                                 <Key className="h-4 w-4 mr-2" />
@@ -696,6 +586,7 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
                                             <Button
                                                 variant={!data.requires_account ? "default" : "outline"}
                                                 className="w-full justify-start"
+                                                type="button"
                                                 onClick={() => setData('requires_account', false)}
                                             >
                                                 <Users className="h-4 w-4 mr-2" />

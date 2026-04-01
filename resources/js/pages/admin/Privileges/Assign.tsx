@@ -1,495 +1,709 @@
-import React, { useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+// resources/js/Pages/Admin/Privileges/Index.tsx
+
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { toast } from 'sonner';
+import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-    Award,
-    CheckCircle,
-    Edit,
-    Eye,
-    MoreHorizontal,
-    Plus,
-    Search,
-    Shield,
-    Trash2,
-    Users,
-    XCircle,
-} from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 
-interface DiscountType {
-    id: number;
-    name: string;
-    code: string;
-}
+// Import custom components
+import PrivilegesHeader from '@/components/admin/privileges/PrivilegesHeader';
+import PrivilegesStats from '@/components/admin/privileges/PrivilegesStats';
+import PrivilegesFilters from '@/components/admin/privileges/PrivilegesFilters';
+import PrivilegesContent from '@/components/admin/privileges/PrivilegesContent';
+import PrivilegesDialogs from '@/components/admin/privileges/PrivilegesDialogs';
 
-interface Privilege {
-    id: number;
-    name: string;
-    code: string;
-    description: string | null;
-    is_active: boolean;
-    discount_type_id: number;
-    default_discount_percentage: string | number;
-    requires_id_number: boolean;
-    requires_verification: boolean;
-    validity_years: number | null;
-    created_at: string;
-    updated_at: string;
-    discount_type?: DiscountType;
-    residents_count?: number;
-    active_residents_count?: number;
-}
+// Import types
+import { 
+    Privilege, 
+    PrivilegeFilters, 
+    PrivilegeStats, 
+    PaginationData,
+    SelectionStats,
+    SelectionMode,
+    BulkOperation,
+    DiscountType
+} from '@/types/admin/privileges/privilege.types';
+import { privilegeUtils } from '@/types/admin/privileges/privilege.types';
 
-interface PrivilegesData {
-    data: Privilege[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-}
-
-interface Props {
-    privileges: PrivilegesData | null; // Allow null
+interface PrivilegesPageProps {
+    privileges: PaginationData;
+    filters: PrivilegeFilters;
     discountTypes: DiscountType[];
-    filters: {
-        search?: string;
-        status?: string;
-        discount_type?: string;
-    };
     can: {
         create: boolean;
         edit: boolean;
         delete: boolean;
         assign: boolean;
     };
+    stats?: PrivilegeStats;
 }
 
-export default function Index({ privileges, discountTypes, filters, can }: Props) {
+const defaultStats: PrivilegeStats = {
+    total: 0,
+    active: 0,
+    totalAssignments: 0,
+    activeAssignments: 0
+};
+
+export default function PrivilegesIndex({ 
+    privileges, 
+    filters, 
+    discountTypes,
+    can,
+    stats: globalStats = defaultStats
+}: PrivilegesPageProps) {
+    const { flash } = usePage().props as any;
+    
+    // State management
     const [search, setSearch] = useState(filters.search || '');
-    const [status, setStatus] = useState(filters.status || '');
-    const [discountType, setDiscountType] = useState(filters.discount_type || '');
+    const [filtersState, setFiltersState] = useState<PrivilegeFilters>({
+        status: filters.status || 'all',
+        discount_type: filters.discount_type || 'all',
+        requires_verification: filters.requires_verification || 'all',
+        requires_id_number: filters.requires_id_number || 'all',
+        sort_by: filters.sort_by || 'name',
+        sort_order: filters.sort_order || 'asc'
+    });
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage] = useState(15);
+    const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+    const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+    
+    // Bulk selection states
+    const [selectedPrivileges, setSelectedPrivileges] = useState<number[]>([]);
+    const [isBulkMode, setIsBulkMode] = useState(false);
+    const [isSelectAll, setIsSelectAll] = useState(false);
+    const [selectionMode, setSelectionMode] = useState<SelectionMode>('page');
+    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+    const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
+    const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [bulkEditValue, setBulkEditValue] = useState<string>('');
 
-    // CRITICAL FIX #1: Early return if privileges is null/undefined
-    if (!privileges) {
-        return (
-            <AppLayout
-                header={
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
-                                Privileges Management
-                            </h2>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Manage resident privileges and discounts
-                            </p>
-                        </div>
-                        {can?.create && (
-                            <Link href={route('admin.privileges.create')}>
-                                <Button className="gap-2">
-                                    <Plus className="h-4 w-4" />
-                                    New Privilege
-                                </Button>
-                            </Link>
-                        )}
-                    </div>
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Debounced search function
+    const debouncedSearch = useCallback(
+        debounce((value: string) => {
+            const params = {
+                ...filtersState,
+                search: value || undefined,
+                status: filtersState.status === 'all' ? undefined : filtersState.status,
+                discount_type: filtersState.discount_type === 'all' ? undefined : filtersState.discount_type,
+                requires_verification: filtersState.requires_verification === 'all' ? undefined : filtersState.requires_verification,
+                requires_id_number: filtersState.requires_id_number === 'all' ? undefined : filtersState.requires_id_number,
+            };
+            
+            Object.keys(params).forEach(key => {
+                const k = key as keyof typeof params;
+                if (params[k] === undefined || params[k] === '') {
+                    delete params[k];
                 }
-            >
-                <Head title="Privileges Management" />
-                <div className="py-6">
-                    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <Card>
-                            <CardContent className="py-10">
-                                <div className="text-center text-gray-500">
-                                    Loading privileges...
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
-            </AppLayout>
-        );
-    }
+            });
+            
+            router.get('/admin/privileges', params, {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+            });
+        }, 300),
+        [filtersState]
+    );
 
-    // CRITICAL FIX #2: Safe data access with fallbacks
-    const privilegeData = privileges?.data ?? [];
-    const totalPrivileges = privileges?.total ?? 0;
-    const currentPage = privileges?.current_page ?? 1;
-    const lastPage = privileges?.last_page ?? 1;
+    // Cleanup debounce on unmount
+    useEffect(() => {
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [debouncedSearch]);
 
-    // Safe calculations
-    const activePrivilegesCount = privilegeData.filter(p => p?.is_active ?? false).length;
-    const totalAssignments = privilegeData.reduce((sum, p) => sum + (p?.residents_count || 0), 0);
-    const activeAssignments = privilegeData.reduce((sum, p) => sum + (p?.active_residents_count || 0), 0);
+    // Handle window resize
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
 
-    const handleSearch = () => {
-        router.get(route('admin.privileges.index'), {
-            search: search || undefined,
-            status: status || undefined,
-            discount_type: discountType || undefined,
-        }, {
-            preserveState: true,
-            replace: true,
+        const handleResize = () => {
+            const width = window.innerWidth;
+            setWindowWidth(width);
+            setIsMobile(width < 768);
+            if (width < 768 && viewMode === 'table') {
+                setViewMode('grid');
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        handleResize();
+        return () => window.removeEventListener('resize', handleResize);
+    }, [viewMode]);
+
+    // Auto switch to grid view on mobile
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.innerWidth < 768 && viewMode === 'table') {
+            setViewMode('grid');
+        }
+    }, []);
+
+    // Flash messages
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash]);
+
+    // Filter privileges
+    const filteredPrivileges = useMemo(() => {
+        return privilegeUtils.filterPrivileges({
+            privileges: privileges.data,
+            search,
+            filters: filtersState
         });
+    }, [privileges.data, search, filtersState]);
+
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        return {
+            total: filteredPrivileges.length,
+            active: filteredPrivileges.filter(p => p.is_active).length,
+            totalAssignments: filteredPrivileges.reduce((sum, p) => sum + (p.residents_count || 0), 0),
+            activeAssignments: filteredPrivileges.reduce((sum, p) => sum + (p.active_residents_count || 0), 0)
+        };
+    }, [filteredPrivileges]);
+
+    // Pagination
+    const totalItems = filteredPrivileges.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedPrivileges = filteredPrivileges.slice(startIndex, endIndex);
+
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, filtersState]);
+
+    // Reset selection when exiting bulk mode
+    useEffect(() => {
+        if (!isBulkMode) {
+            setSelectedPrivileges([]);
+            setIsSelectAll(false);
+        }
+    }, [isBulkMode]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedPrivileges.length > 0) {
+                        setSelectedPrivileges([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedPrivileges.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedPrivileges, isMobile]);
+
+    // Selection handlers
+    const handleSelectAllOnPage = () => {
+        const pageIds = paginatedPrivileges.map(privilege => privilege.id);
+        if (isSelectAll) {
+            setSelectedPrivileges(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            const newSelected = [...new Set([...selectedPrivileges, ...pageIds])];
+            setSelectedPrivileges(newSelected);
+        }
+        setIsSelectAll(!isSelectAll);
+        setSelectionMode('page');
     };
 
-    const handleReset = () => {
-        setSearch('');
-        setStatus('');
-        setDiscountType('');
-        router.get(route('admin.privileges.index'), {}, {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
-    const handleDelete = (id: number) => {
-        if (confirm('Are you sure you want to delete this privilege?')) {
-            router.delete(route('admin.privileges.destroy', id));
+    const handleSelectAllFiltered = () => {
+        const allIds = filteredPrivileges.map(privilege => privilege.id);
+        if (selectedPrivileges.length === allIds.length && allIds.every(id => selectedPrivileges.includes(id))) {
+            setSelectedPrivileges(prev => prev.filter(id => !allIds.includes(id)));
+        } else {
+            const newSelected = [...new Set([...selectedPrivileges, ...allIds])];
+            setSelectedPrivileges(newSelected);
+            setSelectionMode('filtered');
         }
     };
 
-    const getStatusBadge = (isActive: boolean) => {
-        return isActive ? (
-            <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                <CheckCircle className="mr-1 h-3 w-3" />
-                Active
-            </Badge>
-        ) : (
-            <Badge variant="destructive" className="bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">
-                <XCircle className="mr-1 h-3 w-3" />
-                Inactive
-            </Badge>
-        );
+    const handleSelectAll = () => {
+        if (confirm(`This will select ALL ${privileges.total || 0} privileges. This action may take a moment.`)) {
+            const allIds = privileges.data.map(p => p.id);
+            setSelectedPrivileges(allIds);
+            setSelectionMode('all');
+        }
     };
 
-    const getRequirementBadges = (privilege: Privilege) => {
-        return (
-            <div className="flex gap-1">
-                {privilege.requires_id_number && (
-                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                        ID Required
-                    </Badge>
-                )}
-                {privilege.requires_verification && (
-                    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                        Needs Verification
-                    </Badge>
-                )}
-            </div>
-        );
+    const handleItemSelect = (id: number) => {
+        setSelectedPrivileges(prev => {
+            if (prev.includes(id)) {
+                return prev.filter(itemId => itemId !== id);
+            } else {
+                return [...prev, id];
+            }
+        });
     };
+
+    // Check if all items on current page are selected
+    useEffect(() => {
+        const allPageIds = paginatedPrivileges.map(privilege => privilege.id);
+        const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedPrivileges.includes(id));
+        setIsSelectAll(allSelected);
+    }, [selectedPrivileges, paginatedPrivileges]);
+
+    // Get selected privileges data
+    const selectedPrivilegesData = useMemo(() => {
+        return filteredPrivileges.filter(privilege => selectedPrivileges.includes(privilege.id));
+    }, [selectedPrivileges, filteredPrivileges]);
+
+    // Calculate selection stats
+    const selectionStats = useMemo((): SelectionStats => {
+        return privilegeUtils.getSelectionStats(selectedPrivilegesData);
+    }, [selectedPrivilegesData]);
+
+    // Bulk operations
+    const handleBulkOperation = async (operation: BulkOperation) => {
+        if (selectedPrivileges.length === 0) {
+            toast.error('Please select at least one privilege');
+            return;
+        }
+
+        setIsPerformingBulkAction(true);
+
+        try {
+            switch (operation) {
+                case 'delete':
+                    setShowBulkDeleteDialog(true);
+                    break;
+
+                case 'update_status':
+                    setShowBulkStatusDialog(true);
+                    break;
+
+                case 'export':
+                case 'export_csv':
+                    privilegeUtils.exportToCSV(selectedPrivilegesData);
+                    toast.success(`${selectedPrivileges.length} privileges exported successfully`);
+                    setSelectedPrivileges([]);
+                    break;
+
+                case 'print':
+                    selectedPrivileges.forEach(id => {
+                        window.open(`/admin/privileges/${id}/print`, '_blank');
+                    });
+                    toast.success(`${selectedPrivileges.length} privilege(s) opened for printing`);
+                    setSelectedPrivileges([]);
+                    break;
+
+                case 'copy_data':
+                    handleCopySelectedData();
+                    break;
+
+                default:
+                    toast.info('Functionality to be implemented');
+                    break;
+            }
+        } catch (error) {
+            console.error('Bulk operation error:', error);
+            toast.error('An error occurred during the bulk operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkStatusUpdate = async () => {
+        if (!bulkEditValue) {
+            toast.error('Please select a status');
+            return;
+        }
+        
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/privileges/bulk-action', {
+                action: 'update_status',
+                privilege_ids: selectedPrivileges,
+                status: bulkEditValue === 'active' ? 1 : 0
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedPrivileges([]);
+                    setBulkEditValue('');
+                    setShowBulkStatusDialog(false);
+                    toast.success(`${selectedPrivileges.length} privilege statuses updated successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to update privilege status');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk status update error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        setIsPerformingBulkAction(true);
+
+        try {
+            await router.post('/admin/privileges/bulk-action', {
+                action: 'delete',
+                privilege_ids: selectedPrivileges,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedPrivileges([]);
+                    setShowBulkDeleteDialog(false);
+                    toast.success(`${selectedPrivileges.length} privileges deleted successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to delete privileges');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    };
+
+    // Individual privilege operations
+    const handleDelete = (privilege: Privilege) => {
+        if (confirm(`Are you sure you want to delete privilege "${privilege.name || 'Untitled'}"?`)) {
+            router.delete(`/admin/privileges/${privilege.id}`, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedPrivileges(selectedPrivileges.filter(id => id !== privilege.id));
+                    toast.success('Privilege deleted successfully');
+                },
+                onError: () => {
+                    toast.error('Failed to delete privilege');
+                }
+            });
+        }
+    };
+
+    const handleToggleStatus = (privilege: Privilege) => {
+        router.post(`/admin/privileges/${privilege.id}/toggle-status`, {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(`Privilege ${privilege.is_active ? 'deactivated' : 'activated'} successfully`);
+            },
+            onError: () => {
+                toast.error('Failed to toggle privilege status');
+            }
+        });
+    };
+
+    const handleDuplicate = (privilege: Privilege) => {
+        router.post(`/admin/privileges/${privilege.id}/duplicate`, {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Privilege duplicated successfully');
+            },
+            onError: () => {
+                toast.error('Failed to duplicate privilege');
+            }
+        });
+    };
+
+    const handleSort = (column: string) => {
+        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
+        
+        setFiltersState(prev => ({
+            ...prev,
+            sort_by: column,
+            sort_order: newOrder
+        }));
+        
+        const params = {
+            ...filtersState,
+            sort_by: column,
+            sort_order: newOrder,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/privileges', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
+
+    const handleClearFilters = () => {
+        setSearch('');
+        setFiltersState({
+            status: 'all',
+            discount_type: 'all',
+            requires_verification: 'all',
+            requires_id_number: 'all',
+            sort_by: 'name',
+            sort_order: 'asc'
+        });
+        
+        router.get('/admin/privileges', {
+            search: '',
+            status: 'all',
+            discount_type: 'all',
+            requires_verification: 'all',
+            requires_id_number: 'all',
+            sort_by: 'name',
+            sort_order: 'asc'
+        }, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
+
+    const handleClearSelection = () => {
+        setSelectedPrivileges([]);
+        setIsSelectAll(false);
+    };
+
+    const handleCopySelectedData = () => {
+        if (selectedPrivilegesData.length === 0) {
+            toast.error('No data to copy');
+            return;
+        }
+        
+        const data = selectedPrivilegesData.map(privilege => ({
+            'Name': privilege.name,
+            'Code': privilege.code,
+            'Discount %': privilege.default_discount_percentage,
+            'Type': privilege.discount_type?.name || 'N/A',
+            'Status': privilege.is_active ? 'Active' : 'Inactive',
+            'Assignments': privilege.residents_count || 0,
+            'Active': privilege.active_residents_count || 0,
+        }));
+        
+        const csvData = [
+            Object.keys(data[0]).join(','),
+            ...data.map(row => Object.values(row).join(','))
+        ].join('\n');
+        
+        navigator.clipboard.writeText(csvData).then(() => {
+            toast.success(`${selectedPrivilegesData.length} records copied to clipboard`);
+        }).catch(() => {
+            toast.error('Failed to copy to clipboard');
+        });
+    };
+
+    const updateFilter = (key: keyof PrivilegeFilters, value: string) => {
+        setFiltersState(prev => ({ ...prev, [key]: value }));
+        
+        const params = {
+            ...filtersState,
+            [key]: value,
+            search: search
+        };
+        
+        Object.keys(params).forEach(key => {
+            const k = key as keyof typeof params;
+            if (!params[k] || params[k] === 'all') {
+                delete params[k];
+            }
+        });
+        
+        router.get('/admin/privileges', params, {
+            preserveState: true,
+            replace: true,
+            preserveScroll: true,
+        });
+    };
+
+    const hasActiveFilters = Boolean(
+        search || 
+        filtersState.status !== 'all' ||
+        filtersState.discount_type !== 'all' ||
+        filtersState.requires_verification !== 'all' ||
+        filtersState.requires_id_number !== 'all'
+    );
 
     return (
         <AppLayout
-            header={
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
-                            Privileges Management
-                        </h2>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Manage resident privileges and discounts
-                        </p>
-                    </div>
-                    {can?.create && (
-                        <Link href={route('admin.privileges.create')}>
-                            <Button className="gap-2">
-                                <Plus className="h-4 w-4" />
-                                New Privilege
-                            </Button>
-                        </Link>
-                    )}
-                </div>
-            }
+            title="Privilege Management"
+            breadcrumbs={[
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Privileges', href: '/admin/privileges' }
+            ]}
         >
-            <Head title="Privileges Management" />
+            <TooltipProvider>
+                <div className="space-y-4 sm:space-y-6">
+                    <PrivilegesHeader 
+                        isBulkMode={isBulkMode}
+                        setIsBulkMode={setIsBulkMode}
+                        isMobile={isMobile}
+                        canCreate={can?.create || false}
+                    />
 
-            <div className="py-6">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                    {/* Filters Card */}
-                    <Card className="mb-6">
-                        <CardContent className="pt-6">
-                            <div className="grid gap-4 md:grid-cols-4">
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                                    <Input
-                                        placeholder="Search privileges..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                        className="pl-9"
-                                    />
+                    <PrivilegesStats 
+                        globalStats={globalStats}
+                        filteredStats={filteredStats}
+                        isLoading={isPerformingBulkAction}
+                    />
+
+                    <PrivilegesFilters
+                        search={search}
+                        setSearch={setSearch}
+                        onSearchChange={(value) => {
+                            setSearch(value);
+                            debouncedSearch(value);
+                        }}
+                        filtersState={filtersState}
+                        updateFilter={updateFilter}
+                        showAdvancedFilters={showAdvancedFilters}
+                        setShowAdvancedFilters={setShowAdvancedFilters}
+                        handleClearFilters={handleClearFilters}
+                        hasActiveFilters={hasActiveFilters}
+                        isMobile={isMobile}
+                        totalItems={totalItems}
+                        startIndex={startIndex}
+                        endIndex={endIndex}
+                        searchInputRef={searchInputRef}
+                        isLoading={isPerformingBulkAction}
+                        discountTypes={discountTypes}
+                    />
+
+                    <PrivilegesContent
+                        privileges={paginatedPrivileges}
+                        isBulkMode={isBulkMode}
+                        setIsBulkMode={setIsBulkMode}
+                        isSelectAll={isSelectAll}
+                        selectedPrivileges={selectedPrivileges}
+                        viewMode={viewMode}
+                        setViewMode={setViewMode}
+                        isMobile={isMobile}
+                        hasActiveFilters={hasActiveFilters}
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={totalItems}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                        onSelectAllOnPage={handleSelectAllOnPage}
+                        onSelectAllFiltered={handleSelectAllFiltered}
+                        onSelectAll={handleSelectAll}
+                        onItemSelect={handleItemSelect}
+                        onClearFilters={handleClearFilters}
+                        onClearSelection={handleClearSelection}
+                        onDelete={handleDelete}
+                        onToggleStatus={handleToggleStatus}
+                        onDuplicate={handleDuplicate}
+                        onSort={handleSort}
+                        onBulkOperation={handleBulkOperation}
+                        onCopySelectedData={handleCopySelectedData}
+                        setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                        setShowBulkStatusDialog={setShowBulkStatusDialog}
+                        filtersState={filtersState}
+                        isPerformingBulkAction={isPerformingBulkAction}
+                        selectionMode={selectionMode}
+                        selectionStats={selectionStats}
+                        discountTypes={discountTypes}
+                        can={can}
+                    />
+
+                    {/* Keyboard Shortcuts Help */}
+                    {isBulkMode && !isMobile && (
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <KeyRound className="h-4 w-4 text-gray-500" />
+                                    <span className="text-sm font-medium">Keyboard Shortcuts</span>
                                 </div>
-                                <select
-                                    value={status}
-                                    onChange={(e) => setStatus(e.target.value)}
-                                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsBulkMode(false)}
+                                    className="h-7 text-xs"
+                                    disabled={isPerformingBulkAction}
                                 >
-                                    <option value="">All Status</option>
-                                    <option value="active">Active</option>
-                                    <option value="inactive">Inactive</option>
-                                </select>
-                                <select
-                                    value={discountType}
-                                    onChange={(e) => setDiscountType(e.target.value)}
-                                    className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
-                                >
-                                    <option value="">All Discount Types</option>
-                                    {discountTypes?.map((type) => (
-                                        <option key={type.id} value={type.id}>
-                                            {type.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <div className="flex gap-2">
-                                    <Button onClick={handleSearch} className="flex-1">
-                                        Filter
-                                    </Button>
-                                    <Button variant="outline" onClick={handleReset} className="flex-1">
-                                        Reset
-                                    </Button>
+                                    Exit Bulk Mode
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+A</kbd>
+                                    <span>Select page</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Shift+Ctrl+A</kbd>
+                                    <span>Select filtered</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Delete</kbd>
+                                    <span>Delete selected</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
+                                    <span>Exit/clear</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+F</kbd>
+                                    <span>Focus search</span>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Stats Cards */}
-                    <div className="mb-6 grid gap-4 md:grid-cols-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Privileges</CardTitle>
-                                <Award className="h-4 w-4 text-blue-600" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{totalPrivileges}</div>
-                                <p className="text-xs text-gray-500">Across all categories</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Active Privileges</CardTitle>
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{activePrivilegesCount}</div>
-                                <p className="text-xs text-gray-500">Currently available</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Assignments</CardTitle>
-                                <Users className="h-4 w-4 text-purple-600" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{totalAssignments}</div>
-                                <p className="text-xs text-gray-500">Residents with privileges</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Active Assignments</CardTitle>
-                                <Shield className="h-4 w-4 text-amber-600" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{activeAssignments}</div>
-                                <p className="text-xs text-gray-500">Verified & active</p>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Privileges Table */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Privileges List</CardTitle>
-                            <CardDescription>
-                                Showing {privilegeData.length} of {totalPrivileges} privileges
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {privilegeData.length > 0 ? (
-                                <>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Code</TableHead>
-                                                <TableHead>Discount Type</TableHead>
-                                                <TableHead>Discount %</TableHead>
-                                                <TableHead>Requirements</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Assignments</TableHead>
-                                                <TableHead>Validity</TableHead>
-                                                <TableHead className="text-right">Actions</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {privilegeData.map((privilege) => (
-                                                <TableRow key={privilege.id}>
-                                                    <TableCell className="font-medium">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-800 dark:text-amber-300">
-                                                                <Award className="h-4 w-4" />
-                                                            </div>
-                                                            <div>
-                                                                <div>{privilege.name}</div>
-                                                                {privilege.description && (
-                                                                    <div className="text-xs text-gray-500">
-                                                                        {privilege.description.substring(0, 30)}
-                                                                        {privilege.description.length > 30 && '...'}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="outline" className="font-mono">
-                                                            {privilege.code}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {privilege.discount_type?.name || 'N/A'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                                                            {privilege.default_discount_percentage}%
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {getRequirementBadges(privilege)}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {getStatusBadge(privilege.is_active)}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-sm font-medium">
-                                                                {privilege.active_residents_count || 0} active
-                                                            </span>
-                                                            <span className="text-xs text-gray-500">
-                                                                {privilege.residents_count || 0} total
-                                                            </span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {privilege.validity_years ? (
-                                                            <Badge variant="outline">
-                                                                {privilege.validity_years} year(s)
-                                                            </Badge>
-                                                        ) : (
-                                                            <span className="text-xs text-gray-400">Lifetime</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                    <span className="sr-only">Open menu</span>
-                                                                    <MoreHorizontal className="h-4 w-4" />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                                <DropdownMenuItem asChild>
-                                                                    <Link href={route('admin.privileges.show', privilege.id)} className="cursor-pointer">
-                                                                        <Eye className="mr-2 h-4 w-4" />
-                                                                        View Details
-                                                                    </Link>
-                                                                </DropdownMenuItem>
-                                                                {can?.edit && (
-                                                                    <DropdownMenuItem asChild>
-                                                                        <Link href={route('admin.privileges.edit', privilege.id)} className="cursor-pointer">
-                                                                            <Edit className="mr-2 h-4 w-4" />
-                                                                            Edit
-                                                                        </Link>
-                                                                    </DropdownMenuItem>
-                                                                )}
-                                                                {can?.assign && (
-                                                                    <DropdownMenuItem asChild>
-                                                                        <Link href={route('admin.privileges.assign', privilege.id)} className="cursor-pointer">
-                                                                            <Users className="mr-2 h-4 w-4" />
-                                                                            Assign to Residents
-                                                                        </Link>
-                                                                    </DropdownMenuItem>
-                                                                )}
-                                                                <DropdownMenuSeparator />
-                                                                {can?.delete && (
-                                                                    <DropdownMenuItem
-                                                                        onClick={() => handleDelete(privilege.id)}
-                                                                        className="cursor-pointer text-red-600 focus:text-red-600"
-                                                                    >
-                                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                                        Delete
-                                                                    </DropdownMenuItem>
-                                                                )}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-
-                                    {/* Pagination */}
-                                    {lastPage > 1 && (
-                                        <div className="mt-4 flex items-center justify-between">
-                                            <div className="text-sm text-gray-500">
-                                                Page {currentPage} of {lastPage}
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => router.get(route('admin.privileges.index', { page: currentPage - 1 }))}
-                                                    disabled={currentPage === 1}
-                                                >
-                                                    Previous
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => router.get(route('admin.privileges.index', { page: currentPage + 1 }))}
-                                                    disabled={currentPage === lastPage}
-                                                >
-                                                    Next
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <div className="py-10 text-center text-gray-500">
-                                    No privileges found.
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                        </div>
+                    )}
                 </div>
-            </div>
+            </TooltipProvider>
+
+            <PrivilegesDialogs
+                showBulkDeleteDialog={showBulkDeleteDialog}
+                setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                showBulkStatusDialog={showBulkStatusDialog}
+                setShowBulkStatusDialog={setShowBulkStatusDialog}
+                isPerformingBulkAction={isPerformingBulkAction}
+                selectedPrivileges={selectedPrivileges}
+                handleBulkOperation={handleBulkDelete}
+                handleBulkStatusUpdate={handleBulkStatusUpdate}
+                selectionStats={selectionStats}
+                bulkEditValue={bulkEditValue}
+                setBulkEditValue={setBulkEditValue}
+            />
         </AppLayout>
     );
 }

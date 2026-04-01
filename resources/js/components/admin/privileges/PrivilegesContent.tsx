@@ -23,7 +23,9 @@ import {
     Percent,
     Shield,
     IdCard,
-    UserPlus
+    UserPlus,
+    ChevronUp,
+    ChevronDown
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -34,49 +36,13 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import PrivilegesTableView from '@/components/admin/privileges/PrivilegesTableView';
 import PrivilegesGridView from '@/components/admin/privileges/PrivilegesGridView';
 import PrivilegesBulkActions from '@/components/admin/privileges/PrivilegesBulkActions';
-
-interface DiscountType {
-    id: number;
-    name: string;
-    code: string;
-}
-
-interface Privilege {
-    id: number;
-    name: string;
-    code: string;
-    description: string | null;
-    is_active: boolean;
-    discount_type_id: number;
-    default_discount_percentage: string | number;
-    requires_id_number: boolean;
-    requires_verification: boolean;
-    validity_years: number | null;
-    created_at: string;
-    updated_at: string;
-    discount_type?: DiscountType;
-    residents_count?: number;
-    active_residents_count?: number;
-}
-
-interface PrivilegeFilters {
-    status?: string;
-    discount_type?: string;
-    requires_verification?: string;
-    requires_id_number?: string;
-    sort_by?: string;
-    sort_order?: 'asc' | 'desc';
-}
-
-interface SelectionStats {
-    total: number;
-    active: number;
-    inactive: number;
-    requiresVerification: number;
-    requiresIdNumber: number;
-    totalAssignments: number;
-    avgDiscount?: number;
-}
+import { 
+    Privilege, 
+    PrivilegeFilters, 
+    SelectionStats,
+    DiscountType,
+    BulkOperation
+} from '@/types/admin/privileges/privilege.types';
 
 interface PrivilegesContentProps {
     privileges: Privilege[];
@@ -103,7 +69,7 @@ interface PrivilegesContentProps {
     onToggleStatus: (privilege: Privilege) => void;
     onDuplicate: (privilege: Privilege) => void;
     onSort: (column: string) => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkStatusDialog?: (show: boolean) => void;
@@ -171,12 +137,6 @@ export default function PrivilegesContent({
                 icon: <Printer className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('print'),
                 tooltip: 'Print selected privileges'
-            },
-            {
-                label: 'Report',
-                icon: <BarChart3 className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('generate_report'),
-                tooltip: 'Generate report for selected privileges'
             }
         ],
         secondary: [
@@ -214,7 +174,9 @@ export default function PrivilegesContent({
 
     const getSortIcon = (column: string) => {
         if (filtersState.sort_by !== column) return null;
-        return filtersState.sort_order === 'asc' ? '↑' : '↓';
+        return filtersState.sort_order === 'asc' 
+            ? <ChevronUp className="h-4 w-4 ml-1" /> 
+            : <ChevronDown className="h-4 w-4 ml-1" />;
     };
 
     return (

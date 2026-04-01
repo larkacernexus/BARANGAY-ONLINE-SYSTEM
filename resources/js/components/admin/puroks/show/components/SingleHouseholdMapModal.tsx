@@ -1,3 +1,5 @@
+// resources/js/Pages/Admin/Puroks/components/SingleHouseholdMapModal.tsx
+
 import React, { useState, useEffect } from 'react';
 import { Link } from '@inertiajs/react';
 import {
@@ -9,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2, MapPin, Home, Satellite, Map, ZoomIn, ZoomOut, ExternalLink, AlertCircle } from 'lucide-react';
-import { Household } from '@/components/admin/puroks/show/types';
+import { Household } from '@/types/admin/puroks/purok'; // Import from main types
 
 interface Props {
     open: boolean;
@@ -35,8 +37,10 @@ export const SingleHouseholdMapModal = ({ open, onOpenChange, household, purokNa
             return;
         }
 
-        if (!household.latitude || !household.longitude) {
-            console.log('Household missing coordinates:', household);
+        // Check if household has coordinates
+        const hasLatLng = household.latitude && household.longitude;
+        
+        if (!hasLatLng) {
             setMapError(true);
             setMapLoading(false);
             return;
@@ -49,9 +53,20 @@ export const SingleHouseholdMapModal = ({ open, onOpenChange, household, purokNa
             return;
         }
 
-        const embedUrl = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${household.latitude},${household.longitude}&zoom=${zoomLevel}&maptype=${mapType}`;
+        // Parse coordinates if they're strings
+        const lat = typeof household.latitude === 'string' ? parseFloat(household.latitude) : household.latitude;
+        const lng = typeof household.longitude === 'string' ? parseFloat(household.longitude) : household.longitude;
+        
+        if (isNaN(lat) || isNaN(lng)) {
+            setMapError(true);
+            setMapLoading(false);
+            return;
+        }
+
+        const embedUrl = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${lat},${lng}&zoom=${zoomLevel}&maptype=${mapType}`;
         setMapUrl(embedUrl);
-        setMapLoading(false);
+        setMapLoading(true);
+        setMapError(false);
     }, [open, household, zoomLevel, mapType, apiKey]);
 
     const handleZoomIn = () => {
@@ -79,19 +94,72 @@ export const SingleHouseholdMapModal = ({ open, onOpenChange, household, purokNa
         setMapLoading(false);
     };
 
+    // Get head of household name
     const getHeadName = () => {
-        if (household?.head_of_household?.full_name) {
-            return household.head_of_household.full_name;
+        if (!household) return 'No household selected';
+        
+        // Check if head_of_household exists and has full_name
+        if (household.head_of_household) {
+            const head = household.head_of_household;
+            let name = `${head.first_name}`;
+            if (head.middle_name) {
+                name += ` ${head.middle_name.charAt(0)}.`;
+            }
+            name += ` ${head.last_name}`;
+            return name;
         }
-        if (household?.head_of_family) {
-            return household.head_of_family;
+        
+        // If head_of_household is not set, try to find head from members
+        if (household.members) {
+            const head = household.members.find(member => member.is_head);
+            if (head) {
+                let name = `${head.first_name}`;
+                if (head.middle_name) {
+                    name += ` ${head.middle_name.charAt(0)}.`;
+                }
+                name += ` ${head.last_name}`;
+                return name;
+            }
         }
-        return 'No head assigned';
+        
+        return 'Not assigned';
+    };
+
+    // Get contact number from head of household
+    const getContactNumber = () => {
+        if (!household) return 'N/A';
+        
+        if (household.head_of_household?.contact_number) {
+            return household.head_of_household.contact_number;
+        }
+        
+        return 'N/A';
+    };
+
+    // Get member count
+    const getMemberCount = () => {
+        if (!household) return 0;
+        return household.total_members || household.members?.length || 0;
+    };
+
+    // Check if household has valid coordinates
+    const hasValidCoordinates = (): boolean => {
+        if (!household) return false;
+        if (!household.latitude || !household.longitude) return false;
+        
+        const lat = typeof household.latitude === 'string' ? parseFloat(household.latitude) : household.latitude;
+        const lng = typeof household.longitude === 'string' ? parseFloat(household.longitude) : household.longitude;
+        
+        return !isNaN(lat) && !isNaN(lng);
     };
 
     if (!household) return null;
 
-    const hasCoordinates = household.latitude && household.longitude;
+    const hasCoordinates = hasValidCoordinates();
+    const latNum = hasCoordinates && household.latitude ? 
+        (typeof household.latitude === 'string' ? parseFloat(household.latitude) : household.latitude) : null;
+    const lngNum = hasCoordinates && household.longitude ? 
+        (typeof household.longitude === 'string' ? parseFloat(household.longitude) : household.longitude) : null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,9 +187,9 @@ export const SingleHouseholdMapModal = ({ open, onOpenChange, household, purokNa
                                     <AlertCircle className="h-12 w-12 text-yellow-500 mb-3" />
                                     <p className="text-gray-500 dark:text-gray-400">No location data for this household</p>
                                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                        Please add a Google Maps link to the household profile
+                                        Please add coordinates to the household profile
                                     </p>
-                                    <Link href={`/households/${household.id}/edit`} className="mt-3">
+                                    <Link href={`/admin/households/${household.id}/edit`} className="mt-3">
                                         <Button size="sm" variant="outline">
                                             <ExternalLink className="h-3 w-3 mr-1" />
                                             Edit Household
@@ -139,17 +207,19 @@ export const SingleHouseholdMapModal = ({ open, onOpenChange, household, purokNa
                                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                         {!apiKey ? 'Google Maps API key not configured' : 'Invalid coordinates or API error'}
                                     </p>
-                                    <a 
-                                        href={`https://www.google.com/maps/search/${household.latitude},${household.longitude}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="mt-3"
-                                    >
-                                        <Button size="sm" variant="outline">
-                                            <ExternalLink className="h-3 w-3 mr-1" />
-                                            Open in Google Maps
-                                        </Button>
-                                    </a>
+                                    {latNum && lngNum && (
+                                        <a 
+                                            href={`https://www.google.com/maps/search/${latNum},${lngNum}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-3"
+                                        >
+                                            <Button size="sm" variant="outline">
+                                                <ExternalLink className="h-3 w-3 mr-1" />
+                                                Open in Google Maps
+                                            </Button>
+                                        </a>
+                                    )}
                                 </div>
                             ) : mapUrl ? (
                                 <>
@@ -231,28 +301,28 @@ export const SingleHouseholdMapModal = ({ open, onOpenChange, household, purokNa
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Members</p>
-                                    <p className="font-medium text-lg dark:text-gray-200 mt-1">{household.member_count}</p>
+                                    <p className="font-medium text-lg dark:text-gray-200 mt-1">{getMemberCount()}</p>
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contact</p>
-                                    <p className="font-medium dark:text-gray-200 mt-1">{household.contact_number || 'N/A'}</p>
+                                    <p className="font-medium dark:text-gray-200 mt-1">{getContactNumber()}</p>
                                 </div>
                                 <div className="col-span-2">
                                     <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Address</p>
                                     <p className="text-sm dark:text-gray-300 mt-1 break-words">{household.address || 'No address'}</p>
                                 </div>
-                                {household.latitude && household.longitude && (
+                                {hasCoordinates && latNum && lngNum && (
                                     <>
                                         <div>
                                             <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Latitude</p>
                                             <code className="text-xs dark:text-gray-300 bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded block mt-1">
-                                                {household.latitude.toFixed(6)}
+                                                {latNum.toFixed(6)}
                                             </code>
                                         </div>
                                         <div>
                                             <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Longitude</p>
                                             <code className="text-xs dark:text-gray-300 bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded block mt-1">
-                                                {household.longitude.toFixed(6)}
+                                                {lngNum.toFixed(6)}
                                             </code>
                                         </div>
                                     </>
@@ -281,10 +351,10 @@ export const SingleHouseholdMapModal = ({ open, onOpenChange, household, purokNa
                             )}
 
                             {/* Action Buttons */}
-                            <div className="mt-6 pt-4 border-t dark:border-gray-700">
-                                {hasCoordinates && (
+                            {hasCoordinates && (
+                                <div className="mt-6 pt-4 border-t dark:border-gray-700">
                                     <a 
-                                        href={`https://www.google.com/maps/search/${household.latitude},${household.longitude}`}
+                                        href={`https://www.google.com/maps/search/${latNum},${lngNum}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="block w-full"
@@ -294,8 +364,8 @@ export const SingleHouseholdMapModal = ({ open, onOpenChange, household, purokNa
                                             Open in Google Maps
                                         </Button>
                                     </a>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

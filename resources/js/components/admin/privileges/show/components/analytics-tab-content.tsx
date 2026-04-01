@@ -1,5 +1,7 @@
 // resources/js/Pages/Admin/Privileges/components/analytics-tab-content.tsx
+
 import React from 'react';
+import { format, parseISO } from 'date-fns';
 import {
     Card,
     CardContent,
@@ -8,38 +10,17 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { UsageStatisticsCard } from './usage-statistics-card';
 import { BarChart3, UserPlus } from 'lucide-react';
-
-interface Resident {
-    id: number;
-    first_name: string;
-    last_name: string;
-    middle_name?: string;
-}
-
-interface ResidentPrivilege {
-    id: number;
-    resident_id: number;
-    verified_at: string | null;
-    created_at: string;
-    resident: Resident;
-}
-
-interface Privilege {
-    residents_count?: number;
-    active_residents_count?: number;
-    pending_count?: number;
-    expired_count?: number;
-    default_discount_percentage: string | number;
-}
+import { UsageStatisticsCard } from './usage-statistics-card';
+import { ResidentPrivilege as PrivilegeAssignment, Resident, Privilege } from '@/types/admin/privileges/privilege.types';
 
 interface Props {
     privilege: Privilege;
-    recentAssignments: ResidentPrivilege[];
+    recentAssignments: PrivilegeAssignment[];
 }
 
-const getFullName = (resident: Resident) => {
+const getFullName = (resident?: Resident): string => {
+    if (!resident) return 'Unknown Resident';
     let name = `${resident.first_name}`;
     if (resident.middle_name) {
         name += ` ${resident.middle_name.charAt(0)}.`;
@@ -48,7 +29,7 @@ const getFullName = (resident: Resident) => {
     return name;
 };
 
-const formatDate = (dateString: string | null) => {
+const formatDate = (dateString: string | null): string => {
     if (!dateString) return 'N/A';
     try {
         const date = parseISO(dateString);
@@ -57,8 +38,6 @@ const formatDate = (dateString: string | null) => {
         return 'Invalid date';
     }
 };
-
-import { format, parseISO } from 'date-fns';
 
 export const AnalyticsTabContent = ({ privilege, recentAssignments }: Props) => {
     return (
@@ -91,24 +70,30 @@ export const AnalyticsTabContent = ({ privilege, recentAssignments }: Props) => 
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        {recentAssignments.slice(0, 5).map((assignment) => (
-                            <div key={assignment.id} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                                <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                    <UserPlus className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="font-medium dark:text-gray-200">
-                                        {getFullName(assignment.resident)}
-                                    </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        Assigned {formatDate(assignment.created_at)}
-                                    </p>
-                                </div>
-                                <Badge variant="outline" className="dark:border-gray-600">
-                                    {assignment.verified_at ? 'Verified' : 'Pending'}
-                                </Badge>
+                        {recentAssignments.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                No recent activity
                             </div>
-                        ))}
+                        ) : (
+                            recentAssignments.slice(0, 5).map((assignment) => (
+                                <div key={assignment.id} className="flex items-center gap-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                                    <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                        <UserPlus className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-medium dark:text-gray-200">
+                                            {assignment.resident ? getFullName(assignment.resident) : 'Resident not found'}
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            Assigned {formatDate(assignment.created_at)}
+                                        </p>
+                                    </div>
+                                    <Badge variant="outline" className="dark:border-gray-600">
+                                        {assignment.verified_at ? 'Verified' : 'Pending'}
+                                    </Badge>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </CardContent>
             </Card>

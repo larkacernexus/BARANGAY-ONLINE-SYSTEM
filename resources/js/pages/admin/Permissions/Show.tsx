@@ -1,50 +1,17 @@
 // resources/js/Pages/Admin/Permissions/Show.tsx
 import React, { useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
 import {
-    ArrowLeft,
-    Edit,
-    Trash2,
-    Copy,
-    Check,
-    Printer,
     Shield,
     Users,
-    Key,
     Hash,
-    AlertTriangle,
-    RefreshCw,
-    Info,
-    Zap,
-    MessageCircle,
-    Building,
-    FileText,
-    Clock,
-    Database,
-    BookOpen,
-    XCircle,
     Calendar,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-    TooltipProvider,
-} from '@/components/ui/tooltip';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import DeveloperContactModal from '@/components/developer-contact-modal';
 import { route } from 'ziggy-js';
+import { PermissionShowProps } from '@/types/admin/permissions/permission.types';
 
 // Import components
 import { PermissionHeader } from '@/components/admin/permissions/show/components/permission-header';
@@ -54,11 +21,9 @@ import { PermissionTabs } from '@/components/admin/permissions/show/components/p
 import { DangerZone } from '@/components/admin/permissions/show/components/danger-zone';
 import { DeleteConfirmationDialog } from '@/components/admin/permissions/show/components/delete-confirmation-dialog';
 
-// Import types and utilities
-import { PermissionShowProps } from '@/components/admin/permissions/show//types';
+// Import utilities
 import { 
     formatDate, 
-    formatDateTime, 
     formatTimeAgo, 
     getModuleDisplayName, 
     getModuleIcon, 
@@ -71,14 +36,13 @@ import {
 
 export default function PermissionShow({ 
     permission, 
-    roles = [],
+    roles = [], 
     users = [],
     can = { edit: true, delete: true }
 }: PermissionShowProps) {
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeveloperModal, setShowDeveloperModal] = useState(false);
-    const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
 
     const handleEdit = () => {
@@ -103,10 +67,7 @@ export default function PermissionShow({
 
     const handleCopyLink = () => {
         const link = window.location.href;
-        navigator.clipboard.writeText(link).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        });
+        navigator.clipboard.writeText(link);
     };
 
     const handleContactDeveloper = () => {
@@ -232,7 +193,7 @@ export default function PermissionShow({
                     </div>
 
                     {/* Danger Zone */}
-                    {can.delete && (
+                    {can.delete && !isSystem && (
                         <DangerZone
                             rolesCount={roles.length}
                             usersCount={users.length}

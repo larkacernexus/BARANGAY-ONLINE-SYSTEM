@@ -1,3 +1,4 @@
+// components/admin/permissions/show/components/permission-header.tsx
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,18 +28,12 @@ import {
     Shield,
     MoreVertical,
     Download,
-    ShieldCheck,
     Users,
-    CalendarDays,
-    Lock,
-    Unlock,
-    Sparkles
 } from 'lucide-react';
 import { router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
-import { Permission } from '@/types';
+import { Permission } from '@/types/admin/permissions/permission.types';
 
-// Define the specific literal types the Badge component accepts
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | null | undefined;
 
 interface Props {
@@ -51,9 +46,8 @@ interface Props {
     onExport?: () => void;
     canEdit: boolean;
     canDelete: boolean;
-    // Updated return type to match Badge variants
-    getStatusVariant: (status: string) => BadgeVariant;
-    getStatusIcon: (status: string) => React.ReactNode;
+    getStatusVariant: (isActive: boolean) => BadgeVariant;
+    getStatusIcon: (isActive: boolean) => React.ReactNode;
 }
 
 const getPermissionGradient = (isSystem: boolean): string => {
@@ -82,7 +76,6 @@ export const PermissionHeader = ({
     getStatusIcon
 }: Props) => {
     const [copied, setCopied] = useState(false);
-    const statusKey = permission.is_active ? 'active' : 'inactive';
 
     const handleCopyLink = () => {
         onCopyLink();
@@ -121,8 +114,11 @@ export const PermissionHeader = ({
                             </h1>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
                                 {/* Status Badge */}
-                                <Badge variant="outline" className={getStatusBadgeColor(permission.is_active)}>
-                                    {getStatusIcon(statusKey)}
+                                <Badge 
+                                    variant={getStatusVariant(permission.is_active)} 
+                                    className={getStatusBadgeColor(permission.is_active)}
+                                >
+                                    {getStatusIcon(permission.is_active)}
                                     <span className="ml-1">{permission.is_active ? 'Active' : 'Inactive'}</span>
                                 </Badge>
 
@@ -155,12 +151,12 @@ export const PermissionHeader = ({
                                     </Badge>
                                 )}
 
-                                {/* Stats Badges - Replace with actual data */}
+                                {/* Stats Badges */}
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <div className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 rounded-full cursor-default">
                                             <Users className="h-3 w-3" />
-                                            <span className="text-sm font-medium">0</span>
+                                            <span className="text-sm font-medium">{permission.roles_count || 0}</span>
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent>Roles using this permission</TooltipContent>
@@ -184,8 +180,8 @@ export const PermissionHeader = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {/* Edit Button - Primary Action (if can edit) */}
-                    {canEdit && (
+                    {/* Edit Button */}
+                    {canEdit && !isSystem && (
                         <Button 
                             size="sm" 
                             onClick={onEdit}

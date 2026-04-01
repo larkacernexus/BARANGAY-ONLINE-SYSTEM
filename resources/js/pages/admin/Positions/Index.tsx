@@ -11,7 +11,7 @@ import {
     PaginationData,
     BulkOperation,
     SelectionMode 
-} from '@/types/position';
+} from '@/types/admin/positions/position.types';
 import { positionUtils } from '@/admin-utils/position-utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -74,6 +74,39 @@ export default function PositionsIndex({
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
+    // Debounced search function
+    const debouncedSearch = useCallback(
+        debounce((value: string) => {
+            const params = {
+                ...filtersState,
+                search: value || undefined,
+                status: filtersState.status === 'all' ? undefined : filtersState.status,
+                requires_account: filtersState.requires_account === 'all' ? undefined : filtersState.requires_account,
+            };
+            
+            Object.keys(params).forEach(key => {
+                const k = key as keyof typeof params;
+                if (params[k] === undefined || params[k] === '') {
+                    delete params[k];
+                }
+            });
+            
+            router.get('/admin/positions', params, {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+            });
+        }, 300),
+        [filtersState]
+    );
+
+    // Cleanup debounce on unmount
+    useEffect(() => {
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [debouncedSearch]);
+
     // Handle window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -109,7 +142,6 @@ export default function PositionsIndex({
         }
     }, [flash]);
 
- 
     // Filter positions
     const filteredPositions = useMemo(() => {
         return positionUtils.filterPositions({
@@ -119,7 +151,6 @@ export default function PositionsIndex({
         });
     }, [positions.data, search, filtersState]);
 
-    // Calculate filtered stats
     const filteredStats = useMemo(() => {
         return {
             total: filteredPositions.length,
@@ -127,8 +158,8 @@ export default function PositionsIndex({
             requires_account: filteredPositions.filter(p => p.requires_account).length,
             kagawad_count: filteredPositions.filter(p => p.code?.startsWith('KAG')).length,
             inactive: filteredPositions.filter(p => !p.is_active).length,
-            assigned: filteredPositions.filter(p => p.officials_count > 0).length,
-            unassigned: filteredPositions.filter(p => p.officials_count === 0).length
+            assigned: filteredPositions.filter(p => (p.officials_count ?? 0) > 0).length,
+            unassigned: filteredPositions.filter(p => (p.officials_count ?? 0) === 0).length
         };
     }, [filteredPositions]);
 
@@ -157,7 +188,6 @@ export default function PositionsIndex({
         if (isMobile) return;
         
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
             if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
                 e.preventDefault();
                 if (e.shiftKey) {
@@ -166,7 +196,6 @@ export default function PositionsIndex({
                     handleSelectAllOnPage();
                 }
             }
-            // Escape key
             if (e.key === 'Escape') {
                 if (isBulkMode) {
                     if (selectedPositions.length > 0) {
@@ -176,17 +205,14 @@ export default function PositionsIndex({
                     }
                 }
             }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
                 e.preventDefault();
                 setIsBulkMode(!isBulkMode);
             }
-            // Ctrl/Cmd + F to focus search
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             }
-            // Delete key for bulk delete
             if (e.key === 'Delete' && isBulkMode && selectedPositions.length > 0) {
                 e.preventDefault();
                 setShowBulkDeleteDialog(true);
@@ -309,7 +335,6 @@ export default function PositionsIndex({
 
                 case 'export':
                 case 'export_csv':
-                    // Export to CSV
                     const exportData = selectedPositionsData.map(position => ({
                         'ID': position.id,
                         'Code': position.code,
@@ -323,31 +348,33 @@ export default function PositionsIndex({
                         'Created At': position.created_at,
                     }));
                     
-                    const headers = Object.keys(exportData[0]);
-                    const csv = [
-                        headers.join(','),
-                        ...exportData.map(row => 
-                            headers.map(header => {
-                                const value = row[header as keyof typeof row];
-                                return typeof value === 'string' && value.includes(',') 
-                                    ? `"${value}"` 
-                                    : value;
-                            }).join(',')
-                        )
-                    ].join('\n');
-                    
-                    const blob = new Blob([csv], { type: 'text/csv' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `positions-export-${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    
-                    toast.success(`${selectedPositions.length} positions exported successfully`);
-                    setSelectedPositions([]);
+                    if (exportData.length > 0) {
+                        const headers = Object.keys(exportData[0]);
+                        const csv = [
+                            headers.join(','),
+                            ...exportData.map(row => 
+                                headers.map(header => {
+                                    const value = row[header as keyof typeof row];
+                                    return typeof value === 'string' && value.includes(',') 
+                                        ? `"${value}"` 
+                                        : value;
+                                }).join(',')
+                            )
+                        ].join('\n');
+                        
+                        const blob = new Blob([csv], { type: 'text/csv' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `positions-export-${new Date().toISOString().split('T')[0]}.csv`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        
+                        toast.success(`${selectedPositions.length} positions exported successfully`);
+                        setSelectedPositions([]);
+                    }
                     break;
 
                 case 'print':
@@ -388,7 +415,6 @@ export default function PositionsIndex({
         }
 
         setIsPerformingBulkAction(true);
-
         try {
             const requiresAccount = bulkEditValue === 'enable';
             await router.post('/admin/positions/bulk-action', {
@@ -417,7 +443,6 @@ export default function PositionsIndex({
 
     const handleBulkDelete = async () => {
         setIsPerformingBulkAction(true);
-
         try {
             await router.post('/admin/positions/bulk-action', {
                 action: 'delete',
@@ -441,7 +466,6 @@ export default function PositionsIndex({
         }
     };
 
-    // Individual position operations
     const handleDelete = (position: Position) => {
         if (confirm(`Are you sure you want to delete position "${position.name || 'Untitled'}"?`)) {
             router.delete(`/admin/positions/${position.id}`, {
@@ -466,7 +490,6 @@ export default function PositionsIndex({
             sort_order: newOrder
         }));
         
-        // Trigger server-side sort update
         const params = {
             ...filtersState,
             sort_by: column,
@@ -497,7 +520,6 @@ export default function PositionsIndex({
             sort_order: 'asc'
         });
         
-        // Trigger server-side filter clear
         router.get('/admin/positions', {
             search: '',
             status: 'all',
@@ -547,7 +569,6 @@ export default function PositionsIndex({
     const updateFilter = (key: keyof PositionFilters, value: string) => {
         setFiltersState(prev => ({ ...prev, [key]: value }));
         
-        // Trigger server-side filter update
         const params = {
             ...filtersState,
             [key]: value,
@@ -568,10 +589,11 @@ export default function PositionsIndex({
         });
     };
 
-    const hasActiveFilters = 
+    const hasActiveFilters = Boolean(
         search || 
         filtersState.status !== 'all' ||
-        filtersState.requires_account !== 'all';
+        filtersState.requires_account !== 'all'
+    );
 
     return (
         <AppLayout
@@ -589,7 +611,6 @@ export default function PositionsIndex({
                         isMobile={isMobile}
                     />
 
-                    {/* Separate Stats Component */}
                     <PositionsStats 
                         globalStats={stats}
                         filteredStats={filteredStats}
@@ -597,7 +618,6 @@ export default function PositionsIndex({
                     />
 
                     <PositionsFilters
-                        // Remove stats prop
                         search={search}
                         setSearch={setSearch}
                         onSearchChange={(value) => {
@@ -620,7 +640,6 @@ export default function PositionsIndex({
 
                     <PositionsContent
                         positions={paginatedPositions}
-                        // Remove stats prop
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -652,7 +671,6 @@ export default function PositionsIndex({
                         selectionStats={selectionStats}
                     />
 
-                    {/* Keyboard Shortcuts Help */}
                     {isBulkMode && !isMobile && (
                         <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
                             <div className="flex items-center justify-between">

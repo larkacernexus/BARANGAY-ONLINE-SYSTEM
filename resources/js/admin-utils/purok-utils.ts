@@ -1,4 +1,4 @@
-import { Purok, PurokFilters } from '@/types/purok';
+import { Purok, PurokFilters } from '@/types/admin/puroks/purok';
 
 export const purokUtils = {
     filterPuroks: ({

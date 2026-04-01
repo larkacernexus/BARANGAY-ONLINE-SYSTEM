@@ -55,8 +55,51 @@ import { ResidentsTable } from '@/components/admin/puroks/show/components/reside
 import { DemographicsDetailsCard } from '@/components/admin/puroks/show/components/demographics-details-card';
 
 // Import types and utilities
-import { PurokShowProps } from '@/components/admin/puroks/show/types';
+import { Purok, PurokStats, Household, Resident, PaginatedData } from '@/types/admin/puroks/purok';
 import { formatDate, getStatusColor, getStatusIcon } from '@/components/admin/puroks/show/utils/helpers';
+
+interface DemographicsData {
+    gender: {
+        male: number;
+        female: number;
+        other?: number;
+    };
+    ageGroups: {
+        '0-17': number;
+        '18-30': number;
+        '31-59': number;
+        '60+': number;
+    };
+    civilStatus: {
+        single: number;
+        married: number;
+        widowed: number;
+        divorced: number;
+    };
+    occupation: {
+        employed: number;
+        unemployed: number;
+        student: number;
+        retired: number;
+    };
+    education: {
+        elementary: number;
+        highSchool: number;
+        college: number;
+        postgraduate: number;
+        none: number;
+    };
+}
+
+interface PurokShowProps {
+    purok: Purok;
+    stats: PurokStats;
+    recentHouseholds: Household[];
+    recentResidents: Resident[];
+    demographics: DemographicsData;
+    households: PaginatedData<Household>;  // Generic with Household type
+    residents: PaginatedData<Resident>;    // Generic with Resident type
+}
 
 export default function PurokShow({ 
     purok, 
@@ -114,7 +157,10 @@ export default function PurokShow({
         const a = document.createElement('a');
         a.href = url;
         a.download = `purok-${purok.slug}-data.json`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     // Tab definitions
@@ -144,7 +190,7 @@ export default function PurokShow({
     ];
 
     // Get status badge variant
-    const getStatusVariant = (status: string) => {
+    const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
         switch (status) {
             case 'active':
                 return 'default';

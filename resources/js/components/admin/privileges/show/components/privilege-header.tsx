@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/Privileges/components/privilege-header.tsx
+
 import React, { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,6 @@ import { route } from 'ziggy-js';
 import {
     Tooltip,
     TooltipContent,
-    TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
@@ -137,57 +137,51 @@ export const PrivilegeHeader = ({
                             )}
 
                             {/* Privilege Code Badge with Copy */}
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div 
-                                            className="flex items-center gap-1 px-3 py-1 bg-indigo-100 text-indigo-800 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800 rounded-full cursor-pointer hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors"
-                                            onClick={handleCopyLink}
-                                        >
-                                            <Hash className="h-3 w-3" />
-                                            <span className="text-sm font-mono">
-                                                {privilege.code}
-                                            </span>
-                                            {copied ? (
-                                                <Check className="h-3 w-3 ml-1" />
-                                            ) : (
-                                                <Copy className="h-3 w-3 ml-1" />
-                                            )}
-                                        </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Click to copy privilege code</TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div 
+                                        className="flex items-center gap-1 px-3 py-1 bg-indigo-100 text-indigo-800 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800 rounded-full cursor-pointer hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors"
+                                        onClick={handleCopyLink}
+                                    >
+                                        <Hash className="h-3 w-3" />
+                                        <span className="text-sm font-mono">
+                                            {privilege.code}
+                                        </span>
+                                        {copied ? (
+                                            <Check className="h-3 w-3 ml-1" />
+                                        ) : (
+                                            <Copy className="h-3 w-3 ml-1" />
+                                        )}
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent>Click to copy privilege code</TooltipContent>
+                            </Tooltip>
 
                             {/* Discount Type Badge */}
                             {privilege.discount_type && (
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <div className="flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 rounded-full cursor-default">
-                                                <Tag className="h-3 w-3" />
-                                                <span className="text-sm">
-                                                    {privilege.discount_type.name}
-                                                </span>
-                                            </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Discount Type</TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 rounded-full cursor-default">
+                                            <Tag className="h-3 w-3" />
+                                            <span className="text-sm">
+                                                {privilege.discount_type.name}
+                                            </span>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Discount Type</TooltipContent>
+                                </Tooltip>
                             )}
 
                             {/* Placeholder for stats - can be replaced with actual data */}
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 rounded-full cursor-default">
-                                            <Users className="h-3 w-3" />
-                                            <span className="text-sm font-medium">0</span>
-                                        </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Assigned Residents</TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 rounded-full cursor-default">
+                                        <Users className="h-3 w-3" />
+                                        <span className="text-sm font-medium">0</span>
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent>Assigned Residents</TooltipContent>
+                            </Tooltip>
                         </div>
                     </div>
                 </div>

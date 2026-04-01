@@ -17,9 +17,10 @@ import {
     Key,
     Hash,
     Users,
+    Crown,
+    Shield,
 } from 'lucide-react';
-import { Position } from '../types';
-import { getStatusVariant, getStatusIcon, getPositionIcon } from '../utils/helpers';
+import { Position } from '@/types/admin/positions/position.types';
 
 interface Props {
     position: Position;
@@ -42,6 +43,26 @@ export const PositionHeader = ({
     onDelete,
     canDelete
 }: Props) => {
+    const getPositionIcon = () => {
+        if (isCaptainPosition) {
+            return <Crown className="h-6 w-6 text-amber-100" />;
+        }
+        if (isKagawadPosition) {
+            return <Shield className="h-6 w-6 text-amber-100" />;
+        }
+        return <Shield className="h-6 w-6 text-white" />;
+    };
+
+    const getStatusVariant = (isActive: boolean): "default" | "secondary" | "destructive" | "outline" => {
+        return isActive ? 'default' : 'secondary';
+    };
+
+    const getStatusIcon = (isActive: boolean) => {
+        return isActive ? 
+            <div className="h-3 w-3 rounded-full bg-green-500 mr-1" /> : 
+            <div className="h-3 w-3 rounded-full bg-gray-400 mr-1" />;
+    };
+
     return (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -53,7 +74,7 @@ export const PositionHeader = ({
                 </Link>
                 <div className="flex items-center gap-3">
                     <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${isCaptainPosition ? 'from-amber-600 to-amber-800' : isKagawadPosition ? 'from-amber-500 to-amber-700' : 'from-blue-600 to-blue-800'} flex items-center justify-center shadow-lg`}>
-                        {getPositionIcon(isCaptainPosition, isKagawadPosition)}
+                        {getPositionIcon()}
                     </div>
                     <div>
                         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
@@ -79,8 +100,17 @@ export const PositionHeader = ({
                             </Badge>
                             <Badge variant="outline" className="flex items-center gap-1 dark:border-gray-600 dark:text-gray-300">
                                 <Users className="h-3 w-3" />
-                                {position.officials_count || 0} Officials
+                                {position.officials_count ?? 0} Officials
                             </Badge>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={onCopyCode}
+                                className="h-6 px-2 text-xs"
+                            >
+                                <Copy className="h-3 w-3 mr-1" />
+                                {position.code}
+                            </Button>
                         </div>
                     </div>
                 </div>

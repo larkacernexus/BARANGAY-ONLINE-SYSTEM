@@ -2,78 +2,265 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Demographics } from '../types';
+import { Demographics } from '@/types/admin/puroks/purok';
 
 interface Props {
     demographics: Demographics;
 }
 
 export const DemographicsDetailsCard = ({ demographics }: Props) => {
-    const total = demographics.gender.male + demographics.gender.female + demographics.gender.other;
+    // Calculate totals
+    const total = (demographics.gender.male || 0) + (demographics.gender.female || 0) + (demographics.gender.other || 0);
+    
+    // Calculate male to female ratio
     const maleToFemaleRatio = demographics.gender.female > 0 
         ? (demographics.gender.male / demographics.gender.female).toFixed(2)
-        : 'N/A';
-
+        : demographics.gender.male > 0 ? '∞' : 'N/A';
+    
+    // Calculate age group totals for summary
+    const children = demographics.ageGroups['0-17'] || 0;
+    const youngAdults = demographics.ageGroups['18-30'] || 0;
+    const adults = demographics.ageGroups['31-59'] || 0;
+    const seniors = demographics.ageGroups['60+'] || 0;
+    const adultsTotal = youngAdults + adults; // 18-59 age group
+    
+    // Calculate civil status percentages
+    const civilStatusTotal = (demographics.civilStatus.single || 0) + 
+                            (demographics.civilStatus.married || 0) + 
+                            (demographics.civilStatus.widowed || 0) + 
+                            (demographics.civilStatus.divorced || 0);
+    
+    // Calculate occupation percentages
+    const occupationTotal = (demographics.occupation.employed || 0) + 
+                           (demographics.occupation.unemployed || 0) + 
+                           (demographics.occupation.student || 0) + 
+                           (demographics.occupation.retired || 0);
+    
+    // Calculate education percentages
+    const educationTotal = (demographics.education.elementary || 0) + 
+                          (demographics.education.highSchool || 0) + 
+                          (demographics.education.college || 0) + 
+                          (demographics.education.postgraduate || 0) + 
+                          (demographics.education.none || 0);
+    
     return (
         <Card className="dark:bg-gray-900">
             <CardHeader>
                 <CardTitle className="dark:text-gray-100">Detailed Demographics</CardTitle>
                 <CardDescription className="dark:text-gray-400">
-                    Additional demographic information
+                    Comprehensive demographic breakdown of residents
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-6">
+                    {/* Gender Breakdown */}
                     <div>
-                        <h4 className="text-sm font-medium mb-2 dark:text-gray-300">Gender Breakdown</h4>
+                        <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Gender Distribution</h4>
                         <div className="grid grid-cols-3 gap-4 text-center">
                             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{demographics.gender.male}</p>
                                 <p className="text-xs text-gray-600 dark:text-gray-400">Male</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                    {total > 0 ? ((demographics.gender.male / total) * 100).toFixed(1) : 0}%
+                                </p>
                             </div>
                             <div className="p-3 bg-pink-50 dark:bg-pink-900/20 rounded-lg">
                                 <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">{demographics.gender.female}</p>
                                 <p className="text-xs text-gray-600 dark:text-gray-400">Female</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                    {total > 0 ? ((demographics.gender.female / total) * 100).toFixed(1) : 0}%
+                                </p>
                             </div>
                             <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{demographics.gender.other}</p>
+                                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{demographics.gender.other || 0}</p>
                                 <p className="text-xs text-gray-600 dark:text-gray-400">Other</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                    {total > 0 ? (((demographics.gender.other || 0) / total) * 100).toFixed(1) : 0}%
+                                </p>
                             </div>
                         </div>
                     </div>
                     
                     <Separator className="dark:bg-gray-700" />
                     
+                    {/* Age Distribution */}
                     <div>
-                        <h4 className="text-sm font-medium mb-2 dark:text-gray-300">Age Distribution</h4>
+                        <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Age Distribution</h4>
+                        <div className="space-y-3">
+                            <div>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-sm dark:text-gray-300">Children (0-17)</span>
+                                    <span className="font-medium dark:text-gray-200">{children}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div 
+                                        className="bg-blue-500 h-2 rounded-full" 
+                                        style={{ width: `${total > 0 ? (children / total) * 100 : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-sm dark:text-gray-300">Young Adults (18-30)</span>
+                                    <span className="font-medium dark:text-gray-200">{youngAdults}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div 
+                                        className="bg-green-500 h-2 rounded-full" 
+                                        style={{ width: `${total > 0 ? (youngAdults / total) * 100 : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-sm dark:text-gray-300">Adults (31-59)</span>
+                                    <span className="font-medium dark:text-gray-200">{adults}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div 
+                                        className="bg-yellow-500 h-2 rounded-full" 
+                                        style={{ width: `${total > 0 ? (adults / total) * 100 : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="flex justify-between mb-1">
+                                    <span className="text-sm dark:text-gray-300">Seniors (60+)</span>
+                                    <span className="font-medium dark:text-gray-200">{seniors}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div 
+                                        className="bg-red-500 h-2 rounded-full" 
+                                        style={{ width: `${total > 0 ? (seniors / total) * 100 : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <Separator className="dark:bg-gray-700" />
+                    
+                    {/* Civil Status */}
+                    <div>
+                        <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Civil Status</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                                <span className="text-sm dark:text-gray-300">Single</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.civilStatus.single}</span>
+                            </div>
+                            <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                                <span className="text-sm dark:text-gray-300">Married</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.civilStatus.married}</span>
+                            </div>
+                            <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                                <span className="text-sm dark:text-gray-300">Widowed</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.civilStatus.widowed}</span>
+                            </div>
+                            <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                                <span className="text-sm dark:text-gray-300">Divorced</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.civilStatus.divorced}</span>
+                            </div>
+                        </div>
+                        {civilStatusTotal > 0 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                Total: {civilStatusTotal} individuals
+                            </p>
+                        )}
+                    </div>
+                    
+                    <Separator className="dark:bg-gray-700" />
+                    
+                    {/* Occupation */}
+                    <div>
+                        <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Occupation</h4>
                         <div className="space-y-2">
                             <div className="flex justify-between">
-                                <span className="text-sm dark:text-gray-300">Children (0-17)</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.age_groups.children}</span>
+                                <span className="text-sm dark:text-gray-300">Employed</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.occupation.employed}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-sm dark:text-gray-300">Adults (18-59)</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.age_groups.adults}</span>
+                                <span className="text-sm dark:text-gray-300">Unemployed</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.occupation.unemployed}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-sm dark:text-gray-300">Seniors (60+)</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.age_groups.seniors}</span>
+                                <span className="text-sm dark:text-gray-300">Student</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.occupation.student}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-sm dark:text-gray-300">Retired</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.occupation.retired}</span>
                             </div>
                         </div>
+                        {occupationTotal > 0 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                Total: {occupationTotal} individuals
+                            </p>
+                        )}
                     </div>
                     
                     <Separator className="dark:bg-gray-700" />
                     
+                    {/* Education Level */}
                     <div>
-                        <h4 className="text-sm font-medium mb-2 dark:text-gray-300">Summary</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Total Population</p>
-                                <p className="text-xl font-bold dark:text-gray-100">{total}</p>
+                        <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Education Level</h4>
+                        <div className="space-y-2">
+                            <div className="flex justify-between">
+                                <span className="text-sm dark:text-gray-300">No Formal Education</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.education.none}</span>
                             </div>
-                            <div>
+                            <div className="flex justify-between">
+                                <span className="text-sm dark:text-gray-300">Elementary</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.education.elementary}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-sm dark:text-gray-300">High School</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.education.highSchool}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-sm dark:text-gray-300">College</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.education.college}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-sm dark:text-gray-300">Post Graduate</span>
+                                <span className="font-medium dark:text-gray-200">{demographics.education.postgraduate}</span>
+                            </div>
+                        </div>
+                        {educationTotal > 0 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                Total: {educationTotal} individuals
+                            </p>
+                        )}
+                    </div>
+                    
+                    <Separator className="dark:bg-gray-700" />
+                    
+                    {/* Summary */}
+                    <div>
+                        <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Summary Statistics</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Total Population</p>
+                                <p className="text-2xl font-bold dark:text-gray-100">{total}</p>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Male to Female Ratio</p>
-                                <p className="text-xl font-bold dark:text-gray-100">{maleToFemaleRatio}</p>
+                                <p className="text-2xl font-bold dark:text-gray-100">{maleToFemaleRatio}:1</p>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Working Age (18-59)</p>
+                                <p className="text-2xl font-bold dark:text-gray-100">{adultsTotal}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    {total > 0 ? ((adultsTotal / total) * 100).toFixed(1) : 0}% of population
+                                </p>
+                            </div>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Dependency Ratio</p>
+                                <p className="text-2xl font-bold dark:text-gray-100">
+                                    {adultsTotal > 0 ? ((children + seniors) / adultsTotal * 100).toFixed(1) : 0}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Dependents per 100 working age
+                                </p>
                             </div>
                         </div>
                     </div>

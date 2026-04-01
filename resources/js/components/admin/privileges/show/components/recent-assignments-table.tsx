@@ -1,6 +1,8 @@
 // resources/js/Pages/Admin/Privileges/components/recent-assignments-table.tsx
+
 import React from 'react';
 import { Link } from '@inertiajs/react';
+import { format, parseISO } from 'date-fns';
 import {
     Card,
     CardContent,
@@ -22,34 +24,21 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Users, UserPlus, Eye } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Users, UserPlus, Eye, Clock, XCircle, CheckCircle } from 'lucide-react';
 
-interface Resident {
-    id: number;
-    first_name: string;
-    last_name: string;
-    middle_name?: string;
-}
-
-interface ResidentPrivilege {
-    id: number;
-    resident_id: number;
-    id_number?: string;
-    verified_at: string | null;
-    expires_at: string | null;
-    created_at: string;
-    resident: Resident;
-}
+// Import types from your types file
+import { ResidentPrivilege as PriviledgeAssignment, Resident } from '@/types/admin/privileges/privilege.types';
 
 interface Props {
-    assignments: ResidentPrivilege[];
+    assignments: PriviledgeAssignment[];
     privilegeId: number;
     privilegeName: string;
     onAssignClick: () => void;
 }
 
 // Helper functions
-const formatDate = (dateString: string | null, includeTime: boolean = false) => {
+const formatDate = (dateString: string | null, includeTime: boolean = false): string => {
     if (!dateString) return 'N/A';
     try {
         const date = parseISO(dateString);
@@ -59,7 +48,7 @@ const formatDate = (dateString: string | null, includeTime: boolean = false) => 
     }
 };
 
-const getAssignmentStatusBadge = (assignment: ResidentPrivilege) => {
+const getAssignmentStatusBadge = (assignment: PriviledgeAssignment) => {
     if (!assignment.verified_at) {
         return (
             <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800 flex items-center gap-1">
@@ -86,7 +75,8 @@ const getAssignmentStatusBadge = (assignment: ResidentPrivilege) => {
     );
 };
 
-const getFullName = (resident: Resident) => {
+const getFullName = (resident?: Resident): string => {
+    if (!resident) return 'Unknown Resident';
     let name = `${resident.first_name}`;
     if (resident.middle_name) {
         name += ` ${resident.middle_name.charAt(0)}.`;
@@ -95,17 +85,15 @@ const getFullName = (resident: Resident) => {
     return name;
 };
 
-import { format, parseISO } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
-import { Clock, XCircle, CheckCircle } from 'lucide-react';
-import {
-    TooltipProvider,
-} from '@/components/ui/tooltip';
-
 export const RecentAssignmentsTable = ({ 
     assignments, 
+    privilegeId,
+    privilegeName,
     onAssignClick
 }: Props) => {
+    // Display only the 5 most recent assignments
+    const recentAssignments = assignments.slice(0, 5);
+
     return (
         <Card className="dark:bg-gray-900">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -115,7 +103,7 @@ export const RecentAssignmentsTable = ({
                         Recent Assignments
                     </CardTitle>
                     <CardDescription className="dark:text-gray-400">
-                        Latest residents with this privilege
+                        Latest residents with {privilegeName} privilege
                     </CardDescription>
                 </div>
                 <Button variant="outline" size="sm" onClick={onAssignClick} className="dark:border-gray-600 dark:text-gray-300">
@@ -136,7 +124,7 @@ export const RecentAssignmentsTable = ({
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {assignments.length === 0 ? (
+                            {recentAssignments.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">
                                         No assignments yet.
@@ -149,12 +137,16 @@ export const RecentAssignmentsTable = ({
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                assignments.map((assignment) => (
+                                recentAssignments.map((assignment) => (
                                     <TableRow key={assignment.id} className="dark:border-gray-700">
                                         <TableCell className="font-medium dark:text-gray-200">
-                                            <Link href={`/admin/residents/${assignment.resident_id}`} className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
-                                                {getFullName(assignment.resident)}
-                                            </Link>
+                                            {assignment.resident ? (
+                                                <Link href={`/admin/residents/${assignment.resident_id}`} className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
+                                                    {getFullName(assignment.resident)}
+                                                </Link>
+                                            ) : (
+                                                <span className="text-gray-500 italic">Resident not found</span>
+                                            )}
                                         </TableCell>
                                         <TableCell className="dark:text-gray-300">
                                             {assignment.id_number || <span className="text-gray-400 italic">N/A</span>}
@@ -173,16 +165,22 @@ export const RecentAssignmentsTable = ({
                                             </Tooltip>
                                         </TableCell>
                                         <TableCell>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Link href={`/admin/residents/${assignment.resident_id}`}>
-                                                        <Button size="sm" variant="ghost" className="dark:text-gray-400 dark:hover:text-white">
-                                                            <Eye className="h-4 w-4" />
-                                                        </Button>
-                                                    </Link>
-                                                </TooltipTrigger>
-                                                <TooltipContent>View resident details</TooltipContent>
-                                            </Tooltip>
+                                            {assignment.resident ? (
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Link href={`/admin/residents/${assignment.resident_id}`}>
+                                                            <Button size="sm" variant="ghost" className="dark:text-gray-400 dark:hover:text-white">
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                        </Link>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>View resident details</TooltipContent>
+                                                </Tooltip>
+                                            ) : (
+                                                <Button size="sm" variant="ghost" disabled className="dark:text-gray-600">
+                                                    <Eye className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))

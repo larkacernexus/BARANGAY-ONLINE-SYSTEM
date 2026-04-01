@@ -1,7 +1,10 @@
+// resources/js/components/admin/positions/PositionsBulkActions.tsx
+
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { BulkOperation } from '@/types/admin/positions/position.types'; // ← IMPORT BulkOperation
 import {
     PackageCheck,
     PackageX,
@@ -44,7 +47,7 @@ interface PositionsBulkActionsProps {
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void; // ← CHANGE FROM string TO BulkOperation
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkStatusDialog?: (show: boolean) => void;
@@ -131,7 +134,7 @@ export default function PositionsBulkActions({
                                         disabled={isPerformingBulkAction}
                                     >
                                         {action.icon}
-                                        {action.label}
+                                        {!isMobile && action.label}
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -168,18 +171,25 @@ export default function PositionsBulkActions({
                                             key={index}
                                             variant="ghost"
                                             className="w-full justify-start h-8 text-sm"
-                                            onClick={action.onClick}
+                                            onClick={() => {
+                                                action.onClick();
+                                                setShowBulkActions(false);
+                                            }}
                                         >
                                             {action.icon}
                                             {action.label}
                                         </Button>
                                     ))}
+                                    <div className="border-t my-1"></div>
                                     {bulkActions.destructive.map((action, index) => (
                                         <Button
                                             key={index}
                                             variant="ghost"
                                             className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-                                            onClick={action.onClick}
+                                            onClick={() => {
+                                                action.onClick();
+                                                setShowBulkActions(false);
+                                            }}
                                         >
                                             {action.icon}
                                             {action.label}
@@ -224,7 +234,7 @@ export default function PositionsBulkActions({
                         <div className="flex items-center gap-2">
                             <Users className="h-3.5 w-3.5 text-green-500" />
                             <span>
-                                {selectionStats.totalOfficials?.toLocaleString() || '0'} officials
+                                {selectionStats.assigned?.toLocaleString() || '0'} officials
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -236,19 +246,19 @@ export default function PositionsBulkActions({
                         <div className="flex items-center gap-2">
                             <Key className="h-3.5 w-3.5 text-purple-500" />
                             <span>
-                                {selectionStats.requiresAccount || 0} require account
+                                {selectionStats.requires_account || 0} require account
                             </span>
                         </div>
                     </div>
-                    {selectionStats.hasCommittee !== undefined && (
+                    {(selectionStats.assigned !== undefined || selectionStats.unassigned !== undefined) && (
                         <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">
                             <div className="flex items-center gap-1">
-                                <TargetIcon className="h-3 w-3 text-cyan-500" />
-                                <span>{selectionStats.hasCommittee} with committee</span>
+                                <Users className="h-3 w-3 text-blue-500" />
+                                <span>{selectionStats.assigned || 0} assigned</span>
                             </div>
                             <div className="flex items-center gap-1">
-                                <Crown className="h-3 w-3 text-amber-500" />
-                                <span>{selectionStats.isKagawad || 0} Kagawad positions</span>
+                                <PackageX className="h-3 w-3 text-gray-500" />
+                                <span>{selectionStats.unassigned || 0} unassigned</span>
                             </div>
                         </div>
                     )}

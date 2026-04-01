@@ -2,12 +2,19 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
-import { Permission, Paginated, FilterParams, Stats } from '@/types';
+import { 
+    Permission, 
+    Paginated, 
+    FilterParams, 
+    PermissionStats,
+    ModuleInfo,
+    PermissionsIndexProps,
+    DeveloperContactDetails,
+    PermissionStatus
+} from '@/types/admin/permissions/permission.types';
 import {
     Search,
     Download,
-    Plus,
-    Shield,
     Users,
     Key,
     Eye,
@@ -21,13 +28,8 @@ import {
     XCircle,
     BarChart3,
     Layers,
-    AlertCircle,
-    Lock,
-    Unlock,
-    FileText,
-    Filter,
-    X,
-    MessageCircle
+    MessageCircle,
+    X
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,18 +60,44 @@ import DeveloperContactModal from '@/components/developer-contact-modal';
 import PermissionsStats from '@/components/admin/permissions/PermissionsStats';
 import { route } from 'ziggy-js';
 
-interface PermissionsIndexProps {
-    permissions: Paginated<Permission>;
-    modules: string[] | Array<{ name: string; display_name?: string; description?: string; icon?: string }>;
-    filters: FilterParams;
-    stats?: {
-        total: number;
-        active: number;
-        inactive: number;
-        modules: number;
-        rolesAssigned: number;
-    };
-}
+// Constants for better maintainability
+const TRUNCATION_LENGTHS = {
+    mobile: {
+        name: 15,
+        description: 20,
+        module: 10
+    },
+    tablet: {
+        name: 20,
+        description: 25,
+        module: 12
+    },
+    smallDesktop: {
+        name: 25,
+        description: 30,
+        module: 15
+    },
+    largeDesktop: {
+        name: 30,
+        description: 35,
+        module: 20
+    }
+} as const;
+
+type DeviceType = 'mobile' | 'tablet' | 'smallDesktop' | 'largeDesktop';
+
+const developerDetails: DeveloperContactDetails = {
+    name: "System Security Team",
+    email: "support@larkacernexus.com",
+    phone: "+1 (555) 987-6543",
+    department: "Security & Permissions",
+    company: "LARKACER NEXUS IT SOLUTIONS",
+    website: "https://security.yourcompany.com/permissions",
+    officeHours: "Monday - Friday, 8:00 AM - 5:00 PM",
+    specialization: "Role-Based Access Control",
+    responseTime: "24-48 business hours",
+    notes: "All permission requests go through security review. Please include justification and which user roles need access."
+};
 
 export default function PermissionsIndex({ 
     permissions, 
@@ -77,23 +105,41 @@ export default function PermissionsIndex({
     filters: initialFilters, 
     stats: propsStats 
 }: PermissionsIndexProps) {
+    // State management with proper types
     const [filters, setFilters] = useState<FilterParams>({
         search: initialFilters.search || '',
         module: initialFilters.module || 'all',
-        status: initialFilters.status || 'all',
+        status: initialFilters.status || PermissionStatus.ALL,
     });
+    
     const [localSearch, setLocalSearch] = useState(initialFilters.search || '');
     const [isSearching, setIsSearching] = useState(false);
     const [showDeveloperModal, setShowDeveloperModal] = useState(false);
-
     const [currentPage, setCurrentPage] = useState(permissions.meta?.current_page || 1);
-    const [itemsPerPage] = useState(permissions.meta?.per_page || 10);
-    const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
-
+    const [windowWidth, setWindowWidth] = useState<number>(
+        typeof window !== 'undefined' ? window.innerWidth : 1024
+    );
+    
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    // Calculate global stats from props
-    const globalStats = useMemo(() => {
+    // Calculate device type based on window width
+    const getDeviceType = (width: number): DeviceType => {
+        if (width < 640) return 'mobile';
+        if (width < 768) return 'tablet';
+        if (width < 1024) return 'smallDesktop';
+        return 'largeDesktop';
+    };
+
+    // Get responsive truncation length
+    const getTruncationLength = useMemo(() => {
+        const deviceType = getDeviceType(windowWidth);
+        return (type: 'name' | 'description' | 'module' = 'name'): number => {
+            return TRUNCATION_LENGTHS[deviceType][type];
+        };
+    }, [windowWidth]);
+
+    // Calculate global stats
+    const globalStats = useMemo((): PermissionStats => {
         const totalPermissions = permissions.meta?.total || 0;
         const activePermissions = permissions.data.filter(p => p.is_active).length;
         const inactivePermissions = permissions.data.filter(p => !p.is_active).length;
@@ -109,8 +155,8 @@ export default function PermissionsIndex({
         };
     }, [propsStats, permissions, modules]);
 
-    // Calculate filtered stats from current view
-    const filteredStats = useMemo(() => {
+    // Calculate filtered stats
+    const filteredStats = useMemo((): PermissionStats => {
         const filteredData = permissions.data.filter(permission => {
             // Apply search filter
             if (filters.search && !permission.name.toLowerCase().includes(filters.search.toLowerCase()) && 
@@ -125,10 +171,10 @@ export default function PermissionsIndex({
             }
             
             // Apply status filter
-            if (filters.status !== 'all') {
+            if (filters.status !== PermissionStatus.ALL) {
                 const isActive = permission.is_active;
-                if (filters.status === 'active' && !isActive) return false;
-                if (filters.status === 'inactive' && isActive) return false;
+                if (filters.status === PermissionStatus.ACTIVE && !isActive) return false;
+                if (filters.status === PermissionStatus.INACTIVE && isActive) return false;
             }
             
             return true;
@@ -145,6 +191,22 @@ export default function PermissionsIndex({
         };
     }, [permissions.data, filters]);
 
+    // Get available modules from permissions or provided modules
+    const availableModules = useMemo((): string[] => {
+        if (modules && modules.length > 0) {
+            // Handle both string arrays and object arrays
+            if (typeof modules[0] === 'string') {
+                return modules as string[];
+            } else if (typeof modules[0] === 'object' && modules[0] !== null) {
+                // Extract module names from objects
+                const moduleObjects = modules as ModuleInfo[];
+                return moduleObjects.map(m => m.name).filter(Boolean);
+            }
+        }
+        // Fallback: get modules from permissions data
+        return Array.from(new Set(permissions.data.map(p => p.module))).filter(Boolean);
+    }, [modules, permissions.data]);
+
     // Track window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -157,45 +219,8 @@ export default function PermissionsIndex({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Get responsive truncation length
-    const getTruncationLength = (type: 'name' | 'description' | 'module' = 'name'): number => {
-        if (typeof window === 'undefined') return 30;
-        
-        const width = window.innerWidth;
-        if (width < 640) { // Mobile
-            switch(type) {
-                case 'name': return 15;
-                case 'description': return 20;
-                case 'module': return 10;
-                default: return 15;
-            }
-        }
-        if (width < 768) { // Tablet
-            switch(type) {
-                case 'name': return 20;
-                case 'description': return 25;
-                case 'module': return 12;
-                default: return 20;
-            }
-        }
-        if (width < 1024) { // Small desktop
-            switch(type) {
-                case 'name': return 25;
-                case 'description': return 30;
-                case 'module': return 15;
-                default: return 25;
-            }
-        }
-        // Large desktop
-        switch(type) {
-            case 'name': return 30;
-            case 'description': return 35;
-            case 'module': return 20;
-            default: return 30;
-        }
-    };
-
-    const formatDate = (dateString: string) => {
+    // Format date utility
+    const formatDate = (dateString: string): string => {
         return new Date(dateString).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
@@ -203,55 +228,88 @@ export default function PermissionsIndex({
         });
     };
 
-    const handleApplyFilters = () => {
+    // Helper function to convert FilterParams to router-compatible object
+    const prepareFiltersForRouter = (filtersToPrepare: FilterParams): Record<string, string | number> => {
+        const prepared: Record<string, string | number> = {};
+        
+        // Only add non-undefined values
+        if (filtersToPrepare.search && filtersToPrepare.search !== '') {
+            prepared.search = filtersToPrepare.search;
+        }
+        if (filtersToPrepare.module && filtersToPrepare.module !== 'all') {
+            prepared.module = filtersToPrepare.module;
+        }
+        if (filtersToPrepare.status && filtersToPrepare.status !== PermissionStatus.ALL) {
+            prepared.status = filtersToPrepare.status;
+        }
+        if (filtersToPrepare.page && filtersToPrepare.page > 1) {
+            prepared.page = filtersToPrepare.page;
+        }
+        if (filtersToPrepare.per_page) {
+            prepared.per_page = filtersToPrepare.per_page;
+        }
+        if (filtersToPrepare.sort_by) {
+            prepared.sort_by = filtersToPrepare.sort_by;
+        }
+        if (filtersToPrepare.sort_order) {
+            prepared.sort_order = filtersToPrepare.sort_order;
+        }
+        
+        return prepared;
+    };
+
+    // Event handlers with proper types
+    const handleApplyFilters = (): void => {
         setIsSearching(true);
-        router.get(route('admin.permissions.index'), filters, {
+        router.get(route('admin.permissions.index'), prepareFiltersForRouter(filters), {
             preserveState: true,
             replace: true,
             onFinish: () => setIsSearching(false),
         });
     };
 
-    const handleSearch = () => {
+    const handleSearch = (): void => {
         setIsSearching(true);
-        router.get(route('admin.permissions.index'), filters, {
+        router.get(route('admin.permissions.index'), prepareFiltersForRouter(filters), {
             preserveState: true,
             replace: true,
             onFinish: () => setIsSearching(false),
         });
     };
 
-    const handleClearSearch = () => {
-        setFilters(prev => ({ ...prev, search: '' }));
+    const handleClearSearch = (): void => {
+        const updatedFilters = { ...filters, search: '' };
+        setFilters(updatedFilters);
         setLocalSearch('');
-        router.get(route('admin.permissions.index'), { ...filters, search: '' }, {
+        router.get(route('admin.permissions.index'), prepareFiltersForRouter(updatedFilters), {
             preserveState: true,
             replace: true,
         });
     };
 
-    const handleFilterChange = (key: keyof FilterParams, value: string) => {
+    const handleFilterChange = (key: keyof FilterParams, value: string): void => {
         setFilters(prev => ({ ...prev, [key]: value }));
     };
 
-    const resetFilters = () => {
-        const newFilters = {
+    const resetFilters = (): void => {
+        const newFilters: FilterParams = {
             search: '',
             module: 'all',
-            status: 'all',
+            status: PermissionStatus.ALL,
         };
         setFilters(newFilters);
         setLocalSearch('');
         setIsSearching(true);
-        router.get(route('admin.permissions.index'), newFilters, {
+        router.get(route('admin.permissions.index'), prepareFiltersForRouter(newFilters), {
             preserveState: true,
             replace: true,
             onFinish: () => setIsSearching(false),
         });
     };
 
-    const togglePermissionStatus = (permission: Permission) => {
-        if (confirm(`Are you sure you want to ${permission.is_active ? 'deactivate' : 'activate'} permission "${permission.display_name}"?`)) {
+    const togglePermissionStatus = (permission: Permission): void => {
+        const action = permission.is_active ? 'deactivate' : 'activate';
+        if (confirm(`Are you sure you want to ${action} permission "${permission.display_name}"?`)) {
             router.put(route('admin.permissions.toggle-status', permission.id), {}, {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -261,60 +319,77 @@ export default function PermissionsIndex({
         }
     };
 
-    const handleDelete = (permission: Permission) => {
+    const handleDelete = (permission: Permission): void => {
         if (confirm(`Are you sure you want to delete permission "${permission.display_name}"? This action cannot be undone.`)) {
             router.delete(route('admin.permissions.destroy', permission.id));
         }
     };
 
-    const handleCopyToClipboard = (text: string, label: string) => {
+    const handleCopyToClipboard = (text: string, label: string): void => {
         navigator.clipboard.writeText(text).then(() => {
             console.log(`Copied ${label} to clipboard:`, text);
+        }).catch(err => {
+            console.error('Failed to copy:', err);
         });
     };
 
-    const handleExport = () => {
+    const handleExport = (): void => {
         const exportUrl = new URL(route('admin.permissions.export'), window.location.origin);
         if (filters.search) exportUrl.searchParams.append('search', filters.search);
-        if (filters.module !== 'all') exportUrl.searchParams.append('module', filters.module);
-        if (filters.status !== 'all') exportUrl.searchParams.append('status', filters.status);
+        if (filters.module && filters.module !== 'all') exportUrl.searchParams.append('module', filters.module);
+        if (filters.status && filters.status !== PermissionStatus.ALL) exportUrl.searchParams.append('status', filters.status);
         window.open(exportUrl.toString(), '_blank');
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
+    const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
         if (e.key === 'Enter') {
             handleSearch();
         }
     };
 
-    // Handle contact developer
-    const handleContactDeveloper = () => {
+    const handleContactDeveloper = (): void => {
         setShowDeveloperModal(true);
     };
 
-    const hasActiveFilters = filters.search || filters.module !== 'all' || filters.status !== 'all';
+    const handlePageChange = (page: number): void => {
+        setIsSearching(true);
+        router.get(route('admin.permissions.index'), prepareFiltersForRouter({ ...filters, page }), {
+            preserveState: true,
+            replace: true,
+            onFinish: () => setIsSearching(false),
+        });
+    };
 
-    // Calculate pagination
+    // Computed values for UI
+    const hasActiveFilters = Boolean(
+        filters.search || (filters.module && filters.module !== 'all') || 
+        (filters.status && filters.status !== PermissionStatus.ALL)
+    );
+    
     const totalItems = permissions.meta?.total || 0;
     const totalPages = permissions.meta?.last_page || 1;
-    const startIndex = (permissions.meta?.current_page || 1) - 1 * (permissions.meta?.per_page || 10) + 1;
-    const endIndex = Math.min((permissions.meta?.current_page || 1) * (permissions.meta?.per_page || 10), totalItems);
+    const currentPageNum = permissions.meta?.current_page || 1;
+    const perPage = permissions.meta?.per_page || 10;
+    const startIndex = (currentPageNum - 1) * perPage + 1;
+    const endIndex = Math.min(currentPageNum * perPage, totalItems);
 
-    // Get unique modules from permissions if not provided
-    const availableModules = useMemo(() => {
-        if (modules && modules.length > 0) {
-            // Handle both string arrays and object arrays
-            if (typeof modules[0] === 'string') {
-                return modules as string[];
-            } else if (typeof modules[0] === 'object' && modules[0] !== null) {
-                // Extract module names from objects
-                const moduleObjects = modules as Array<{ name: string; [key: string]: any }>;
-                return moduleObjects.map(m => m.name).filter(Boolean);
-            }
+    // Generate pagination items
+    const paginationItems = useMemo(() => {
+        const items: number[] = [];
+        const maxVisible = 5;
+        
+        if (totalPages <= maxVisible) {
+            for (let i = 1; i <= totalPages; i++) items.push(i);
+        } else if (currentPageNum <= 3) {
+            for (let i = 1; i <= 5; i++) items.push(i);
+        } else if (currentPageNum >= totalPages - 2) {
+            for (let i = totalPages - 4; i <= totalPages; i++) items.push(i);
+        } else {
+            for (let i = currentPageNum - 2; i <= currentPageNum + 2; i++) items.push(i);
         }
-        // Fallback: get modules from permissions data
-        return Array.from(new Set(permissions.data.map(p => p.module))).filter(Boolean) as string[];
-    }, [modules, permissions.data]);
+        
+        return items;
+    }, [totalPages, currentPageNum]);
 
     return (
         <AdminLayout
@@ -326,29 +401,19 @@ export default function PermissionsIndex({
         >
             <Head title="Permissions Management" />
 
-            {/* Developer Contact Modal */}
             <DeveloperContactModal
                 isOpen={showDeveloperModal}
                 onClose={() => setShowDeveloperModal(false)}
-                developerDetails={{
-                    name: "System Security Team",
-                    email: "support@larkacernexus.com",
-                    phone: "+1 (555) 987-6543",
-                    department: "Security & Permissions",
-                    company: "LARKACER NEXUS IT SOLUTIONS",
-                    website: "https://security.yourcompany.com/permissions",
-                    officeHours: "Monday - Friday, 8:00 AM - 5:00 PM",
-                    specialization: "Role-Based Access Control",
-                    responseTime: "24-48 business hours",
-                    notes: "All permission requests go through security review. Please include justification and which user roles need access."
-                }}
+                developerDetails={developerDetails}
             />
 
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">Permissions Management</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
+                            Permissions Management
+                        </h1>
                         <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
                             Manage system permissions and access control
                         </p>
@@ -383,7 +448,7 @@ export default function PermissionsIndex({
                     </div>
                 </div>
 
-                {/* Stats Cards - Now using the separate component */}
+                {/* Stats Cards */}
                 <PermissionsStats 
                     globalStats={globalStats}
                     filteredStats={filteredStats}
@@ -410,6 +475,7 @@ export default function PermissionsIndex({
                                         <button
                                             onClick={handleClearSearch}
                                             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                            aria-label="Clear search"
                                         >
                                             <X className="h-4 w-4" />
                                         </button>
@@ -421,6 +487,7 @@ export default function PermissionsIndex({
                                         value={filters.module || 'all'}
                                         onChange={(e) => handleFilterChange('module', e.target.value)}
                                         disabled={isSearching}
+                                        aria-label="Filter by module"
                                     >
                                         <option value="all">All Modules</option>
                                         {availableModules.map((module) => (
@@ -432,13 +499,14 @@ export default function PermissionsIndex({
                                     
                                     <select 
                                         className="border rounded px-3 py-2 text-sm w-28 bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-gray-200"
-                                        value={filters.status || 'all'}
+                                        value={filters.status || PermissionStatus.ALL}
                                         onChange={(e) => handleFilterChange('status', e.target.value)}
                                         disabled={isSearching}
+                                        aria-label="Filter by status"
                                     >
-                                        <option value="all">All Status</option>
-                                        <option value="active">Active</option>
-                                        <option value="inactive">Inactive</option>
+                                        <option value={PermissionStatus.ALL}>All Status</option>
+                                        <option value={PermissionStatus.ACTIVE}>Active</option>
+                                        <option value={PermissionStatus.INACTIVE}>Inactive</option>
                                     </select>
                                     
                                     <Button 
@@ -467,13 +535,13 @@ export default function PermissionsIndex({
                                 </div>
                             </div>
 
-                            {/* Active filters indicator and clear button */}
+                            {/* Active filters indicator */}
                             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                                 <div className="text-sm text-gray-500 dark:text-gray-400">
                                     Showing {startIndex} to {endIndex} of {totalItems} permissions
                                     {filters.search && ` matching "${filters.search}"`}
-                                    {filters.module !== 'all' && ` • Module: ${filters.module}`}
-                                    {filters.status !== 'all' && ` • Status: ${filters.status}`}
+                                    {filters.module && filters.module !== 'all' && ` • Module: ${filters.module}`}
+                                    {filters.status && filters.status !== PermissionStatus.ALL && ` • Status: ${filters.status}`}
                                 </div>
                                 
                                 <div className="flex gap-2">
@@ -506,7 +574,7 @@ export default function PermissionsIndex({
                     <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700">
                         <CardTitle className="text-lg sm:text-xl dark:text-gray-100">Permissions List</CardTitle>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Page {permissions.meta?.current_page || 1} of {totalPages}
+                            Page {currentPageNum} of {totalPages}
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -544,7 +612,7 @@ export default function PermissionsIndex({
                                                 <TableRow>
                                                     <TableCell colSpan={7} className="text-center py-8 text-gray-500 dark:text-gray-400">
                                                         <div className="flex flex-col items-center justify-center space-y-4">
-                                                            <Shield className="h-16 w-16 text-gray-300 dark:text-gray-700" />
+                                                            <Key className="h-16 w-16 text-gray-300 dark:text-gray-700" />
                                                             <div>
                                                                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                                                                     {isSearching ? 'Searching...' : 'No permissions found'}
@@ -588,162 +656,156 @@ export default function PermissionsIndex({
                                                     </TableCell>
                                                 </TableRow>
                                             ) : (
-                                                permissions.data.map((permission) => {
-                                                    const nameLength = getTruncationLength('name');
-                                                    const descLength = getTruncationLength('description');
-                                                    const moduleLength = getTruncationLength('module');
-                                                    
-                                                    return (
-                                                        <TableRow key={permission.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors border-gray-200 dark:border-gray-700">
-                                                            <TableCell className="px-4 py-3 whitespace-nowrap dark:text-gray-300">
-                                                                <div 
-                                                                    className="flex items-center gap-3 cursor-text select-text"
-                                                                    onDoubleClick={(e) => {
-                                                                        const selection = window.getSelection();
-                                                                        if (selection) {
-                                                                            const range = document.createRange();
-                                                                            range.selectNodeContents(e.currentTarget);
-                                                                            selection.removeAllRanges();
-                                                                            selection.addRange(range);
-                                                                        }
-                                                                    }}
-                                                                    title={`Double-click to select all\nPermission: ${permission.name}\nDescription: ${permission.description || 'No description'}`}
-                                                                >
-                                                                    <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
-                                                                        <Key className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                                permissions.data.map((permission) => (
+                                                    <TableRow key={permission.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors border-gray-200 dark:border-gray-700">
+                                                        <TableCell className="px-4 py-3 whitespace-nowrap dark:text-gray-300">
+                                                            <div 
+                                                                className="flex items-center gap-3 cursor-text select-text"
+                                                                onDoubleClick={(e) => {
+                                                                    const selection = window.getSelection();
+                                                                    if (selection) {
+                                                                        const range = document.createRange();
+                                                                        range.selectNodeContents(e.currentTarget);
+                                                                        selection.removeAllRanges();
+                                                                        selection.addRange(range);
+                                                                    }
+                                                                }}
+                                                                title={`Double-click to select all\nPermission: ${permission.name}\nDescription: ${permission.description || 'No description'}`}
+                                                            >
+                                                                <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
+                                                                    <Key className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <div 
+                                                                        className="font-medium text-gray-900 dark:text-white truncate"
+                                                                        title={permission.name}
+                                                                    >
+                                                                        {permission.name.length > getTruncationLength('name') 
+                                                                            ? permission.name.substring(0, getTruncationLength('name')) + '...' 
+                                                                            : permission.name}
                                                                     </div>
-                                                                    <div className="min-w-0">
+                                                                    {permission.description && (
                                                                         <div 
-                                                                            className="font-medium text-gray-900 dark:text-white truncate"
-                                                                            data-full-text={permission.name}
+                                                                            className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1"
+                                                                            title={permission.description}
                                                                         >
-                                                                            {permission.name.length > nameLength 
-                                                                                ? permission.name.substring(0, nameLength) + '...' 
-                                                                                : permission.name}
+                                                                            {permission.description.length > getTruncationLength('description') 
+                                                                                ? permission.description.substring(0, getTruncationLength('description')) + '...' 
+                                                                                : permission.description}
                                                                         </div>
-                                                                        {permission.description && (
-                                                                            <div 
-                                                                                className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1"
-                                                                                data-full-text={permission.description}
-                                                                            >
-                                                                                {permission.description.length > descLength 
-                                                                                    ? permission.description.substring(0, descLength) + '...' 
-                                                                                    : permission.description}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3 dark:text-gray-300">
-                                                                <div 
-                                                                    className="font-medium truncate"
-                                                                    title={permission.display_name}
-                                                                >
-                                                                    {permission.display_name}
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3">
-                                                                <Badge 
-                                                                    variant="outline" 
-                                                                    className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
-                                                                    title={permission.module}
-                                                                >
-                                                                    <span className="truncate">
-                                                                        {permission.module && permission.module.length > moduleLength 
-                                                                            ? permission.module.substring(0, moduleLength) + '...' 
-                                                                            : permission.module || 'N/A'}
-                                                                    </span>
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => togglePermissionStatus(permission)}
-                                                                    className={`h-6 px-2 text-xs font-medium ${
-                                                                        permission.is_active
-                                                                            ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50'
-                                                                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700'
-                                                                    }`}
-                                                                    disabled={isSearching}
-                                                                >
-                                                                    {permission.is_active ? (
-                                                                        <CheckCircle className="h-3 w-3 mr-1" />
-                                                                    ) : (
-                                                                        <XCircle className="h-3 w-3 mr-1" />
                                                                     )}
-                                                                    <span className="ml-1">
-                                                                        {permission.is_active ? 'Active' : 'Inactive'}
-                                                                    </span>
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3 dark:text-gray-300">
-                                                                <div className="flex items-center gap-2">
-                                                                    <Users className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                                                    <span className="truncate">{permission.roles_count || 0}</span>
                                                                 </div>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3">
-                                                                <div 
-                                                                    className="text-sm text-gray-500 dark:text-gray-400 truncate"
-                                                                    title={formatDate(permission.created_at)}
-                                                                >
-                                                                    {formatDate(permission.created_at)}
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="px-4 py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
-                                                                <DropdownMenu>
-                                                                    <DropdownMenuTrigger asChild>
-                                                                        <Button 
-                                                                            variant="ghost" 
-                                                                            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
-                                                                            disabled={isSearching}
-                                                                        >
-                                                                            <span className="sr-only">Open menu</span>
-                                                                            <MoreVertical className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
-                                                                        <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-700">
-                                                                            <Link href={route('admin.permissions.show', permission.id)} className="flex items-center cursor-pointer">
-                                                                                <Eye className="mr-2 h-4 w-4" />
-                                                                                <span>View Details</span>
-                                                                            </Link>
-                                                                        </DropdownMenuItem>
-                                                                        
-                                                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
-                                                                        
-                                                                        <DropdownMenuItem 
-                                                                            onClick={() => handleCopyToClipboard(permission.name, 'Permission Name')}
-                                                                            className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
-                                                                        >
-                                                                            <Copy className="mr-2 h-4 w-4" />
-                                                                            <span>Copy Name</span>
-                                                                        </DropdownMenuItem>
-                                                                        
-                                                                        <DropdownMenuItem 
-                                                                            onClick={() => handleCopyToClipboard(permission.display_name, 'Display Name')}
-                                                                            className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
-                                                                        >
-                                                                            <Copy className="mr-2 h-4 w-4" />
-                                                                            <span>Copy Display Name</span>
-                                                                        </DropdownMenuItem>
-                                                                        
-                                                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
-                                                                        
-                                                                        <DropdownMenuItem 
-                                                                            className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:text-red-400 dark:focus:text-red-300 dark:focus:bg-red-950/30"
-                                                                            onClick={() => handleDelete(permission)}
-                                                                        >
-                                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                                            <span>Delete Permission</span>
-                                                                        </DropdownMenuItem>
-                                                                    </DropdownMenuContent>
-                                                                </DropdownMenu>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    );
-                                                })
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="px-4 py-3 dark:text-gray-300">
+                                                            <div 
+                                                                className="font-medium truncate"
+                                                                title={permission.display_name}
+                                                            >
+                                                                {permission.display_name}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="px-4 py-3">
+                                                            <Badge 
+                                                                variant="outline" 
+                                                                className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
+                                                                title={permission.module}
+                                                            >
+                                                                <span className="truncate">
+                                                                    {permission.module && permission.module.length > getTruncationLength('module') 
+                                                                        ? permission.module.substring(0, getTruncationLength('module')) + '...' 
+                                                                        : permission.module || 'N/A'}
+                                                                </span>
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="px-4 py-3">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => togglePermissionStatus(permission)}
+                                                                className={`h-6 px-2 text-xs font-medium ${
+                                                                    permission.is_active
+                                                                        ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50'
+                                                                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700'
+                                                                }`}
+                                                                disabled={isSearching}
+                                                            >
+                                                                {permission.is_active ? (
+                                                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                                                ) : (
+                                                                    <XCircle className="h-3 w-3 mr-1" />
+                                                                )}
+                                                                <span className="ml-1">
+                                                                    {permission.is_active ? 'Active' : 'Inactive'}
+                                                                </span>
+                                                            </Button>
+                                                        </TableCell>
+                                                        <TableCell className="px-4 py-3 dark:text-gray-300">
+                                                            <div className="flex items-center gap-2">
+                                                                <Users className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                                                <span className="truncate">{permission.roles_count || 0}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="px-4 py-3">
+                                                            <div 
+                                                                className="text-sm text-gray-500 dark:text-gray-400 truncate"
+                                                                title={formatDate(permission.created_at)}
+                                                            >
+                                                                {formatDate(permission.created_at)}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="px-4 py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button 
+                                                                        variant="ghost" 
+                                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
+                                                                        disabled={isSearching}
+                                                                    >
+                                                                        <span className="sr-only">Open menu</span>
+                                                                        <MoreVertical className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
+                                                                    <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-700">
+                                                                        <Link href={route('admin.permissions.show', permission.id)} className="flex items-center cursor-pointer">
+                                                                            <Eye className="mr-2 h-4 w-4" />
+                                                                            <span>View Details</span>
+                                                                        </Link>
+                                                                    </DropdownMenuItem>
+                                                                    
+                                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                                                    
+                                                                    <DropdownMenuItem 
+                                                                        onClick={() => handleCopyToClipboard(permission.name, 'Permission Name')}
+                                                                        className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
+                                                                    >
+                                                                        <Copy className="mr-2 h-4 w-4" />
+                                                                        <span>Copy Name</span>
+                                                                    </DropdownMenuItem>
+                                                                    
+                                                                    <DropdownMenuItem 
+                                                                        onClick={() => handleCopyToClipboard(permission.display_name, 'Display Name')}
+                                                                        className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
+                                                                    >
+                                                                        <Copy className="mr-2 h-4 w-4" />
+                                                                        <span>Copy Display Name</span>
+                                                                    </DropdownMenuItem>
+                                                                    
+                                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                                                    
+                                                                    <DropdownMenuItem 
+                                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:text-red-400 dark:focus:text-red-300 dark:focus:bg-red-950/30"
+                                                                        onClick={() => handleDelete(permission)}
+                                                                    >
+                                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                                        <span>Delete Permission</span>
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
                                             )}
                                         </TableBody>
                                     </Table>
@@ -761,73 +823,36 @@ export default function PermissionsIndex({
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => {
-                                            const prevPage = Math.max(1, (permissions.meta?.current_page || 1) - 1);
-                                            setIsSearching(true);
-                                            router.get(route('admin.permissions.index'), { ...filters, page: prevPage }, {
-                                                preserveState: true,
-                                                replace: true,
-                                                onFinish: () => setIsSearching(false),
-                                            });
-                                        }}
-                                        disabled={(permissions.meta?.current_page || 1) === 1 || isSearching}
+                                        onClick={() => handlePageChange(currentPageNum - 1)}
+                                        disabled={currentPageNum === 1 || isSearching}
                                         className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50"
                                     >
                                         <ChevronLeft className="h-4 w-4 mr-1" />
                                         Previous
                                     </Button>
                                     <div className="flex items-center gap-1">
-                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                            let pageNum;
-                                            const currentPage = permissions.meta?.current_page || 1;
-                                            
-                                            if (totalPages <= 5) {
-                                                pageNum = i + 1;
-                                            } else if (currentPage <= 3) {
-                                                pageNum = i + 1;
-                                            } else if (currentPage >= totalPages - 2) {
-                                                pageNum = totalPages - 4 + i;
-                                            } else {
-                                                pageNum = currentPage - 2 + i;
-                                            }
-                                            return (
-                                                <Button
-                                                    key={pageNum}
-                                                    variant={currentPage === pageNum ? "default" : "outline"}
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        setIsSearching(true);
-                                                        router.get(route('admin.permissions.index'), { ...filters, page: pageNum }, {
-                                                            preserveState: true,
-                                                            replace: true,
-                                                            onFinish: () => setIsSearching(false),
-                                                        });
-                                                    }}
-                                                    className={`h-8 w-8 p-0 ${
-                                                        currentPage === pageNum 
-                                                            ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
-                                                            : 'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900'
-                                                    }`}
-                                                    disabled={isSearching}
-                                                >
-                                                    {pageNum}
-                                                </Button>
-                                            );
-                                        })}
+                                        {paginationItems.map((pageNum) => (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPageNum === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => handlePageChange(pageNum)}
+                                                className={`h-8 w-8 p-0 ${
+                                                    currentPageNum === pageNum 
+                                                        ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
+                                                        : 'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900'
+                                                }`}
+                                                disabled={isSearching}
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        ))}
                                     </div>
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => {
-                                            const nextPage = Math.min(totalPages, (permissions.meta?.current_page || 1) + 1);
-                                            setIsSearching(true);
-                                            router.get(route('admin.permissions.index'), { ...filters, page: nextPage }, {
-                                                preserveState: true,
-                                                replace: true,
-                                                onFinish: () => setIsSearching(false),
-                                            });
-                                        }}
-                                        disabled={(permissions.meta?.current_page || 1) === totalPages || isSearching}
+                                        onClick={() => handlePageChange(currentPageNum + 1)}
+                                        disabled={currentPageNum === totalPages || isSearching}
                                         className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50"
                                     >
                                         Next
@@ -858,7 +883,6 @@ export default function PermissionsIndex({
                                     size="sm" 
                                     className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                     onClick={() => {
-                                        // Bulk assign feature
                                         alert('Bulk assign feature coming soon!');
                                     }}
                                     disabled={isSearching}
@@ -912,7 +936,6 @@ export default function PermissionsIndex({
                                     {Array.from(new Set(permissions.data.map(p => p.module))).slice(0, 4).map((module) => {
                                         const modulePermissions = permissions.data.filter(p => p.module === module);
                                         const activeCount = modulePermissions.filter(p => p.is_active).length;
-                                        const moduleLength = getTruncationLength('module');
                                         
                                         return (
                                             <div key={module} className="flex items-center justify-between">
@@ -921,8 +944,8 @@ export default function PermissionsIndex({
                                                         className="text-sm font-medium truncate dark:text-gray-200"
                                                         title={module || 'N/A'}
                                                     >
-                                                        {module && module.length > moduleLength 
-                                                            ? module.substring(0, moduleLength) + '...' 
+                                                        {module && module.length > getTruncationLength('module') 
+                                                            ? module.substring(0, getTruncationLength('module')) + '...' 
                                                             : module || 'N/A'}
                                                     </span>
                                                     <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
@@ -950,7 +973,9 @@ export default function PermissionsIndex({
                                     )}
                                 </div>
                             ) : (
-                                <p className="text-gray-500 dark:text-gray-400 text-center py-4 text-sm">No permission data available</p>
+                                <p className="text-gray-500 dark:text-gray-400 text-center py-4 text-sm">
+                                    No permission data available
+                                </p>
                             )}
                         </CardContent>
                     </Card>

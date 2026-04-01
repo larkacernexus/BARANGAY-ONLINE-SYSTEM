@@ -1,3 +1,6 @@
+// resources/js/components/admin/privileges/PrivilegesTableView.tsx
+
+import React from 'react';
 import {
     Table,
     TableBody,
@@ -16,6 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from '@inertiajs/react';
 import { 
     Award,
@@ -28,46 +32,17 @@ import {
     Trash2,
     CheckSquare,
     Square,
-    Percent,
     Shield,
     IdCard,
     CheckCircle,
     XCircle,
-    Calendar
 } from 'lucide-react';
-
-interface DiscountType {
-    id: number;
-    name: string;
-    code: string;
-}
-
-interface Privilege {
-    id: number;
-    name: string;
-    code: string;
-    description: string | null;
-    is_active: boolean;
-    discount_type_id: number;
-    default_discount_percentage: string | number;
-    requires_id_number: boolean;
-    requires_verification: boolean;
-    validity_years: number | null;
-    created_at: string;
-    updated_at: string;
-    discount_type?: DiscountType;
-    residents_count?: number;
-    active_residents_count?: number;
-}
-
-interface PrivilegeFilters {
-    status?: string;
-    discount_type?: string;
-    requires_verification?: string;
-    requires_id_number?: string;
-    sort_by?: string;
-    sort_order?: 'asc' | 'desc';
-}
+import { 
+    Privilege, 
+    PrivilegeFilters, 
+    DiscountType,
+    SelectionStats
+} from '@/types/admin/privileges/privilege.types';
 
 interface PrivilegesTableViewProps {
     privileges: Privilege[];
@@ -82,8 +57,8 @@ interface PrivilegesTableViewProps {
     onDelete: (privilege: Privilege) => void;
     onToggleStatus: (privilege: Privilege) => void;
     onDuplicate: (privilege: Privilege) => void;
-    selectionStats: any;
-    getSortIcon: (column: string) => string | null;
+    selectionStats: SelectionStats;
+    getSortIcon: (column: string) => React.ReactNode;
     discountTypes: DiscountType[];
     can: {
         edit: boolean;
@@ -134,12 +109,12 @@ export default function PrivilegesTableView({
 
     const getStatusBadge = (isActive: boolean) => {
         return isActive ? (
-            <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 flex items-center gap-1">
+            <Badge className="bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400 flex items-center gap-1">
                 <CheckCircle className="h-3 w-3" />
                 Active
             </Badge>
         ) : (
-            <Badge variant="destructive" className="bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100 flex items-center gap-1">
+            <Badge variant="destructive" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 flex items-center gap-1">
                 <XCircle className="h-3 w-3" />
                 Inactive
             </Badge>
@@ -150,29 +125,34 @@ export default function PrivilegesTableView({
         return (
             <div className="flex gap-1">
                 {privilege.requires_verification && (
-                    <Shield className="h-3.5 w-3.5 text-purple-500" title="Requires Verification" />
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Shield className="h-3.5 w-3.5 text-purple-500 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Requires Verification</p>
+                        </TooltipContent>
+                    </Tooltip>
                 )}
                 {privilege.requires_id_number && (
-                    <IdCard className="h-3.5 w-3.5 text-blue-500" title="Requires ID Number" />
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <IdCard className="h-3.5 w-3.5 text-blue-500 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>Requires ID Number</p>
+                        </TooltipContent>
+                    </Tooltip>
                 )}
             </div>
         );
     };
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-PH', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    };
-
     const handleCopyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text).then(() => {
-            // Toast would be handled by parent
+            console.log(`Copied ${label}: ${text}`);
         }).catch(() => {
-            // Toast would be handled by parent
+            console.error(`Failed to copy ${label}`);
         });
     };
 
@@ -180,7 +160,8 @@ export default function PrivilegesTableView({
         if (privilege.discount_type) {
             return privilege.discount_type.name;
         }
-        return discountTypes.find(t => t.id === privilege.discount_type_id)?.name || 'N/A';
+        const discountType = discountTypes.find(t => t.id === privilege.discount_type_id);
+        return discountType?.name || 'N/A';
     };
 
     return (
@@ -212,54 +193,54 @@ export default function PrivilegesTableView({
                                     </TableHead>
                                 )}
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('name')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Privilege Name
-                                        {getSortIcon('name')}
+                                        <span className="ml-1">{getSortIcon('name')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('code')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Code
-                                        {getSortIcon('code')}
+                                        <span className="ml-1">{getSortIcon('code')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                                     Discount Type
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('discount_percentage')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Discount %
-                                        {getSortIcon('discount_percentage')}
+                                        <span className="ml-1">{getSortIcon('discount_percentage')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
                                     Requirements
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
-                                    onClick={() => onSort('status')}
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    onClick={() => onSort('is_active')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Status
-                                        {getSortIcon('status')}
+                                        <span className="ml-1">{getSortIcon('is_active')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('residents_count')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Assignments
-                                        {getSortIcon('residents_count')}
+                                        <span className="ml-1">{getSortIcon('residents_count')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
@@ -330,7 +311,7 @@ export default function PrivilegesTableView({
                                             {getDiscountTypeName(privilege)}
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
-                                            <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+                                            <Badge className="bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400">
                                                 {privilege.default_discount_percentage}%
                                             </Badge>
                                         </TableCell>
@@ -342,12 +323,12 @@ export default function PrivilegesTableView({
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
                                             <div className="flex flex-col">
-                                                <span className="text-sm font-medium">
-                                                    {privilege.active_residents_count || 0} active
-                                                </span>
-                                                <span className="text-xs text-gray-500">
-                                                    {privilege.residents_count || 0} total
-                                                </span>
+                                                <div className="text-sm font-medium">
+                                                    {privilege.active_residents_count ?? 0} active
+                                                </div>
+                                                <div className="text-xs text-gray-500">
+                                                    {privilege.residents_count ?? 0} total
+                                                </div>
                                             </div>
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
@@ -356,7 +337,7 @@ export default function PrivilegesTableView({
                                                     {privilege.validity_years} year(s)
                                                 </Badge>
                                             ) : (
-                                                <span className="text-xs text-gray-400">Lifetime</span>
+                                                <div className="text-xs text-gray-400">Lifetime</div>
                                             )}
                                         </TableCell>
                                         <TableCell className="px-4 py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
@@ -441,6 +422,14 @@ export default function PrivilegesTableView({
                                                         <span>Copy Name</span>
                                                     </DropdownMenuItem>
                                                     
+                                                    <DropdownMenuItem 
+                                                        onClick={() => handleCopyToClipboard(privilege.code, 'Privilege Code')}
+                                                        className="flex items-center cursor-pointer"
+                                                    >
+                                                        <Copy className="mr-2 h-4 w-4" />
+                                                        <span>Copy Code</span>
+                                                    </DropdownMenuItem>
+                                                    
                                                     <DropdownMenuItem asChild>
                                                         <Link href={`/admin/privileges/${privilege.id}/print`} className="flex items-center cursor-pointer">
                                                             <Printer className="mr-2 h-4 w-4" />
@@ -474,7 +463,7 @@ export default function PrivilegesTableView({
                                                         <>
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem 
-                                                                className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                                                className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/50"
                                                                 onClick={() => onDelete(privilege)}
                                                             >
                                                                 <Trash2 className="mr-2 h-4 w-4" />

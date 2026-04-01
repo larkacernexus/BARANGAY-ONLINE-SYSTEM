@@ -1,21 +1,24 @@
-// resources/js/Pages/Admin/Positions/components/status-banner.tsx
+// resources/js/components/admin/positions/show/components/status-banner.tsx
 import React from 'react';
 import { Link } from '@inertiajs/react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-    AlertTriangle,
-    Target,
-} from 'lucide-react';
-import { Position } from '../types';
+import { AlertTriangle, Target } from 'lucide-react';
+import { Position } from '@/types/admin/positions/position.types';
 
-interface Props {
+interface StatusBannerProps {
     position: Position;
 }
 
-export const StatusBanner = ({ position }: Props) => {
-    const isKagawadPosition = position.name.toLowerCase().includes('kagawad') || 
-                              position.code.toLowerCase().includes('kagawad');
+export function StatusBanner({ position }: StatusBannerProps) {
+    const isKagawadPosition = position.name?.toLowerCase().includes('kagawad') || 
+                              position.code?.toLowerCase().includes('kagawad');
+
+    const hasNoCommittee = !position.committee;
+
+    if (!hasNoCommittee) {
+        return null;
+    }
 
     return (
         <Card className="border-l-4 border-l-amber-500 dark:bg-gray-900">
@@ -24,12 +27,12 @@ export const StatusBanner = ({ position }: Props) => {
                     <div className="flex items-center gap-3">
                         <AlertTriangle className="h-5 w-5 text-amber-500 dark:text-amber-400" />
                         <div>
-                            <p className="font-medium dark:text-gray-100">No Committees Assigned</p>
+                            <p className="font-medium dark:text-gray-100">No Committee Assigned</p>
                             <p className="text-sm text-amber-600 dark:text-amber-400">
-                                This position has no primary or additional committees assigned.
+                                This position has no committee assigned.
                                 {isKagawadPosition && (
                                     <span className="block mt-1 text-xs">
-                                        Kagawad positions usually have a primary committee.
+                                        Kagawad positions should be assigned to a committee.
                                     </span>
                                 )}
                             </p>
@@ -45,4 +48,4 @@ export const StatusBanner = ({ position }: Props) => {
             </CardContent>
         </Card>
     );
-};
+}

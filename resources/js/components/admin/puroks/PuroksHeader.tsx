@@ -1,10 +1,13 @@
+// resources/js/components/admin/puroks/PuroksHeader.tsx
+
 import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
 import { 
     MousePointer,
     Layers,
     Plus,
-    RefreshCw
+    RefreshCw,
+    BarChart3
 } from 'lucide-react';
 
 interface PuroksHeaderProps {
@@ -12,7 +15,8 @@ interface PuroksHeaderProps {
     setIsBulkMode: (value: boolean) => void;
     isMobile: boolean;
     isRefreshing?: boolean;
-    onRefresh?: () => void; // Optional - for manual refresh
+    onRefresh?: () => void;
+    onUpdateStatistics?: () => void; // Add this prop
 }
 
 export default function PuroksHeader({ 
@@ -20,7 +24,8 @@ export default function PuroksHeader({
     setIsBulkMode, 
     isMobile,
     isRefreshing = false,
-    onRefresh
+    onRefresh,
+    onUpdateStatistics
 }: PuroksHeaderProps) {
     return (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -61,7 +66,22 @@ export default function PuroksHeader({
                     )}
                 </Button>
                 
-                {/* Optional refresh button - only if you want manual refresh capability */}
+                {/* Update Statistics Button */}
+                {onUpdateStatistics && (
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={onUpdateStatistics}
+                        disabled={isRefreshing}
+                        className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Update Stats</span>
+                        <span className="sm:hidden">Stats</span>
+                    </Button>
+                )}
+                
+                {/* Optional refresh button */}
                 {onRefresh && (
                     <Button 
                         variant="outline" 

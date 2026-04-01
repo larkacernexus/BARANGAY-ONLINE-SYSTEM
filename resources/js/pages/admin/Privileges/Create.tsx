@@ -38,27 +38,22 @@ import {
     Clock,
     FileText
 } from 'lucide-react';
-
-interface DiscountType {
-    id: number;
-    name: string;
-    code: string;
-}
+import { DiscountType, PrivilegeFormData } from '@/types/admin/privileges/privilege.types';
 
 interface Props {
     discountTypes: DiscountType[];
 }
 
 export default function Create({ discountTypes }: Props) {
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors } = useForm<PrivilegeFormData>({
         name: '',
         code: '',
-        description: '',
-        discount_type_id: '',
-        default_discount_percentage: '',
+        description: null,
+        discount_type_id: null,
+        default_discount_percentage: 0,
         requires_id_number: true,
         requires_verification: true,
-        validity_years: '',
+        validity_years: null,
         is_active: true,
     });
 
@@ -68,9 +63,10 @@ export default function Create({ discountTypes }: Props) {
     };
 
     // Helper to get discount type name by ID
-    const getDiscountTypeName = (id: string) => {
-        const type = discountTypes.find(t => t.id.toString() === id);
-        return type?.name || '';
+    const getDiscountTypeName = (id: number | null): string => {
+        if (!id) return 'Not set';
+        const type = discountTypes.find(t => t.id === id);
+        return type?.name || 'Not set';
     };
 
     return (
@@ -199,8 +195,8 @@ export default function Create({ discountTypes }: Props) {
                                                 Discount Type <span className="text-red-500">*</span>
                                             </Label>
                                             <Select
-                                                value={data.discount_type_id.toString()}
-                                                onValueChange={(value) => setData('discount_type_id', value)}
+                                                value={data.discount_type_id?.toString() || ""}
+                                                onValueChange={(value) => setData('discount_type_id', parseInt(value))}
                                             >
                                                 <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                                     <SelectValue placeholder="Select type" />
@@ -229,8 +225,8 @@ export default function Create({ discountTypes }: Props) {
                                             id="description" 
                                             placeholder="Describe the privilege, eligibility criteria, and benefits..."
                                             rows={3}
-                                            value={data.description}
-                                            onChange={(e) => setData('description', e.target.value)}
+                                            value={data.description || ''}
+                                            onChange={(e) => setData('description', e.target.value || null)}
                                             className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                         />
                                         {errors.description && (
@@ -268,7 +264,7 @@ export default function Create({ discountTypes }: Props) {
                                                 step="0.01"
                                                 placeholder="e.g., 20"
                                                 value={data.default_discount_percentage}
-                                                onChange={(e) => setData('default_discount_percentage', e.target.value)}
+                                                onChange={(e) => setData('default_discount_percentage', parseFloat(e.target.value))}
                                                 className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                             />
                                         </div>
@@ -368,8 +364,8 @@ export default function Create({ discountTypes }: Props) {
                                                 type="number"
                                                 min="0"
                                                 placeholder="Leave empty for lifetime"
-                                                value={data.validity_years}
-                                                onChange={(e) => setData('validity_years', e.target.value)}
+                                                value={data.validity_years ?? ''}
+                                                onChange={(e) => setData('validity_years', e.target.value ? parseInt(e.target.value) : null)}
                                                 className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                             />
                                         </div>
@@ -435,7 +431,7 @@ export default function Create({ discountTypes }: Props) {
                                         <div className="flex justify-between items-center py-2 border-b dark:border-gray-700">
                                             <span className="text-gray-500 dark:text-gray-400">Discount Type:</span>
                                             <span className="font-medium dark:text-gray-200">
-                                                {data.discount_type_id ? getDiscountTypeName(data.discount_type_id) : 'Not set'}
+                                                {getDiscountTypeName(data.discount_type_id)}
                                             </span>
                                         </div>
                                         <div className="flex justify-between items-center py-2 border-b dark:border-gray-700">

@@ -1,3 +1,5 @@
+// resources/js/components/admin/positions/PositionsTableView.tsx
+
 import {
     Table,
     TableBody,
@@ -34,7 +36,7 @@ import {
     XCircle,
     Crown
 } from 'lucide-react';
-import { Position, PositionFilters } from '@/types/position';
+import { Position, PositionFilters } from '@/types/admin/positions/position.types'; // ← FIX IMPORT PATH
 import { positionUtils } from '@/admin-utils/position-utils';
 
 interface PositionsTableViewProps {
@@ -48,7 +50,7 @@ interface PositionsTableViewProps {
     hasActiveFilters: boolean;
     onClearFilters: () => void;
     onDelete: (position: Position) => void;
-    selectionStats: any;
+    selectionStats?: any; // ← MAKE OPTIONAL
     getSortIcon: (column: string) => React.ReactNode;
 }
 
@@ -63,10 +65,22 @@ export default function PositionsTableView({
     hasActiveFilters,
     onClearFilters,
     onDelete,
-    selectionStats,
+    selectionStats = {}, // ← ADD DEFAULT VALUE
     getSortIcon
 }: PositionsTableViewProps) {
-    const truncateText = positionUtils.truncateText;
+    
+    // Helper functions that might be missing from positionUtils
+    const truncateText = (text: string, length: number): string => {
+        if (!text) return '';
+        if (text.length <= length) return text;
+        return text.substring(0, length) + '...';
+    };
+
+    const formatDate = (dateString: string): string => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleDateString();
+    };
+
     const getTruncationLength = (type: 'name' | 'description' | 'code' = 'name'): number => {
         if (typeof window === 'undefined') return 30;
         
@@ -111,18 +125,17 @@ export default function PositionsTableView({
         return requiresAccount ? 'default' : 'outline';
     };
 
-    const formatDate = positionUtils.formatDate;
-
     const handleCopyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text).then(() => {
             // Toast would be handled by parent
+            console.log(`Copied ${label}: ${text}`);
         }).catch(() => {
-            // Toast would be handled by parent
+            console.error(`Failed to copy ${label}`);
         });
     };
 
     const isKagawad = (name: string, code: string) => {
-        return name.toLowerCase().includes('kagawad') || code.toLowerCase().includes('kagawad');
+        return name?.toLowerCase().includes('kagawad') || code?.toLowerCase().includes('kagawad');
     };
 
     return (
@@ -139,8 +152,14 @@ export default function PositionsTableView({
                                                 checked={selectedPositions.length === positions.length && positions.length > 0}
                                                 onCheckedChange={() => {
                                                     if (selectedPositions.length === positions.length) {
-                                                        positions.forEach(p => onItemSelect(p.id));
+                                                        // Deselect all on page
+                                                        positions.forEach(p => {
+                                                            if (selectedPositions.includes(p.id)) {
+                                                                onItemSelect(p.id);
+                                                            }
+                                                        });
                                                     } else {
+                                                        // Select all on page
                                                         positions.forEach(p => {
                                                             if (!selectedPositions.includes(p.id)) {
                                                                 onItemSelect(p.id);
@@ -154,7 +173,7 @@ export default function PositionsTableView({
                                     </TableHead>
                                 )}
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('name')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -169,7 +188,7 @@ export default function PositionsTableView({
                                     Committee
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('order')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -178,7 +197,7 @@ export default function PositionsTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('officials_count')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -190,12 +209,12 @@ export default function PositionsTableView({
                                     Account
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
-                                    onClick={() => onSort('status')}
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    onClick={() => onSort('is_active')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Status
-                                        {getSortIcon('status')}
+                                        {getSortIcon('is_active')}
                                     </div>
                                 </TableHead>
                                 <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[80px]">
@@ -242,13 +261,17 @@ export default function PositionsTableView({
                                         <TableCell className="px-4 py-3 whitespace-nowrap">
                                             <div className="flex items-center gap-3">
                                                 <div className={`h-8 w-8 rounded-full ${isKagawadPos ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-blue-100 dark:bg-blue-900/30'} flex items-center justify-center flex-shrink-0`}>
-                                                    <Shield className={`h-4 w-4 ${isKagawadPos ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}`} />
+                                                    {isKagawadPos ? (
+                                                        <Crown className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                                    ) : (
+                                                        <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                                    )}
                                                 </div>
                                                 <div className="min-w-0">
                                                     <div className="font-medium text-gray-900 dark:text-white truncate">
                                                         {truncateText(position.name, nameLength)}
                                                         {isKagawadPos && (
-                                                            <Badge variant="outline" className="ml-2 text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                                            <Badge variant="outline" className="ml-2 text-xs bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
                                                                 Kagawad
                                                             </Badge>
                                                         )}
@@ -301,7 +324,7 @@ export default function PositionsTableView({
                                             <div className="flex items-center gap-2">
                                                 <Users className="h-4 w-4 text-gray-500 flex-shrink-0" />
                                                 <Badge variant="outline" className="text-xs">
-                                                    {position.officials_count || 0}
+                                                    {position.officials_count ?? 0}
                                                 </Badge>
                                             </div>
                                         </TableCell>
@@ -422,7 +445,7 @@ export default function PositionsTableView({
                                                     <DropdownMenuSeparator />
                                                     
                                                     <DropdownMenuItem 
-                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950/50"
                                                         onClick={() => onDelete(position)}
                                                     >
                                                         <Trash2 className="mr-2 h-4 w-4" />

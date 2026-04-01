@@ -26,12 +26,13 @@ import {
 } from 'lucide-react';
 import { Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-import { PageProps } from '@/types';
+import { PageProps, PositionFormData } from '@/types/admin/positions/position.types';
 
 interface CommitteeOption {
     value: number;
     label: string;
-    code: string;
+    name: string;
+    is_active: boolean;
 }
 
 interface RoleOption {
@@ -46,14 +47,12 @@ interface CreatePositionProps extends PageProps {
 }
 
 export default function CreatePosition({ committees, roles, nextOrder }: CreatePositionProps) {
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors } = useForm<PositionFormData>({
         code: '',
         name: '',
-        committee_id: null as number | null,
-        additional_committees: [] as number[],
         description: '',
         order: nextOrder,
-        role_id: null as number | null,
+        committee_id: null,
         requires_account: false,
         is_active: true,
     });
@@ -87,30 +86,8 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
         }
     };
 
-    const handleRoleSelect = (roleId: string) => {
-        if (roleId === "null" || roleId === "") {
-            setData('role_id', null);
-        } else {
-            const id = parseInt(roleId);
-            setData('role_id', id);
-        }
-    };
-
-    const toggleAdditionalCommittee = (committeeId: number) => {
-        const current = data.additional_committees;
-        if (current.includes(committeeId)) {
-            setData('additional_committees', current.filter(id => id !== committeeId));
-        } else {
-            setData('additional_committees', [...current, committeeId]);
-        }
-    };
-
-    const getSelectedAdditionalCommittees = () => {
-        return committees.filter(c => data.additional_committees.includes(c.value));
-    };
-
-    const isKagawadPosition = data.name.toLowerCase().includes('kagawad') || 
-                              data.code.toLowerCase().includes('kagawad');
+    const isKagawadPosition = data.name?.toLowerCase().includes('kagawad') || 
+                              data.code?.toLowerCase().includes('kagawad');
 
     return (
         <AppLayout
@@ -249,41 +226,18 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
                                             <p className="text-xs text-gray-500 dark:text-gray-400">
                                                 Determines sorting in official lists
                                             </p>
+                                            {errors.order && (
+                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.order}</p>
+                                            )}
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="role_id" className="dark:text-gray-300">System Role</Label>
-                                            <Select 
-                                                value={data.role_id?.toString() || "null"}
-                                                onValueChange={handleRoleSelect}
-                                            >
-                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                    <SelectValue placeholder="Select system role" />
-                                                </SelectTrigger>
-                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                    <SelectItem value="null" className="dark:text-gray-300 dark:focus:bg-gray-700">No role</SelectItem>
-                                                    {roles.map((role) => (
-                                                        <SelectItem key={role.id} value={role.id.toString()} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                            {role.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                Role assigned when creating user account
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Committee Selection */}
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="committee_id" className="dark:text-gray-300">Primary Committee</Label>
+                                            <Label htmlFor="committee_id" className="dark:text-gray-300">Committee</Label>
                                             <Select 
                                                 value={data.committee_id?.toString() || "null"}
                                                 onValueChange={handleCommitteeSelect}
                                             >
                                                 <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                    <SelectValue placeholder="Select primary committee" />
+                                                    <SelectValue placeholder="Select committee" />
                                                 </SelectTrigger>
                                                 <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                     <SelectItem value="null" className="dark:text-gray-300 dark:focus:bg-gray-700">No committee</SelectItem>
@@ -300,58 +254,12 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
                                             {isKagawadPosition && !data.committee_id && (
                                                 <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1">
                                                     <AlertCircle className="h-3 w-3" />
-                                                    Kagawad positions usually have a primary committee
+                                                    Kagawad positions usually have a committee assigned
                                                 </p>
                                             )}
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label className="dark:text-gray-300">Additional Committees</Label>
-                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                                {committees.map((committee) => {
-                                                    const isPrimary = committee.value === data.committee_id;
-                                                    const isSelected = data.additional_committees.includes(committee.value);
-                                                    
-                                                    return (
-                                                        <div 
-                                                            key={committee.value} 
-                                                            className={`flex items-start space-x-2 p-2 border rounded-md ${
-                                                                isPrimary 
-                                                                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
-                                                                    : isSelected
-                                                                        ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
-                                                                        : 'border-gray-200 dark:border-gray-700'
-                                                            }`}
-                                                        >
-                                                            <Checkbox 
-                                                                id={`committee_${committee.value}`}
-                                                                checked={isSelected}
-                                                                onCheckedChange={() => toggleAdditionalCommittee(committee.value)}
-                                                                disabled={isPrimary}
-                                                                className="mt-0.5 dark:border-gray-600"
-                                                            />
-                                                            <Label 
-                                                                htmlFor={`committee_${committee.value}`} 
-                                                                className={`cursor-pointer text-sm ${
-                                                                    isPrimary 
-                                                                        ? 'text-blue-700 dark:text-blue-400 font-medium' 
-                                                                        : 'dark:text-gray-300'
-                                                                }`}
-                                                            >
-                                                                {committee.label}
-                                                                {isPrimary && (
-                                                                    <Badge variant="outline" className="ml-1 text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
-                                                                        Primary
-                                                                    </Badge>
-                                                                )}
-                                                            </Label>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                Select additional committees this position belongs to
-                                            </p>
+                                            {errors.committee_id && (
+                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.committee_id}</p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -365,6 +273,9 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
                                             onChange={(e) => setData('description', e.target.value)}
                                             className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                         />
+                                        {errors.description && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.description}</p>
+                                        )}
                                     </div>
 
                                     <div className="space-y-3">
@@ -382,6 +293,9 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
                                         <p className="text-sm text-gray-500 dark:text-gray-400 ml-7">
                                             Officials with this position will need a user account
                                         </p>
+                                        {errors.requires_account && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.requires_account}</p>
+                                        )}
 
                                         <div className="flex items-center space-x-2 p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                             <Checkbox 
@@ -394,6 +308,9 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
                                                 Position is active
                                             </Label>
                                         </div>
+                                        {errors.is_active && (
+                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.is_active}</p>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
@@ -449,29 +366,13 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
                                                 </div>
                                             </div>
 
-                                            {/* Committees Preview */}
-                                            {(data.committee_id || data.additional_committees.length > 0) && (
+                                            {/* Committee Preview */}
+                                            {selectedCommittee && (
                                                 <div className="pt-4 border-t dark:border-gray-700">
-                                                    <h5 className="font-medium mb-2 dark:text-gray-300">Committees:</h5>
-                                                    <div className="space-y-2">
-                                                        {selectedCommittee && (
-                                                            <div className="flex items-center justify-between p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                                                                <div className="flex items-center gap-2">
-                                                                    <Target className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                                                                    <span className="text-sm dark:text-gray-300">{selectedCommittee.label}</span>
-                                                                </div>
-                                                                <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
-                                                                    Primary
-                                                                </Badge>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {getSelectedAdditionalCommittees().map((committee) => (
-                                                            <div key={committee.value} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded border border-gray-200 dark:border-gray-700">
-                                                                <Target className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-                                                                <span className="text-sm dark:text-gray-300">{committee.label}</span>
-                                                            </div>
-                                                        ))}
+                                                    <h5 className="font-medium mb-2 dark:text-gray-300">Committee:</h5>
+                                                    <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                                                        <Target className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                                        <span className="text-sm dark:text-gray-300">{selectedCommittee.label}</span>
                                                     </div>
                                                 </div>
                                             )}
@@ -508,7 +409,7 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
                                             <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
                                             <div>
                                                 <span className="font-medium dark:text-gray-200">Kagawad Positions:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Should have a primary committee assigned (e.g., Kagawad - Peace and Order)</p>
+                                                <p className="text-gray-600 dark:text-gray-400">Should have a committee assigned (e.g., Kagawad - Peace and Order)</p>
                                             </div>
                                         </li>
                                         <li className="flex items-start gap-2">
@@ -521,15 +422,15 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
                                         <li className="flex items-start gap-2">
                                             <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
                                             <div>
-                                                <span className="font-medium dark:text-gray-200">Multiple Committees:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Some positions (e.g., SK Chairman) may belong to multiple committees</p>
+                                                <span className="font-medium dark:text-gray-200">Display Order:</span>
+                                                <p className="text-gray-600 dark:text-gray-400">Determines how officials are displayed on the barangay website</p>
                                             </div>
                                         </li>
                                         <li className="flex items-start gap-2">
                                             <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
                                             <div>
-                                                <span className="font-medium dark:text-gray-200">Display Order:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Determines how officials are displayed on the barangay website</p>
+                                                <span className="font-medium dark:text-gray-200">Position Code:</span>
+                                                <p className="text-gray-600 dark:text-gray-400">Unique identifier used in URLs and API endpoints</p>
                                             </div>
                                         </li>
                                     </ul>
@@ -553,11 +454,9 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
                                     setData({
                                         code: '',
                                         name: '',
-                                        committee_id: null,
-                                        additional_committees: [],
                                         description: '',
                                         order: nextOrder,
-                                        role_id: null,
+                                        committee_id: null,
                                         requires_account: false,
                                         is_active: true,
                                     });

@@ -1,5 +1,6 @@
 // resources/js/pages/admin/puroks/index.tsx
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+
+import { useState, useMemo, useEffect, useCallback, useRef, SetStateAction } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
 import debounce from 'lodash/debounce';
@@ -7,11 +8,10 @@ import AppLayout from '@/layouts/admin-app-layout';
 import { 
     Purok, 
     PurokFilters, 
-    PurokStats, 
-    BulkOperation
-} from '@/types/purok';
-
-type SelectionMode = 'page' | 'filtered' | 'all';
+    PaginationData,
+    BulkOperation,
+    SelectionMode
+} from '@/types/admin/puroks/purok';
 import { purokUtils } from '@/admin-utils/purok-utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -23,16 +23,6 @@ import PuroksContent from '@/components/admin/puroks/PuroksContent';
 import PuroksDialogs from '@/components/admin/puroks/PuroksDialogs';
 import { Button } from '@/components/ui/button';
 import { KeyRound } from 'lucide-react';
-
-interface PaginationData {
-    data: Purok[];
-    total: number;
-    per_page: number;
-    current_page: number;
-    last_page: number;
-    from: number;
-    to: number;
-}
 
 interface PuroksPageProps {
     puroks: PaginationData;
@@ -85,6 +75,38 @@ export default function PuroksIndex({
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
+    // Debounced search function
+    const debouncedSearch = useCallback(
+        debounce((value: string) => {
+            const params = {
+                ...filtersState,
+                search: value || undefined,
+                status: filtersState.status === 'all' ? undefined : filtersState.status,
+            };
+            
+            Object.keys(params).forEach(key => {
+                const k = key as keyof typeof params;
+                if (params[k] === undefined || params[k] === '') {
+                    delete params[k];
+                }
+            });
+            
+            router.get('/admin/puroks', params, {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+            });
+        }, 300),
+        [filtersState]
+    );
+
+    // Cleanup debounce on unmount
+    useEffect(() => {
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [debouncedSearch]);
+
     // Handle window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -119,8 +141,6 @@ export default function PuroksIndex({
             toast.error(flash.error);
         }
     }, [flash]);
-
-    
 
     // Filter puroks
     const filteredPuroks = useMemo(() => {
@@ -286,7 +306,6 @@ export default function PuroksIndex({
 
                 case 'export':
                 case 'export_csv':
-                    // Export to CSV
                     const exportData = selectedPuroksData.map(purok => ({
                         'ID': purok.id,
                         'Name': purok.name,
@@ -328,7 +347,6 @@ export default function PuroksIndex({
                     break;
 
                 case 'print':
-                    // Open print preview for each selected purok
                     selectedPuroks.forEach(id => {
                         window.open(`/admin/puroks/${id}/print`, '_blank');
                     });
@@ -337,7 +355,6 @@ export default function PuroksIndex({
                     break;
 
                 case 'generate_report':
-                    // Generate report for selected puroks
                     const idsParam = selectedPuroks.join(',');
                     window.open(`/admin/puroks/report?ids=${idsParam}`, '_blank');
                     toast.success(`Generating report for ${selectedPuroks.length} purok(s)`);
@@ -345,7 +362,6 @@ export default function PuroksIndex({
                     break;
 
                 case 'send_message':
-                    // Get leaders with contact numbers
                     const leadersWithContacts = selectedPuroksData
                         .filter(p => p.leader_contact)
                         .map(p => ({ name: p.leader_name, contact: p.leader_contact }));
@@ -475,7 +491,6 @@ export default function PuroksIndex({
             sort_order: newOrder
         }));
         
-        // Trigger server-side sort update
         const params = {
             ...filtersState,
             sort_by: column,
@@ -505,7 +520,6 @@ export default function PuroksIndex({
             sort_order: 'asc'
         });
         
-        // Trigger server-side filter clear
         router.get('/admin/puroks', {
             search: '',
             status: 'all',
@@ -553,7 +567,6 @@ export default function PuroksIndex({
     const updateFilter = (key: keyof PurokFilters, value: string) => {
         setFiltersState(prev => ({ ...prev, [key]: value }));
         
-        // Trigger server-side filter update
         const params = {
             ...filtersState,
             [key]: value,
@@ -574,9 +587,10 @@ export default function PuroksIndex({
         });
     };
 
-    const hasActiveFilters = 
+    const hasActiveFilters = Boolean(
         search || 
-        filtersState.status !== 'all';
+        filtersState.status !== 'all'
+    );
 
     return (
         <AppLayout
@@ -595,17 +609,19 @@ export default function PuroksIndex({
                         onUpdateStatistics={handleUpdateStatistics}
                     />
 
-                    {/* Separate Stats Component */}
                     <PuroksStats 
                         globalStats={stats}
                         filteredStats={filteredStats}
                         isLoading={isPerformingBulkAction}
                     />
 
-                    <PuroksFilters
-                        // Remove stats prop
+                   <PuroksFilters
                         search={search}
                         setSearch={setSearch}
+                        onSearchChange={(value: string) => {  // ← Change to string, not SetStateAction<string>
+                            setSearch(value);
+                            debouncedSearch(value);
+                        }}
                         filtersState={filtersState}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
@@ -619,10 +635,8 @@ export default function PuroksIndex({
                         searchInputRef={searchInputRef}
                         isLoading={isPerformingBulkAction}
                     />
-
                     <PuroksContent
                         puroks={paginatedPuroks}
-                        // Remove stats prop
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}

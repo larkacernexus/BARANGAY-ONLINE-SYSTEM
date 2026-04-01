@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
-import { SystemModule } from '@/types';
+import { SystemModule, PermissionCreateProps } from '@/types/admin/permissions/permission.types';
 import {
     ArrowLeft,
     Save,
@@ -14,7 +14,6 @@ import {
     Copy,
     HelpCircle,
     FileText,
-    PlusCircle,
     LayoutDashboard,
     Users,
     Home,
@@ -36,11 +35,6 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { route } from 'ziggy-js';
-
-interface PermissionCreateProps {
-    modules?: SystemModule[];
-    validation_errors?: Record<string, string>;
-}
 
 export default function PermissionCreate({ 
     modules = [], 
@@ -171,7 +165,7 @@ export default function PermissionCreate({
                 setData('name', suggestedName);
             }
         }
-    }, [data.display_name, selectedModule]);
+    }, [data.display_name, selectedModule, setData]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -306,7 +300,7 @@ export default function PermissionCreate({
                                     <div className="space-y-2">
                                         <Label htmlFor="module">Module *</Label>
                                         {modules.length === 0 ? (
-                                            <Alert variant="warning">
+                                            <Alert variant="destructive">
                                                 <AlertCircle className="h-4 w-4" />
                                                 <AlertDescription>
                                                     No modules available. Please contact your administrator.

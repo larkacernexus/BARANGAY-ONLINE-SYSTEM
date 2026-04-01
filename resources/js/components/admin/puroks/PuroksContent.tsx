@@ -1,3 +1,5 @@
+// resources/js/components/admin/puroks/PuroksContent.tsx
+
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,7 +31,9 @@ import {
     MoreVertical,
     ExternalLink,
     Phone,
-    Shield
+    Shield,
+    ChevronUp,
+    ChevronDown
 } from 'lucide-react';
 
 import { Link } from '@inertiajs/react';
@@ -41,12 +45,11 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import PuroksTableView from '@/components/admin/puroks/PuroksTableView';
 import PuroksGridView from '@/components/admin/puroks/PuroksGridView';
 import PuroksBulkActions from '@/components/admin/puroks/PuroksBulkActions';
-import { Purok, PurokFilters } from '@/types/purok';
+import { Purok, PurokFilters, BulkOperation } from '@/types/admin/puroks/purok'; // ← Import BulkOperation
 import { purokUtils } from '@/admin-utils/purok-utils';
 
 interface PuroksContentProps {
     puroks: Purok[];
-    stats: Array<{label: string, value: number | string}>;
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
@@ -68,7 +71,7 @@ interface PuroksContentProps {
     onClearSelection: () => void;
     onDelete: (purok: Purok) => void;
     onSort: (column: string) => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void; // ← CHANGE: Use BulkOperation type
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkStatusDialog?: (show: boolean) => void;
@@ -80,7 +83,6 @@ interface PuroksContentProps {
 
 export default function PuroksContent({
     puroks,
-    stats,
     isBulkMode,
     setIsBulkMode,
     isSelectAll,
@@ -184,7 +186,9 @@ export default function PuroksContent({
 
     const getSortIcon = (column: string) => {
         if (filtersState.sort_by !== column) return null;
-        return filtersState.sort_order === 'asc' ? '↑' : '↓';
+        return filtersState.sort_order === 'asc' 
+            ? <ChevronUp className="h-4 w-4 ml-1" /> 
+            : <ChevronDown className="h-4 w-4 ml-1" />;
     };
 
     return (
@@ -333,6 +337,7 @@ export default function PuroksContent({
                                     hasActiveFilters={hasActiveFilters}
                                     onClearFilters={onClearFilters}
                                     selectionStats={selectionStats}
+                                    onCopyToClipboard={onCopySelectedData}
                                 />
                             )}
 

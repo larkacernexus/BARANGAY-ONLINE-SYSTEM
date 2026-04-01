@@ -1,3 +1,5 @@
+// resources/js/Pages/Admin/Privileges/components/assign-modal.tsx
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,7 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import type { Privilege, Resident } from '@/components/admin/privileges/show/privilege';
+import { Privilege, Resident } from '@/types/admin/privileges/privilege.types';
 
 interface Props {
     isOpen: boolean;
@@ -33,7 +35,7 @@ interface Props {
     onSuccess?: () => void;
 }
 
-const getFullName = (resident: Resident) => {
+const getFullName = (resident: Resident): string => {
     const middle = resident.middle_name ? ` ${resident.middle_name.charAt(0)}.` : '';
     return `${resident.last_name}, ${resident.first_name}${middle}`;
 };
@@ -57,7 +59,7 @@ export const AssignModal = ({ isOpen, onClose, privilege, onSuccess }: Props) =>
     const [notes, setNotes] = useState('');
     const [verifyNow, setVerifyNow] = useState(!privilege.requires_verification);
 
-    // Get discount values from privilege (to be stored in resident_privileges table)
+    // Get discount values from privilege
     const discountTypeId = useMemo(() => {
         return privilege.discount_type_id;
     }, [privilege.discount_type_id]);
@@ -86,6 +88,8 @@ export const AssignModal = ({ isOpen, onClose, privilege, onSuccess }: Props) =>
             setExpiresAt('');
             setVerifyNow(!privilege.requires_verification);
             setSearchError(null);
+            setPage(1);
+            setHasMore(true);
         }
     }, [isOpen, privilege.requires_verification]);
 
@@ -368,7 +372,7 @@ export const AssignModal = ({ isOpen, onClose, privilege, onSuccess }: Props) =>
                                         />
                                         <label
                                             htmlFor="verifyNow"
-                                            className="text-sm font-medium leading-none"
+                                            className="text-sm font-medium leading-none cursor-pointer"
                                         >
                                             Verify immediately
                                         </label>

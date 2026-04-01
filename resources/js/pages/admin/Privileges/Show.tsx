@@ -1,8 +1,9 @@
+// resources/js/Pages/Admin/Privileges/Show.tsx
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import AppLayout from '@/layouts/admin-app-layout';
-
 import { route } from 'ziggy-js';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -26,56 +27,29 @@ import {
     UserCheck,
 } from 'lucide-react';
 
+// Import types
+import { 
+    Privilege, 
+    DiscountType,
+    ResidentPrivilege,
+    Resident 
+} from '@/types/admin/privileges/privilege.types';
+
+// Import components
+import { RecentAssignmentsTable } from '@/components/admin/privileges/show/components/recent-assignments-table';
+import { RequirementsCard } from '@/components/admin/privileges/show/components/requirements-card';
+import { QuickActionsCard } from '@/components/admin/privileges/show/components/quick-actions-card';
+import { SystemInfoCard } from '@/components/admin/privileges/show/components/system-info-card';
+import { UsageStatisticsCard } from '@/components/admin/privileges/show/components/usage-statistics-card';
+import { AssignModal } from '@/components/admin/privileges/show/components/assign-modal';
+import { PrivilegeHeader } from '@/components/admin/privileges/show/components/privilege-header';
+import { PrivilegeInfoCard } from '@/components/admin/privileges/show/components/privilege-info-card';
+import { AllAssignmentsTable } from '@/components/admin/privileges/show/components/all-assignments-table';
+import { RequirementsTabContent } from '@/components/admin/privileges/show/components/requirements-tab-content';
+import { AnalyticsTabContent } from '@/components/admin/privileges/show/components/analytics-tab-content';
+import { DeleteConfirmationDialog } from '@/components/admin/privileges/show/components/delete-confirmation-dialog';
+
 // ========== INTERFACES ==========
-interface DiscountType {
-    id: number;
-    name: string;
-    code: string;
-    default_percentage: number;  // Added to match AssignModal's expectation
-}
-
-interface Resident {
-    id: number;
-    first_name: string;
-    last_name: string;
-    middle_name?: string;
-    contact_number?: string;
-    email?: string;
-    age?: number;
-    gender?: string;
-}
-
-interface ResidentPrivilege {
-    id: number;
-    resident_id: number;
-    privilege_id: number;
-    id_number?: string;
-    verified_at: string | null;
-    expires_at: string | null;
-    created_at: string;
-    resident: Resident;
-}
-
-interface Privilege {
-    id: number;
-    name: string;
-    code: string;
-    description: string | null;
-    is_active: boolean;
-    discount_type_id: number;
-    default_discount_percentage: string | number;
-    requires_id_number: boolean;
-    requires_verification: boolean;
-    validity_years: number | null;
-    created_at: string;
-    updated_at: string;
-    discount_type?: DiscountType;
-    residents_count?: number;
-    active_residents_count?: number;
-    pending_count?: number;
-    expired_count?: number;
-}
-
 interface Props {
     privilege: Privilege;
     recentAssignments: ResidentPrivilege[];
@@ -86,20 +60,8 @@ interface Props {
     };
 }
 
-// ========== DEBOUNCE UTILITY ==========
-function debounce<T extends (...args: any[]) => any>(
-    func: T,
-    wait: number
-): (...args: Parameters<T>) => void {
-    let timeout: NodeJS.Timeout;
-    return (...args: Parameters<T>) => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), wait);
-    };
-}
-
 // ========== HELPER FUNCTIONS ==========
-const formatDate = (dateString: string | null, includeTime: boolean = false) => {
+const formatDate = (dateString: string | null, includeTime: boolean = false): string => {
     if (!dateString) return 'N/A';
     try {
         const date = parseISO(dateString);
@@ -109,7 +71,7 @@ const formatDate = (dateString: string | null, includeTime: boolean = false) => 
     }
 };
 
-const getStatusColor = (isActive: boolean) => {
+const getStatusColor = (isActive: boolean): string => {
     return isActive 
         ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
         : 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
@@ -148,7 +110,7 @@ const getAssignmentStatusBadge = (assignment: ResidentPrivilege) => {
     );
 };
 
-const getFullName = (resident: Resident) => {
+const getFullName = (resident: Resident): string => {
     let name = `${resident.first_name}`;
     if (resident.middle_name) {
         name += ` ${resident.middle_name.charAt(0)}.`;
@@ -156,20 +118,6 @@ const getFullName = (resident: Resident) => {
     name += ` ${resident.last_name}`;
     return name;
 };
-
-// ========== IMPORT COMPONENTS ==========
-import { RecentAssignmentsTable } from '@/components/admin/privileges/show/components/recent-assignments-table';
-import { RequirementsCard } from '@/components/admin/privileges/show/components/requirements-card';
-import { QuickActionsCard } from '@/components/admin/privileges/show/components/quick-actions-card';
-import { SystemInfoCard } from '@/components/admin/privileges/show/components/system-info-card';
-import { UsageStatisticsCard } from '@/components/admin/privileges/show/components/usage-statistics-card';
-import { AssignModal } from '@/components/admin/privileges/show/components/assign-modal';
-import { PrivilegeHeader } from '@/components/admin/privileges/show/components/privilege-header';
-import { PrivilegeInfoCard } from '@/components/admin/privileges/show/components/privilege-info-card';
-import { AllAssignmentsTable } from '@/components/admin/privileges/show/components/all-assignments-table';
-import { RequirementsTabContent } from '@/components/admin/privileges/show/components/requirements-tab-content';
-import { AnalyticsTabContent } from '@/components/admin/privileges/show/components/analytics-tab-content';
-import { DeleteConfirmationDialog } from '@/components/admin/privileges/show/components/delete-confirmation-dialog';
 
 // ========== MAIN COMPONENT ==========
 export default function Show({ privilege, recentAssignments, can }: Props) {
@@ -218,17 +166,18 @@ export default function Show({ privilege, recentAssignments, can }: Props) {
         const a = document.createElement('a');
         a.href = url;
         a.download = `privilege-${privilege.code}-data.json`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     // Function to refresh data after successful assignment
-    const refreshData = () => {
-        router.reload({ 
-            only: ['privilege', 'recentAssignments'], // Only reload these props
-            preserveState: true,
-            preserveScroll: true 
-        });
-    };
+        const refreshData = () => {
+            router.reload({
+                only: ['privilege', 'recentAssignments']
+            });
+        };
 
     const stats = [
         {
@@ -247,14 +196,14 @@ export default function Show({ privilege, recentAssignments, can }: Props) {
         },
         {
             title: 'Total Assignments',
-            value: privilege.residents_count || 0,
+            value: privilege.residents_count ?? 0,
             icon: <Users className="h-5 w-5" />,
             color: 'purple' as const,
             description: undefined
         },
         {
             title: 'Active Now',
-            value: privilege.active_residents_count || 0,
+            value: privilege.active_residents_count ?? 0,
             icon: <UserCheck className="h-5 w-5" />,
             description: 'Verified & active',
             color: 'amber' as const
@@ -263,7 +212,7 @@ export default function Show({ privilege, recentAssignments, can }: Props) {
 
     const tabs = [
         { id: 'overview', label: 'Overview', icon: <Info className="h-4 w-4" /> },
-        { id: 'assignments', label: 'Assignments', icon: <Users className="h-4 w-4" />, count: privilege.residents_count },
+        { id: 'assignments', label: 'Assignments', icon: <Users className="h-4 w-4" />, count: privilege.residents_count ?? 0 },
         { id: 'requirements', label: 'Requirements', icon: <Shield className="h-4 w-4" /> },
         { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="h-4 w-4" /> },
     ];
@@ -285,7 +234,7 @@ export default function Show({ privilege, recentAssignments, can }: Props) {
                     <PrivilegeHeader
                         privilege={privilege}
                         isNew={isNew}
-                        copied={copied}
+                        // copied={copied}
                         can={can}
                         onCopyLink={handleCopyLink}
                         onPrint={handlePrint}
@@ -293,7 +242,6 @@ export default function Show({ privilege, recentAssignments, can }: Props) {
                         onAssign={() => setShowAssignModal(true)}
                         onDelete={() => setShowDeleteDialog(true)}
                     />
-
 
                     {/* Tabs Navigation */}
                     <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">

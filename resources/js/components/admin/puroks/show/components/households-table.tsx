@@ -23,22 +23,30 @@ import {
     PlusCircle,
     ChevronLeft,
     ChevronRight,
-    Map,
     MapPin,
 } from 'lucide-react';
-import { PaginatedData, Household } from '../types';
+import { Household } from '@/types/admin/puroks/purok';
 import { SingleHouseholdMapModal } from './SingleHouseholdMapModal';
 
+interface HouseholdsPaginatedData {
+    data: Household[];
+    total: number;
+    per_page: number;
+    current_page: number;
+    last_page: number;
+    from: number;
+    to: number;
+}
+
 interface Props {
-    households: PaginatedData<Household>;
+    households: HouseholdsPaginatedData;
     purokId: number;
     purokName: string;
 }
 
 export const HouseholdsTable = ({ households, purokId, purokName }: Props) => {
-    const [mapModalOpen, setMapModalOpen] = useState(false);
-    const [selectedHousehold, setSelectedHousehold] = useState<Household | null>(null);
     const [singleMapModalOpen, setSingleMapModalOpen] = useState(false);
+    const [selectedHousehold, setSelectedHousehold] = useState<Household | null>(null);
     
     const handlePageChange = (page: number) => {
         router.get(`/admin/puroks/${purokId}`, { household_page: page }, {
@@ -52,13 +60,41 @@ export const HouseholdsTable = ({ households, purokId, purokName }: Props) => {
         setSingleMapModalOpen(true);
     };
 
-    const allHouseholds = households.data || [];
+    const getHeadOfHousehold = (household: Household): string => {
+        if (household.head_of_household) {
+            const head = household.head_of_household;
+            let name = `${head.first_name}`;
+            if (head.middle_name) {
+                name += ` ${head.middle_name.charAt(0)}.`;
+            }
+            name += ` ${head.last_name}`;
+            return name;
+        }
+        
+        if (household.members) {
+            const head = household.members.find(member => member.is_head);
+            if (head) {
+                let name = `${head.first_name}`;
+                if (head.middle_name) {
+                    name += ` ${head.middle_name.charAt(0)}.`;
+                }
+                name += ` ${head.last_name}`;
+                return name;
+            }
+        }
+        
+        return 'Not assigned';
+    };
 
-    // Check if a household has coordinates
-    const hasCoordinates = (household: Household) => {
-        return household.latitude && household.longitude && 
-               typeof household.latitude === 'number' && 
-               typeof household.longitude === 'number';
+    const hasCoordinates = (household: Household): boolean => {
+        return !!(household.latitude && household.longitude);
+    };
+
+    const getContactNumber = (household: Household): string => {
+        if (household.head_of_household?.contact_number) {
+            return household.head_of_household.contact_number;
+        }
+        return 'N/A';
     };
 
     return (
@@ -75,8 +111,13 @@ export const HouseholdsTable = ({ households, purokId, purokName }: Props) => {
                         </CardDescription>
                     </div>
                     <div className="flex gap-2">
-                       
-                        <Link href={`/admin/households?purok=${encodeURIComponent(purokName)}`}>
+                        <Link href={`/admin/households/create?purok_id=${purokId}&purok_name=${encodeURIComponent(purokName)}`}>
+                            <Button size="sm" className="dark:bg-blue-600 dark:hover:bg-blue-700">
+                                <PlusCircle className="h-4 w-4 mr-1" />
+                                Add Household
+                            </Button>
+                        </Link>
+                        <Link href={`/admin/households?purok_id=${purokId}`}>
                             <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
                                 View All
                                 <ChevronRight className="h-4 w-4 ml-1" />
@@ -102,7 +143,7 @@ export const HouseholdsTable = ({ households, purokId, purokName }: Props) => {
                                         <TableCell colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">
                                             No households in this purok yet.
                                             <div className="mt-2">
-                                                <Link href="/admin/households/create">
+                                                <Link href={`/admin/households/create?purok_id=${purokId}&purok_name=${encodeURIComponent(purokName)}`}>
                                                     <Button size="sm" variant="outline" className="dark:border-gray-600 dark:text-gray-300">
                                                         <PlusCircle className="h-3 w-3 mr-1" />
                                                         Register Household
@@ -115,21 +156,27 @@ export const HouseholdsTable = ({ households, purokId, purokName }: Props) => {
                                     households.data.map((household) => (
                                         <TableRow key={household.id} className="dark:border-gray-700">
                                             <TableCell className="font-medium dark:text-gray-200">
-                                                <Link href={`/admin/households/${household.id}`} className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
+                                                <Link 
+                                                    href={`/admin/households/${household.id}`} 
+                                                    className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                                                >
                                                     {household.household_number}
                                                 </Link>
                                             </TableCell>
-                                            <TableCell className="dark:text-gray-300">{household.head_of_family}</TableCell>
+                                            <TableCell className="dark:text-gray-300">
+                                                {getHeadOfHousehold(household)}
+                                            </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
                                                     <Users className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-                                                    <span className="dark:text-gray-300">{household.member_count}</span>
+                                                    <span className="dark:text-gray-300">{household.total_members || 0}</span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="dark:text-gray-300">{household.contact_number || 'N/A'}</TableCell>
+                                            <TableCell className="dark:text-gray-300">
+                                                {getContactNumber(household)}
+                                            </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-1">
-                                                    {/* Map Button - Only show if household has coordinates */}
                                                     {hasCoordinates(household) && (
                                                         <TooltipProvider>
                                                             <Tooltip>
@@ -168,11 +215,10 @@ export const HouseholdsTable = ({ households, purokId, purokName }: Props) => {
                         </Table>
                     </div>
                     
-                    {/* Pagination for households */}
                     {households.last_page > 1 && (
                         <div className="flex items-center justify-between mt-4 pt-4 border-t dark:border-gray-700">
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                                Showing {households.data.length} of {households.total} households
+                                Showing {households.from} to {households.to} of {households.total} households
                             </div>
                             <div className="flex gap-2">
                                 <Button
@@ -201,9 +247,6 @@ export const HouseholdsTable = ({ households, purokId, purokName }: Props) => {
                 </CardContent>
             </Card>
 
-        
-
-            {/* Single Household Map Modal */}
             <SingleHouseholdMapModal
                 open={singleMapModalOpen}
                 onOpenChange={setSingleMapModalOpen}

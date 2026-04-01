@@ -1,3 +1,5 @@
+// resources/js/Pages/Admin/Puroks/utils/helpers.ts
+
 import React from 'react';
 import { format, parseISO } from 'date-fns';
 import {
@@ -18,7 +20,7 @@ export interface Resident {
     first_name: string;
     middle_name?: string | null;
     last_name: string;
-    [key: string]: any; // Allows for other resident properties without errors
+    [key: string]: any;
 }
 
 export const formatDate = (dateString: string, includeTime: boolean = false) => {
@@ -97,14 +99,43 @@ export const getColorClass = (color: string) => {
     }
 };
 
-export const formatCoordinates = (latitude?: number, longitude?: number) => {
-    if (latitude && longitude) {
-        return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+// FIXED: Updated to accept string | number | null
+export const formatCoordinates = (latitude?: string | number | null, longitude?: string | number | null) => {
+    if (!latitude || !longitude) {
+        return 'Not set';
     }
-    return 'Not available';
+    
+    // Convert to numbers if they're strings
+    const lat = typeof latitude === 'string' ? parseFloat(latitude) : latitude;
+    const lng = typeof longitude === 'string' ? parseFloat(longitude) : longitude;
+    
+    // Check if they're valid numbers
+    if (isNaN(lat) || isNaN(lng)) {
+        return 'Invalid coordinates';
+    }
+    
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 };
 
 export const truncateUrl = (url: string, maxLength: number = 50) => {
     if (url.length <= maxLength) return url;
     return url.substring(0, maxLength) + '...';
+};
+
+// Add these helper functions for better coordinate handling
+export const parseCoordinate = (coord?: string | number | null): number | null => {
+    if (coord === undefined || coord === null) return null;
+    
+    const num = typeof coord === 'string' ? parseFloat(coord) : coord;
+    
+    if (isNaN(num)) return null;
+    
+    return num;
+};
+
+export const isValidCoordinates = (latitude?: string | number | null, longitude?: string | number | null): boolean => {
+    const lat = parseCoordinate(latitude);
+    const lng = parseCoordinate(longitude);
+    
+    return lat !== null && lng !== null;
 };

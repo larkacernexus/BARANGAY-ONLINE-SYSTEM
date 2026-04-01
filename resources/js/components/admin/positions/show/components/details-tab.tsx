@@ -25,7 +25,7 @@ import {
     Hash,
 } from 'lucide-react';
 import { Link, router } from '@inertiajs/react';
-import { Position } from '../types';
+import { Position } from '@/types/admin/positions/position.types';
 import { formatShortDate } from '../utils/helpers';
 
 // Helper Label component
@@ -45,16 +45,7 @@ interface Props {
 }
 
 export const DetailsTab = ({ position, copied, onCopyCode, formatDateTime }: Props) => {
-    const getPrimaryCommittee = () => {
-        return position.committee;
-    };
-
-    const getAdditionalCommittees = () => {
-        if (!position.all_committees || !position.additional_committees) return [];
-        return position.all_committees.filter(c => 
-            position.additional_committees.includes(c.id)
-        );
-    };
+    const hasCommittee = position.committee !== null && position.committee !== undefined;
 
     return (
         <div className="grid gap-6 lg:grid-cols-3">
@@ -89,6 +80,19 @@ export const DetailsTab = ({ position, copied, onCopyCode, formatDateTime }: Pro
 
                         <Separator className="dark:bg-gray-700" />
 
+                        {/* Display Order */}
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Display Order</Label>
+                            <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                    <Hash className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                    <span className="font-medium dark:text-gray-200">{position.order}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <Separator className="dark:bg-gray-700" />
+
                         {/* Description Section */}
                         <div className="space-y-2">
                             <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</Label>
@@ -103,6 +107,34 @@ export const DetailsTab = ({ position, copied, onCopyCode, formatDateTime }: Pro
                             )}
                         </div>
 
+                        {/* Committee Information */}
+                        {hasCommittee && (
+                            <>
+                                <Separator className="dark:bg-gray-700" />
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-500 dark:text-gray-400">Committee Assignment</Label>
+                                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <p className="font-medium dark:text-blue-300">{position.committee!.name}</p>
+                                                {position.committee!.description && (
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                        {position.committee!.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <Badge 
+                                                variant={position.committee!.is_active ? "default" : "secondary"} 
+                                                className="dark:bg-gray-700 dark:text-gray-300"
+                                            >
+                                                {position.committee!.is_active ? 'Active' : 'Inactive'}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
                         {/* System Role */}
                         {position.role && (
                             <>
@@ -113,9 +145,6 @@ export const DetailsTab = ({ position, copied, onCopyCode, formatDateTime }: Pro
                                         <div className="flex items-start justify-between">
                                             <div>
                                                 <p className="font-medium dark:text-gray-200">{position.role.name}</p>
-                                                {position.role.description && (
-                                                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{position.role.description}</p>
-                                                )}
                                             </div>
                                             <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
                                                 <Key className="h-3 w-3 mr-1" />
@@ -143,7 +172,7 @@ export const DetailsTab = ({ position, copied, onCopyCode, formatDateTime }: Pro
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-600 dark:text-gray-400">Total Officials</span>
-                            <span className="font-bold text-lg dark:text-gray-200">{position.officials_count || 0}</span>
+                            <span className="font-bold text-lg dark:text-gray-200">{position.officials_count ?? 0}</span>
                         </div>
                         <Separator className="dark:bg-gray-700" />
                         <div className="flex items-center justify-between">
@@ -152,9 +181,9 @@ export const DetailsTab = ({ position, copied, onCopyCode, formatDateTime }: Pro
                         </div>
                         <Separator className="dark:bg-gray-700" />
                         <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600 dark:text-gray-400">Committees</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Committee</span>
                             <span className="font-bold text-lg dark:text-gray-200">
-                                {(position.committee ? 1 : 0) + (position.additional_committees?.length || 0)}
+                                {hasCommittee ? 1 : 0}
                             </span>
                         </div>
                         <Separator className="dark:bg-gray-700" />

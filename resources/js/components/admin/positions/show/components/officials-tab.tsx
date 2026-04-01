@@ -3,52 +3,85 @@ import React from 'react';
 import { Link } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
     Users,
     UserPlus,
     UserCheck,
-    XCircle,
-    Mail,
-    Phone,
-    Calendar,
-    CheckCircle,
+    Info,
 } from 'lucide-react';
-import { Position, Official } from '../types';
-import { formatShortDate } from '@/components/admin/positions/show/utils/helpers';
+import { Position } from '@/types/admin/positions/position.types';
 
 interface Props {
     position: Position;
 }
 
 export const OfficialsTab = ({ position }: Props) => {
-    const getActiveOfficials = (): Official[] => {
-        return position.officials?.filter(o => o.is_active) || [];
-    };
+    const hasOfficials = (position.officials_count ?? 0) > 0;
 
-    const getInactiveOfficials = (): Official[] => {
-        return position.officials?.filter(o => !o.is_active) || [];
-    };
-
-    if (!position.officials || position.officials.length === 0) {
-        return (
-            <Card className="dark:bg-gray-900">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+    return (
+        <Card className="dark:bg-gray-900">
+            <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 dark:text-gray-100">
                         <Users className="h-5 w-5" />
-                        No Officials Assigned
-                    </CardTitle>
-                    <CardDescription className="dark:text-gray-400">
-                        This position doesn't have any officials assigned yet
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-center py-8 space-y-4">
+                        Officials ({position.officials_count ?? 0})
+                    </span>
+                    <Link href={`/admin/officials/create?position_id=${position.id}`}>
+                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            Assign Official
+                        </Button>
+                    </Link>
+                </CardTitle>
+                <CardDescription className="dark:text-gray-400">
+                    Officials assigned to this position
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {hasOfficials ? (
+                    <div className="space-y-4">
+                        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                            <div className="flex items-center gap-3">
+                                <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                    <UserCheck className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="font-semibold text-blue-900 dark:text-blue-300">
+                                        {position.officials_count} Official(s) Assigned
+                                    </h4>
+                                    <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
+                                        This position currently has {position.officials_count} official(s) assigned.
+                                    </p>
+                                </div>
+                                <Link href={`/admin/officials?position_id=${position.id}`}>
+                                    <Button variant="outline" className="border-blue-300 dark:border-blue-700">
+                                        View All
+                                    </Button>
+                                </Link>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                                <Info className="h-5 w-5 text-gray-400 mt-0.5" />
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                    <p>Manage officials assigned to this position:</p>
+                                    <ul className="list-disc list-inside mt-2 space-y-1">
+                                        <li>View detailed information about each official</li>
+                                        <li>Update official status and任期</li>
+                                        <li>Remove or reassign officials as needed</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-center py-12 space-y-4">
                         <Users className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600" />
                         <div>
-                            <h4 className="font-medium text-gray-700 dark:text-gray-300">No officials found</h4>
+                            <h4 className="font-medium text-gray-700 dark:text-gray-300">No officials assigned</h4>
                             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                                Assign an official to this position
+                                This position doesn't have any officials assigned yet
                             </p>
                         </div>
                         <Link href={`/admin/officials/create?position_id=${position.id}`}>
@@ -58,134 +91,8 @@ export const OfficialsTab = ({ position }: Props) => {
                             </Button>
                         </Link>
                     </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    const activeOfficials = getActiveOfficials();
-    const inactiveOfficials = getInactiveOfficials();
-
-    return (
-        <div className="space-y-6">
-            {/* Active Officials */}
-            {activeOfficials.length > 0 && (
-                <Card className="dark:bg-gray-900">
-                    <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                            <span className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                                <UserCheck className="h-5 w-5" />
-                                Active Officials ({activeOfficials.length})
-                            </span>
-                            <Link href={`/admin/officials/create?position_id=${position.id}`}>
-                                <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
-                                    <UserPlus className="h-4 w-4 mr-2" />
-                                    Assign Official
-                                </Button>
-                            </Link>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2">
-                            {activeOfficials.map((official) => (
-                                <Link 
-                                    key={official.id} 
-                                    href={`/admin/officials/${official.id}`}
-                                    className="block"
-                                >
-                                    <Card className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors border-green-100 dark:border-green-900">
-                                        <CardContent className="p-4">
-                                            <div className="space-y-2">
-                                                <div className="flex items-start justify-between">
-                                                    <h5 className="font-medium dark:text-gray-200">{official.full_name}</h5>
-                                                    <Badge className="gap-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                                                        <CheckCircle className="h-3 w-3" />
-                                                        Active
-                                                    </Badge>
-                                                </div>
-                                                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                                                    {official.email && (
-                                                        <p className="flex items-center gap-1">
-                                                            <Mail className="h-3 w-3" />
-                                                            {official.email}
-                                                        </p>
-                                                    )}
-                                                    {official.phone && (
-                                                        <p className="flex items-center gap-1">
-                                                            <Phone className="h-3 w-3" />
-                                                            {official.phone}
-                                                        </p>
-                                                    )}
-                                                    <p className="flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" />
-                                                        Since: {formatShortDate(official.start_date)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </Link>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Inactive Officials */}
-            {inactiveOfficials.length > 0 && (
-                <Card className="dark:bg-gray-900">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                            <XCircle className="h-5 w-5" />
-                            Inactive Officials ({inactiveOfficials.length})
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2">
-                            {inactiveOfficials.map((official) => (
-                                <Link 
-                                    key={official.id} 
-                                    href={`/admin/officials/${official.id}`}
-                                    className="block"
-                                >
-                                    <Card className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors opacity-75">
-                                        <CardContent className="p-4">
-                                            <div className="space-y-2">
-                                                <div className="flex items-start justify-between">
-                                                    <h5 className="font-medium text-gray-500 dark:text-gray-400">{official.full_name}</h5>
-                                                    <Badge variant="secondary" className="gap-1 dark:bg-gray-700 dark:text-gray-300">
-                                                        <XCircle className="h-3 w-3" />
-                                                        Inactive
-                                                    </Badge>
-                                                </div>
-                                                <div className="space-y-1 text-sm text-gray-500 dark:text-gray-500">
-                                                    {official.email && (
-                                                        <p className="flex items-center gap-1">
-                                                            <Mail className="h-3 w-3" />
-                                                            {official.email}
-                                                        </p>
-                                                    )}
-                                                    {official.phone && (
-                                                        <p className="flex items-center gap-1">
-                                                            <Phone className="h-3 w-3" />
-                                                            {official.phone}
-                                                        </p>
-                                                    )}
-                                                    <p className="flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" />
-                                                        Period: {formatShortDate(official.start_date)} - 
-                                                        {official.end_date ? ` ${formatShortDate(official.end_date)}` : ' Present'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </Link>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-        </div>
+                )}
+            </CardContent>
+        </Card>
     );
 };

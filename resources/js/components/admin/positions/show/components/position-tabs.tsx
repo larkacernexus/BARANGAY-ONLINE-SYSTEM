@@ -1,7 +1,7 @@
 // resources/js/Pages/Admin/Positions/components/position-tabs.tsx
 import React from 'react';
 import { Shield, Target, Users } from 'lucide-react';
-import { Position } from '../types';
+import { Position } from '@/types/admin/positions/position.types';
 
 // Import tab content components
 import { DetailsTab } from './details-tab';
@@ -42,7 +42,7 @@ export const PositionTabs = ({ activeTab, setActiveTab, position, hasCommittees 
                     Committees
                     {hasCommittees && (
                         <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400 rounded-full">
-                            {(position.committee ? 1 : 0) + (position.additional_committees?.length || 0)}
+                            {position.committee ? 1 : 0}
                         </span>
                     )}
                 </button>
