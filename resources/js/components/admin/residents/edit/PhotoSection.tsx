@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Camera, Upload, X, User } from 'lucide-react';
-import { useRef } from 'react';
 
 interface PhotoSectionProps {
     photoPreview: string | null;
@@ -11,8 +10,8 @@ interface PhotoSectionProps {
     onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onRemovePhoto: (e?: React.MouseEvent) => void;
     onChoosePhotoClick: (e: React.MouseEvent) => void;
-    selectedFile: File | null;
-    fileInputRef: React.RefObject<HTMLInputElement>;
+    selectedFile: File | null | undefined; // Allow undefined
+    fileInputRef: React.RefObject<HTMLInputElement | null>; // Allow null
 }
 
 // Helper function to get initials from name
@@ -20,7 +19,13 @@ const getInitials = (name: string): string => {
     if (!name) return '?';
     const nameParts = name.split(' ');
     const firstName = nameParts[0] || '';
-    const lastName = nameParts[nameParts.length - 1] || '';
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+    
+    // If only first name is provided, return first letter
+    if (!lastName) {
+        return firstName.charAt(0).toUpperCase();
+    }
+    
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 };
 

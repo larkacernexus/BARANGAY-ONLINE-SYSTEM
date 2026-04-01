@@ -18,16 +18,8 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
-interface Privilege {
-    id: number;
-    name: string;
-    code: string;
-    description: string;
-    discount_percentage?: number;
-    requires_id_number?: boolean;
-    is_active?: boolean;
-    validity_years?: number;
-}
+// Import types from main types file
+import { Privilege } from '@/types/admin/residents/residents-types';
 
 interface PrivilegeAssignment {
     privilege_id: number;
@@ -172,9 +164,9 @@ export default function PrivilegesCard({
                                                     </Badge>
                                                 </div>
                                                 <div className="flex items-center gap-2 text-xs">
-                                                    {privilege.discount_percentage ? (
+                                                    {privilege.default_discount_percentage ? (
                                                         <span className="text-green-600 dark:text-green-400">
-                                                            {privilege.discount_percentage}% off
+                                                            {privilege.default_discount_percentage}% off
                                                         </span>
                                                     ) : null}
                                                     {privilege.requires_id_number && (
@@ -260,9 +252,9 @@ export default function PrivilegesCard({
                                                             <Badge variant="outline" className="text-xs px-1 py-0 h-5">
                                                                 {privilege.code}
                                                             </Badge>
-                                                            {privilege.discount_percentage && (
+                                                            {privilege.default_discount_percentage && (
                                                                 <Badge variant="outline" className="text-xs bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 h-5">
-                                                                    {privilege.discount_percentage}% off
+                                                                    {privilege.default_discount_percentage}% off
                                                                 </Badge>
                                                             )}
                                                         </div>

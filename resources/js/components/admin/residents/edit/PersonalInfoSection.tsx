@@ -4,7 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User, Calendar } from 'lucide-react';
-import { ResidentFormData } from '@/components/admin/residents/edit/resident';
+
+// Import types from main types file
+import { ResidentFormData } from '@/types/admin/residents/residents-types';
 
 interface Props {
     data: ResidentFormData;
@@ -14,6 +16,12 @@ interface Props {
     civilStatusOptions: Array<{value: string, label: string}>;
     formatDisplayDate: (date: string) => string;
 }
+
+// Helper function to safely get input value - always returns string
+const getInputValue = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined) return '';
+    return String(value);
+};
 
 export default function PersonalInfoSection({ 
     data, 
@@ -46,7 +54,7 @@ export default function PersonalInfoSection({
                             id="first_name" 
                             placeholder="Juan" 
                             required 
-                            value={data.first_name}
+                            value={getInputValue(data.first_name)}
                             onChange={(e) => setData('first_name', e.target.value)}
                             className={`dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 ${errors.first_name ? 'border-red-500 dark:border-red-800' : ''}`}
                         />
@@ -61,7 +69,7 @@ export default function PersonalInfoSection({
                         <Input 
                             id="middle_name" 
                             placeholder="Santos" 
-                            value={data.middle_name}
+                            value={getInputValue(data.middle_name)}
                             onChange={(e) => setData('middle_name', e.target.value)}
                             className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                         />
@@ -74,7 +82,7 @@ export default function PersonalInfoSection({
                             id="last_name" 
                             placeholder="Dela Cruz" 
                             required 
-                            value={data.last_name}
+                            value={getInputValue(data.last_name)}
                             onChange={(e) => setData('last_name', e.target.value)}
                             className={`dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 ${errors.last_name ? 'border-red-500 dark:border-red-800' : ''}`}
                         />
@@ -89,7 +97,7 @@ export default function PersonalInfoSection({
                         <Input 
                             id="suffix" 
                             placeholder="Jr., Sr., III" 
-                            value={data.suffix}
+                            value={getInputValue(data.suffix)}
                             onChange={(e) => setData('suffix', e.target.value)}
                             className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                         />
@@ -106,7 +114,7 @@ export default function PersonalInfoSection({
                             id="birth_date" 
                             type="date" 
                             required 
-                            value={data.birth_date}
+                            value={getInputValue(data.birth_date)}
                             onChange={(e) => setData('birth_date', e.target.value)}
                             max={new Date().toISOString().split('T')[0]}
                             className={`dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 ${errors.birth_date ? 'border-red-500 dark:border-red-800' : ''}`}
@@ -127,7 +135,7 @@ export default function PersonalInfoSection({
                             type="number" 
                             min="0"
                             max="120"
-                            value={data.age || ''}
+                            value={getInputValue(data.age)}
                             readOnly
                             className="bg-gray-50 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600 cursor-not-allowed"
                         />
@@ -137,8 +145,8 @@ export default function PersonalInfoSection({
                             Gender <span className="text-red-500">*</span>
                         </Label>
                         <Select 
-                            value={data.gender}
-                            onValueChange={(value) => setData('gender', value)}
+                            value={data.gender ?? undefined}
+                            onValueChange={(value) => setData('gender', value as any)}
                         >
                             <SelectTrigger className={`dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 ${errors.gender ? 'border-red-500 dark:border-red-800' : ''}`}>
                                 <SelectValue placeholder="Select gender" />
@@ -162,7 +170,7 @@ export default function PersonalInfoSection({
                     <Input 
                         id="place_of_birth" 
                         placeholder="City/Municipality, Province" 
-                        value={data.place_of_birth}
+                        value={getInputValue(data.place_of_birth)}
                         onChange={(e) => setData('place_of_birth', e.target.value)}
                         className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                     />
@@ -181,7 +189,7 @@ export default function PersonalInfoSection({
                                     name="civil_status"
                                     value={option.value}
                                     checked={data.civil_status === option.value}
-                                    onChange={() => setData('civil_status', option.value)}
+                                    onChange={() => setData('civil_status', option.value as any)}
                                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-900"
                                 />
                                 <Label htmlFor={`civil_status_${option.value}`} className="cursor-pointer text-sm dark:text-gray-300">
@@ -201,7 +209,7 @@ export default function PersonalInfoSection({
                     </Label>
                     <Select 
                         value={data.status}
-                        onValueChange={(value) => setData('status', value)}
+                        onValueChange={(value) => setData('status', value as any)}
                     >
                         <SelectTrigger className={`dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 ${errors.status ? 'border-red-500 dark:border-red-800' : ''}`}>
                             <SelectValue placeholder="Select status" />
@@ -213,8 +221,11 @@ export default function PersonalInfoSection({
                             <SelectItem value="inactive" className="text-amber-600 dark:text-amber-400 dark:focus:bg-gray-700">
                                 Inactive
                             </SelectItem>
-                            <SelectItem value="deceased" className="text-red-600 dark:text-red-400 dark:focus:bg-gray-700">
-                                Deceased
+                            <SelectItem value="pending" className="text-yellow-600 dark:text-yellow-400 dark:focus:bg-gray-700">
+                                Pending
+                            </SelectItem>
+                            <SelectItem value="suspended" className="text-red-600 dark:text-red-400 dark:focus:bg-gray-700">
+                                Suspended
                             </SelectItem>
                         </SelectContent>
                     </Select>

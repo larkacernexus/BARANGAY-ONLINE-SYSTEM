@@ -6,13 +6,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Briefcase, GraduationCap, Church, FileText } from 'lucide-react';
-import { ResidentFormData } from '@/components/admin/residents/edit/resident';
+
+// Import types from main types file
+import { ResidentFormData } from '@/types/admin/residents/residents-types';
 
 interface Props {
     data: ResidentFormData;
     setData: (key: keyof ResidentFormData, value: any) => void;
     educationOptions: Array<{value: string, label: string}>;
 }
+
+// Helper function to safely get input value
+const getInputValue = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined) return '';
+    return String(value);
+};
 
 export default function AdditionalInfoSection({ data, setData, educationOptions }: Props) {
     return (
@@ -38,7 +46,7 @@ export default function AdditionalInfoSection({ data, setData, educationOptions 
                         <Input 
                             id="occupation" 
                             placeholder="Farmer/Business Owner/Employee" 
-                            value={data.occupation}
+                            value={getInputValue(data.occupation)}
                             onChange={(e) => setData('occupation', e.target.value)}
                             className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                         />
@@ -49,8 +57,8 @@ export default function AdditionalInfoSection({ data, setData, educationOptions 
                             Highest Education
                         </Label>
                         <Select 
-                            value={data.education}
-                            onValueChange={(value) => setData('education', value)}
+                            value={getInputValue(data.education_level)}
+                            onValueChange={(value) => setData('education_level', value)}
                         >
                             <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                 <SelectValue placeholder="Select education" />
@@ -74,7 +82,7 @@ export default function AdditionalInfoSection({ data, setData, educationOptions 
                     <Input 
                         id="religion" 
                         placeholder="Roman Catholic, Protestant, Muslim, etc." 
-                        value={data.religion}
+                        value={getInputValue(data.religion)}
                         onChange={(e) => setData('religion', e.target.value)}
                         className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                     />
@@ -84,7 +92,7 @@ export default function AdditionalInfoSection({ data, setData, educationOptions 
                     <div className="flex items-center space-x-2 p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                         <Checkbox 
                             id="is_voter" 
-                            checked={data.is_voter}
+                            checked={data.is_voter || false}
                             onCheckedChange={(checked) => setData('is_voter', checked as boolean)}
                             className="dark:border-gray-600"
                         />
@@ -100,7 +108,7 @@ export default function AdditionalInfoSection({ data, setData, educationOptions 
                         id="remarks" 
                         placeholder="Additional notes about the resident..."
                         rows={3}
-                        value={data.remarks}
+                        value={getInputValue(data.remarks)}
                         onChange={(e) => setData('remarks', e.target.value)}
                         className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                     />

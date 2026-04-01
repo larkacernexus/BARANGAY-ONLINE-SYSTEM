@@ -1,3 +1,5 @@
+// resources/js/Pages/Admin/Residents/Show/components/BenefitsSummary.tsx
+
 import { 
     Card, 
     CardHeader, 
@@ -7,12 +9,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { BarChart3, AlertCircle } from "lucide-react";
-import { ResidentPrivilege } from '../types';
+import { ResidentPrivilege } from '@/types/admin/residents/residents-types';
 import { 
     getPrivilegeIconName, 
     getPrivilegeIcon, 
     getDiscountPercentage, 
-    getDiscountColor 
+    getDiscountColor,
+    getPrivilegeName,
+    getPrivilegeStatus
 } from '@/components/admin/residents/show/utils/badge-utils';
 
 interface BenefitsSummaryProps {
@@ -29,7 +33,12 @@ export const BenefitsSummary = ({
     discountTypes 
 }: BenefitsSummaryProps) => {
     const hasPrivileges = privileges.length > 0;
-    const expiringSoon = privileges.filter(p => p.status === 'expiring_soon');
+    
+    // Get expiring soon privileges using the utility function
+    const expiringSoon = privileges.filter(p => {
+        const status = getPrivilegeStatus(p);
+        return status === 'expiring_soon';
+    });
 
     return (
         <Card className="dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-sm">
@@ -72,8 +81,9 @@ export const BenefitsSummary = ({
                             <h4 className="text-[10px] font-bold uppercase text-gray-400 dark:text-gray-500 tracking-widest">Active Benefits</h4>
                             <div className="space-y-2">
                                 {activePrivileges.slice(0, 4).map((p) => {
-                                    // Fix: Default to 0 if undefined to satisfy TS and logic
+                                    // Get discount using utility function
                                     const discount = getDiscountPercentage(p) ?? 0;
+                                    const privilegeName = getPrivilegeName(p);
                                     const IconName = getPrivilegeIconName(p);
                                     const IconComponent = getPrivilegeIcon(IconName);
 
@@ -81,8 +91,8 @@ export const BenefitsSummary = ({
                                         <div key={p.id} className="flex items-center justify-between text-sm">
                                             <div className="flex items-center gap-2">
                                                 <IconComponent className="h-3.5 w-3.5 text-gray-400" />
-                                                <span className="text-xs font-medium dark:text-gray-300 truncate max-w-[120px]">
-                                                    {p.privilege?.name || p.privilege_name}
+                                                <span className="text-xs font-medium dark:text-gray-300 truncate max-w-[120px]" title={privilegeName}>
+                                                    {privilegeName}
                                                 </span>
                                             </div>
                                             {discount > 0 ? (
@@ -96,16 +106,44 @@ export const BenefitsSummary = ({
                                     );
                                 })}
                             </div>
+                            
+                            {activePrivileges.length > 4 && (
+                                <div className="text-center pt-1">
+                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                        +{activePrivileges.length - 4} more
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         {expiringSoon.length > 0 && (
                             <div className="mt-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 flex items-center gap-2">
                                 <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
                                 <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase">
-                                    {expiringSoon.length} Expiring Soon
+                                    {expiringSoon.length} {expiringSoon.length === 1 ? 'Benefit Expiring Soon' : 'Benefits Expiring Soon'}
                                 </span>
                             </div>
                         )}
+                        
+                        {/* Show if no active benefits but has other privileges */}
+                        {activePrivileges.length === 0 && privileges.length > 0 && (
+                            <div className="mt-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                                <AlertCircle className="h-3.5 w-3.5 text-gray-500" />
+                                <span className="text-[10px] font-bold text-gray-600 dark:text-gray-400 uppercase">
+                                    No active benefits
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                )}
+                
+                {!hasPrivileges && (
+                    <div className="text-center py-6">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 mb-3">
+                            <BarChart3 className="h-6 w-6 text-gray-400" />
+                        </div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No benefits assigned</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">This resident has no active benefits</p>
                     </div>
                 )}
             </CardContent>

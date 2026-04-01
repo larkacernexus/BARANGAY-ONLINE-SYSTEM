@@ -2,7 +2,7 @@ import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { ResidentsProps, Resident, FilterState, SelectionMode, SelectionStats, Privilege } from '@/types/admin/residents/residents-types';
+import { ResidentsProps, Resident, FilterState, SelectionMode, SelectionStats, Privilege, ResidentPrivilege } from '@/types/admin/residents/residents-types';
 import { 
     filterResidents,
     getSelectionStats,
@@ -263,16 +263,17 @@ export default function Residents() {
         const privilegeCounts: Record<string, number> = {};
         const heads = selectedResidentsData.filter(r => isHeadOfHousehold(r)).length;
         
-        selectedResidentsData.forEach(resident => {
-            if (resident.privileges && Array.isArray(resident.privileges)) {
-                resident.privileges.forEach((privilege: Privilege) => {
-                    if (privilege.code) {
-                        privilegeCounts[privilege.code] = (privilegeCounts[privilege.code] || 0) + 1;
-                    }
-                });
+       selectedResidentsData.forEach(resident => {
+    if (resident.privileges && Array.isArray(resident.privileges)) {
+        resident.privileges.forEach((privilege: ResidentPrivilege) => {  // Changed from Privilege to ResidentPrivilege
+            // Access the privilege code from either the nested privilege object or direct property
+            const code = privilege.privilege?.code || privilege.privilege_code;
+            if (code) {
+                privilegeCounts[code] = (privilegeCounts[code] || 0) + 1;
             }
         });
-        
+    }
+});
         return {
             ...baseStats,
             heads,

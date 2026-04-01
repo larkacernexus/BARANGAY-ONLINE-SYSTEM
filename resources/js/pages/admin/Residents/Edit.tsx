@@ -7,9 +7,16 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Save, User, Mail, Phone, MapPin, Calendar, Award, FileText, Home, Users, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Link, useForm } from '@inertiajs/react';
 import { useEffect, useState, useRef } from 'react';
-import { PageProps } from '@/types';
 
-// Import new components
+// Import types from main types file
+import { 
+    Purok, 
+    Privilege, 
+    Resident,
+    PageProps
+} from '@/types/admin/residents/residents-types';
+
+// Import components
 import PersonalInfoSection from '@/components/admin/residents/edit/PersonalInfoSection';
 import ContactInfoSection from '@/components/admin/residents/edit/ContactInfoSection';
 import AdditionalInfoSection from '@/components/admin/residents/edit/AdditionalInfoSection';
@@ -19,9 +26,47 @@ import FormProgressCard from '@/components/admin/residents/edit/FormProgressCard
 import ResidentInfoCard from '@/components/admin/residents/edit/ResidentInfoCard';
 import ErrorMessages from '@/components/admin/residents/edit/ErrorMessages';
 
-// Import types and utilities
-import { Purok, Privilege, Resident, ResidentFormData } from '@/components/admin/residents/edit/resident';
+// Import utilities
 import { formatDisplayDate, calculateAgeFromDate } from '@/components/admin/residents/edit/utils/date-utils';
+import { getFullName } from '@/components/admin/residents/show/utils/helpers';
+
+// Define ResidentFormData interface
+export interface ResidentFormData {
+    age: number;
+    place_of_birth?: string | null;
+    remarks?: string | null;
+    status: 'active' | 'inactive' | 'pending' | 'suspended';
+    first_name: string;
+    last_name: string;
+    middle_name?: string | null;
+    suffix?: string | null;
+    birth_date: string;
+    gender: 'male' | 'female' | 'other' | null;
+    civil_status: 'single' | 'married' | 'divorced' | 'widowed' | 'separated' | null;
+    contact_number?: string | null;
+    email?: string | null;
+    occupation?: string | null;
+    religion?: string | null;
+    education_level?: string | null;
+    purok_id?: number | null;
+    street?: string | null;
+    house_number?: string | null;
+    is_voter: boolean;
+    is_head: boolean;
+    household_id?: number | null;
+    relationship_to_head?: string | null;
+    privileges: Array<{
+        privilege_id: number;
+        id_number?: string;
+        verified_at?: string;
+        expires_at?: string;
+        remarks?: string;
+        discount_percentage?: number;
+    }>;
+    photo?: File | null;
+    address?: string | null;
+    _method?: string;
+}
 
 interface EditResidentProps extends PageProps {
     resident: Resident;
@@ -54,14 +99,22 @@ export default function EditResident({
         address: resident.address || '',
         purok_id: resident.purok_id,
         occupation: resident.occupation || '',
-        education: resident.education || '',
+        education_level: resident.education_level || '',
         religion: resident.religion || '',
         is_voter: resident.is_voter || false,
+        is_head: resident.is_head || false,
         place_of_birth: resident.place_of_birth || '',
         remarks: resident.remarks || '',
         status: resident.status || 'active',
         photo: null,
-        privileges: resident.privileges || [],
+        privileges: resident.privileges?.map(p => ({
+            privilege_id: p.privilege_id,
+            id_number: p.id_number || '',
+            verified_at: p.verified_at || '',
+            expires_at: p.expiry_date || '',
+            remarks: p.remarks || '',
+            discount_percentage: p.privilege?.default_discount_percentage || 0,
+        })) || [],
         _method: 'PUT',
     });
 
@@ -90,8 +143,12 @@ export default function EditResident({
             if (key === 'photo' && value instanceof File) {
                 formData.append('photo', value);
             } else if (key === 'privileges') {
-                formData.append('privileges', JSON.stringify(value));
-            } else if (value !== null && value !== undefined) {
+                if (value && Array.isArray(value) && value.length > 0) {
+                    formData.append('privileges', JSON.stringify(value));
+                }
+            } else if (key === '_method') {
+                formData.append('_method', value);
+            } else if (value !== null && value !== undefined && value !== '') {
                 formData.append(key, String(value));
             }
         });
@@ -103,7 +160,7 @@ export default function EditResident({
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        e.stopPropagation(); // Stop event from bubbling
+        e.stopPropagation();
         const file = e.target.files?.[0] || null;
         
         if (file) {
@@ -128,7 +185,6 @@ export default function EditResident({
         }
     };
 
-    // Handle click on choose photo button
     const handleChoosePhotoClick = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -143,7 +199,7 @@ export default function EditResident({
     
     const optionalFields = [
         'middle_name', 'suffix', 'email', 'occupation', 
-        'education', 'religion', 'place_of_birth', 'remarks', 'status'
+        'education_level', 'religion', 'place_of_birth', 'remarks', 'status'
     ];
 
     const completedRequired = requiredFields.filter(field => {
@@ -167,7 +223,8 @@ export default function EditResident({
         switch(status) {
             case 'active': return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
             case 'inactive': return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800';
-            case 'deceased': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
+            case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800';
+            case 'suspended': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
             default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
         }
     };
@@ -176,18 +233,27 @@ export default function EditResident({
         switch(status) {
             case 'active': return <CheckCircle className="h-3 w-3" />;
             case 'inactive': return <AlertCircle className="h-3 w-3" />;
-            case 'deceased': return <XCircle className="h-3 w-3" />;
+            case 'pending': return <AlertCircle className="h-3 w-3" />;
+            case 'suspended': return <XCircle className="h-3 w-3" />;
             default: return <AlertCircle className="h-3 w-3" />;
         }
     };
 
+    const fullName = getFullName(resident);
+    
+    // Create household object for the info card
+    const household = resident.household ? {
+        id: resident.household.id,
+        household_number: resident.household.household_number
+    } : null;
+
     return (
         <AppLayout
-            title={`Edit Resident: ${resident.first_name} ${resident.last_name}`}
+            title={`Edit Resident: ${fullName}`}
             breadcrumbs={[
                 { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Residents', href: '/admin/residents' },
-                { title: resident.resident_id || `Resident #${resident.id}`, href: `/admin/residents/${resident.id}` },
+                { title: resident.resident_id?.toString() || `Resident #${resident.id}`, href: `/admin/residents/${resident.id}` },
                 { title: 'Edit', href: `/admin/residents/${resident.id}/edit` }
             ]}
         >
@@ -213,14 +279,14 @@ export default function EditResident({
                                     <div className="flex items-center gap-2 mt-2 flex-wrap">
                                         <Badge variant="outline" className="flex items-center gap-1 bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
                                             <FileText className="h-3 w-3" />
-                                            {resident.resident_id || `ID: ${resident.id}`}
+                                            {resident.resident_id?.toString() || `ID: ${resident.id}`}
                                         </Badge>
                                         <Badge variant="outline" className={`flex items-center gap-1 ${getStatusColor(resident.status)}`}>
                                             {getStatusIcon(resident.status)}
                                             <span className="ml-1 capitalize">{resident.status}</span>
                                         </Badge>
                                         <span className="text-sm text-gray-600 dark:text-gray-400">
-                                            {resident.first_name} {resident.last_name}
+                                            {fullName}
                                         </span>
                                     </div>
                                 </div>
@@ -314,10 +380,10 @@ export default function EditResident({
 
                         {/* Right Column */}
                         <div className="space-y-6">
-                            {/* Photo Upload - Updated with Avatar */}
+                            {/* Photo Upload */}
                             <PhotoSection 
                                 photoPreview={photoPreview}
-                                residentName={`${resident.first_name} ${resident.last_name}`}
+                                residentName={fullName}
                                 onFileChange={handleFileChange}
                                 onRemovePhoto={removePhoto}
                                 onChoosePhotoClick={handleChoosePhotoClick}
@@ -327,18 +393,19 @@ export default function EditResident({
 
                             {/* Resident Info Card */}
                             <ResidentInfoCard 
-                                residentId={resident.resident_id}
+                                residentId={resident.resident_id?.toString() || `#${resident.id}`}
                                 createdAt={resident.created_at}
                                 age={data.age}           
                                 gender={data.gender}     
-                                householdRelation={resident.household_relation}
+                                household={household}
+                                householdRelation={resident.relationship_to_head}
                                 formatDisplayDate={formatDisplayDate}
                             />
 
                             {/* Privileges/Benefits Card */}
                             <PrivilegesSection
                                 privileges={all_privileges}
-                                assignedPrivileges={data.privileges}
+                                assignedPrivileges={data.privileges || []}
                                 onAddPrivilege={(privilegeId) => {
                                     const privilege = all_privileges.find(p => p.id === privilegeId);
                                     const today = new Date().toISOString().split('T')[0];
@@ -351,22 +418,22 @@ export default function EditResident({
                                     }
                                     
                                     setData('privileges', [
-                                        ...data.privileges,
+                                        ...(data.privileges || []),
                                         {
                                             privilege_id: privilegeId,
                                             id_number: '',
                                             verified_at: today,
                                             expires_at: expiresAt,
                                             remarks: '',
-                                            discount_percentage: privilege?.discount_percentage,
+                                            discount_percentage: privilege?.default_discount_percentage || undefined,
                                         }
                                     ]);
                                 }}
                                 onRemovePrivilege={(privilegeId) => {
-                                    setData('privileges', data.privileges.filter(p => p.privilege_id !== privilegeId));
+                                    setData('privileges', (data.privileges || []).filter(p => p.privilege_id !== privilegeId));
                                 }}
                                 onUpdatePrivilege={(privilegeId, field, value) => {
-                                    setData('privileges', data.privileges.map(p => 
+                                    setData('privileges', (data.privileges || []).map(p => 
                                         p.privilege_id === privilegeId ? { ...p, [field]: value } : p
                                     ));
                                 }}
@@ -381,7 +448,7 @@ export default function EditResident({
                         </div>
                     </div>
 
-                    {/* Form Actions - Fixed at bottom */}
+                    {/* Form Actions */}
                     <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
                         <Link href={`/admin/residents/${resident.id}`}>
                             <Button variant="outline" type="button" className="dark:border-gray-600 dark:text-gray-300">

@@ -5,7 +5,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Phone, Mail, MapPin, Home, AlertCircle } from 'lucide-react';
-import { ResidentFormData, Purok } from '@/components/admin/residents/edit/resident';
+
+// Import types from main types file
+import { ResidentFormData, Purok } from '@/types/admin/residents/residents-types';
 
 interface Props {
     data: ResidentFormData;
@@ -13,6 +15,12 @@ interface Props {
     errors: Record<string, string>;
     puroks: Purok[];
 }
+
+// Helper function to safely get input value
+const getInputValue = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined) return '';
+    return String(value);
+};
 
 export default function ContactInfoSection({ data, setData, errors, puroks }: Props) {
     return (
@@ -39,7 +47,7 @@ export default function ContactInfoSection({ data, setData, errors, puroks }: Pr
                             id="contact_number" 
                             placeholder="09123456789" 
                             required 
-                            value={data.contact_number}
+                            value={getInputValue(data.contact_number)}
                             onChange={(e) => setData('contact_number', e.target.value)}
                             className={`dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 ${errors.contact_number ? 'border-red-500 dark:border-red-800' : ''}`}
                         />
@@ -59,7 +67,7 @@ export default function ContactInfoSection({ data, setData, errors, puroks }: Pr
                             id="email" 
                             type="email" 
                             placeholder="juan@example.com" 
-                            value={data.email}
+                            value={getInputValue(data.email)}
                             onChange={(e) => setData('email', e.target.value)}
                             className={`dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 ${errors.email ? 'border-red-500 dark:border-red-800' : ''}`}
                         />
@@ -79,10 +87,10 @@ export default function ContactInfoSection({ data, setData, errors, puroks }: Pr
                     </Label>
                     <Textarea 
                         id="address" 
-                        placeholder="House No., Street, Purok, Barangay Kibawe" 
+                        placeholder="House No., Street, Purok, Barangay" 
                         required 
                         rows={3}
-                        value={data.address}
+                        value={getInputValue(data.address)}
                         onChange={(e) => setData('address', e.target.value)}
                         className={`dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 ${errors.address ? 'border-red-500 dark:border-red-800' : ''}`}
                     />

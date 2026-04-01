@@ -22,7 +22,11 @@ import { useState, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 
-import { ResidentPrivilege } from '@/components/admin/residents/show/types';
+// Import types from main types file
+import { 
+    Privilege, 
+    ResidentPrivilege 
+} from '@/types/admin/residents/residents-types';
 import { PrivilegesTable } from '../PrivilegesTable';
 
 // Import shadcn dialog components
@@ -43,24 +47,6 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-
-interface Privilege {
-    id: number;
-    name: string;
-    code: string;
-    description: string;
-    is_active: boolean;
-    default_discount_percentage: number | null;
-    requires_id_number: boolean;
-    requires_verification: boolean;
-    validity_years: number | null;
-    discount_type?: {
-        id: number;
-        name: string;
-        code: string;
-    } | null;
-}
 
 interface PrivilegesTabProps {
     privileges: ResidentPrivilege[];
@@ -69,7 +55,7 @@ interface PrivilegesTabProps {
     expiringSoonPrivileges: ResidentPrivilege[];
     pendingPrivileges: ResidentPrivilege[];
     expiredPrivileges: ResidentPrivilege[];
-    availablePrivileges?: Privilege[]; // Added optional prop
+    availablePrivileges?: Privilege[];
 }
 
 export const PrivilegesTab = ({ 
@@ -79,7 +65,7 @@ export const PrivilegesTab = ({
     expiringSoonPrivileges,
     pendingPrivileges,
     expiredPrivileges,
-    availablePrivileges: initialAvailablePrivileges = [] // Added with default value
+    availablePrivileges: initialAvailablePrivileges = []
 }: PrivilegesTabProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,7 +77,6 @@ export const PrivilegesTab = ({
     const [idNumber, setIdNumber] = useState('');
     const [issuedDate, setIssuedDate] = useState('');
     const [expiryDate, setExpiryDate] = useState('');
-    const [requiresVerification, setRequiresVerification] = useState(false);
     const [remarks, setRemarks] = useState('');
 
     const hasPrivileges = privileges.length > 0;
@@ -112,11 +97,9 @@ export const PrivilegesTab = ({
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
-            console.log('Fetched privileges:', data); // Debug log
             setAvailablePrivileges(data);
         } catch (error) {
             console.error('Error fetching privileges:', error);
-            // Show a user-friendly error message
             alert('Failed to load available privileges. Please try again.');
         } finally {
             setIsLoadingPrivileges(false);
@@ -130,7 +113,6 @@ export const PrivilegesTab = ({
         setIdNumber('');
         setIssuedDate('');
         setExpiryDate('');
-        setRequiresVerification(false);
         setRemarks('');
     };
 
@@ -143,15 +125,12 @@ export const PrivilegesTab = ({
 
         setIsSubmitting(true);
         
-        const selectedPriv = availablePrivileges.find(p => p.id.toString() === selectedPrivilege);
-        
         // Prepare data for submission
         const data = {
             privilege_id: selectedPrivilege,
             id_number: idNumber || null,
             issued_date: issuedDate || null,
             expiry_date: expiryDate || null,
-            requires_verification: selectedPriv?.requires_verification ?? requiresVerification,
             remarks: remarks || null,
         };
 
@@ -165,7 +144,6 @@ export const PrivilegesTab = ({
                 setIdNumber('');
                 setIssuedDate('');
                 setExpiryDate('');
-                setRequiresVerification(false);
                 setRemarks('');
             },
             onError: (errors) => {
@@ -190,6 +168,22 @@ export const PrivilegesTab = ({
 
     // Get the selected privilege details for conditional rendering
     const selectedPrivilegeDetails = availablePrivileges.find(p => p.id.toString() === selectedPrivilege);
+
+    // Helper function to get privilege name with fallback
+    const getPrivilegeName = (privilege: Privilege) => {
+        return privilege.name || privilege.code || 'Unknown Benefit';
+    };
+
+    // Helper function to get privilege discount display
+    const getDiscountDisplay = (privilege: Privilege) => {
+        if (privilege.default_discount_percentage && privilege.default_discount_percentage > 0) {
+            return `${privilege.default_discount_percentage}% off`;
+        }
+        if (privilege.discount_type?.name) {
+            return privilege.discount_type.name;
+        }
+        return null;
+    };
 
     return (
         <>
@@ -221,50 +215,37 @@ export const PrivilegesTab = ({
                         <>
                             {/* Privilege Summary Cards */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <Card className="dark:bg-gray-900">
-                                    <CardContent className="pt-6">
-                                        <div className="text-center space-y-2">
-                                            <div className="mx-auto w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                                                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                                            </div>
-                                            <h3 className="text-2xl font-bold dark:text-gray-100">{activePrivileges.length}</h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">Active</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="dark:bg-gray-900">
-                                    <CardContent className="pt-6">
-                                        <div className="text-center space-y-2">
-                                            <div className="mx-auto w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                                                <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-                                            </div>
-                                            <h3 className="text-2xl font-bold dark:text-gray-100">{expiringSoonPrivileges.length}</h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">Expiring Soon</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="dark:bg-gray-900">
-                                    <CardContent className="pt-6">
-                                        <div className="text-center space-y-2">
-                                            <div className="mx-auto w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                                                <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                                            </div>
-                                            <h3 className="text-2xl font-bold dark:text-gray-100">{pendingPrivileges.length}</h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">Pending</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                <Card className="dark:bg-gray-900">
-                                    <CardContent className="pt-6">
-                                        <div className="text-center space-y-2">
-                                            <div className="mx-auto w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                                                <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                                            </div>
-                                            <h3 className="text-2xl font-bold dark:text-gray-100">{expiredPrivileges.length}</h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">Expired</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
+                                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center">
+                                    <div className="mx-auto w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-2">
+                                        <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{activePrivileges.length}</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
+                                </div>
+                                
+                                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 text-center">
+                                    <div className="mx-auto w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center mb-2">
+                                        <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{expiringSoonPrivileges.length}</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Expiring Soon</p>
+                                </div>
+                                
+                                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 text-center">
+                                    <div className="mx-auto w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-2">
+                                        <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{pendingPrivileges.length}</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Pending</p>
+                                </div>
+                                
+                                <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 text-center">
+                                    <div className="mx-auto w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-2">
+                                        <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{expiredPrivileges.length}</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Expired</p>
+                                </div>
                             </div>
 
                             {/* Benefits Details Table */}
@@ -323,22 +304,28 @@ export const PrivilegesTab = ({
                                     <SelectValue placeholder={isLoadingPrivileges ? "Loading privileges..." : "Select a benefit"} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {availablePrivileges.map((privilege) => (
-                                        <SelectItem key={privilege.id} value={privilege.id.toString()}>
-                                            <div className="flex items-center gap-2">
-                                                <span>{privilege.name}</span>
-                                                <span className="text-xs text-gray-500">({privilege.code})</span>
-                                                {privilege.default_discount_percentage && privilege.default_discount_percentage > 0 && (
-                                                    <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-1 rounded">
-                                                        {privilege.default_discount_percentage}% off
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                    {availablePrivileges.length === 0 && !isLoadingPrivileges && (
+                                    {availablePrivileges.length > 0 ? (
+                                        availablePrivileges.map((privilege) => {
+                                            const discountDisplay = getDiscountDisplay(privilege);
+                                            return (
+                                                <SelectItem key={privilege.id} value={privilege.id.toString()}>
+                                                    <div className="flex items-center justify-between w-full gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span>{getPrivilegeName(privilege)}</span>
+                                                            <span className="text-xs text-gray-500">({privilege.code})</span>
+                                                        </div>
+                                                        {discountDisplay && (
+                                                            <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded">
+                                                                {discountDisplay}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </SelectItem>
+                                            );
+                                        })
+                                    ) : !isLoadingPrivileges && (
                                         <div className="p-4 text-center text-sm text-gray-500">
-                                            No available privileges to add
+                                            No available benefits to add
                                         </div>
                                     )}
                                 </SelectContent>
@@ -357,7 +344,7 @@ export const PrivilegesTab = ({
                                     value={idNumber}
                                     onChange={(e) => setIdNumber(e.target.value)}
                                     className="dark:bg-gray-900 dark:border-gray-700"
-                                    required={selectedPrivilegeDetails?.requires_id_number}
+                                    required
                                 />
                             </div>
                         )}
@@ -376,7 +363,7 @@ export const PrivilegesTab = ({
                             />
                         </div>
 
-                        {/* Expiry Date - calculate based on validity_years if available */}
+                        {/* Expiry Date */}
                         <div className="space-y-2">
                             <Label htmlFor="expiryDate" className="dark:text-gray-300">
                                 Expiry Date
@@ -387,14 +374,15 @@ export const PrivilegesTab = ({
                                 value={expiryDate}
                                 onChange={(e) => setExpiryDate(e.target.value)}
                                 className="dark:bg-gray-900 dark:border-gray-700"
-                                placeholder={selectedPrivilegeDetails?.validity_years ? 
-                                    `Auto-calculated (${selectedPrivilegeDetails.validity_years} years validity)` : 
-                                    'Optional'
+                                placeholder={
+                                    selectedPrivilegeDetails?.validity_years 
+                                        ? `Auto-calculated (${selectedPrivilegeDetails.validity_years} years validity)` 
+                                        : 'Optional'
                                 }
                             />
                             {selectedPrivilegeDetails?.validity_years && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    This privilege is valid for {selectedPrivilegeDetails.validity_years} years
+                                    This benefit is valid for {selectedPrivilegeDetails.validity_years} years
                                 </p>
                             )}
                         </div>

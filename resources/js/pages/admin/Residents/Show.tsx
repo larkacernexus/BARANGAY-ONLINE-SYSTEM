@@ -5,19 +5,26 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipProvider, TooltipContent } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from "@/lib/utils";
 
-// Types
-import { PageProps } from '@/components/admin/residents/show/types';
+// Types - Import from your main types file
+import { 
+    Resident, 
+    Household, 
+    Purok, 
+    Privilege, 
+    ResidentPrivilege 
+} from '@/types/admin/residents/residents-types';
 
 // Utils
 import { 
     getStatusConfig, 
     getStatusVariant, 
-    getDiscountPercentage 
+    getDiscountPercentage,
+    getPrivilegeName,
+    getPrivilegeStatus
 } from '@/components/admin/residents/show/utils/badge-utils';
-import { getPhotoUrl } from '@/components/admin/residents/show/utils/helpers';
+import { getPhotoUrl, formatDate } from '@/components/admin/residents/show/utils/helpers';
 
 // Icons
 import * as Icons from 'lucide-react';
@@ -36,9 +43,7 @@ import {
     Printer, 
     Edit, 
     Trash2, 
-    Clock, 
     Check,
-    ChevronRight,
     Receipt,
     CreditCard,
     History,
@@ -64,9 +69,20 @@ import { ClearancesTab } from '@/components/admin/residents/show/components/tabs
 import { DocumentsTab } from '@/components/admin/residents/show/components/tabs/DocumentsTab';
 import { ActivityLogTab } from '@/components/admin/residents/show/components/tabs/ActivityLogTab';
 
-// Extend the PageProps interface
-interface ExtendedPageProps extends PageProps {
-    available_privileges?: any[];
+// Extend the props interface
+interface ExtendedPageProps {
+    resident: Resident;
+    household?: Household | null;
+    household_membership?: {
+        id: number;
+        is_head: boolean;
+        relationship?: string;
+        joined_at?: string;
+    } | null;
+    related_household_members?: Resident[];
+    households?: Household[];
+    puroks?: Purok[];
+    available_privileges?: Privilege[];
     fees?: any[];
     payments?: any[];
     clearances?: any[];
@@ -111,32 +127,80 @@ export default function ShowResident({
     const isHeadOfHousehold = actualHouseholdMembership?.is_head || false;
     const hasHousehold = !!actualHousehold;
     
-    // Privilege categorization
-    const activePrivileges = residentPrivileges.filter(p => p.status === 'active');
-    const expiringSoonPrivileges = residentPrivileges.filter(p => p.status === 'expiring_soon');
-    const pendingPrivileges = residentPrivileges.filter(p => p.status === 'pending');
-    const expiredPrivileges = residentPrivileges.filter(p => p.status === 'expired');
+    // Transform related household members to match RelatedHouseholdMember interface
+    const transformedRelatedMembers = actualRelatedMembers.map(member => ({
+        id: member.id,
+        resident_id: member.id,
+        relationship_to_head: member.relationship_to_head || 'member',
+        is_head: member.is_head || false,
+        resident: {
+            id: member.id,
+            first_name: member.first_name,
+            last_name: member.last_name,
+            middle_name: member.middle_name,
+            age: member.age,
+            gender: member.gender || '',
+            civil_status: member.civil_status || '',
+            contact_number: member.contact_number,
+            purok_id: member.purok_id,
+            photo_path: member.photo_path,
+            photo_url: member.photo_url,
+        }
+    }));
+    
+    // Transform households to match HouseholdOption interface
+    const transformedHouseholds = households.map(household => ({
+        id: household.id,
+        household_number: household.household_number,
+        head_of_family: household.head ? 
+            `${household.head.first_name} ${household.head.last_name}` : 
+            'Unknown',
+        member_count: household.total_members,
+        address: household.purok?.name,
+        purok: household.purok?.name
+    }));
+    
+    // Privilege categorization with proper typing
+    const activePrivileges = residentPrivileges.filter((p: ResidentPrivilege) => {
+        const status = getPrivilegeStatus(p);
+        return status === 'active';
+    });
+    
+    const expiringSoonPrivileges = residentPrivileges.filter((p: ResidentPrivilege) => {
+        const status = getPrivilegeStatus(p);
+        return status === 'expiring_soon';
+    });
+    
+    const pendingPrivileges = residentPrivileges.filter((p: ResidentPrivilege) => {
+        const status = getPrivilegeStatus(p);
+        return status === 'pending';
+    });
+    
+    const expiredPrivileges = residentPrivileges.filter((p: ResidentPrivilege) => {
+        const status = getPrivilegeStatus(p);
+        return status === 'expired';
+    });
     
     // Fee statistics
     const totalFees = fees.length;
-    const pendingFees = fees.filter(f => f.status === 'pending' || f.status === 'issued').length;
-    const paidFees = fees.filter(f => f.status === 'paid').length;
-    const overdueFees = fees.filter(f => f.status === 'overdue').length;
-    const totalFeeAmount = fees.reduce((sum, f) => sum + (f.total_amount || 0), 0);
+    const pendingFees = fees.filter((f: any) => f.status === 'pending' || f.status === 'issued').length;
+    const paidFees = fees.filter((f: any) => f.status === 'paid').length;
+    const overdueFees = fees.filter((f: any) => f.status === 'overdue').length;
+    const totalFeeAmount = fees.reduce((sum: number, f: any) => sum + (f.total_amount || 0), 0);
     
     // Payment statistics
     const totalPayments = payments.length;
-    const totalPaymentAmount = payments.reduce((sum, p) => sum + (p.total_amount || 0), 0);
+    const totalPaymentAmount = payments.reduce((sum: number, p: any) => sum + (p.total_amount || 0), 0);
     
     // Clearance statistics
     const totalClearances = clearances.length;
-    const pendingClearances = clearances.filter(c => c.status === 'pending').length;
+    const pendingClearances = clearances.filter((c: any) => c.status === 'pending').length;
     
     // Document statistics
     const totalDocuments = documents.length;
-    const activeDocuments = documents.filter(d => d.status === 'active').length;
+    const activeDocuments = documents.filter((d: any) => d.status === 'active').length;
     
-    const maxDiscount = Math.max(...residentPrivileges.map(p => getDiscountPercentage(p) || 0), 0);
+    const maxDiscount = Math.max(...residentPrivileges.map((p: ResidentPrivilege) => getDiscountPercentage(p) || 0), 0);
     const fullName = `${resident.first_name} ${resident.middle_name ? resident.middle_name + ' ' : ''}${resident.last_name}${resident.suffix ? ' ' + resident.suffix : ''}`;
 
     // Status Resolution
@@ -367,8 +431,8 @@ export default function ShowResident({
                                     resident={resident}
                                     household={actualHousehold}
                                     householdMembership={actualHouseholdMembership}
-                                    relatedMembers={actualRelatedMembers}
-                                    households={households}
+                                    relatedMembers={transformedRelatedMembers}
+                                    households={transformedHouseholds}
                                     puroks={puroks}
                                 />
                             )}
@@ -393,7 +457,14 @@ export default function ShowResident({
                                 privileges={residentPrivileges}
                                 activePrivileges={activePrivileges}
                                 maxDiscount={maxDiscount}
-                                discountTypes={new Set(residentPrivileges.map(p => p.privilege?.name).filter(Boolean) as string[])}
+                                discountTypes={new Set(
+                                    residentPrivileges
+                                        .map((p: ResidentPrivilege) => {
+                                            const name = getPrivilegeName(p);
+                                            return name;
+                                        })
+                                        .filter((name): name is string => Boolean(name))
+                                )}
                             />
                             <QuickActions
                                 residentId={resident.id}

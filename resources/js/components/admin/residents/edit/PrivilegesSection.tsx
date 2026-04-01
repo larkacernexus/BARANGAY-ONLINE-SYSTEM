@@ -6,12 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { 
   Award, Plus, X, Search, Calendar, FileText, 
-  Percent, Shield, ChevronDown, ChevronUp, Filter,
+  Percent, Shield, ChevronDown, ChevronUp,
   Clock, CheckCircle, AlertCircle, AlertTriangle,
   IdCard, FileWarning
 } from 'lucide-react';
 import { useState } from 'react';
-import { Privilege, PrivilegeAssignment } from '@/components/admin/residents/edit/resident';
 import {
   Collapsible,
   CollapsibleContent,
@@ -20,6 +19,18 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
+// Import types from main types file
+import { Privilege } from '@/types/admin/residents/residents-types';
+
+interface PrivilegeAssignment {
+    privilege_id: number;
+    id_number?: string;
+    verified_at?: string;
+    expires_at?: string;
+    remarks?: string;
+    discount_percentage?: number;
+}
+
 interface Props {
     privileges: Privilege[];
     assignedPrivileges: PrivilegeAssignment[];
@@ -27,6 +38,12 @@ interface Props {
     onRemovePrivilege: (privilegeId: number) => void;
     onUpdatePrivilege: (privilegeId: number, field: string, value: string) => void;
 }
+
+// Helper function to safely get input value
+const getInputValue = (value: string | null | undefined): string => {
+    if (value === null || value === undefined) return '';
+    return value;
+};
 
 export default function PrivilegesSection({ 
     privileges, 
@@ -50,6 +67,7 @@ export default function PrivilegesSection({
     };
 
     const availablePrivileges = privileges.filter(p => 
+        p.is_active &&
         !assignedPrivileges.some(assigned => assigned.privilege_id === p.id) &&
         (privilegeSearch === '' || 
          p.name.toLowerCase().includes(privilegeSearch.toLowerCase()) ||
@@ -172,9 +190,9 @@ export default function PrivilegesSection({
                                                 </Badge>
                                             </div>
                                             <div className="flex items-center gap-2 text-xs">
-                                                {privilege.discount_percentage ? (
+                                                {privilege.default_discount_percentage ? (
                                                     <span className="text-green-600 dark:text-green-400">
-                                                        {privilege.discount_percentage}% off
+                                                        {privilege.default_discount_percentage}% off
                                                     </span>
                                                 ) : null}
                                                 {privilege.requires_id_number && (
@@ -336,7 +354,7 @@ export default function PrivilegesSection({
                                                         <Input
                                                             id={`id-${privilege.id}`}
                                                             placeholder={`Enter ${privilege.name} ID`}
-                                                            value={assignment.id_number || ''}
+                                                            value={getInputValue(assignment.id_number)}
                                                             onChange={(e) => onUpdatePrivilege(assignment.privilege_id, 'id_number', e.target.value)}
                                                             className={cn(
                                                                 "h-8 text-sm dark:bg-gray-900 dark:border-gray-700",
@@ -362,7 +380,7 @@ export default function PrivilegesSection({
                                                             <Input
                                                                 id={`verified-${privilege.id}`}
                                                                 type="date"
-                                                                value={assignment.verified_at || ''}
+                                                                value={getInputValue(assignment.verified_at)}
                                                                 onChange={(e) => onUpdatePrivilege(assignment.privilege_id, 'verified_at', e.target.value)}
                                                                 className={cn(
                                                                     "h-8 text-sm pl-8 dark:bg-gray-900 dark:border-gray-700",
@@ -381,7 +399,7 @@ export default function PrivilegesSection({
                                                             <Input
                                                                 id={`expires-${privilege.id}`}
                                                                 type="date"
-                                                                value={assignment.expires_at || ''}
+                                                                value={getInputValue(assignment.expires_at)}
                                                                 onChange={(e) => onUpdatePrivilege(assignment.privilege_id, 'expires_at', e.target.value)}
                                                                 className="h-8 text-sm pl-8 dark:bg-gray-900 dark:border-gray-700"
                                                             />
@@ -401,7 +419,7 @@ export default function PrivilegesSection({
                                                     <Input
                                                         id={`remarks-${privilege.id}`}
                                                         placeholder="Additional notes (optional)"
-                                                        value={assignment.remarks || ''}
+                                                        value={getInputValue(assignment.remarks)}
                                                         onChange={(e) => onUpdatePrivilege(assignment.privilege_id, 'remarks', e.target.value)}
                                                         className="h-8 text-sm dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                                     />

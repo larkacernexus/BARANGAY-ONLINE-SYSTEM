@@ -1,4 +1,5 @@
-// UI Components
+// resources/js/Pages/Admin/Residents/Show/components/ProfileSummary.tsx
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -7,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // Icons
 import { User, Crown, Eye, Camera } from 'lucide-react';
-import { Resident } from '../types';
+import { Resident } from '@/types/admin/residents/residents-types';
 
 // Updated Utility Imports - Matching your badge-utils.ts
 import { 
@@ -17,7 +18,7 @@ import {
     getCivilStatusBadgeConfig,
     getPrivilegeIcon 
 } from '@/components/admin/residents/show/utils/badge-utils';
-import { getPhotoUrl } from '@/components/admin/residents/show/utils/helpers';
+import { getPhotoUrl, getFullName, getAddress } from '@/components/admin/residents/show/utils/helpers';
 
 interface ProfileSummaryProps {
     resident: Resident;
@@ -37,7 +38,7 @@ export const ProfileSummary = ({
     activePrivilegesCount,
     onViewFullPhoto 
 }: ProfileSummaryProps) => {
-    const fullName = `${resident.first_name} ${resident.middle_name ? resident.middle_name + ' ' : ''}${resident.last_name}${resident.suffix ? ' ' + resident.suffix : ''}`;
+    const fullName = getFullName(resident);
     
     // Configs from utilities
     const statusCfg = getStatusConfig(resident.status);
@@ -47,6 +48,12 @@ export const ProfileSummary = ({
 
     const photoUrl = getPhotoUrl(resident.photo_path, resident.photo_url);
     const hasPhoto = !!photoUrl;
+    
+    // Get purok name from purok object or fallback
+    const purokName = resident.purok?.name || `Purok ${resident.purok_id}` || 'None';
+    
+    // Get address for tooltip or display
+    const address = getAddress(resident);
 
     return (
         <Card className="dark:bg-gray-900">
@@ -119,10 +126,12 @@ export const ProfileSummary = ({
                         </Badge>
                     </div>
 
-                    {/* Location Row */}
+                    {/* Location Row - Updated to use purok object */}
                     <div className="flex justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Purok:</span>
-                        <span className="font-medium dark:text-gray-200">{resident.purok_name || 'None'}</span>
+                        <span className="font-medium dark:text-gray-200 truncate max-w-[180px] text-right" title={address}>
+                            {purokName}
+                        </span>
                     </div>
 
                     {/* Voter Row */}
@@ -136,6 +145,14 @@ export const ProfileSummary = ({
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-600 dark:text-gray-400">Active Benefits:</span>
                             <span className="font-medium text-green-600 dark:text-green-400">{activePrivilegesCount}</span>
+                        </div>
+                    )}
+                    
+                    {/* Household ID (if part of household) */}
+                    {resident.household_id && (
+                        <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">Household:</span>
+                            <span className="font-mono text-sm dark:text-gray-300">#{resident.household_id}</span>
                         </div>
                     )}
                 </div>
@@ -153,6 +170,15 @@ export const ProfileSummary = ({
                             View Full Photo
                         </Button>
                     </>
+                )}
+                
+                {/* Optional: Show address tooltip */}
+                {address && address !== 'No address specified' && (
+                    <div className="text-center">
+                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate" title={address}>
+                            {address}
+                        </p>
+                    </div>
                 )}
             </CardContent>
         </Card>

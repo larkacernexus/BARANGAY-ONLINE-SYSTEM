@@ -22,19 +22,18 @@ import {
 } from 'lucide-react';
 
 // Types and Utils
-import { ResidentPrivilege } from '../types';
+import { ResidentPrivilege } from '@/types/admin/residents/residents-types'; // Updated import path
 import {
     getPrivilegeIconName,
     getPrivilegeIcon,
     getDiscountPercentage,
-    getDiscountColor,
     getPrivilegeStatusColor
 } from '@/components/admin/residents/show/utils/badge-utils';
 import { formatDate } from '@/components/admin/residents/show/utils/helpers';
 
 interface PrivilegesTableProps {
     privileges: ResidentPrivilege[];
-    onRemove?: (privilegeId: number) => void; // Add optional onRemove prop
+    onRemove?: (privilegeId: number) => void;
 }
 
 export const PrivilegesTable = ({ privileges, onRemove }: PrivilegesTableProps) => {
@@ -46,11 +45,44 @@ export const PrivilegesTable = ({ privileges, onRemove }: PrivilegesTableProps) 
             pending: 'Pending'
         };
 
+        // Get status from privilege or from pivot
+        const status = privilege.status || privilege.pivot?.status || 'pending';
+        
         return (
-            <Badge className={`${getPrivilegeStatusColor(privilege.status)} border`}>
-                {statusText[privilege.status as keyof typeof statusText] || privilege.status}
+            <Badge className={`${getPrivilegeStatusColor(status)} border`}>
+                {statusText[status as keyof typeof statusText] || status}
             </Badge>
         );
+    };
+
+    // Helper function to get privilege name safely
+    const getPrivilegeName = (privilege: ResidentPrivilege) => {
+        return privilege.privilege?.name || privilege.privilege_name || 'Unknown Benefit';
+    };
+
+    // Helper function to get privilege code safely
+    const getPrivilegeCode = (privilege: ResidentPrivilege) => {
+        return privilege.privilege?.code || privilege.privilege_code || '';
+    };
+
+    // Helper function to get ID number safely
+    const getIdNumber = (privilege: ResidentPrivilege) => {
+        return privilege.id_number || privilege.pivot?.id_number || null;
+    };
+
+    // Helper function to get issued date safely
+    const getIssuedDate = (privilege: ResidentPrivilege) => {
+        return privilege.issued_date || privilege.pivot?.granted_at || null;
+    };
+
+    // Helper function to get expiry date safely
+    const getExpiryDate = (privilege: ResidentPrivilege) => {
+        return privilege.expiry_date || privilege.pivot?.valid_until || null;
+    };
+
+    // Helper function to get verified status safely
+    const getVerifiedStatus = (privilege: ResidentPrivilege) => {
+        return privilege.verified_at || privilege.pivot?.verified_at || null;
     };
 
     return (
@@ -80,6 +112,11 @@ export const PrivilegesTable = ({ privileges, onRemove }: PrivilegesTableProps) 
                             const discount = getDiscountPercentage(privilege);
                             const iconName = getPrivilegeIconName(privilege);
                             const IconComponent = getPrivilegeIcon(iconName);
+                            const idNumber = getIdNumber(privilege);
+                            const issuedDate = getIssuedDate(privilege);
+                            const expiryDate = getExpiryDate(privilege);
+                            const verifiedAt = getVerifiedStatus(privilege);
+                            const status = privilege.status || privilege.pivot?.status || 'pending';
 
                             return (
                                 <TableRow key={privilege.id} className="dark:border-gray-700">
@@ -90,19 +127,19 @@ export const PrivilegesTable = ({ privileges, onRemove }: PrivilegesTableProps) 
                                             </div>
                                             <div>
                                                 <p className="font-medium dark:text-gray-200">
-                                                    {privilege.privilege?.name || privilege.privilege_name}
+                                                    {getPrivilegeName(privilege)}
                                                 </p>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {privilege.privilege?.code || privilege.privilege_code}
+                                                    {getPrivilegeCode(privilege)}
                                                 </p>
                                             </div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        {privilege.id_number ? (
+                                        {idNumber ? (
                                             <div className="flex items-center gap-1">
                                                 <IdCard className="h-3 w-3 text-gray-400" />
-                                                <span className="font-mono text-sm dark:text-gray-300">{privilege.id_number}</span>
+                                                <span className="font-mono text-sm dark:text-gray-300">{idNumber}</span>
                                             </div>
                                         ) : (
                                             <span className="text-gray-400 dark:text-gray-500">—</span>
@@ -110,7 +147,7 @@ export const PrivilegesTable = ({ privileges, onRemove }: PrivilegesTableProps) 
                                     </TableCell>
                                     <TableCell>
                                         {discount ? (
-                                            <Badge variant="secondary" className={`${getPrivilegeStatusColor(privilege.status)} font-bold`}>
+                                            <Badge variant="secondary" className={`${getPrivilegeStatusColor(status)} font-bold`}>
                                                 <Percent className="h-3 w-3 mr-1" />
                                                 {discount}%
                                             </Badge>
@@ -119,25 +156,25 @@ export const PrivilegesTable = ({ privileges, onRemove }: PrivilegesTableProps) 
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        {privilege.issued_date ? (
+                                        {issuedDate ? (
                                             <div className="flex items-center gap-1">
                                                 <Calendar className="h-3 w-3 text-gray-400" />
-                                                <span className="text-sm dark:text-gray-300">{formatDate(privilege.issued_date)}</span>
+                                                <span className="text-sm dark:text-gray-300">{formatDate(issuedDate)}</span>
                                             </div>
                                         ) : (
                                             <span className="text-gray-400 dark:text-gray-500">—</span>
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        {privilege.expiry_date ? (
+                                        {expiryDate ? (
                                             <div className="flex items-center gap-1">
                                                 <CalendarDays className="h-3 w-3 text-gray-400" />
                                                 <span className={`text-sm ${
-                                                    privilege.status === 'expired' ? 'text-red-600 dark:text-red-400 font-medium' :
-                                                    privilege.status === 'expiring_soon' ? 'text-yellow-600 dark:text-yellow-400 font-medium' :
+                                                    status === 'expired' ? 'text-red-600 dark:text-red-400 font-medium' :
+                                                    status === 'expiring_soon' ? 'text-yellow-600 dark:text-yellow-400 font-medium' :
                                                     'dark:text-gray-300'
                                                 }`}>
-                                                    {formatDate(privilege.expiry_date)}
+                                                    {formatDate(expiryDate)}
                                                 </span>
                                             </div>
                                         ) : (
@@ -148,11 +185,11 @@ export const PrivilegesTable = ({ privileges, onRemove }: PrivilegesTableProps) 
                                         {getStatusBadge(privilege)}
                                     </TableCell>
                                     <TableCell>
-                                        {privilege.verified_at ? (
+                                        {verifiedAt ? (
                                             <div className="flex items-center gap-1">
                                                 <BadgeCheck className="h-4 w-4 text-green-500 dark:text-green-400" />
                                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {formatDate(privilege.verified_at)}
+                                                    {formatDate(verifiedAt)}
                                                 </span>
                                             </div>
                                         ) : (

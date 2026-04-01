@@ -1,4 +1,5 @@
 // components/admin/residents/ResidentsDialogs.tsx
+
 import {
     AlertDialog,
     AlertDialogAction,
@@ -28,20 +29,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2, Award, CheckCircle, AlertCircle, Users, Shield, ShieldOff } from 'lucide-react';
-import { Purok } from '@/types/admin/residents/residents-types';
+import { Purok, Privilege } from '@/types/admin/residents/residents-types';
 import { useState, useEffect } from 'react';
-
-interface Privilege {
-    id: number;
-    name: string;
-    code: string;
-    description?: string;
-    category?: string;
-    discount_percentage?: number;
-    requires_id_number?: boolean;
-    requires_verification?: boolean;
-    validity_years?: number;
-}
 
 interface SelectionStats {
     total: number;
@@ -50,14 +39,13 @@ interface SelectionStats {
     female: number;
     other?: number;
     voters: number;
-    seniors?: number; // Make optional
-    pwds?: number;    // Make optional
+    seniors?: number;
+    pwds?: number;
     heads: number;
-    avgAge?: number;   // Make optional
+    avgAge?: number;
     hasPhotos?: number;
     privilegeCounts?: Record<string, number>;
     hasPrivileges?: number;
-    // Add additional fields that might come from parent
     males?: number;
     females?: number;
     inactive?: number;

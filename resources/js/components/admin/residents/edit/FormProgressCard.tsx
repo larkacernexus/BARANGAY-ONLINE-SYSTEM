@@ -1,7 +1,9 @@
 // components/admin/residents/edit/FormProgressCard.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, AlertCircle, Award, FileText } from 'lucide-react';
-import { ResidentFormData } from '@/components/admin/residents/edit/resident';
+
+// Import types from main types file
+import { ResidentFormData } from '@/types/admin/residents/residents-types';
 
 interface Props {
     data: ResidentFormData;
@@ -29,6 +31,9 @@ export default function FormProgressCard({ data, requiredFields, optionalFields 
     const totalFields = requiredFields.length + optionalFields.length;
     const totalCompleted = completedRequired + completedOptional;
     const totalProgress = Math.round((totalCompleted / totalFields) * 100);
+
+    // Helper to safely get privileges length
+    const privilegesLength = data.privileges?.length || 0;
 
     return (
         <Card className="dark:bg-gray-900">
@@ -118,7 +123,7 @@ export default function FormProgressCard({ data, requiredFields, optionalFields 
                         <div className="flex items-center gap-1">
                             <Award className="h-4 w-4 text-purple-500 dark:text-purple-400" />
                             <span className="font-medium text-purple-600 dark:text-purple-400">
-                                {data.privileges.length} assigned
+                                {privilegesLength} assigned
                             </span>
                         </div>
                     </div>
@@ -136,6 +141,9 @@ export default function FormProgressCard({ data, requiredFields, optionalFields 
                                         }
                                         if (field === 'birth_date') {
                                             return !value || value === '';
+                                        }
+                                        if (field === 'education_level') {
+                                            return value === '' || value === null || value === undefined;
                                         }
                                         return value === '' || value === null || value === undefined;
                                     })

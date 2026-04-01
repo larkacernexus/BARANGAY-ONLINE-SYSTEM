@@ -5,13 +5,11 @@ import { router, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { 
     Resident, 
-    Household, 
-    HouseholdMembership, 
-    RelatedHouseholdMember,
-    HouseholdOption 
-} from '../types';
+    Household
+} from '@/types/admin/residents/residents-types';
+
 import { formatRelationship, getRelationshipColor } from '@/components/admin/residents/show/utils/badge-utils';
-import { getPhotoUrl } from '@/components/admin/residents/show/utils/helpers';
+import { getPhotoUrl, getFullName } from '@/components/admin/residents/show/utils/helpers';
 
 // UI Components
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -50,10 +48,51 @@ import {
     User
 } from 'lucide-react';
 
+// Define local types that match the structure
+interface RelatedHouseholdMember {
+    id: number;
+    resident_id: number;
+    relationship_to_head: string;
+    is_head: boolean;
+    resident: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        middle_name?: string | null;
+        age: number;
+        gender: string;
+        civil_status: string;
+        contact_number?: string | null;
+        purok_id?: number | null;
+        photo_path?: string | null;
+        photo_url?: string | null;
+    };
+}
+
+interface HouseholdOption {
+    id: number;
+    household_number: string;
+    head_of_family: string;
+    member_count: number;
+    address?: string;
+    purok?: string;
+}
+
+// Define a flexible household membership type
+interface HouseholdMembershipData {
+    id: number;
+    is_head: boolean;
+    relationship?: string | null;
+    joined_at?: string | null;
+    household_id?: number;
+    resident_id?: number;
+    is_active?: boolean;
+}
+
 interface HouseholdManagementProps {
     resident: Resident;
     household?: Household | null;
-    householdMembership?: HouseholdMembership | null;
+    householdMembership?: HouseholdMembershipData | null;
     relatedMembers: RelatedHouseholdMember[];
     households?: HouseholdOption[];
 }
@@ -67,7 +106,7 @@ export const HouseholdManagement = ({
     resident, 
     household, 
     householdMembership, 
-    relatedMembers,
+    relatedMembers = [],
     households = [],
 }: HouseholdManagementProps) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -104,7 +143,7 @@ export const HouseholdManagement = ({
     const handleAddToHousehold = () => {
         if (isAssignDisabled) return;
         setIsSubmitting(true);
-        router.post(`/admin/residents/${resident.id}/assign-household`, {
+        router.post(route('admin.residents.assign-household', resident.id), {
             household_id: selectedHouseholdId,
             relationship: relationship
         }, {
@@ -126,7 +165,7 @@ export const HouseholdManagement = ({
     const handleRemoveFromHousehold = () => {
         if (!confirm('Are you sure you want to remove this resident from the household?')) return;
         setIsSubmitting(true);
-        router.delete(`/admin/residents/${resident.id}/remove-from-household`, {
+        router.delete(route('admin.residents.remove-from-household', resident.id), {
             onFinish: () => setIsSubmitting(false)
         });
     };
@@ -146,9 +185,9 @@ export const HouseholdManagement = ({
                         <CardTitle className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             Current Household
                         </CardTitle>
-                        <Badge className={`${getRelationshipColor(householdMembership.relationship_to_head)} px-2 py-1`}>
+                        <Badge className={`${getRelationshipColor(householdMembership.relationship)} px-2 py-1`}>
                             {householdMembership.is_head && <Crown className="h-3 w-3 mr-1 inline" />}
-                            {formatRelationship(householdMembership.relationship_to_head)}
+                            {formatRelationship(householdMembership.relationship || 'Member')}
                         </Badge>
                     </CardHeader>
                     <CardContent>
@@ -160,11 +199,13 @@ export const HouseholdManagement = ({
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold dark:text-gray-100">HH #{household.household_number}</p>
-                                        <p className="text-xs text-gray-500">{household.address}</p>
+                                        <p className="text-xs text-gray-500">
+                                            {household.purok?.name || 'No purok specified'}
+                                        </p>
                                     </div>
                                 </div>
                                 <Badge variant="secondary" className="font-mono">
-                                    {household.member_count} Members
+                                    {household.total_members} Members
                                 </Badge>
                             </div>
                             <div className="flex gap-2">
@@ -200,44 +241,52 @@ export const HouseholdManagement = ({
                         </CardHeader>
                         <CardContent className="px-2 pb-2">
                             <div className="space-y-1 max-h-[300px] overflow-y-auto px-2">
-                                {relatedMembers.map((member) => (
-                                    <Link 
-                                        key={member.id} 
-                                        href={route('admin.residents.show', member.resident.id)}
-                                        className={`flex items-center justify-between p-2 rounded-md transition-colors border ${
-                                            member.resident.id === resident.id 
-                                            ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' 
-                                            : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="relative">
-                                                <Avatar className="h-8 w-8 border border-gray-200 dark:border-gray-700">
-                                                    <AvatarImage 
-                                                        src={getPhotoUrl(member.resident.photo_path, member.resident.photo_url)} 
-                                                        alt={`${member.resident.first_name} ${member.resident.last_name}`}
-                                                    />
-                                                    <AvatarFallback className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
-                                                        {getInitials(member.resident.first_name, member.resident.last_name)}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                {member.is_head && (
-                                                    <div className="absolute -top-1 -right-1 bg-amber-400 rounded-full p-0.5 border border-white dark:border-gray-800">
-                                                        <Crown className="h-2 w-2 text-white" />
-                                                    </div>
-                                                )}
+                                {relatedMembers.map((member) => {
+                                    const memberName = getFullName(member.resident);
+                                    const memberPhotoUrl = getPhotoUrl(
+                                        member.resident.photo_path, 
+                                        member.resident.photo_url
+                                    );
+                                    
+                                    return (
+                                        <Link 
+                                            key={member.id} 
+                                            href={route('admin.residents.show', member.resident.id)}
+                                            className={`flex items-center justify-between p-2 rounded-md transition-colors border ${
+                                                member.resident.id === resident.id 
+                                                ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' 
+                                                : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 border-transparent'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative">
+                                                    <Avatar className="h-8 w-8">
+                                                        <AvatarImage 
+                                                            src={memberPhotoUrl || undefined} 
+                                                            alt={memberName}
+                                                        />
+                                                        <AvatarFallback>
+                                                            <User className="h-4 w-4" />
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    {member.is_head && (
+                                                        <div className="absolute -top-1 -right-1 bg-amber-400 rounded-full p-0.5 border border-white dark:border-gray-800">
+                                                            <Crown className="h-2 w-2 text-white" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-semibold dark:text-gray-200">
+                                                        {memberName}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-500 uppercase">
+                                                        {formatRelationship(member.relationship_to_head)}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-xs font-semibold dark:text-gray-200">
-                                                    {member.resident.first_name} {member.resident.last_name}
-                                                </p>
-                                                <p className="text-[10px] text-gray-500 uppercase">
-                                                    {formatRelationship(member.relationship_to_head)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                ))}
+                                        </Link>
+                                    );
+                                })}
                             </div>
                         </CardContent>
                     </Card>
@@ -274,20 +323,28 @@ export const HouseholdManagement = ({
                     <DialogHeader>
                         <DialogTitle>Household Assignment</DialogTitle>
                         <DialogDescription>
-                            Place {resident.first_name} into a family unit.
+                            Place {resident.first_name} {resident.last_name} into a family unit.
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-lg">
                         <button 
                             onClick={() => setMode('select')}
-                            className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${mode === 'select' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
+                            className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                                mode === 'select' 
+                                    ? 'bg-white dark:bg-gray-700 shadow-sm' 
+                                    : 'text-gray-500'
+                            }`}
                         >
                             Select Existing
                         </button>
                         <button 
                             onClick={() => setMode('create')}
-                            className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${mode === 'create' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500'}`}
+                            className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                                mode === 'create' 
+                                    ? 'bg-white dark:bg-gray-700 shadow-sm' 
+                                    : 'text-gray-500'
+                            }`}
                         >
                             New Household
                         </button>
@@ -310,20 +367,31 @@ export const HouseholdManagement = ({
                                     filteredHouseholds.map((h) => (
                                         <div
                                             key={h.id}
-                                            className={`p-3 cursor-pointer border-b last:border-0 hover:bg-blue-50 dark:hover:bg-blue-900/10 ${selectedHouseholdId === h.id.toString() ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                                            className={`p-3 cursor-pointer border-b last:border-0 hover:bg-blue-50 dark:hover:bg-blue-900/10 ${
+                                                selectedHouseholdId === h.id.toString() 
+                                                    ? 'bg-blue-50 dark:bg-blue-900/20' 
+                                                    : ''
+                                            }`}
                                             onClick={() => setSelectedHouseholdId(h.id.toString())}
                                         >
                                             <div className="flex justify-between items-start">
                                                 <div>
                                                     <p className="text-sm font-bold">HH #{h.household_number}</p>
                                                     <p className="text-xs text-gray-500 line-clamp-1">{h.head_of_family}</p>
+                                                    <p className="text-xs text-gray-400 mt-1">
+                                                        {h.member_count} members
+                                                    </p>
                                                 </div>
-                                                {selectedHouseholdId === h.id.toString() && <Check className="h-4 w-4 text-blue-600" />}
+                                                {selectedHouseholdId === h.id.toString() && (
+                                                    <Check className="h-4 w-4 text-blue-600" />
+                                                )}
                                             </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="p-8 text-center text-gray-500 text-sm italic">No households match your search.</div>
+                                    <div className="p-8 text-center text-gray-500 text-sm italic">
+                                        No households match your search.
+                                    </div>
                                 )}
                             </div>
 
@@ -331,7 +399,11 @@ export const HouseholdManagement = ({
                                 <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
                                     <Label className="text-xs font-bold uppercase text-gray-500 flex justify-between">
                                         Relationship to Head
-                                        {!relationship && <span className="text-red-500 lowercase font-normal italic">Required*</span>}
+                                        {!relationship && (
+                                            <span className="text-red-500 lowercase font-normal italic">
+                                                Required*
+                                            </span>
+                                        )}
                                     </Label>
                                     <Select value={relationship} onValueChange={setRelationship}>
                                         <SelectTrigger>
@@ -339,7 +411,9 @@ export const HouseholdManagement = ({
                                         </SelectTrigger>
                                         <SelectContent>
                                             {relationshipOptions.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                <SelectItem key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -349,24 +423,27 @@ export const HouseholdManagement = ({
                     ) : (
                         <div className="py-6 text-center space-y-3">
                             <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-amber-700 dark:text-amber-400 text-xs border border-amber-200 dark:border-amber-800">
-                                This will create a <strong>new unique Household Number</strong> with {resident.first_name} as the primary head.
+                                This will create a <strong>new unique Household Number</strong> with{' '}
+                                {resident.first_name} {resident.last_name} as the primary head.
                             </div>
                         </div>
                     )}
 
                     <DialogFooter>
-                        <Button variant="ghost" onClick={() => setIsOpen(false)} disabled={isSubmitting}>Cancel</Button>
+                        <Button variant="ghost" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
+                            Cancel
+                        </Button>
                         {mode === 'select' ? (
                             <Button 
                                 onClick={handleAddToHousehold} 
                                 disabled={isAssignDisabled} 
-                                className="bg-blue-600"
+                                className="bg-blue-600 hover:bg-blue-700"
                             >
                                 {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                                 Assign to Unit
                             </Button>
                         ) : (
-                            <Button onClick={handleCreateHousehold} className="bg-green-600">
+                            <Button onClick={handleCreateHousehold} className="bg-green-600 hover:bg-green-700">
                                 Register New Household
                             </Button>
                         )}

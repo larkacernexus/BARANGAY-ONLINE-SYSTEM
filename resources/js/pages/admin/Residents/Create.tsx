@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Save, Upload, Download, UserPlus, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-import { PageProps } from '@/types';
 import ImportModal from '@/components/filerelated/import-modal';
 
 // Import new components
@@ -21,6 +20,13 @@ import HouseholdSection from '@/components/admin/residents/create/forms/Househol
 import { useResidentForm } from '@/components/admin/residents/create/hooks/useResidentForm';
 import { downloadTemplate, downloadGuide, downloadEmptyTemplate } from '@/components/admin/residents/create/utils/csv-utils';
 
+// Import types from main types file
+import { 
+    Purok, 
+    Privilege,
+    PageProps
+} from '@/types/admin/residents/residents-types';
+
 interface Household {
     id: number;
     household_number: string;
@@ -29,22 +35,6 @@ interface Household {
     has_head: boolean;
     head_name: string;
     member_count: number;
-}
-
-interface Purok {
-    id: number;
-    name: string;
-}
-
-interface Privilege {
-    id: number;
-    name: string;
-    code: string;
-    description: string;
-    is_active: boolean;
-    discount_percentage?: number;
-    requires_id_number?: boolean;
-    validity_years?: number;
 }
 
 interface CreateResidentProps extends PageProps {
@@ -96,10 +86,12 @@ export default function CreateResident({
             if (key === 'photo' && value instanceof File) {
                 formData.append('photo', value);
             } else if (key === 'privileges') {
-                if (value.length > 0) {
+                if (value && Array.isArray(value) && value.length > 0) {
                     formData.append('privileges', JSON.stringify(value));
                 }
-            } else if (value !== null && value !== undefined) {
+            } else if (key === 'new_household_name' && value) {
+                formData.append('new_household_name', String(value));
+            } else if (value !== null && value !== undefined && value !== '') {
                 formData.append(key, String(value));
             }
         });
@@ -107,12 +99,54 @@ export default function CreateResident({
         post('/admin/residents', {
             data: formData,
             preserveScroll: true,
-            onSuccess: () => reset()
+            onSuccess: () => {
+                // Optional: Show success message or redirect
+                console.log('Resident created successfully');
+            }
         });
+    };
+
+    const handleClearForm = () => {
+        if (reset && typeof reset === 'function') {
+            reset();
+        }
     };
 
     const handleImportSuccess = () => {
         setImportModalOpen(false);
+    };
+
+    // Helper to handle privilege addition
+    const handleAddPrivilege = (privilegeId: number) => {
+        const privilege = privileges.find(p => p.id === privilegeId);
+        if (privilege) {
+            const expiresAt = privilege.validity_years 
+                ? new Date(new Date().setFullYear(new Date().getFullYear() + privilege.validity_years)).toISOString().split('T')[0]
+                : '';
+            
+            setData('privileges', [
+                ...data.privileges,
+                {
+                    privilege_id: privilegeId,
+                    id_number: '',
+                    verified_at: new Date().toISOString().split('T')[0],
+                    expires_at: expiresAt,
+                    remarks: '',
+                }
+            ]);
+        }
+    };
+
+    // Helper to handle privilege removal
+    const handleRemovePrivilege = (privilegeId: number) => {
+        setData('privileges', data.privileges.filter(p => p.privilege_id !== privilegeId));
+    };
+
+    // Helper to handle privilege update
+    const handleUpdatePrivilege = (privilegeId: number, field: string, value: string) => {
+        setData('privileges', data.privileges.map(p => 
+            p.privilege_id === privilegeId ? { ...p, [field]: value } : p
+        ));
     };
 
     return (
@@ -127,7 +161,7 @@ export default function CreateResident({
             >
                 <form onSubmit={handleSubmit} encType="multipart/form-data">
                     <div className="space-y-6">
-                        {/* Header with Actions - EXACT same as Forms */}
+                        {/* Header with Actions */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
                                 <Link href="/admin/residents">
@@ -181,7 +215,7 @@ export default function CreateResident({
                             </div>
                         </div>
 
-                        {/* Error Messages - With dark mode styling */}
+                        {/* Error Messages */}
                         {Object.keys(errors).length > 0 && (
                             <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
                                 <CardContent className="p-4">
@@ -202,7 +236,7 @@ export default function CreateResident({
                             </Card>
                         )}
 
-                        {/* Template Download Info - With dark mode styling */}
+                        {/* Template Download Info */}
                         <Card className="border-l-4 border-l-blue-500 dark:bg-gray-900">
                             <CardContent className="p-4">
                                 <div className="flex items-start gap-3">
@@ -252,7 +286,7 @@ export default function CreateResident({
                                     civilStatusOptions={civilStatusOptions}
                                 />
 
-                                {/* Contact Information Card */}
+                                {/* Contact Information & Household Section */}
                                 <Card className="dark:bg-gray-900">
                                     <ContactInfoForm 
                                         data={data}
@@ -261,7 +295,6 @@ export default function CreateResident({
                                         puroks={puroks}
                                     />
                                     
-                                    {/* Household Section */}
                                     <HouseholdSection
                                         data={data}
                                         setData={setData}
@@ -292,31 +325,9 @@ export default function CreateResident({
                                 <PrivilegesCard
                                     privileges={privileges}
                                     assignedPrivileges={data.privileges}
-                                    onAddPrivilege={(privilegeId) => {
-                                        const privilege = privileges.find(p => p.id === privilegeId);
-                                        if (privilege) {
-                                            setData('privileges', [
-                                                ...data.privileges,
-                                                {
-                                                    privilege_id: privilegeId,
-                                                    id_number: '',
-                                                    verified_at: new Date().toISOString().split('T')[0],
-                                                    expires_at: privilege.validity_years 
-                                                        ? new Date(new Date().setFullYear(new Date().getFullYear() + privilege.validity_years)).toISOString().split('T')[0]
-                                                        : '',
-                                                    remarks: '',
-                                                }
-                                            ]);
-                                        }
-                                    }}
-                                    onRemovePrivilege={(privilegeId) => {
-                                        setData('privileges', data.privileges.filter(p => p.privilege_id !== privilegeId));
-                                    }}
-                                    onUpdatePrivilege={(privilegeId, field, value) => {
-                                        setData('privileges', data.privileges.map(p => 
-                                            p.privilege_id === privilegeId ? { ...p, [field]: value } : p
-                                        ));
-                                    }}
+                                    onAddPrivilege={handleAddPrivilege}
+                                    onRemovePrivilege={handleRemovePrivilege}
+                                    onUpdatePrivilege={handleUpdatePrivilege}
                                 />
 
                                 {/* Form Preview */}
@@ -333,9 +344,15 @@ export default function CreateResident({
                             </div>
                         </div>
 
-                        {/* Form Actions - Fixed at bottom */}
+                        {/* Form Actions */}
                         <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
-                            <Button variant="ghost" type="button" onClick={reset} className="dark:text-gray-400 dark:hover:text-white">
+                            <Button 
+                                variant="ghost" 
+                                type="button" 
+                                onClick={handleClearForm} 
+                                className="dark:text-gray-400 dark:hover:text-white"
+                                disabled={processing}
+                            >
                                 Clear Form
                             </Button>
                             <div className="flex items-center gap-2">
