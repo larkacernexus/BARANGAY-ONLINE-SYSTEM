@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Search, Filter, Download, X, FilterX, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
-import { FilterState } from '@/admin-utils/rolePermissionsUtils';
+
+import { FilterState } from '@/types/admin/rolepermissions/rolePermissions.types';
 
 interface RolePermissionsFiltersProps {
     search: string;
@@ -22,7 +23,7 @@ interface RolePermissionsFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef: React.RefObject<HTMLInputElement>;
+    searchInputRef: React.RefObject<HTMLInputElement | null>; // Update to accept nullable
     handleExport: () => void;
     handleSort: (column: string) => void;
     isLoading?: boolean;

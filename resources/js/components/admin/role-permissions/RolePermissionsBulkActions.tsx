@@ -1,4 +1,5 @@
 // components/admin/role-permissions/RolePermissionsBulkActions.tsx
+// components/admin/role-permissions/RolePermissionsBulkActions.tsx
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -16,9 +17,10 @@ import {
     Loader2,
     ChevronDown
 } from 'lucide-react';
-import { useState, useRef } from 'react';
-import { SelectionMode, SelectionStats } from '@/admin-utils/rolePermissionsUtils';
+import { useState, useRef, useEffect } from 'react';
 
+// Import types from the types file
+import { SelectionMode, SelectionStats, BulkOperation } from '@/types/admin/rolepermissions/rolePermissions.types';
 interface RolePermissionsBulkActionsProps {
     selectedPermissions: number[];
     selectionMode: SelectionMode;
@@ -30,7 +32,7 @@ interface RolePermissionsBulkActionsProps {
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void; // Changed to BulkOperation type
     onCopySelectedData: () => void;
     setShowBulkRevokeDialog: (show: boolean) => void;
 }
@@ -52,6 +54,18 @@ export default function RolePermissionsBulkActions({
 }: RolePermissionsBulkActionsProps) {
     const [showBulkActions, setShowBulkActions] = useState(false);
     const bulkActionRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (bulkActionRef.current && !bulkActionRef.current.contains(event.target as Node)) {
+                setShowBulkActions(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     return (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/10 dark:to-indigo-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4 shadow-sm">
@@ -95,7 +109,7 @@ export default function RolePermissionsBulkActions({
                     </div>
                 </div>
                 
-                <div className="flex flex-wrap items-center gap-2" ref={bulkActionRef}>
+                <div className="flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-2">
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -134,7 +148,7 @@ export default function RolePermissionsBulkActions({
                         </Tooltip>
                     </div>
                     
-                    <div className="relative">
+                    <div className="relative" ref={bulkActionRef}>
                         <Button
                             onClick={() => setShowBulkActions(!showBulkActions)}
                             className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
@@ -160,7 +174,10 @@ export default function RolePermissionsBulkActions({
                                     <Button
                                         variant="ghost"
                                         className="w-full justify-start h-8 text-sm"
-                                        onClick={() => onBulkOperation('generate_report')}
+                                        onClick={() => {
+                                            onBulkOperation('generate_report');
+                                            setShowBulkActions(false);
+                                        }}
                                     >
                                         <FileSpreadsheet className="h-3.5 w-3.5 mr-2" />
                                         Generate Report
@@ -169,7 +186,10 @@ export default function RolePermissionsBulkActions({
                                     <Button
                                         variant="ghost"
                                         className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        onClick={() => setShowBulkRevokeDialog(true)}
+                                        onClick={() => {
+                                            setShowBulkRevokeDialog(true);
+                                            setShowBulkActions(false);
+                                        }}
                                     >
                                         <Trash2 className="h-3.5 w-3.5 mr-2" />
                                         Revoke Selected
@@ -182,7 +202,7 @@ export default function RolePermissionsBulkActions({
                     <Button
                         variant="outline"
                         className="h-8"
-                        onClick={() => onBulkOperation('print')}
+                        onClick={() => onBulkOperation('generate_report')}
                         disabled={isPerformingBulkAction}
                     >
                         <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />

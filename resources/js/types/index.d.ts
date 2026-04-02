@@ -334,3 +334,16 @@
 //     errors?: Record<string, string>;
 //     [key: string]: any;
 // }
+
+// export interface FlashMessage {
+//     success?: string;
+//     error?: string;
+//     warning?: string;
+//     info?: string;
+// }
+
+// export interface Auth {
+//     user: User;
+//     permissions?: string[];
+//     roles?: string[];
+// }

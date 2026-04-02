@@ -1,3 +1,4 @@
+// pages/RolePermissionShow.tsx
 import React, { useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
@@ -14,17 +15,15 @@ import {
     MoreVertical,
     AlertTriangle,
     Check,
-    Edit,
     Mail,
     FileText,
     Eye,
     Download,
     Printer,
-    ChevronRight,
     Settings,
     RefreshCw,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -50,44 +49,18 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { route } from 'ziggy-js';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
-interface RolePermissionShowProps {
-    role_permission: {
-        id: number;
-        role_id: number;
-        permission_id: number;
-        granted_by: number;
-        granted_at: string;
-        role: {
-            id: number;
-            name: string;
-            description?: string;
-            is_system_role: boolean;
-            users_count?: number;
-            created_at: string;
-            updated_at: string;
-        };
-        permission: {
-            id: number;
-            name: string;
-            display_name: string;
-            module: string;
-            description?: string;
-            is_active: boolean;
-            created_at: string;
-            updated_at: string;
-        };
-        granter: {
-            id: number;
-            name: string;
-            email: string;
-            avatar?: string | null;
-            role?: string;
-        };
-        notes?: string;
-    };
-}
+// Import types from the types file
+import { RolePermissionShowProps } from '@/types/admin/rolepermissions/rolePermissions.types';
+
+// Import utilities from the utils file
+import { 
+    formatDate, 
+    formatTimeAgo, 
+    getModuleBadgeVariant, 
+    getRoleTypeBadgeVariant 
+} from '@/admin-utils/rolePermissionsUtils';
 
 export default function RolePermissionShow({ role_permission }: RolePermissionShowProps) {
     const [copySuccess, setCopySuccess] = useState<string | null>(null);
@@ -110,46 +83,16 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
         );
     }
 
-    const formatDate = (dateString: string) => {
-        if (!dateString) return 'N/A';
-        try {
-            return new Date(dateString).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-            });
-        } catch {
-            return 'Invalid date';
-        }
-    };
-
-    const formatTimeAgo = (dateString: string) => {
-        if (!dateString) return 'N/A';
-        try {
-            const date = new Date(dateString);
-            const now = new Date();
-            const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-            
-            if (diffInSeconds < 60) return 'just now';
-            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
-            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
-            if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
-            return formatDate(dateString);
-        } catch {
-            return 'Invalid date';
-        }
-    };
-
     const handleCopyToClipboard = async (text: string, label: string) => {
         if (!text) return;
         try {
             await navigator.clipboard.writeText(text);
             setCopySuccess(`${label} copied to clipboard!`);
+            toast.success(`${label} copied to clipboard!`);
             setTimeout(() => setCopySuccess(null), 3000);
         } catch (err) {
             console.error('Failed to copy:', err);
+            toast.error('Failed to copy to clipboard');
         }
     };
 
@@ -159,13 +102,16 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
 
     const confirmRevoke = () => {
         setIsRevoking(true);
-        router.delete(route('role-permissions.destroy', role_permission.id), {
+        router.delete(route('admin.role-permissions.destroy', role_permission.id), {
             preserveScroll: true,
             onSuccess: () => {
+                setIsRevoking(false);
+                toast.success('Permission revoked successfully');
                 router.visit(route('admin.role-permissions.index'));
             },
             onError: () => {
                 setIsRevoking(false);
+                toast.error('Failed to revoke permission');
             },
         });
     };
@@ -190,6 +136,7 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+        toast.success('Assignment details exported successfully');
     };
 
     const getInitials = (name: string) => {
@@ -202,19 +149,20 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
             .slice(0, 2);
     };
 
-    // Safe access helpers
+    // Safe access helpers with proper date handling
     const granter = role_permission.granter || {
         id: 0,
         name: 'Unknown',
         email: '',
         avatar: null,
-        role: 'Unknown'
     };
 
     const role = role_permission.role || {
         id: 0,
         name: 'Unknown',
+        description: '',
         is_system_role: false,
+        users_count: 0,
         created_at: '',
         updated_at: ''
     };
@@ -224,10 +172,20 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
         name: 'unknown',
         display_name: 'Unknown',
         module: 'unknown',
+        description: '',
         is_active: false,
         created_at: '',
         updated_at: ''
     };
+
+    // Safely get date strings
+    const roleCreatedAt = typeof role.created_at === 'string' ? role.created_at : '';
+    const roleUpdatedAt = typeof role.updated_at === 'string' ? role.updated_at : '';
+    const permissionCreatedAt = typeof permission.created_at === 'string' ? permission.created_at : '';
+    const permissionUpdatedAt = typeof permission.updated_at === 'string' ? permission.updated_at : '';
+
+    const roleBadge = getRoleTypeBadgeVariant(role.is_system_role);
+    const moduleBadge = getModuleBadgeVariant(permission.module);
 
     return (
         <AdminLayout
@@ -441,11 +399,6 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                         <div className="flex-1">
                                             <div className="font-medium dark:text-white">{granter.name}</div>
                                             <div className="text-sm text-gray-500 dark:text-gray-400">{granter.email || 'No email'}</div>
-                                            {granter.role && (
-                                                <Badge variant="outline" className="mt-1 text-xs dark:border-gray-600 dark:text-gray-300">
-                                                    {granter.role}
-                                                </Badge>
-                                            )}
                                         </div>
                                     </div>
 
@@ -458,19 +411,6 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                         >
                                             <Mail className="h-4 w-4 mr-2" />
                                             Copy Email
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            className="w-full justify-start dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                                            onClick={() => {
-                                                toast({
-                                                    title: "Info",
-                                                    description: "User profile view not implemented",
-                                                });
-                                            }}
-                                        >
-                                            <Eye className="h-4 w-4 mr-2" />
-                                            View Profile
                                         </Button>
                                     </div>
                                 </CardContent>
@@ -495,7 +435,9 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                                     <div className="font-medium dark:text-white">Role</div>
                                                     <div className="text-lg font-semibold dark:text-white">{role.name}</div>
                                                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                        {role.is_system_role ? 'System Role' : 'Custom Role'}
+                                                        <Badge className={roleBadge.className}>
+                                                            {roleBadge.text}
+                                                        </Badge>
                                                         {role.users_count && ` • ${role.users_count} users`}
                                                     </div>
                                                 </div>
@@ -517,8 +459,8 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                                     <div className="text-lg font-semibold dark:text-white">{permission.display_name}</div>
                                                     <div className="text-sm text-gray-500 dark:text-gray-400">
                                                         <code className="dark:text-gray-400">{permission.name}</code>
-                                                        <Badge variant="outline" className="ml-2 dark:border-gray-600 dark:text-gray-300">
-                                                            {permission.module}
+                                                        <Badge className={`ml-2 ${moduleBadge.className}`}>
+                                                            {moduleBadge.text}
                                                         </Badge>
                                                     </div>
                                                 </div>
@@ -558,14 +500,8 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                             <div>
                                                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Role Type</div>
                                                 <div className="mt-1">
-                                                    <Badge 
-                                                        variant={role.is_system_role ? "default" : "outline"}
-                                                        className={role.is_system_role 
-                                                            ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800"
-                                                            : "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800"
-                                                        }
-                                                    >
-                                                        {role.is_system_role ? 'System Role' : 'Custom Role'}
+                                                    <Badge className={roleBadge.className}>
+                                                        {roleBadge.text}
                                                     </Badge>
                                                 </div>
                                             </div>
@@ -588,14 +524,18 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                    <span className="text-sm dark:text-white">{formatDate(role.created_at)}</span>
+                                                    <span className="text-sm dark:text-white">
+                                                        {roleCreatedAt ? formatDate(roleCreatedAt) : 'N/A'}
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div>
                                                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Updated</div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <Clock className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                    <span className="text-sm dark:text-white">{formatTimeAgo(role.updated_at)}</span>
+                                                    <span className="text-sm dark:text-white">
+                                                        {roleUpdatedAt ? formatTimeAgo(roleUpdatedAt) : 'N/A'}
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div>
@@ -670,8 +610,8 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                             <div>
                                                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Module</div>
                                                 <div className="mt-1">
-                                                    <Badge variant="outline" className="text-lg dark:border-gray-600 dark:text-gray-300">
-                                                        {permission.module}
+                                                    <Badge className={moduleBadge.className}>
+                                                        {moduleBadge.text}
                                                     </Badge>
                                                 </div>
                                             </div>
@@ -683,7 +623,6 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</div>
                                                 <div className="mt-1">
                                                     <Badge 
-                                                        variant={permission.is_active ? "default" : "outline"}
                                                         className={permission.is_active 
                                                             ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800"
                                                             : "bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300 dark:border-gray-700"
@@ -697,14 +636,18 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                    <span className="text-sm dark:text-white">{formatDate(permission.created_at)}</span>
+                                                    <span className="text-sm dark:text-white">
+                                                        {permissionCreatedAt ? formatDate(permissionCreatedAt) : 'N/A'}
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div>
                                                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Updated</div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <Clock className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                    <span className="text-sm dark:text-white">{formatTimeAgo(permission.updated_at)}</span>
+                                                    <span className="text-sm dark:text-white">
+                                                        {permissionUpdatedAt ? formatTimeAgo(permissionUpdatedAt) : 'N/A'}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
@@ -786,10 +729,6 @@ export default function RolePermissionShow({ role_permission }: RolePermissionSh
                                                             <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">
                                                                 Manual Assignment
                                                             </Badge>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span className="text-sm text-gray-500 dark:text-gray-400">Granter Role:</span>
-                                                            <span className="text-sm dark:text-white">{granter.role || 'N/A'}</span>
                                                         </div>
                                                     </div>
                                                 </CardContent>

@@ -10,14 +10,16 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+import { BulkOperation, RolePermission } from '@/types/admin/rolepermissions/rolePermissions.types';
+
 interface RolePermissionsDialogsProps {
     showBulkRevokeDialog: boolean;
     setShowBulkRevokeDialog: (value: boolean) => void;
-    showRevokeDialog: any;
-    setShowRevokeDialog: (value: any) => void;
+    showRevokeDialog: RolePermission | null; // Change from any to proper type
+    setShowRevokeDialog: (value: RolePermission | null) => void; // Change from any to proper type
     isPerformingBulkAction: boolean;
     selectedPermissions: number[];
-    handleBulkOperation: (operation: string) => void;
+    handleBulkOperation: (operation: BulkOperation) => void; // Change from string to BulkOperation
     confirmRevoke: () => void;
     selectionStats: any;
 }
@@ -50,8 +52,8 @@ export default function RolePermissionsDialogs({
                         <div className="my-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
                             <h4 className="text-sm font-medium mb-2">Affected data:</h4>
                             <ul className="text-sm space-y-1 text-gray-600 dark:text-gray-400">
-                                <li>• {selectionStats.rolesCount || 0} roles affected</li>
-                                <li>• {selectionStats.modulesCount || 0} modules impacted</li>
+                                <li>• {selectionStats.uniqueRoles || 0} roles affected</li>
+                                <li>• {selectionStats.uniqueModules || 0} modules impacted</li>
                             </ul>
                         </div>
                     )}
@@ -77,11 +79,11 @@ export default function RolePermissionsDialogs({
                         <AlertDialogDescription>
                             Are you sure you want to revoke permission 
                             <span className="font-medium text-gray-900 dark:text-white mx-1">
-                                "{showRevokeDialog?.permission_name}"
+                                "{showRevokeDialog?.permission?.display_name || showRevokeDialog?.permission?.name || 'N/A'}"
                             </span>
                             from role 
                             <span className="font-medium text-gray-900 dark:text-white mx-1">
-                                "{showRevokeDialog?.role_name}"
+                                "{showRevokeDialog?.role?.name || 'N/A'}"
                             </span>
                             ? This action cannot be undone.
                         </AlertDialogDescription>
@@ -91,9 +93,9 @@ export default function RolePermissionsDialogs({
                         <div className="my-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
                             <h4 className="text-sm font-medium mb-2">Permission details:</h4>
                             <ul className="text-sm space-y-1 text-gray-600 dark:text-gray-400">
-                                <li>• Module: {showRevokeDialog.module_name || 'N/A'}</li>
-                                <li>• Granted by: {showRevokeDialog.granter_name || 'System'}</li>
-                                <li>• Granted on: {showRevokeDialog.granted_at_formatted || 'N/A'}</li>
+                                <li>• Module: {showRevokeDialog.permission?.module || 'N/A'}</li>
+                                <li>• Granted by: {showRevokeDialog.granter?.name || 'System'}</li>
+                                <li>• Granted on: {showRevokeDialog.granted_at ? new Date(showRevokeDialog.granted_at).toLocaleString() : 'N/A'}</li>
                             </ul>
                         </div>
                     )}

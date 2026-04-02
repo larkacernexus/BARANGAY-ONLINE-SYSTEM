@@ -1,5 +1,5 @@
 // admin-utils/rolesUtils.ts
-import { Role } from '@/types/roles';
+import { Role } from '@/types/admin/roles/roles';
 
 export interface FilterState {
     search: string;

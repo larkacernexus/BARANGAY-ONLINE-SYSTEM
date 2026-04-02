@@ -1,3 +1,4 @@
+// pages/RolePermissionCreate.tsx
 import React, { useState, useEffect } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
@@ -37,36 +38,17 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { route } from 'ziggy-js';
 import { toast } from 'sonner';
 
-interface Role {
-    id: number;
-    name: string;
-    description?: string;
-    is_system_role: boolean;
-    users_count?: number;
-    permissions?: number[];
-}
+// Import types from the types file
+import { 
+    Role, 
+    Permission, 
+    RolePermissionCreateProps,
+    PermissionGroup,
+    RolePermissionFormData
+} from '@/types/admin/rolepermissions/rolePermissions.types';
 
-interface Permission {
-    id: number;
-    name: string;
-    display_name: string;
-    module: string;
-    description?: string;
-    is_active: boolean;
-}
-
-interface RolePermissionCreateProps {
-    roles?: Role[];
-    permissions?: Permission[];
-    modules?: string[];
-    validation_errors?: Record<string, string>;
-    success_message?: string;
-}
-
-interface PermissionGroup {
-    module: string;
-    permissions: Permission[];
-}
+// Import utilities from the utils file (if needed)
+// import { formatDate, groupPermissionsByModule } from '@/admin-utils/rolePermissionsUtils';
 
 export default function RolePermissionCreate({
     roles: initialRoles = [],
@@ -75,22 +57,24 @@ export default function RolePermissionCreate({
     validation_errors = {},
     success_message
 }: RolePermissionCreateProps) {
-    // Safe defaults for all props
+    // Safe defaults for all props with proper type checking
     const safeRoles: Role[] = Array.isArray(initialRoles) ? initialRoles : [];
     const safePermissions: Permission[] = Array.isArray(initialPermissions) ? initialPermissions : [];
     const safeModules: string[] = Array.isArray(initialModules) ? initialModules : [];
 
+    // State management with proper types
     const [selectedRoleId, setSelectedRoleId] = useState<string>('');
     const [selectedPermissions, setSelectedPermissions] = useState<Set<number>>(new Set());
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState<string>('');
     const [moduleFilter, setModuleFilter] = useState<string>('all');
     const [viewMode, setViewMode] = useState<'list' | 'grouped'>('grouped');
-    const [showInactive, setShowInactive] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showInactive, setShowInactive] = useState<boolean>(false);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-    const { data, setData, errors, processing, post, reset } = useForm({
+    // Form handling with proper types
+    const { data, setData, errors, processing, post, reset } = useForm<RolePermissionFormData>({
         role_id: '',
-        permission_ids: [] as number[],
+        permission_ids: [],
         notes: '',
         grant_all_module_permissions: false,
     });
@@ -98,17 +82,17 @@ export default function RolePermissionCreate({
     // Update form data when selected role or permissions change
     useEffect(() => {
         setData('role_id', selectedRoleId);
-    }, [selectedRoleId]);
+    }, [selectedRoleId, setData]);
 
     useEffect(() => {
         setData('permission_ids', Array.from(selectedPermissions));
-    }, [selectedPermissions]);
+    }, [selectedPermissions, setData]);
 
-    // Get selected role details
+    // Get selected role details with proper type checking
     const selectedRole = safeRoles.find(role => role.id.toString() === selectedRoleId);
 
-    // Get available modules from permissions
-    const availableModules = Array.from(
+    // Get available modules from permissions with proper filtering
+    const availableModules: string[] = Array.from(
         new Set(safePermissions.map(p => p.module).filter(Boolean))
     ).sort();
 
@@ -122,7 +106,7 @@ export default function RolePermissionCreate({
     }, [selectedRole]);
 
     // Filter permissions based on search and filters
-    const filteredPermissions = safePermissions.filter(permission => {
+    const filteredPermissions: Permission[] = safePermissions.filter(permission => {
         // Filter by active status
         if (!showInactive && !permission.is_active) return false;
 
@@ -152,7 +136,7 @@ export default function RolePermissionCreate({
         .filter(group => group.permissions.length > 0);
 
     // Check if all permissions in a module are selected
-    const isModuleAllSelected = (module: string) => {
+    const isModuleAllSelected = (module: string): boolean => {
         const modulePermissions = safePermissions.filter(p => 
             p.module === module && (showInactive || p.is_active)
         );
@@ -160,7 +144,7 @@ export default function RolePermissionCreate({
     };
 
     // Toggle all permissions in a module
-    const toggleModulePermissions = (module: string, checked: boolean) => {
+    const toggleModulePermissions = (module: string, checked: boolean): void => {
         const modulePermissions = safePermissions.filter(p => 
             p.module === module && (showInactive || p.is_active)
         );
@@ -176,7 +160,7 @@ export default function RolePermissionCreate({
     };
 
     // Toggle individual permission
-    const togglePermission = (permissionId: number, checked: boolean) => {
+    const togglePermission = (permissionId: number, checked: boolean): void => {
         const newSelected = new Set(selectedPermissions);
         if (checked) {
             newSelected.add(permissionId);
@@ -187,7 +171,7 @@ export default function RolePermissionCreate({
     };
 
     // Grant all permissions
-    const grantAllPermissions = () => {
+    const grantAllPermissions = (): void => {
         const allPermissionIds = safePermissions
             .filter(p => showInactive || p.is_active)
             .map(p => p.id);
@@ -195,11 +179,11 @@ export default function RolePermissionCreate({
     };
 
     // Revoke all permissions
-    const revokeAllPermissions = () => {
+    const revokeAllPermissions = (): void => {
         setSelectedPermissions(new Set());
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
         e.preventDefault();
         
         if (!selectedRoleId) {
@@ -229,7 +213,7 @@ export default function RolePermissionCreate({
         });
     };
 
-    const handleReset = () => {
+    const handleReset = (): void => {
         reset();
         setSelectedRoleId('');
         setSelectedPermissions(new Set());
@@ -239,7 +223,7 @@ export default function RolePermissionCreate({
     };
 
     // Get system role warning
-    const getSystemRoleWarning = () => {
+    const getSystemRoleWarning = (): React.ReactNode => {
         if (!selectedRole) return null;
         
         if (selectedRole.is_system_role) {
@@ -255,6 +239,33 @@ export default function RolePermissionCreate({
         }
         return null;
     };
+
+    // Get permission status badge
+    const getPermissionStatusBadge = (permission: Permission): React.ReactNode => {
+        if (!permission.is_active) {
+            return (
+                <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
+                    Inactive
+                </Badge>
+            );
+        }
+        return null;
+    };
+
+    // Render empty state
+    const renderEmptyState = (message: string): React.ReactNode => (
+        <div className="flex flex-col items-center justify-center h-64 text-center p-8">
+            <Key className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-4" />
+            <h3 className="font-medium text-gray-700 dark:text-gray-300">
+                {message}
+            </h3>
+            {message === "Select a Role First" && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Please select a role to view and assign permissions
+                </p>
+            )}
+        </div>
+    );
 
     return (
         <AdminLayout
@@ -561,15 +572,7 @@ export default function RolePermissionCreate({
                                     <div className="border rounded-lg dark:border-gray-700">
                                         <ScrollArea className="h-[400px]">
                                             {!selectedRoleId ? (
-                                                <div className="flex flex-col items-center justify-center h-64 text-center p-8">
-                                                    <Shield className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-4" />
-                                                    <h3 className="font-medium text-gray-700 dark:text-gray-300">
-                                                        Select a Role First
-                                                    </h3>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                        Please select a role to view and assign permissions
-                                                    </p>
-                                                </div>
+                                                renderEmptyState("Select a Role First")
                                             ) : viewMode === 'grouped' ? (
                                                 /* Grouped View */
                                                 <div className="p-4 space-y-6">
@@ -625,11 +628,7 @@ export default function RolePermissionCreate({
                                                                                 >
                                                                                     {permission.display_name}
                                                                                 </Label>
-                                                                                {!permission.is_active && (
-                                                                                    <Badge variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
-                                                                                        Inactive
-                                                                                    </Badge>
-                                                                                )}
+                                                                                {getPermissionStatusBadge(permission)}
                                                                             </div>
                                                                             <p className="text-sm text-gray-600 dark:text-gray-400 font-mono">
                                                                                 {permission.name}
@@ -680,14 +679,10 @@ export default function RolePermissionCreate({
                                                                             </p>
                                                                         </div>
                                                                         <div className="flex items-center gap-2">
-                                                                            <Badge variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
+                                                                            <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
                                                                                 {permission.module}
                                                                             </Badge>
-                                                                            {!permission.is_active && (
-                                                                                <Badge variant="secondary" size="sm" className="dark:bg-gray-700 dark:text-gray-300">
-                                                                                    Inactive
-                                                                                </Badge>
-                                                                            )}
+                                                                            {getPermissionStatusBadge(permission)}
                                                                         </div>
                                                                     </div>
                                                                     {permission.description && (
@@ -703,17 +698,11 @@ export default function RolePermissionCreate({
                                             )}
 
                                             {selectedRoleId && filteredPermissions.length === 0 && (
-                                                <div className="flex flex-col items-center justify-center h-64 text-center p-8">
-                                                    <Key className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-4" />
-                                                    <h3 className="font-medium text-gray-700 dark:text-gray-300">
-                                                        No permissions found
-                                                    </h3>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                        {searchQuery
-                                                            ? 'Try a different search term'
-                                                            : 'No permissions available for the selected filters'}
-                                                    </p>
-                                                </div>
+                                                renderEmptyState(
+                                                    searchQuery
+                                                        ? 'No permissions found for your search'
+                                                        : 'No permissions available for the selected filters'
+                                                )
                                             )}
                                         </ScrollArea>
                                     </div>
@@ -826,6 +815,9 @@ export default function RolePermissionCreate({
                                                     const selectedCount = group.permissions.filter(p =>
                                                         selectedPermissions.has(p.id)
                                                     ).length;
+                                                    const percentage = group.permissions.length > 0 
+                                                        ? (selectedCount / group.permissions.length) * 100 
+                                                        : 0;
                                                     return (
                                                         <div key={group.module} className="flex items-center justify-between text-sm">
                                                             <span className="text-gray-600 dark:text-gray-400">{group.module}</span>
@@ -833,9 +825,9 @@ export default function RolePermissionCreate({
                                                                 <span className="dark:text-white">{selectedCount}/{group.permissions.length}</span>
                                                                 <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                                                     <div
-                                                                        className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full"
+                                                                        className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all"
                                                                         style={{
-                                                                            width: `${(selectedCount / group.permissions.length) * 100}%`
+                                                                            width: `${percentage}%`
                                                                         }}
                                                                     />
                                                                 </div>

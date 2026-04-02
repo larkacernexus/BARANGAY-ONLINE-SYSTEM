@@ -16,8 +16,15 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import RolePermissionsTableView from './RolePermissionsTableView';
 import RolePermissionsGridView from './RolePermissionsGridView';
 import RolePermissionsBulkActions from './RolePermissionsBulkActions';
-import { RolePermission } from '@/admin-utils/rolePermissionsUtils';
-import { FilterState, SelectionMode, SelectionStats } from '@/admin-utils/rolePermissionsUtils';
+
+// Import types from the types file
+import { 
+    RolePermission, 
+    FilterState, 
+    SelectionMode, 
+    SelectionStats, 
+    BulkOperation 
+} from '@/types/admin/rolepermissions/rolePermissions.types';
 
 interface RolePermissionsContentProps {
     permissions: RolePermission[];
@@ -41,12 +48,12 @@ interface RolePermissionsContentProps {
     onRevokePermission: (permission: RolePermission) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     onCopySelectedData: () => void;
-    onBulkOperation: (operation: string) => void;
-    setShowBulkRevokeDialog?: (show: boolean) => void;
+    onBulkOperation: (operation: BulkOperation) => void; // Change from string to BulkOperation
+    setShowBulkRevokeDialog: (show: boolean) => void;
     filtersState: FilterState;
     isPerformingBulkAction: boolean;
     selectionMode: SelectionMode;
-    selectionStats?: SelectionStats;
+    selectionStats: SelectionStats;
     windowWidth: number;
     expandedPermission: number | null;
     togglePermissionExpansion: (id: number) => void;
@@ -237,8 +244,9 @@ export default function RolePermissionsContent({
                                     onSelectAllOnPage={onSelectAllOnPage}
                                     isSelectAll={isSelectAll}
                                     windowWidth={windowWidth}
-                                    expandedPermission={expandedPermission}
-                                    togglePermissionExpansion={togglePermissionExpansion}
+                                    // Remove these lines if not needed:
+                                    // expandedPermission={expandedPermission}
+                                    // togglePermissionExpansion={togglePermissionExpansion}
                                 />
                             ) : (
                                 // Grid View

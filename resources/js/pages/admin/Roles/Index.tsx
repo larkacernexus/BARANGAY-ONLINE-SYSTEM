@@ -2,9 +2,19 @@
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import debounce from 'lodash/debounce';
 import AdminLayout from '@/layouts/admin-app-layout';
-import { RolesIndexProps, Role } from '@/types';
+
+// Import types from the types file
+import { 
+    RolesIndexProps, 
+    Role, 
+    FilterState, 
+    BulkOperation, 
+    SelectionMode, 
+    SelectionStats 
+} from '@/types/admin/roles/roles';
+
+// Import utilities from the utils file
 import { 
     filterRoles,
     getSelectionStats,
@@ -16,10 +26,6 @@ import {
     canDeleteRole,
     getQuickFilterActions,
     normalizeStats,
-    FilterState,
-    BulkOperation,
-    SelectionMode,
-    SelectionStats
 } from '@/admin-utils/rolesUtils';
 
 // Import reusable components
@@ -33,14 +39,15 @@ import { Button } from '@/components/ui/button';
 import { Key } from 'lucide-react';
 
 export default function Roles() {
+    // Use RolesIndexProps instead of PageProps
     const { props } = usePage<RolesIndexProps>();
     const { roles, filters: initialFilters, stats: propsStats } = props;
     
     // State management
-    const [search, setSearch] = useState(initialFilters.search || '');
+    const [search, setSearch] = useState(initialFilters?.search || '');
     const [filtersState, setFiltersState] = useState<FilterState>({
-        search: initialFilters.search || '',
-        type: initialFilters.type || 'all'
+        search: initialFilters?.search || '',
+        type: initialFilters?.type || 'all'
     });
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -64,10 +71,9 @@ export default function Roles() {
 
     // Normalize stats
     const stats = useMemo(() => {
-        return normalizeStats(propsStats, roles.data);
-    }, [propsStats, roles.data]);
+        return normalizeStats(propsStats, roles?.data || []);
+    }, [propsStats, roles]);
 
-    
     // Handle window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -143,21 +149,22 @@ export default function Roles() {
 
     // Filter roles
     const filteredRoles = useMemo(() => {
+        if (!roles?.data) return [];
         return filterRoles(
             roles.data,
             filtersState.search,
             filtersState
         );
-    }, [roles.data, filtersState]);
+    }, [roles?.data, filtersState]);
 
     // Get current page roles
     const currentPageRoles = useMemo(() => {
-        return roles.data;
-    }, [roles.data]);
+        return roles?.data || [];
+    }, [roles?.data]);
 
     // Selection handlers
     const handleSelectAllOnPage = () => {
-        const pageIds = currentPageRoles.map(role => role.id);
+        const pageIds = currentPageRoles.map((role: Role) => role.id);
         if (isSelectAll) {
             setSelectedRoles(prev => prev.filter(id => !pageIds.includes(id)));
         } else {
@@ -169,7 +176,7 @@ export default function Roles() {
     };
 
     const handleSelectAllFiltered = () => {
-        const allIds = filteredRoles.map(role => role.id);
+        const allIds = filteredRoles.map((role: Role) => role.id);
         if (selectedRoles.length === allIds.length && allIds.every(id => selectedRoles.includes(id))) {
             setSelectedRoles(prev => prev.filter(id => !allIds.includes(id)));
         } else {
@@ -180,8 +187,8 @@ export default function Roles() {
     };
 
     const handleSelectAll = () => {
-        if (confirm(`This will select ALL ${roles.meta?.total || 0} roles. This action may take a moment.`)) {
-            const pageIds = currentPageRoles.map(role => role.id);
+        if (confirm(`This will select ALL ${roles?.meta?.total || 0} roles. This action may take a moment.`)) {
+            const pageIds = currentPageRoles.map((role: Role) => role.id);
             setSelectedRoles(pageIds);
             setSelectionMode('all');
         }
@@ -199,14 +206,14 @@ export default function Roles() {
 
     // Check if all items on current page are selected
     useEffect(() => {
-        const allPageIds = currentPageRoles.map(role => role.id);
+        const allPageIds = currentPageRoles.map((role: Role) => role.id);
         const allSelected = allPageIds.every(id => selectedRoles.includes(id));
         setIsSelectAll(allSelected);
     }, [selectedRoles, currentPageRoles]);
 
     // Get selected roles data
     const selectedRolesData = useMemo(() => {
-        return filteredRoles.filter(role => selectedRoles.includes(role.id));
+        return filteredRoles.filter((role: Role) => selectedRoles.includes(role.id));
     }, [selectedRoles, filteredRoles]);
 
     // Calculate selection stats
@@ -226,7 +233,7 @@ export default function Roles() {
         try {
             switch (operation) {
                 case 'delete':
-                    const deletableRoles = selectedRolesData.filter(role => canDeleteRole(role));
+                    const deletableRoles = selectedRolesData.filter((role: Role) => canDeleteRole(role));
                     if (deletableRoles.length === 0) {
                         toast.error('No deletable roles selected. System roles or roles with users cannot be deleted.');
                         break;
@@ -234,7 +241,7 @@ export default function Roles() {
                     
                     await router.post('/admin/roles/bulk-action', {
                         action: 'delete',
-                        role_ids: deletableRoles.map(r => r.id),
+                        role_ids: deletableRoles.map((r: Role) => r.id),
                     }, {
                         preserveScroll: true,
                         onSuccess: () => {
@@ -283,9 +290,9 @@ export default function Roles() {
                     break;
 
                 case 'export_permissions':
-                    const permissionData = selectedRolesData.map(role => ({
+                    const permissionData = selectedRolesData.map((role: Role) => ({
                         'Role': role.name,
-                        'Permissions': role.permissions?.map(p => p.name).join('; ') || 'None',
+                        'Permissions': role.permissions?.map((p: Permission) => p.name).join('; ') || 'None',
                         'Total Permissions': role.permissions_count || 0,
                     }));
                     
@@ -431,10 +438,10 @@ export default function Roles() {
         filtersState.type !== 'all';
 
     // Pagination data
-    const totalItems = roles.meta?.total || filteredRoles.length;
-    const totalPages = roles.meta?.last_page || 1;
-    const currentPageNum = roles.meta?.current_page || 1;
-    const itemsPerPage = roles.meta?.per_page || 10;
+    const totalItems = roles?.meta?.total || filteredRoles.length;
+    const totalPages = roles?.meta?.last_page || 1;
+    const currentPageNum = roles?.meta?.current_page || 1;
+    const itemsPerPage = roles?.meta?.per_page || 10;
     const startIndex = (currentPageNum - 1) * itemsPerPage + 1;
     const endIndex = Math.min(currentPageNum * itemsPerPage, totalItems);
 
@@ -489,7 +496,7 @@ export default function Roles() {
                     />
 
                     <RolesContent
-                        roles={roles.data}
+                        roles={roles?.data || []}
                         stats={stats}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
